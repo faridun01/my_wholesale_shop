@@ -3,6 +3,7 @@ import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 
 const router = Router();
+const PAYMENT_EPSILON = 0.01;
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
@@ -27,7 +28,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
         if (invoice) {
           const newPaidAmount = Number(invoice.paidAmount) + Number(amount);
-          const status = newPaidAmount >= Number(invoice.netAmount) ? 'paid' : 'partial';
+          const netAmount = Number(invoice.netAmount);
+          const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
           
           await tx.invoice.update({
             where: { id: Number(invoice_id) },

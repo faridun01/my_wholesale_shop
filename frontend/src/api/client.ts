@@ -1,13 +1,20 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = (() => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  if (typeof window !== 'undefined' && window.location.port === '3000') {
+    return 'http://localhost:3001/api';
+  }
+
+  return '/api';
+})();
 
 const client = axios.create({
   baseURL: API_URL,
   timeout: 30000, // 30 seconds
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Add a request interceptor to include the auth token
@@ -17,6 +24,13 @@ client.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+
     return config;
   },
   (error) => {

@@ -9,7 +9,10 @@ router.get('/', async (req, res, next) => {
   try {
     const { warehouseId } = req.query;
     const products = await prisma.product.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        warehouseId: warehouseId ? Number(warehouseId) : undefined,
+      },
       include: { 
         category: true, 
         warehouse: true,
@@ -97,9 +100,10 @@ router.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
     const productId = Number(req.params.id);
+    const userId = req.user?.id || 1;
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
     
     if (!oldProduct) {
@@ -148,6 +152,19 @@ router.put('/:id', async (req, res, next) => {
             productId,
             costPrice: newCost,
             sellingPrice: newSelling
+          }
+        });
+
+        await prisma.inventoryTransaction.create({
+          data: {
+            productId,
+            warehouseId: oldProduct.warehouseId || newWarehouseId,
+            userId,
+            qtyChange: 0,
+            type: 'adjustment',
+            reason: `Изменение цены: ${oldProduct.sellingPrice} -> ${newSelling}`,
+            costAtTime: newCost,
+            sellingAtTime: newSelling,
           }
         });
       }
@@ -243,15 +260,47 @@ router.get('/:id/price-history', async (req, res, next) => {
 
 router.get('/:id/history', async (req, res, next) => {
   try {
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where: { productId: Number(req.params.id) },
-      include: { user: true },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(transactions.map(t => ({
-      ...t,
-      username: t.user.username
-    })));
+    const productId = Number(req.params.id);
+
+    const [transactions, priceHistory] = await Promise.all([
+      prisma.inventoryTransaction.findMany({
+        where: { productId },
+        include: { user: true, warehouse: true },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.priceHistory.findMany({
+        where: { productId },
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+
+    const transactionHistory = transactions.map((t) => ({
+      id: `tx-${t.id}`,
+      createdAt: t.createdAt,
+      type: t.type,
+      qtyChange: t.qtyChange,
+      warehouse: t.warehouse,
+      warehouseName: t.warehouse?.name || '---',
+      username: t.user.username,
+      reason: t.reason || null,
+    }));
+
+    const priceEvents = priceHistory.map((p) => ({
+      id: `price-${p.id}`,
+      createdAt: p.createdAt,
+      type: 'price_change',
+      qtyChange: 0,
+      warehouse: null,
+      warehouseName: '---',
+      username: 'system',
+      reason: `Цена продажи: ${p.sellingPrice}, себестоимость: ${p.costPrice}`,
+    }));
+
+    const history = [...transactionHistory, ...priceEvents].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    res.json(history);
   } catch (error) {
     next(error);
   }

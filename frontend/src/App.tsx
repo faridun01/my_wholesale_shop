@@ -15,6 +15,7 @@ import POSView from './views/POSView';
 import Sidebar from './components/layout/Sidebar';
 import { Toaster } from 'react-hot-toast';
 import { Menu, X, Warehouse } from 'lucide-react';
+import { getCurrentUser, isAdminUser } from './utils/userAccess';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
@@ -25,24 +26,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex min-h-screen bg-shopify-bg">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Mobile Header */}
-        <header className="lg:hidden bg-[#0F172A] text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-2xl border-b border-white/5">
+        <header className="lg:hidden bg-white text-shopify-text p-4 flex items-center justify-between sticky top-0 z-30 border-b border-shopify-border">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Warehouse size={22} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#e3f1df] text-shopify-green">
+              <Warehouse size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tighter leading-none">Wholesale</span>
-              <span className="text-[7px] font-black text-indigo-400 uppercase tracking-[0.3em] mt-1">Professional</span>
+              <span className="text-lg font-semibold tracking-tight leading-none">Wholesale</span>
+              <span className="text-[10px] text-shopify-muted mt-0.5">Admin</span>
             </div>
           </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-300 active:scale-90"
+            className="p-2.5 bg-shopify-bg hover:bg-[#eef1f3] rounded-xl transition-all duration-300 active:scale-90"
           >
             {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -57,8 +58,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
+  const user = getCurrentUser();
+  const isAdmin = isAdminUser(user);
 
   return (
     <Router>

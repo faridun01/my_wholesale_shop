@@ -4,6 +4,17 @@ import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
+router.get('/public', async (req, res, next) => {
+  try {
+    const settings = await SettingsService.getSettings();
+    res.json({
+      priceVisibility: settings.priceVisibility || 'everyone',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const settings = await SettingsService.getSettings();

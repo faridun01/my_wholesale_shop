@@ -1,9 +1,16 @@
 import prisma from '../db/prisma.js';
 
 export class ReminderService {
-  static async getReminders(userId: number) {
+  static async getReminders() {
     return await prisma.reminder.findMany({
-      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
       orderBy: { dueDate: 'asc' },
     });
   }

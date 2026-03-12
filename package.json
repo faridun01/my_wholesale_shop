@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsx backend/src/server.ts",
+    "dev": "npm run dev:backend",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:backend": "tsc -p backend",
+    "dev:backend": "npm run build:backend && node backend/dist/server.js",
+    "dev:frontend": "vite --config frontend/vite.config.ts",
     "build": "tsc -p backend && vite build frontend",
     "lint": "tsc -p backend --noEmit && tsc -p frontend --noEmit",
     "prisma:generate": "prisma generate --schema=backend/prisma/schema.prisma",

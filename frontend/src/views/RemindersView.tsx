@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Plus, 
-  CheckCircle2, 
-  Circle, 
-  Trash2, 
-  Clock, 
-  AlertCircle,
-  Bell
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Bell,
+  Calendar,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import client from '../api/client';
 import toast from 'react-hot-toast';
+import client from '../api/client';
+import { getCurrentUser, isAdminUser } from '../utils/userAccess';
+
+function clsx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ');
+}
 
 export default function RemindersView() {
+  const currentUser = getCurrentUser();
+  const canDeleteReminder = isAdminUser(currentUser);
   const [reminders, setReminders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -21,13 +27,22 @@ export default function RemindersView() {
     title: '',
     description: '',
     dueDate: '',
-    type: 'general'
+    type: 'general',
   });
+
+  const sortedReminders = useMemo(() => {
+    return [...reminders].sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.dueDate).getTime();
+      const bTime = new Date(b.createdAt || b.dueDate).getTime();
+      return bTime - aTime;
+    });
+  }, [reminders]);
 
   const fetchReminders = async () => {
     try {
       const res = await client.get('/reminders');
-      setReminders(res.data);
+      setReminders(Array.isArray(res.data) ? res.data : []);
+      window.dispatchEvent(new Event('reminders-updated'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -43,11 +58,11 @@ export default function RemindersView() {
     e.preventDefault();
     try {
       await client.post('/reminders', newReminder);
-      toast.success('Напоминание создано!');
+      toast.success('Напоминание создано');
       setShowAddModal(false);
       setNewReminder({ title: '', description: '', dueDate: '', type: 'general' });
       fetchReminders();
-    } catch (err) {
+    } catch {
       toast.error('Ошибка при создании напоминания');
     }
   };
@@ -55,9 +70,9 @@ export default function RemindersView() {
   const handleComplete = async (id: number) => {
     try {
       await client.put(`/reminders/${id}/complete`);
-      toast.success('Напоминание выполнено!');
+      toast.success('Напоминание выполнено');
       fetchReminders();
-    } catch (err) {
+    } catch {
       toast.error('Ошибка');
     }
   };
@@ -67,8 +82,8 @@ export default function RemindersView() {
       await client.delete(`/reminders/${id}`);
       toast.success('Удалено');
       fetchReminders();
-    } catch (err) {
-      toast.error('Ошибка');
+    } catch (err: any) {
+      toast.error(err?.response?.status === 403 ? 'Удалять напоминания может только админ' : 'Ошибка');
     }
   };
 
@@ -76,20 +91,20 @@ export default function RemindersView() {
     if (isCompleted) return 'text-emerald-500 bg-emerald-50';
     const now = new Date();
     const due = new Date(dueDate);
-    if (due < now) return 'text-rose-500 bg-rose-50';
-    return 'text-amber-500 bg-amber-50';
+    if (due < now) return 'text-rose-600 bg-rose-50';
+    return 'text-rose-500 bg-rose-50';
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex justify-between items-end">
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Напоминания</h1>
-          <p className="text-slate-500 mt-1">Запланированные задачи и уведомления.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Напоминания</h1>
+          <p className="mt-1 text-slate-500">Последние объявления сверху. Незавершённые выделены красным.</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all flex items-center space-x-2"
+          className="flex items-center space-x-2 rounded-2xl bg-indigo-600 px-6 py-3 font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700"
         >
           <Plus size={20} />
           <span>Добавить</span>
@@ -97,63 +112,80 @@ export default function RemindersView() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400 font-bold">Загрузка...</div>
+        <div className="py-20 text-center font-bold text-slate-400">Загрузка...</div>
       ) : (
         <div className="grid gap-4">
           <AnimatePresence>
-            {reminders.map((reminder) => (
-              <motion.div 
+            {sortedReminders.map((reminder) => (
+              <motion.div
                 key={reminder.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className={clsx(
-                  "bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group transition-all hover:shadow-md",
-                  reminder.isCompleted && "opacity-60"
+                  'group flex items-center justify-between rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md',
+                  reminder.isCompleted
+                    ? 'border-slate-100 bg-white opacity-60'
+                    : 'border-rose-100 bg-rose-50/55'
                 )}
               >
                 <div className="flex items-center space-x-4">
-                  <button 
+                  <button
                     onClick={() => !reminder.isCompleted && handleComplete(reminder.id)}
                     className={clsx(
-                      "p-2 rounded-xl transition-all",
-                      reminder.isCompleted ? "text-emerald-500" : "text-slate-300 hover:text-indigo-600 hover:bg-indigo-50"
+                      'rounded-xl p-2 transition-all',
+                      reminder.isCompleted
+                        ? 'text-emerald-500'
+                        : 'text-rose-400 hover:bg-white hover:text-rose-600'
                     )}
                   >
                     {reminder.isCompleted ? <CheckCircle2 size={24} /> : <Circle size={24} />}
                   </button>
                   <div>
-                    <h3 className={clsx("font-bold text-slate-900", reminder.isCompleted && "line-through")}>
+                    <h3 className={clsx('font-bold text-slate-900', reminder.isCompleted && 'line-through')}>
                       {reminder.title}
                     </h3>
-                    <div className="flex items-center space-x-3 mt-1">
-                      <span className={clsx(
-                        "text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center space-x-1",
-                        getStatusColor(reminder.dueDate, reminder.isCompleted)
-                      )}>
+                    <div className="mt-1 flex items-center space-x-3">
+                      <span
+                        className={clsx(
+                          'flex items-center space-x-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest',
+                          getStatusColor(reminder.dueDate, reminder.isCompleted)
+                        )}
+                      >
                         <Clock size={10} className="mr-1" />
-                        {new Date(reminder.dueDate).toLocaleDateString()} {new Date(reminder.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(reminder.dueDate).toLocaleDateString()}
                       </span>
                       {reminder.description && (
-                        <p className="text-xs text-slate-400 line-clamp-1">{reminder.description}</p>
+                        <p className={clsx('line-clamp-1 text-xs', reminder.isCompleted ? 'text-slate-400' : 'text-rose-500')}>
+                          {reminder.description}
+                        </p>
                       )}
                     </div>
+                    {reminder.user?.username && (
+                      <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                        Создал: {reminder.user.username}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleDelete(reminder.id)}
-                  className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={20} />
-                </button>
+
+                {canDeleteReminder && (
+                  <button
+                    onClick={() => handleDelete(reminder.id)}
+                    className="rounded-xl p-2 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
-          {reminders.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-3xl border border-slate-100">
-              <Bell size={48} className="mx-auto text-slate-200 mb-4" />
+
+          {sortedReminders.length === 0 && (
+            <div className="rounded-3xl border border-slate-100 bg-white py-20 text-center">
+              <Bell size={48} className="mx-auto mb-4 text-slate-200" />
               <h3 className="text-xl font-bold text-slate-900">Нет напоминаний</h3>
-              <p className="text-slate-500 mt-1">Вы всё выполнили! Отличная работа.</p>
+              <p className="mt-1 text-slate-500">Все объявления выполнены.</p>
             </div>
           )}
         </div>
@@ -161,59 +193,63 @@ export default function RemindersView() {
 
       <AnimatePresence>
         {showAddModal && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
             >
-              <div className="p-8 border-b border-slate-100 bg-indigo-50/50">
-                <h3 className="text-2xl font-bold text-slate-900 flex items-center space-x-2">
+              <div className="border-b border-slate-100 bg-indigo-50/50 p-8">
+                <h3 className="flex items-center space-x-2 text-2xl font-bold text-slate-900">
                   <Bell className="text-indigo-600" size={24} />
                   <span>Новое напоминание</span>
                 </h3>
               </div>
-              <form onSubmit={handleCreate} className="p-8 space-y-6">
+              <form onSubmit={handleCreate} className="space-y-6 p-8">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Заголовок</label>
-                    <input 
-                      type="text" 
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Заголовок</label>
+                    <input
+                      type="text"
                       required
                       placeholder="Напр: Позвонить клиенту"
                       value={newReminder.title}
-                      onChange={e => setNewReminder({ ...newReminder, title: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Описание</label>
-                    <textarea 
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Описание</label>
+                    <textarea
                       placeholder="Дополнительные детали..."
                       value={newReminder.description}
-                      onChange={e => setNewReminder({ ...newReminder, description: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
+                      onChange={(e) => setNewReminder({ ...newReminder, description: e.target.value })}
+                      className="h-24 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Дата и время</label>
-                    <input 
-                      type="datetime-local" 
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Дата и время</label>
+                    <input
+                      type="datetime-local"
                       required
                       value={newReminder.dueDate}
-                      onChange={e => setNewReminder({ ...newReminder, dueDate: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => setNewReminder({ ...newReminder, dueDate: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
-                  <button type="submit" className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all">Создать</button>
+                  <button type="button" onClick={() => setShowAddModal(false)} className="rounded-xl px-6 py-3 font-bold text-slate-500 transition-all hover:bg-slate-50">
+                    Отмена
+                  </button>
+                  <button type="submit" className="rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700">
+                    Создать
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -222,8 +258,4 @@ export default function RemindersView() {
       </AnimatePresence>
     </div>
   );
-}
-
-function clsx(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

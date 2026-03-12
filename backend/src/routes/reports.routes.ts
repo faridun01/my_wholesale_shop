@@ -3,6 +3,50 @@ import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 
 const router = Router();
+const MONEY_EPSILON = 0.0001;
+
+function getRemainingQuantity(item: any) {
+  return Math.max(0, Number(item?.quantity || 0) - Number(item?.returnedQty || 0));
+}
+
+function getInvoiceSubtotal(items: any[]) {
+  return items.reduce((sum, item) => sum + Number(item.sellingPrice || 0) * Number(item.quantity || 0), 0);
+}
+
+function getRemainingSubtotal(items: any[]) {
+  return items.reduce((sum, item) => sum + Number(item.sellingPrice || 0) * getRemainingQuantity(item), 0);
+}
+
+function getLineNetRevenue(invoice: any, item: any) {
+  const remainingQty = getRemainingQuantity(item);
+  if (remainingQty <= 0) return 0;
+
+  const remainingSubtotal = getRemainingSubtotal(invoice.items || []);
+  const lineRemainingSubtotal = Number(item.sellingPrice || 0) * remainingQty;
+
+  if (remainingSubtotal <= MONEY_EPSILON) {
+    return lineRemainingSubtotal;
+  }
+
+  const invoiceNetAmount = Number(invoice.netAmount || 0);
+  return (lineRemainingSubtotal / remainingSubtotal) * invoiceNetAmount;
+}
+
+function getLineCost(item: any) {
+  const remainingQty = getRemainingQuantity(item);
+  if (remainingQty <= 0) return 0;
+
+  const allocatedCost = Array.isArray(item.saleAllocations)
+    ? item.saleAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.batch?.costPrice || 0) * Number(alloc.quantity || 0), 0)
+    : 0;
+
+  if (allocatedCost > MONEY_EPSILON) {
+    return allocatedCost;
+  }
+
+  const averageCost = Number(item.costPrice || 0);
+  return averageCost * remainingQty;
+}
 
 // Apply authentication to all routes in this router
 router.use(authenticate);
@@ -121,19 +165,34 @@ router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => 
     const invoices = await prisma.invoice.findMany({
       where,
       include: {
+        customer: true,
+        warehouse: true,
         items: { include: { product: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap(inv => 
-      inv.items.map(item => ({
-        date: inv.createdAt.toISOString().split('T')[0],
-        product_name: item.product.name,
-        quantity: item.quantity,
-        selling_price: Number(item.sellingPrice),
-        total_sales: Number(item.sellingPrice) * item.quantity,
-      }))
+    const report = invoices.flatMap((inv) =>
+      inv.items
+        .map((item) => {
+          const quantity = getRemainingQuantity(item);
+          if (quantity <= 0) return null;
+
+          return {
+            invoice_id: inv.id,
+            date: inv.createdAt.toISOString().split('T')[0],
+            warehouse_name: inv.warehouse?.name || '',
+            customer_name: inv.customer?.name || '',
+            product_name: item.product.name,
+            unit: item.product.unit || '',
+            quantity,
+            selling_price: Number(item.sellingPrice),
+            gross_sales: Number(item.sellingPrice) * quantity,
+            discount_percent: Number(inv.discount || 0),
+            total_sales: getLineNetRevenue(inv, item),
+          };
+        })
+        .filter(Boolean)
     );
 
     res.json(report);
@@ -164,6 +223,8 @@ router.get('/profit', async (req, res, next) => {
     const invoices = await prisma.invoice.findMany({
       where,
       include: {
+        customer: true,
+        warehouse: true,
         items: {
           include: {
             product: true,
@@ -174,19 +235,32 @@ router.get('/profit', async (req, res, next) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap(inv => 
-      inv.items.map(item => {
-        const cost = item.saleAllocations.reduce((sum, alloc) => sum + (Number(alloc.batch.costPrice) * alloc.quantity), 0);
-        const revenue = Number(item.sellingPrice) * item.quantity;
-        return {
-          date: inv.createdAt.toISOString().split('T')[0],
-          product_name: item.product.name,
-          quantity: item.quantity,
-          selling_price: Number(item.sellingPrice),
-          cost_price: cost / item.quantity,
-          profit: revenue - cost,
-        };
-      })
+    const report = invoices.flatMap((inv) =>
+      inv.items
+        .map((item) => {
+          const quantity = getRemainingQuantity(item);
+          if (quantity <= 0) return null;
+
+          const revenue = getLineNetRevenue(inv, item);
+          const cost = getLineCost(item);
+
+          return {
+            invoice_id: inv.id,
+            date: inv.createdAt.toISOString().split('T')[0],
+            warehouse_name: inv.warehouse?.name || '',
+            customer_name: inv.customer?.name || '',
+            product_name: item.product.name,
+            unit: item.product.unit || '',
+            quantity,
+            selling_price: Number(item.sellingPrice),
+            gross_sales: Number(item.sellingPrice) * quantity,
+            discount_percent: Number(inv.discount || 0),
+            net_sales: revenue,
+            cost_price: quantity > 0 ? cost / quantity : 0,
+            profit: revenue - cost,
+          };
+        })
+        .filter(Boolean)
     );
 
     res.json(report);
@@ -209,15 +283,24 @@ router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req, res, next) =
 
     const transactions = await prisma.inventoryTransaction.findMany({
       where,
-      include: { product: true },
+      include: {
+        product: true,
+        warehouse: true,
+        user: true,
+      },
       orderBy: { createdAt: 'asc' },
     });
 
     const report = transactions.map(t => ({
+      return_id: t.referenceId || t.id,
       date: t.createdAt.toISOString().split('T')[0],
+      warehouse_name: t.warehouse?.name || '',
+      staff_name: t.user?.username || '',
       product_name: t.product.name,
+      unit: t.product.unit || '',
       quantity: Math.abs(t.qtyChange),
-      selling_price: 0, // Returns might not have selling price directly in transaction
+      selling_price: Number(t.sellingAtTime || 0),
+      total_value: Math.abs(t.qtyChange) * Number(t.sellingAtTime || 0),
       reason: t.reason,
     }));
 

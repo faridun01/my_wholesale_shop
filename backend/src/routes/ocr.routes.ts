@@ -15,13 +15,17 @@ router.post('/parse-invoice', authenticate, upload.single('invoice'), async (req
     }
 
     const items = await OCRService.parseInvoice(req.file.path, req.file.mimetype);
-    
-    // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
 
     res.json(items);
-  } catch (error) {
+  } catch (error: any) {
+    if (Number(error?.status) === 503) {
+      return res.status(503).json({ error: error.message });
+    }
     next(error);
+  } finally {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
   }
 });
 
@@ -32,13 +36,17 @@ router.post('/invoice', authenticate, upload.single('image'), async (req, res, n
     }
 
     const items = await OCRService.parseInvoice(req.file.path, req.file.mimetype);
-    
-    // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
 
     res.json({ items });
-  } catch (error) {
+  } catch (error: any) {
+    if (Number(error?.status) === 503) {
+      return res.status(503).json({ error: error.message });
+    }
     next(error);
+  } finally {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
   }
 });
 
