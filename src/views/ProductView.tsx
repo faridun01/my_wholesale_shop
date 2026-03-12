@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, Plus, Package, History, Trash2, X, Edit, Camera, ArrowUpDown, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, Badge } from '../components/UI';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI as OCRProviderClient } from "@google/genai";
 
 interface Product {
   id: number;
@@ -113,8 +113,8 @@ export const ProductView = ({ products, fetchData, user, warehouseId, warehouses
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Data = (reader.result as string).split(',')[1];
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-        const response = await ai.models.generateContent({
+        const ocrClient = new OCRProviderClient({ apiKey: process.env.OCR_API_KEY! });
+        const response = await ocrClient.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: [
             {
@@ -767,7 +767,7 @@ export const ProductView = ({ products, fetchData, user, warehouseId, warehouses
           <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center space-y-4">
             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
             <p className="text-lg font-bold text-slate-900">Чтение накладной...</p>
-            <p className="text-sm text-slate-500">Пожалуйста, подождите, Gemini анализирует фото</p>
+            <p className="text-sm text-slate-500">Пожалуйста, подождите, OCR анализирует фото</p>
           </div>
         </div>
       )}

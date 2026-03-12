@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI as OCRProviderClient } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,14 +25,14 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   "9e8b6a0c8b4f43d6b2b1a3c7d9e4f6a7c8d2e1f5b6a9c0d4e7f8a1b2c3d4e5f6";
 
-const ai = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+const ocrClient = process.env.OCR_API_KEY
+  ? new OCRProviderClient({
+      apiKey: process.env.OCR_API_KEY,
     })
   : null;
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn("GEMINI_API_KEY not found. Gemini features are disabled.");
+if (!process.env.OCR_API_KEY) {
+  console.warn("OCR_API_KEY not found. OCR features are disabled.");
 }
 
 app.use(cors());
@@ -131,7 +131,7 @@ app.get("/api/health", async (_req, res) => {
       warehouseCount,
       productCount,
       customerCount,
-      geminiEnabled: !!ai,
+      ocrEnabled: !!ocrClient,
     });
   } catch (error) {
     console.error("HEALTH ERROR:", error);
@@ -850,7 +850,7 @@ app.post(
 app.get("/api/ai/health", auth, (_req, res) => {
   return res.json({
     ok: true,
-    geminiEnabled: !!ai,
+    ocrEnabled: !!ocrClient,
   });
 });
 

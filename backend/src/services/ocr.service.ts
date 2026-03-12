@@ -1,28 +1,33 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI as OCRProviderClient, Type as OCRSchemaType } from "@google/genai";
 import fs from 'fs';
 
 export class OCRService {
   private static readonly MAX_RETRIES = 3;
 
   static getClient() {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const apiKey = process.env.OCR_API_KEY?.trim();
 
     if (!apiKey) {
-      throw new Error('OCR is not configured: GEMINI_API_KEY is missing');
+      throw new Error('OCR is not configured: OCR_API_KEY is missing');
     }
 
-    return new GoogleGenAI({ apiKey });
+    return new OCRProviderClient({ apiKey });
   }
 
   static async parseInvoice(imagePath: string, mimeType: string = 'image/jpeg') {
     const ai = OCRService.getClient();
     const imageData = fs.readFileSync(imagePath).toString('base64');
     let response: { text?: string } | null = null;
+    const model = process.env.OCR_MODEL?.trim();
+
+    if (!model) {
+      throw new Error('OCR is not configured: OCR_MODEL is missing');
+    }
 
     for (let attempt = 1; attempt <= OCRService.MAX_RETRIES; attempt += 1) {
       try {
         response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+          model,
           contents: [
             {
               parts: [
@@ -47,14 +52,14 @@ Return only a JSON array of objects with "name", "quantity", "price", and "sku".
           config: {
             responseMimeType: "application/json",
             responseSchema: {
-              type: Type.ARRAY,
+              type: OCRSchemaType.ARRAY,
               items: {
-                type: Type.OBJECT,
+                type: OCRSchemaType.OBJECT,
                 properties: {
-                  name: { type: Type.STRING },
-                  quantity: { type: Type.NUMBER },
-                  price: { type: Type.NUMBER },
-                  sku: { type: Type.STRING },
+                  name: { type: OCRSchemaType.STRING },
+                  quantity: { type: OCRSchemaType.NUMBER },
+                  price: { type: OCRSchemaType.NUMBER },
+                  sku: { type: OCRSchemaType.STRING },
                 },
                 required: ["name", "quantity", "price"],
               },
@@ -88,7 +93,7 @@ Return only a JSON array of objects with "name", "quantity", "price", and "sku".
     try {
       return JSON.parse(response?.text || '[]');
     } catch {
-      console.error("Failed to parse Gemini response:", response?.text);
+      console.error("Failed to parse OCR response:", response?.text);
       return [];
     }
   }
