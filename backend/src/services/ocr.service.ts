@@ -38,13 +38,21 @@ export class OCRService {
                   },
                 },
                 {
-                  text: `Extract products from this invoice.
+                  text: `Extract invoice items from this invoice as separate rows.
 Requirements:
-1. "name": Extract the full product name. If it includes weight or volume like "250 g", keep it.
-2. "quantity": The invoice may list quantities in bags or boxes. You must convert them to total pieces. For example, if the invoice says "(1 bag - 24 packs) / 240 packs", return 240.
-3. "price": Extract the unit price. If the price is in USD ($), return it as a number.
-4. "sku": Extract the product SKU or customs code if available, for example "3402500000".
-Return only a JSON array of objects with "name", "quantity", "price", and "sku".`,
+1. Return one JSON object per invoice line item. Never merge different products into one object.
+2. Keep the original product wording. "name" must contain the full product name exactly as written, including weight, volume, flavor, packaging, and brand details.
+3. If two lines have similar names, keep them as separate objects unless the line is literally the same repeated line.
+4. "quantity": Convert packaging to the final total piece count only if the invoice clearly provides the conversion. If conversion is unclear, use the line quantity as-is.
+5. "price": Extract the unit purchase price as a number. If the price is in USD ($), return the numeric USD value.
+6. "sku": Extract SKU, customs code, barcode fragment, or article code if present.
+7. "rawQuantity": Return the original quantity text exactly as shown on the invoice.
+8. "unit": Return the unit or packaging text such as "pcs", "box", "bag", "kg", "уп", "шт".
+9. "lineTotal": Return the total amount for the line if available.
+10. "note": Return useful details for that exact line only, such as packaging conversion, color, scent, or remarks.
+11. "lineIndex": Return the visible order number of the line from top to bottom starting with 1.
+12. Do not invent values. If a field is missing, return an empty string for text fields or 0 for numeric fields.
+Return only a JSON array of objects with "lineIndex", "name", "quantity", "price", "sku", "rawQuantity", "unit", "lineTotal", and "note".`,
                 },
               ],
             },
@@ -56,12 +64,17 @@ Return only a JSON array of objects with "name", "quantity", "price", and "sku".
               items: {
                 type: OCRSchemaType.OBJECT,
                 properties: {
+                  lineIndex: { type: OCRSchemaType.NUMBER },
                   name: { type: OCRSchemaType.STRING },
                   quantity: { type: OCRSchemaType.NUMBER },
                   price: { type: OCRSchemaType.NUMBER },
                   sku: { type: OCRSchemaType.STRING },
+                  rawQuantity: { type: OCRSchemaType.STRING },
+                  unit: { type: OCRSchemaType.STRING },
+                  lineTotal: { type: OCRSchemaType.NUMBER },
+                  note: { type: OCRSchemaType.STRING },
                 },
-                required: ["name", "quantity", "price"],
+                required: ["lineIndex", "name", "quantity", "price"],
               },
             },
           },
