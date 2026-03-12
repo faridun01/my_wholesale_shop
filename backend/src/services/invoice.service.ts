@@ -169,29 +169,39 @@ export class InvoiceService {
 
     if (!invoice) throw new Error('Invoice not found');
 
+    const invoiceItems: any[] = Array.isArray(invoice.items) ? invoice.items : [];
+    const invoicePayments: any[] = Array.isArray(invoice.payments) ? invoice.payments : [];
+    const invoiceReturns: any[] = await prisma.return.findMany({
+      where: { invoiceId },
+      include: { user: true }
+    });
+
+    const normalizedItems = invoiceItems.map((item) => ({
+      ...item,
+      product_name: item.product.name,
+      unit: item.product.unit,
+    }));
+
+    const normalizedPayments = invoicePayments.map((payment) => ({
+      ...payment,
+      method: payment.method,
+      staff_name: payment.user.username
+    }));
+
+    const normalizedReturns = invoiceReturns.map((itemReturn) => ({
+      ...itemReturn,
+      staff_name: itemReturn.user.username
+    }));
+
     return {
       ...invoice,
       customer_name: invoice.customer.name,
       customer_phone: invoice.customer.phone,
       customer_address: invoice.customer.address,
       staff_name: invoice.user.username,
-      items: invoice.items.map(item => ({
-        ...item,
-        product_name: item.product.name,
-        unit: item.product.unit,
-      })),
-      payments: invoice.payments.map(p => ({
-        ...p,
-        method: p.method,
-        staff_name: p.user.username
-      })),
-      returns: await prisma.return.findMany({
-        where: { invoiceId },
-        include: { user: true }
-      }).then(returns => returns.map(r => ({
-        ...r,
-        staff_name: r.user.username
-      })))
+      items: normalizedItems,
+      payments: normalizedPayments,
+      returns: normalizedReturns
     };
   }
 
