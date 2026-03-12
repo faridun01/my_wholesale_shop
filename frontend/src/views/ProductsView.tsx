@@ -186,10 +186,20 @@ export default function ProductsView() {
     try {
       const res = await client.post('/ocr/parse-invoice', formData);
       const rawItems = Array.isArray(res.data) ? res.data : [];
-      const items = rawItems.map((item: any) => ({
-        ...item,
-        sellingPrice: item.sellingPrice || ''
-      }));
+      const items = rawItems
+        .map((item: any, index: number) => ({
+          lineIndex: Number(item.lineIndex || index + 1),
+          name: item.name || '',
+          sku: item.sku || '',
+          quantity: Number(item.quantity || 0),
+          price: Number(item.price || 0),
+          rawQuantity: item.rawQuantity || '',
+          unit: item.unit || 'шт',
+          lineTotal: Number(item.lineTotal || 0),
+          note: item.note || '',
+          sellingPrice: item.sellingPrice || '',
+        }))
+        .sort((a, b) => a.lineIndex - b.lineIndex);
       if (!items.length) {
         toast.error('Сканирование завершено, но товары не были распознаны');
         setOcrResults([]);
@@ -214,43 +224,64 @@ export default function ProductsView() {
     const rate = parseFloat(usdRate) || 1;
     try {
       setIsLoading(true);
-      const normalizedResults = new Map<string, any>();
-      for (const item of ocrResults) {
-        const normalizedName = String(item.name || '').trim();
-        const normalizedSku = String(item.sku || '').trim();
-        const key = normalizedSku || normalizedName.toLowerCase();
-        const quantity = Number(item.quantity || 0);
-        const price = Number(item.price || 0);
-        const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0;
-        if (!key || !normalizedName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-          continue;
-        }
-        const existing = normalizedResults.get(key);
-        if (existing) {
-          existing.quantity += quantity;
-          existing.price = price || existing.price;
-          existing.sellingPrice = sellingPrice || existing.sellingPrice;
-        } else {
-          normalizedResults.set(key, {
+      const preparedResults = ocrResults
+        .map((item) => {
+          const normalizedName = String(item.name || '').trim();
+          const normalizedSku = String(item.sku || '').trim();
+          const quantity = Number(item.quantity || 0);
+          const price = Number(item.price || 0);
+          const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0;
+
+          if (!normalizedName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
+            return null;
+          }
+
+          return {
+            lineIndex: Number(item.lineIndex || 0),
             name: normalizedName,
             sku: normalizedSku || null,
             quantity,
             price,
             sellingPrice,
-          });
-        }
-      }
-      if (!normalizedResults.size) {
+            rawQuantity: String(item.rawQuantity || '').trim(),
+            lineTotal: Number(item.lineTotal || 0),
+          };
+        })
+        .filter(Boolean) as Array<{
+          lineIndex: number;
+          name: string;
+          sku: string | null;
+          quantity: number;
+          price: number;
+          sellingPrice: number;
+          rawQuantity: string;
+          lineTotal: number;
+        }>;
+
+      if (!preparedResults.length) {
         toast.error('После сканирования не осталось корректных товаров для добавления');
         return;
       }
       const currentProducts = [...products];
-      for (const item of normalizedResults.values()) {
+      for (const item of preparedResults) {
         const costPriceTJS = item.price * rate;
         const normalizedItemName = item.name.trim().toLowerCase();
+        const normalizedItemSku = String(item.sku || '').trim().toLowerCase();
         const product = currentProducts.find((p) => {
           const productName = String(p.name || '').trim().toLowerCase();
-          return (item.sku && p.sku === item.sku) || productName === normalizedItemName;
+          const productSku = String(p.sku || '').trim().toLowerCase();
+          const productWarehouseId = Number(p.warehouseId || 0);
+          const targetWarehouseId = Number(selectedWarehouseId);
+
+          if (productWarehouseId && productWarehouseId !== targetWarehouseId) {
+            return false;
+          }
+
+          if (productName === normalizedItemName && (!normalizedItemSku || productSku === normalizedItemSku)) {
+            return true;
+          }
+
+          return Boolean(normalizedItemSku && productSku === normalizedItemSku);
         });
         if (product) {
           await restockProduct(product.id, {
@@ -266,18 +297,47 @@ export default function ProductsView() {
           }
           continue;
         }
-        const createdProduct = await createProduct({
-          name: item.name,
-          sku: item.sku || undefined,
-          unit: 'шт',
-          categoryId: Number(categories[0].id),
-          warehouseId: Number(selectedWarehouseId),
-          costPrice: costPriceTJS,
-          sellingPrice: Number(item.sellingPrice) || costPriceTJS * 1.2,
-          initialStock: Number(item.quantity),
-          minStock: 0,
-        });
-        currentProducts.push(createdProduct);
+        try {
+          const createdProduct = await createProduct({
+            name: item.name,
+            sku: item.sku || undefined,
+            unit: 'шт',
+            categoryId: Number(categories[0].id),
+            warehouseId: Number(selectedWarehouseId),
+            costPrice: costPriceTJS,
+            sellingPrice: Number(item.sellingPrice) || costPriceTJS * 1.2,
+            initialStock: Number(item.quantity),
+            minStock: 0,
+          });
+          currentProducts.push(createdProduct);
+        } catch (createErr: any) {
+          const duplicateByName = currentProducts.find((p) => {
+            const productName = String(p.name || '').trim().toLowerCase();
+            const productSku = String(p.sku || '').trim().toLowerCase();
+            const sameWarehouse = Number(p.warehouseId || 0) === Number(selectedWarehouseId);
+            return sameWarehouse && (
+              (productName === normalizedItemName && (!normalizedItemSku || productSku === normalizedItemSku)) ||
+              Boolean(normalizedItemSku && productSku === normalizedItemSku)
+            );
+          });
+
+          if (!duplicateByName) {
+            throw createErr;
+          }
+
+          await restockProduct(duplicateByName.id, {
+            warehouseId: Number(selectedWarehouseId),
+            quantity: Number(item.quantity),
+            costPrice: costPriceTJS,
+            reason: 'OCR Restock'
+          });
+
+          if (item.sellingPrice) {
+            await updateProduct(duplicateByName.id, {
+              sellingPrice: Number(item.sellingPrice)
+            });
+          }
+        }
       }
       toast.success('Все товары успешно добавлены на склад');
       setOcrResults(null);
@@ -474,6 +534,32 @@ export default function ProductsView() {
       </div>
       
       <AnimatePresence>
+        {isScanning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-2xl"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                  <Loader2 size={30} className="animate-spin" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Идёт чтение накладной</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Пожалуйста, подождите. OCR распознаёт все позиции, количество, цену и детали строки.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {(showAddModal || showEditModal) && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -818,7 +904,7 @@ export default function ProductsView() {
               <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-black text-slate-900">Результаты сканирования</h3>
-                  <p className="text-slate-500 font-bold">Проверьте данные и установите цены.</p>
+                  <p className="text-slate-500 font-bold">Показываем все распознанные детали. На склад добавятся только нужные поля.</p>
                 </div>
                 <div className="flex items-center space-x-4 bg-sky-50 p-4 rounded-2xl border border-sky-100 shadow-sm">
                   <div className="text-right">
@@ -836,25 +922,41 @@ export default function ProductsView() {
               </div>
               <div className="p-8 overflow-y-auto flex-1 space-y-4">
                 <div className="grid grid-cols-12 gap-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <div className="col-span-5">Товар</div>
+                  <div className="col-span-4">Товар</div>
                   <div className="col-span-2 text-center">Кол-во</div>
                   <div className="col-span-2 text-right">Закупка ($)</div>
-                  <div className="col-span-3 text-right">Цена продажи (TJS)</div>
+                  <div className="col-span-2 text-right">Сумма</div>
+                  <div className="col-span-2 text-right">Цена продажи (TJS)</div>
                 </div>
                 {ocrResults.map((item, i) => (
                   <div key={i} className="grid grid-cols-12 gap-4 items-center p-4 bg-sky-50 rounded-2xl group hover:bg-sky-100/50 transition-colors">
-                    <div className="col-span-5">
-                      <p className="font-bold text-slate-900 line-clamp-2">{item.name}</p>
+                    <div className="col-span-4">
+                      <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-500">
+                        Строка #{item.lineIndex || i + 1}
+                      </p>
+                      <p className="font-bold text-slate-900 break-words whitespace-normal">{item.name}</p>
                       <p className="text-[10px] text-slate-400 font-black uppercase">Артикул: {item.sku || '---'}</p>
+                      {item.note && <p className="mt-1 text-[10px] text-slate-500">{item.note}</p>}
                     </div>
                     <div className="col-span-2 text-center">
-                      <p className="font-black text-sky-600">{item.quantity} шт.</p>
+                      <p className="font-black text-sky-600">{item.quantity} {item.unit || 'шт'}</p>
+                      {item.rawQuantity && <p className="text-[10px] font-bold text-slate-400">{item.rawQuantity}</p>}
                     </div>
                     <div className="col-span-2 text-right">
                       <p className="font-black text-slate-900">{item.price} $</p>
                       <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))}</p>
                     </div>
-                    <div className="col-span-3 text-right">
+                    <div className="col-span-2 text-right">
+                      <p className="font-black text-slate-900">
+                        {item.lineTotal ? `${item.lineTotal} $` : '---'}
+                      </p>
+                      {item.lineTotal ? (
+                        <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}</p>
+                      ) : (
+                        <p className="text-[10px] font-bold text-slate-400">Нет суммы строки</p>
+                      )}
+                    </div>
+                    <div className="col-span-2 text-right">
                       <input 
                         type="number"
                         placeholder="Укажите цену"
