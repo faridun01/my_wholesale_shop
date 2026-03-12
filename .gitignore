@@ -1,8 +1,27 @@
+# Node modules
 node_modules/
+
+# Build folders
 build/
 dist/
+
+# Test coverage
 coverage/
-.DS_Store
+
+# Logs
 *.log
-.env*
-!.env
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+
+# Uploads (OCR invoices / images)
+backend/uploads/
+
+# Temporary files
+tmp/
+temp/
