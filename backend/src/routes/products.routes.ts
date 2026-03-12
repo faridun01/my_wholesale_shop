@@ -346,17 +346,17 @@ router.get('/:id/history', async (req, res, next) => {
               where: { id: { in: warehouseIdsFromReasons } },
               select: { id: true, name: true },
             })
-          ).map((warehouse) => [warehouse.id, warehouse.name])
+          ).map((warehouse: { id: number; name: string }) => [warehouse.id, warehouse.name] as [number, string])
         )
       : new Map<number, string>();
 
     const formatHistoryReason = (reason: string | null | undefined) =>
-      String(reason || '').replace(/Warehouse\s+#(\d+)/gi, (_match, idText) => {
+      String(reason || '').replace(/Warehouse\s+#(\d+)/gi, (_match: string, idText: string): string => {
         const warehouseName = warehousesById.get(Number(idText));
         return warehouseName || `Склад #${idText}`;
       });
 
-    const transactionHistory = transactions.map((t) => ({
+    const transactionHistory = transactions.map((t: any) => ({
       id: `tx-${t.id}`,
       createdAt: t.createdAt,
       type: t.type,
@@ -367,7 +367,7 @@ router.get('/:id/history', async (req, res, next) => {
       reason: formatHistoryReason(t.reason),
     }));
 
-    const priceEvents = priceHistory.map((p) => ({
+    const priceEvents = priceHistory.map((p: any) => ({
       id: `price-${p.id}`,
       createdAt: p.createdAt,
       type: 'price_change',

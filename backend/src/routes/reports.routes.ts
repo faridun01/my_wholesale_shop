@@ -172,9 +172,9 @@ router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => 
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap((inv) =>
+    const report = invoices.flatMap((inv: any) =>
       inv.items
-        .map((item) => {
+        .map((item: any) => {
           const quantity = getRemainingQuantity(item);
           if (quantity <= 0) return null;
 
@@ -235,9 +235,9 @@ router.get('/profit', async (req, res, next) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap((inv) =>
+    const report = invoices.flatMap((inv: any) =>
       inv.items
-        .map((item) => {
+        .map((item: any) => {
           const quantity = getRemainingQuantity(item);
           if (quantity <= 0) return null;
 
@@ -291,7 +291,7 @@ router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req, res, next) =
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = transactions.map(t => ({
+    const report = transactions.map((t: any) => ({
       return_id: t.referenceId || t.id,
       date: t.createdAt.toISOString().split('T')[0],
       warehouse_name: t.warehouse?.name || '',
