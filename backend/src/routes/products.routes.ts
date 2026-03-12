@@ -1,9 +1,17 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 
 const router = Router();
+
+const normalizeBracketSuffix = (value: string | null | undefined) =>
+  String(value || '')
+    .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/plasticковых/giu, 'пластиковых')
+    .replace(/Ñ‘/giu, 'Ðµ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 router.get('/', async (req, res, next) => {
   try {
@@ -41,30 +49,43 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const { initialStock, warehouseId, costPrice, ...rest } = req.body;
     const userId = req.user?.id || 1;
     const wId = warehouseId ? Number(warehouseId) : null;
+    const normalizedName = normalizeBracketSuffix(rest.name);
 
     // Check for unique constraints
     const existingProduct = await prisma.product.findFirst({
       where: {
-        OR: [
-          { name: rest.name, warehouseId: wId },
-          rest.sku ? { sku: rest.sku, warehouseId: wId } : undefined
-        ].filter(Boolean) as any,
+        name: normalizedName,
+        warehouseId: wId,
         active: true
       }
     });
 
     if (existingProduct) {
-      return res.status(400).json({ 
-        error: existingProduct.sku === rest.sku 
-          ? `Товар с артикулом ${rest.sku} уже существует на этом складе` 
-          : `Товар с названием "${rest.name}" уже существует на этом складе` 
+      return res.status(400).json({
+        error: `Товар с названием "${rest.name}" уже существует на этом складе`
       });
+    }
+
+    let resolvedPhotoUrl = rest.photoUrl || null;
+    if (!resolvedPhotoUrl && normalizedName) {
+      const productWithSameNamePhoto = await prisma.product.findFirst({
+        where: {
+          name: normalizedName,
+          active: true,
+          photoUrl: { not: null }
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+      resolvedPhotoUrl = productWithSameNamePhoto?.photoUrl || null;
     }
 
     // Create product with 0 stock first
     const product = await prisma.product.create({
       data: {
         ...rest,
+        name: normalizedName,
+        sku: null,
+        photoUrl: resolvedPhotoUrl,
         initialStock: Number(initialStock || 0),
         totalIncoming: 0,
         stock: 0,
@@ -107,39 +128,51 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
     
     if (!oldProduct) {
-      return res.status(404).json({ error: 'Товар не найден' });
+      return res.status(404).json({ error: 'Ð¢Ð¾Ð²Ð°Ñ€ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
     }
 
-    // Check for unique constraints if name, sku or warehouseId changed
-    const newName = req.body.name || oldProduct.name;
-    const newSku = req.body.sku !== undefined ? req.body.sku : oldProduct.sku;
+    // Check for unique constraints if name or warehouseId changed
+    const newName = normalizeBracketSuffix(req.body.name || oldProduct.name);
     const newWarehouseId = req.body.warehouseId !== undefined ? Number(req.body.warehouseId) : oldProduct.warehouseId;
 
-    if (newName !== oldProduct.name || newSku !== oldProduct.sku || newWarehouseId !== oldProduct.warehouseId) {
+    if (newName !== oldProduct.name || newWarehouseId !== oldProduct.warehouseId) {
       const existingProduct = await prisma.product.findFirst({
         where: {
-          OR: [
-            { name: newName, warehouseId: newWarehouseId },
-            newSku ? { sku: newSku, warehouseId: newWarehouseId } : undefined
-          ].filter(Boolean) as any,
+          name: newName,
+          warehouseId: newWarehouseId,
           id: { not: productId },
           active: true
         }
       });
 
       if (existingProduct) {
-        return res.status(400).json({ 
-          error: existingProduct.sku === newSku 
-            ? `Товар с артикулом ${newSku} уже существует на этом складе` 
-            : `Товар с названием "${newName}" уже существует на этом складе` 
+        return res.status(400).json({
+          error: `Товар с названием "${newName}" уже существует на этом складе`
         });
       }
     }
     
     const product = await prisma.product.update({
       where: { id: productId },
-      data: req.body
+      data: {
+        ...req.body,
+        name: newName,
+        sku: null
+      }
     });
+
+    if (req.body.photoUrl !== undefined) {
+      await prisma.product.updateMany({
+        where: {
+          id: { not: productId },
+          name: newName,
+          active: true
+        },
+        data: {
+          photoUrl: req.body.photoUrl || null
+        }
+      });
+    }
 
     // If price changed, record history
     if (oldProduct && (req.body.costPrice !== undefined || req.body.sellingPrice !== undefined)) {
@@ -162,7 +195,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
             userId,
             qtyChange: 0,
             type: 'adjustment',
-            reason: `Изменение цены: ${oldProduct.sellingPrice} -> ${newSelling}`,
+            reason: `Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ðµ Ñ†ÐµÐ½Ñ‹: ${oldProduct.sellingPrice} -> ${newSelling}`,
             costAtTime: newCost,
             sellingAtTime: newSelling,
           }
@@ -178,8 +211,28 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const productId = Number(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        batches: {
+          where: { remainingQuantity: { gt: 0 } },
+          select: { remainingQuantity: true },
+        },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+
+    const remainingStock = product.batches.reduce((sum, batch) => sum + Number(batch.remainingQuantity || 0), 0);
+    if (remainingStock > 0 || Number(product.stock || 0) > 0) {
+      return res.status(400).json({ error: 'Нельзя удалить товар, пока на складе есть запас' });
+    }
+
     await prisma.product.update({
-      where: { id: Number(req.params.id) },
+      where: { id: productId },
       data: { active: false }
     });
     res.json({ success: true });
@@ -274,6 +327,35 @@ router.get('/:id/history', async (req, res, next) => {
       })
     ]);
 
+    const warehouseIdsFromReasons = Array.from(
+      new Set(
+        transactions
+          .flatMap((transaction) => {
+            const matches = String(transaction.reason || '').match(/Warehouse\s+#(\d+)/gi) || [];
+            return matches
+              .map((match) => Number((match.match(/(\d+)/) || [])[0]))
+              .filter((id) => Number.isFinite(id));
+          })
+      )
+    );
+
+    const warehousesById = warehouseIdsFromReasons.length
+      ? new Map(
+          (
+            await prisma.warehouse.findMany({
+              where: { id: { in: warehouseIdsFromReasons } },
+              select: { id: true, name: true },
+            })
+          ).map((warehouse) => [warehouse.id, warehouse.name])
+        )
+      : new Map<number, string>();
+
+    const formatHistoryReason = (reason: string | null | undefined) =>
+      String(reason || '').replace(/Warehouse\s+#(\d+)/gi, (_match, idText) => {
+        const warehouseName = warehousesById.get(Number(idText));
+        return warehouseName || `Склад #${idText}`;
+      });
+
     const transactionHistory = transactions.map((t) => ({
       id: `tx-${t.id}`,
       createdAt: t.createdAt,
@@ -282,7 +364,7 @@ router.get('/:id/history', async (req, res, next) => {
       warehouse: t.warehouse,
       warehouseName: t.warehouse?.name || '---',
       username: t.user.username,
-      reason: t.reason || null,
+      reason: formatHistoryReason(t.reason),
     }));
 
     const priceEvents = priceHistory.map((p) => ({
@@ -293,7 +375,7 @@ router.get('/:id/history', async (req, res, next) => {
       warehouse: null,
       warehouseName: '---',
       username: 'system',
-      reason: `Цена продажи: ${p.sellingPrice}, себестоимость: ${p.costPrice}`,
+      reason: `Ð¦ÐµÐ½Ð° Ð¿Ñ€Ð¾Ð´Ð°Ð¶Ð¸: ${p.sellingPrice}, ÑÐµÐ±ÐµÑÑ‚Ð¾Ð¸Ð¼Ð¾ÑÑ‚ÑŒ: ${p.costPrice}`,
     }));
 
     const history = [...transactionHistory, ...priceEvents].sort(
@@ -323,3 +405,4 @@ router.get('/:id/batches', async (req, res, next) => {
 });
 
 export default router;
+

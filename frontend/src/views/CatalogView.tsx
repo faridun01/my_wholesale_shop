@@ -17,6 +17,7 @@ import { getProducts } from '../api/products.api';
 import { useNavigate } from 'react-router-dom';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney } from '../utils/format';
+import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 
 function shell(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
@@ -76,9 +77,7 @@ export default function CatalogView() {
   );
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(search.toLowerCase()) ||
-      (product.sku && product.sku.toLowerCase().includes(search.toLowerCase()));
+    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
 
     const matchesCategory = !selectedCategory || (product.category?.name || '') === selectedCategory;
     const matchesStock =
@@ -95,7 +94,12 @@ export default function CatalogView() {
   };
 
   const handleAddToSale = (product: any) => {
-    const currentCart = JSON.parse(localStorage.getItem('pending_cart') || '[]');
+    if (!selectedWarehouseId) {
+      setCartNotice({ productName: 'Сначала выберите склад', count: 0 });
+      return;
+    }
+
+    const currentCart = JSON.parse(sessionStorage.getItem('pending_cart') || '[]');
     const existing = currentCart.find((item: any) => item.id === product.id);
 
     let newCart;
@@ -107,7 +111,7 @@ export default function CatalogView() {
       newCart = [...currentCart, { ...product, quantity: 1 }];
     }
 
-    localStorage.setItem('pending_cart', JSON.stringify(newCart));
+    sessionStorage.setItem('pending_cart', JSON.stringify(newCart));
     const updatedItem = newCart.find((item: any) => item.id === product.id);
     setCartNotice({
       productName: product.name,
@@ -137,7 +141,7 @@ export default function CatalogView() {
                 <p className="text-sm text-slate-500">Product Catalog</p>
                 <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Find products fast</h2>
                 <p className="max-w-2xl text-sm leading-6 text-slate-500">
-                  Search by name or SKU, filter by stock and category, then add items straight into the sale queue.
+                  Search by product name, filter by stock and category, then add items straight into the sale queue.
                 </p>
               </div>
 
@@ -159,7 +163,7 @@ export default function CatalogView() {
                 <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   type="text"
-                  placeholder="Search by product name or SKU..."
+                  placeholder="Search by product name..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
@@ -227,7 +231,7 @@ export default function CatalogView() {
               ))}
             </div>
           ) : (
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
               {filteredProducts.map((product, index) => (
                 <motion.div
                   key={product.id}
@@ -235,31 +239,31 @@ export default function CatalogView() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
                   onClick={() => handleProductClick(product)}
-                  className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md cursor-pointer"
+                  className="cursor-pointer overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:rounded-[24px]"
                 >
                   <div className="aspect-square bg-slate-100">
                     <img
-                      src={product.photoUrl || `https://picsum.photos/seed/product-${product.id}/500/500`}
+                      src={resolveMediaUrl(product.photoUrl, product.id)}
                       alt={product.name}
                       className="h-full w-full object-cover"
                       referrerPolicy="no-referrer"
+                      onError={(event) => handleBrokenImage(event, product.id)}
                     />
                   </div>
 
-                  <div className="space-y-4 p-5">
+                  <div className="space-y-3 p-3 md:space-y-4 md:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="line-clamp-2 text-base text-slate-900">{product.name}</h3>
-                        <p className="mt-1 text-xs text-slate-400">SKU: {product.sku || '---'}</p>
+                        <h3 className="line-clamp-2 text-[13px] leading-4 text-slate-900 md:text-base md:leading-6">{product.name}</h3>
                       </div>
-                      <span className="rounded-xl bg-violet-100 px-3 py-1.5 text-xs text-violet-700">
+                      <span className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-xs">
                         {product.category?.name || 'General'}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       {shouldShowPrice(product) ? (
-                        <span className="text-2xl font-semibold tracking-tight text-slate-900">
+                        <span className="text-[16px] font-semibold tracking-tight text-slate-900 md:text-2xl">
                           {formatMoney(product.sellingPrice)}
                         </span>
                       ) : (
@@ -267,7 +271,7 @@ export default function CatalogView() {
                       )}
                       <span
                         className={shell(
-                          'rounded-xl px-3 py-1.5 text-xs',
+                          'rounded-lg px-2 py-1 text-[10px] md:rounded-xl md:px-3 md:py-1.5 md:text-xs',
                           product.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                         )}
                       >
@@ -280,10 +284,10 @@ export default function CatalogView() {
                         event.stopPropagation();
                         handleAddToSale(product);
                       }}
-                      disabled={product.stock <= 0}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                      disabled={product.stock <= 0 || !selectedWarehouseId}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
                     >
-                      <ShoppingCart size={16} />
+                      <ShoppingCart size={14} className="md:h-4 md:w-4" />
                       <span>Add to Sale</span>
                     </button>
                   </div>
@@ -313,9 +317,11 @@ export default function CatalogView() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">Product added</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {cartNotice.count > 0 ? 'Product added' : 'Warehouse required'}
+                </p>
                 <p className="mt-1 break-words text-sm text-slate-500">{cartNotice.productName}</p>
-                <p className="mt-2 text-xs text-slate-400">In cart: {cartNotice.count}</p>
+                {cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">In cart: {cartNotice.count}</p>}
               </div>
               <button
                 onClick={() => setCartNotice(null)}
@@ -332,15 +338,24 @@ export default function CatalogView() {
               >
                 Stay
               </button>
-              <button
-                onClick={() => {
-                  setCartNotice(null);
-                  navigate('/pos');
-                }}
-                className="flex-1 rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600"
-              >
-                Go to Cart
-              </button>
+              {cartNotice.count > 0 ? (
+                <button
+                  onClick={() => {
+                    setCartNotice(null);
+                    navigate('/pos');
+                  }}
+                  className="flex-1 rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600"
+                >
+                  Go to Cart
+                </button>
+              ) : (
+                <button
+                  onClick={() => setCartNotice(null)}
+                  className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800"
+                >
+                  OK
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -359,21 +374,24 @@ export default function CatalogView() {
               initial={{ scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
-              className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl md:block"
+              className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl md:block md:max-h-[92vh] md:rounded-[28px]"
             >
-              <div className="grid max-h-[90vh] md:grid-cols-[0.95fr_1.05fr]">
-                <div className="h-[260px] bg-slate-100 md:h-full md:max-h-[90vh]">
+              <div className="grid max-h-[88vh] md:max-h-[92vh] md:grid-cols-[1.05fr_0.95fr]">
+                <div className="flex items-center justify-center bg-slate-50 p-3 md:max-h-[90vh] md:p-6">
+                  <div className="w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm md:rounded-[24px]">
                   <img
-                    src={selectedProduct.photoUrl || `https://picsum.photos/seed/product-${selectedProduct.id}/700/700`}
+                    src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)}
                     alt={selectedProduct.name}
-                    className="h-full w-full object-cover"
+                    className="h-[170px] w-full object-contain md:h-[620px]"
                     referrerPolicy="no-referrer"
+                    onError={(event) => handleBrokenImage(event, selectedProduct.id)}
                   />
                 </div>
+                </div>
 
-                <div className="flex max-h-[90vh] flex-col overflow-y-auto p-8">
+                <div className="flex max-h-[88vh] flex-col overflow-y-auto p-3 md:max-h-[90vh] md:p-9">
                   <div className="flex items-start justify-between">
-                    <span className="rounded-2xl bg-[#f4f5fb] px-3 py-1.5 text-xs text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-600 md:px-4 md:py-2 md:text-xs">
                       {selectedProduct.category?.name || 'General'}
                     </span>
                     <button
@@ -384,41 +402,50 @@ export default function CatalogView() {
                     </button>
                   </div>
 
-                  <h2 className="mt-6 text-3xl font-semibold tracking-tight text-slate-900">{selectedProduct.name}</h2>
-                  <p className="mt-2 text-sm text-slate-400">SKU: {selectedProduct.sku || '---'}</p>
+                  <h2 className="mt-3 break-words text-[1.05rem] font-semibold leading-[1.15] tracking-tight text-slate-900 md:mt-6 md:max-w-[14ch] md:text-[2.2rem] md:leading-[1.15]">
+                    {selectedProduct.name}
+                  </h2>
 
-                  <div className="mt-8 space-y-5">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-2xl bg-[#f4f5fb] p-3 text-slate-500">
-                        <Tag size={18} />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-400">Selling Price</p>
-                        <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-                          {formatMoney(selectedProduct.sellingPrice)}
-                        </p>
+                  <div className="mt-4 grid gap-2.5 md:mt-8 md:gap-4">
+                    <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
+                        <Tag size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Selling Price</p>
+                          <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 md:text-2xl">
+                            {formatMoney(selectedProduct.sellingPrice)}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-2xl bg-[#f4f5fb] p-3 text-slate-500">
-                        <Layers size={18} />
+                    <div className="grid gap-2.5 sm:grid-cols-2 md:gap-4">
+                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
+                            <Layers size={16} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Stock</p>
+                            <p className={shell('mt-1 text-lg font-semibold tracking-tight md:text-2xl', selectedProduct.stock > 0 ? 'text-emerald-600' : 'text-rose-600')}>
+                              {selectedProduct.stock} {selectedProduct.unit}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-400">Stock</p>
-                        <p className={shell('mt-1 text-2xl font-semibold tracking-tight', selectedProduct.stock > 0 ? 'text-emerald-600' : 'text-rose-600')}>
-                          {selectedProduct.stock} {selectedProduct.unit}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-2xl bg-[#f4f5fb] p-3 text-slate-500">
-                        <Warehouse size={18} />
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-400">Warehouse</p>
-                        <p className="mt-1 text-lg text-slate-900">{selectedProduct.warehouse?.name || 'Main warehouse'}</p>
+                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
+                            <Warehouse size={16} />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Warehouse</p>
+                            <p className="mt-1 break-words text-sm text-slate-900 md:text-lg">{selectedProduct.warehouse?.name || 'Main warehouse'}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -426,10 +453,12 @@ export default function CatalogView() {
                   <button
                     onClick={() => {
                       handleAddToSale(selectedProduct);
-                      setShowDetails(false);
+                      if (selectedWarehouseId) {
+                        setShowDetails(false);
+                      }
                     }}
-                    disabled={selectedProduct.stock <= 0}
-                    className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-4 text-base text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                    disabled={selectedProduct.stock <= 0 || !selectedWarehouseId}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-auto md:py-4 md:text-base"
                   >
                     <ShoppingCart size={18} />
                     <span>Add to Sale</span>

@@ -22,6 +22,7 @@ import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatDollar, formatMoney, toFixedNumber } from '../utils/format';
+import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 
 type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -52,6 +53,8 @@ const posTheme = {
 };
 
 export default function POSView() {
+  const cartStorageKey = 'pos_cart_session';
+  const pendingCartStorageKey = 'pending_cart';
   const navigate = useNavigate();
   const user = getCurrentUser();
   const isAdmin = isAdminUser(user);
@@ -90,12 +93,22 @@ export default function POSView() {
       })
       .catch(console.error);
 
-    const pending = localStorage.getItem('pending_cart');
+    const savedCart = sessionStorage.getItem(cartStorageKey);
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
+    }
+
+    const pending = sessionStorage.getItem(pendingCartStorageKey) || localStorage.getItem(pendingCartStorageKey);
     if (pending) {
       setCart(JSON.parse(pending));
-      localStorage.removeItem('pending_cart');
+      sessionStorage.removeItem(pendingCartStorageKey);
+      localStorage.removeItem(pendingCartStorageKey);
     }
   }, [warehouseId, isAdmin, userWarehouseId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  }, [cart]);
 
   const addToCart = (product: any) => {
     if (productListRef.current) {
@@ -198,6 +211,8 @@ export default function POSView() {
 
       toast.success('Продажа оформлена');
       setCart([]);
+      sessionStorage.removeItem(cartStorageKey);
+      sessionStorage.removeItem(pendingCartStorageKey);
       setPaidAmount('');
       setCustomerId(null);
       setDiscount(0);
@@ -216,7 +231,7 @@ export default function POSView() {
     const query = productSearch.trim().toLowerCase();
     if (!query) return true;
 
-    return [product.name, product.sku, String(product.id)]
+    return [product.name, String(product.id)]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
@@ -308,13 +323,13 @@ export default function POSView() {
                       type="text"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder="Search product, SKU or ID..."
+                      placeholder="Search product or ID..."
                       className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500">
+                <div className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500 md:grid">
                   <div>Product</div>
                   <div className="text-center">Stock</div>
                   <div className="text-center">Price</div>
@@ -322,19 +337,66 @@ export default function POSView() {
                 </div>
 
                 <div ref={productListRef} className="h-[560px] overflow-y-auto">
+                  <div className="space-y-3 p-3 md:hidden">
+                    {filteredProducts.map((product) => (
+                      <div key={`mobile-pos-${product.id}`} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-sky-100 text-sky-600">
+                            {product.photoUrl ? (
+                              <img
+                                src={resolveMediaUrl(product.photoUrl, product.id)}
+                                alt={product.name}
+                                className="h-full w-full rounded-2xl object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(event) => handleBrokenImage(event, product.id)}
+                              />
+                            ) : (
+                              <Package size={18} />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-[12px] leading-4 text-slate-900">{product.name}</p>
+                            <p className="mt-1 text-[11px] text-slate-400">ID {product.id}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-sky-50 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Stock</p>
+                            <p className="mt-1 text-sm text-slate-900">{product.stock}</p>
+                          </div>
+                          <div className="rounded-xl bg-sky-50 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Price</p>
+                            <p className="mt-1 break-words text-sm text-slate-900">{formatDollar(product.sellingPrice)}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => addToCart(product)}
+                          disabled={isAdmin && !warehouseId}
+                          className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-sky-500 px-3 py-2.5 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Plus size={15} />
+                          <span>Add</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
                   {filteredProducts.map((product) => (
                     <div
                       key={product.id}
-                      className="grid grid-cols-[minmax(0,1.7fr)_90px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0"
+                      className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 md:grid"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
                           {product.photoUrl ? (
                             <img
-                              src={product.photoUrl}
+                              src={resolveMediaUrl(product.photoUrl, product.id)}
                               alt={product.name}
                               className="h-full w-full rounded-2xl object-cover"
                               referrerPolicy="no-referrer"
+                              onError={(event) => handleBrokenImage(event, product.id)}
                             />
                           ) : (
                             <Package size={18} />
@@ -342,7 +404,7 @@ export default function POSView() {
                         </div>
                         <div className="min-w-0">
                           <p className="break-words text-[13px] leading-5 text-slate-900">{product.name}</p>
-                          <p className="text-xs text-slate-400">{product.sku ? `SKU ${product.sku}` : `ID ${product.id}`}</p>
+                          <p className="text-xs text-slate-400">ID {product.id}</p>
                         </div>
                       </div>
 
@@ -413,7 +475,13 @@ export default function POSView() {
                       <div className="flex items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                           {item.photoUrl ? (
-                            <img src={item.photoUrl} alt={item.name} className="h-full w-full rounded-2xl object-cover" referrerPolicy="no-referrer" />
+                            <img
+                              src={resolveMediaUrl(item.photoUrl, item.id)}
+                              alt={item.name}
+                              className="h-full w-full rounded-2xl object-cover"
+                              referrerPolicy="no-referrer"
+                              onError={(event) => handleBrokenImage(event, item.id)}
+                            />
                           ) : (
                             <Package size={16} />
                           )}

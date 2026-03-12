@@ -43,4 +43,13 @@ router.get('/categories', authenticate, async (req, res, next) => {
   }
 });
 
+router.post('/categories', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const category = await SettingsService.ensureCategory(req.body?.name);
+    res.status(201).json(category);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

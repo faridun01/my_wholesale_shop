@@ -8,6 +8,13 @@ const safePercentChange = (current: number, previous: number) => {
   return ((current - previous) / previous) * 100;
 };
 
+const PAYMENT_EPSILON = 0.01;
+
+const getInvoiceDebt = (netAmount: number, paidAmount: number) => {
+  const balance = Number(netAmount || 0) - Number(paidAmount || 0);
+  return balance > PAYMENT_EPSILON ? balance : 0;
+};
+
 const getPeriodRevenue = (invoices: Array<{ createdAt: Date; netAmount: number }>, start: Date, end: Date) =>
   invoices.reduce((sum, invoice) => {
     const createdAt = new Date(invoice.createdAt);
@@ -123,8 +130,8 @@ router.get('/summary', async (req, res, next) => {
     let totalRevenue = 0;
 
     for (const inv of allInvoices) {
-      totalRevenue += Number(inv.netAmount);
-      totalDebts += (Number(inv.netAmount) - Number(inv.paidAmount));
+      totalRevenue += Number(inv.netAmount || 0);
+      totalDebts += getInvoiceDebt(Number(inv.netAmount || 0), Number(inv.paidAmount || 0));
       
       if (isAdmin) {
         for (const item of inv.items) {

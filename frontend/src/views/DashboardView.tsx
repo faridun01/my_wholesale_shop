@@ -378,9 +378,9 @@ export default function DashboardView() {
                       <div>
                         <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Customers</p>
                         <div className="space-y-1">
-                          {dropdownCustomers.map((sale: any) => (
+                          {dropdownCustomers.map((sale: any, index: number) => (
                             <button
-                              key={`customer-${sale.customer?.name}`}
+                              key={`customer-${sale.customer?.id || sale.id || sale.customer?.name || 'unknown'}-${index}`}
                               onClick={() => {
                                 navigate('/customers');
                                 setSearch('');
@@ -529,7 +529,7 @@ export default function DashboardView() {
                   <h2 className="text-lg font-semibold text-slate-900">Sales Overview</h2>
                   <p className="mt-2 text-[11px] text-slate-500">{overviewDescription}</p>
                 </div>
-                <div className="flex items-center gap-2 rounded-full bg-[#f4f5fb] p-1 text-sm">
+                <div className="grid grid-cols-2 gap-2 rounded-[22px] bg-[#f4f5fb] p-1 text-sm sm:flex sm:items-center sm:rounded-full">
                   {[
                     { key: 'week', label: 'Week' },
                     { key: 'month', label: 'Month' },
@@ -543,7 +543,7 @@ export default function DashboardView() {
                       className={
                         overviewPeriod === period.key
                           ? 'rounded-full bg-white px-4 py-2 text-sky-600 shadow-sm'
-                          : 'px-3 py-2 text-slate-500 transition-colors hover:text-slate-700'
+                          : 'rounded-full px-3 py-2 text-slate-500 transition-colors hover:text-slate-700'
                       }
                     >
                       {period.label}
@@ -552,9 +552,9 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="mt-5 flex items-end justify-between gap-4">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <p className="text-[11px] text-slate-500">Recent revenue</p>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <p className="wrap-break-word text-[clamp(1.05rem,1.45vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
                     {formatDollar(overviewTotal)}
                   </p>
@@ -564,7 +564,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="mt-4 h-70">
+              <div className="mt-4 h-[220px] sm:h-[280px] lg:h-70">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={overviewData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
@@ -598,7 +598,7 @@ export default function DashboardView() {
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-white bg-white p-4 shadow-sm">
+            <div className="min-w-0 rounded-[24px] border border-white bg-white p-4 shadow-sm">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Sales by Category</h2>
                 <p className="mt-2 text-[11px] text-slate-500">Total revenue</p>
@@ -607,15 +607,15 @@ export default function DashboardView() {
                 </p>
               </div>
 
-              <div className="mt-5 h-[240px]">
+              <div className="mt-5 h-[220px] sm:h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={72}
-                      outerRadius={96}
+                      innerRadius={52}
+                      outerRadius={74}
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -636,10 +636,10 @@ export default function DashboardView() {
 
               <div className="mt-4 space-y-3">
                 {categoryData.map((item: any, index: number) => (
-                  <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
+                  <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: ringColors[index % ringColors.length] }} />
-                      <span className="truncate text-slate-600">{item.name}</span>
+                      <span className="break-words text-[12px] leading-4 text-slate-600">{item.name}</span>
                     </div>
                     <span className="text-slate-900">
                       {totalCategoryValue > 0 ? formatPercent((item.value / totalCategoryValue) * 100) : formatPercent(0)}
@@ -722,7 +722,7 @@ export default function DashboardView() {
                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                                 <Package size={18} />
                               </div>
-                              <span className="text-sm text-slate-900">{item.name}</span>
+                              <span className="break-words text-[12px] leading-4 text-slate-900">{item.name}</span>
                             </div>
                           </td>
                           <td className="px-5 py-4 text-sm text-slate-500">{item.category?.name || 'General'}</td>
