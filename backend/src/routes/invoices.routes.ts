@@ -23,8 +23,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(invoices.map(inv => {
-      const totalProfit = inv.items.reduce((sum, item) => {
+    res.json(invoices.map((inv: any) => {
+      const totalProfit = inv.items.reduce((sum: number, item: any) => {
         return sum + (item.sellingPrice - item.costPrice) * (item.quantity - item.returnedQty);
       }, 0);
 

@@ -176,7 +176,7 @@ router.get('/:id/payments', async (req, res, next) => {
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(payments.map(p => ({
+    res.json(payments.map((p: any) => ({
       ...p,
       staff_name: p.user.username
     })));
@@ -195,7 +195,7 @@ router.get('/:id/returns', async (req, res, next) => {
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(returns.map(r => ({
+    res.json(returns.map((r: any) => ({
       ...r,
       staff_name: r.user.username
     })));
@@ -223,17 +223,17 @@ router.get('/:id/history', async (req, res, next) => {
       },
       orderBy: { createdAt: 'desc' }
     });
-    const history = invoices.map((invoice) => ({
+    const history = invoices.map((invoice: any) => ({
       ...invoice,
       invoiceBalance: getInvoiceBalance(invoice),
-      paymentEvents: invoice.payments.map((payment) => ({
+      paymentEvents: invoice.payments.map((payment: any) => ({
         id: payment.id,
         amount: payment.amount,
         method: payment.method,
         createdAt: payment.createdAt,
         staff_name: payment.user.username,
       })),
-      returnEvents: invoice.returns.map((itemReturn) => ({
+      returnEvents: invoice.returns.map((itemReturn: any) => ({
         id: itemReturn.id,
         totalValue: itemReturn.totalValue,
         reason: itemReturn.reason,

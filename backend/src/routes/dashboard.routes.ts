@@ -164,8 +164,8 @@ router.get('/summary', async (req, res, next) => {
       totalSold: productSales[p.id]
     })).sort((a: any, b: any) => b.totalSold - a.totalSold);
 
-    const currentRevenue = currentMonthInvoices.reduce((sum, invoice) => sum + Number(invoice.netAmount || 0), 0);
-    const previousRevenue = previousMonthInvoices.reduce((sum, invoice) => sum + Number(invoice.netAmount || 0), 0);
+    const currentRevenue = currentMonthInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
+    const previousRevenue = previousMonthInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
     const revenueChange = safePercentChange(currentRevenue, previousRevenue);
     const ordersChange = safePercentChange(currentMonthInvoices.length, previousMonthInvoices.length);
     const customersChange = safePercentChange(currentMonthCustomers, previousMonthCustomers);
