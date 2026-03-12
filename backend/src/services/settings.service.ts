@@ -23,4 +23,34 @@ export class SettingsService {
       orderBy: { name: 'asc' }
     });
   }
+
+  static async ensureCategory(name: string) {
+    const normalizedName = String(name || '').trim();
+    if (!normalizedName) {
+      throw new Error('Category name is required');
+    }
+
+    const existing = await prisma.category.findFirst({
+      where: {
+        name: {
+          equals: normalizedName,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (existing) {
+      if (!existing.active) {
+        return prisma.category.update({
+          where: { id: existing.id },
+          data: { active: true, name: normalizedName },
+        });
+      }
+      return existing;
+    }
+
+    return prisma.category.create({
+      data: { name: normalizedName },
+    });
+  }
 }

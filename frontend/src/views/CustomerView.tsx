@@ -175,12 +175,12 @@ export default function CustomerView() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 2xl:grid-cols-3">
             {filteredCustomers.map((customer) => (
-              <motion.div layout key={customer.id}>
-                <Card className="rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
+              <motion.div layout key={customer.id} className="h-full">
+                <Card className="flex h-full flex-col rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
                   <div className="mb-6 flex items-start justify-between">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f4f5fb] text-slate-700 transition-colors duration-300 group-hover:bg-slate-900 group-hover:text-white">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 transition-colors duration-300 group-hover:bg-sky-500 group-hover:text-white">
                       <User size={28} strokeWidth={2.2} />
                     </div>
                     <div className="flex space-x-1">
@@ -208,9 +208,9 @@ export default function CustomerView() {
                     </div>
                   </div>
 
-                  <h3 className="mb-2 text-xl font-medium text-slate-900">{customer.name}</h3>
-                  <div className="mb-6 space-y-2">
-                    <div className="flex items-center text-sm text-slate-500">
+                  <h3 className="mb-3 break-words text-xl font-medium leading-7 text-slate-900">{customer.name}</h3>
+                  <div className="mb-6 space-y-3">
+                    <div className="flex items-start text-sm text-slate-500">
                       <Phone size={14} className="mr-2" /> {customer.phone || 'Нет телефона'}
                     </div>
                     <div className="flex items-center text-sm text-slate-500">
@@ -218,24 +218,24 @@ export default function CustomerView() {
                     </div>
                   </div>
 
-                  <div className="mb-6 grid grid-cols-3 gap-4 rounded-2xl bg-[#f4f5fb] p-4">
-                    <div>
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Накладные</p>
-                      <p className="text-sm font-medium text-slate-900">{formatMoney(customer.total_invoiced)}</p>
+                  <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-[#f4f5fb] p-4 lg:grid-cols-3">
+                    <div className="min-w-0 rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3">
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Накладные</p>
+                      <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-slate-900 xl:text-[11px]">{formatMoney(customer.total_invoiced).replace(' TJS', '')}</p>
                     </div>
-                    <div>
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Оплачено</p>
-                      <p className="text-sm font-medium text-emerald-600">{formatMoney(customer.total_paid)}</p>
+                    <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
+                      <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-emerald-600 xl:text-[11px]">{formatMoney(customer.total_paid).replace(' TJS', '')}</p>
                     </div>
-                    <div>
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Долг</p>
-                      <p className={`text-sm font-medium ${customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoney(customer.balance)}</p>
+                    <div className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3">
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Долг</p>
+                      <p className={`whitespace-nowrap text-[10px] leading-4 tabular-nums xl:text-[11px] ${customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoney(customer.balance).replace(' TJS', '')}</p>
                     </div>
                   </div>
 
                   <button
                     onClick={() => openStatement(customer)}
-                    className="flex w-full items-center justify-center space-x-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
+                    className="mt-auto flex w-full items-center justify-center space-x-2 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-sm font-medium text-violet-700 transition-all hover:border-violet-300 hover:bg-violet-100"
                   >
                     <FileText size={16} />
                     <span>Накладные клиента</span>
@@ -272,7 +272,7 @@ export default function CustomerView() {
                 </div>
                 <form onSubmit={handleSave} className="space-y-6 p-10">
                   <div className="space-y-2">
-                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Имя клиента</label>
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Имя клиента</label>
                     <input
                       required
                       className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
@@ -281,7 +281,7 @@ export default function CustomerView() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Телефон</label>
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Телефон</label>
                     <input
                       className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
                       value={formData.phone}
@@ -289,7 +289,7 @@ export default function CustomerView() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Адрес</label>
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Адрес</label>
                     <input
                       className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
                       value={formData.address}
@@ -297,7 +297,7 @@ export default function CustomerView() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Заметки</label>
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Заметки</label>
                     <textarea
                       className="min-h-[100px] w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
                       value={formData.notes}
@@ -341,22 +341,22 @@ export default function CustomerView() {
                   </div>
                   <div className="grid grid-cols-3 gap-6">
                     <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Всего по накладным</p>
-                      <p className="text-xl font-medium text-slate-900">{formatMoney(selectedCustomer.total_invoiced)}</p>
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Всего по накладным</p>
+                      <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoney(selectedCustomer.total_invoiced)}</p>
                     </div>
                     <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Всего оплачено</p>
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Всего оплачено</p>
                       <p className="text-xl font-medium text-emerald-600">{formatMoney(selectedCustomer.total_paid)}</p>
                     </div>
                     <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Текущий долг</p>
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Текущий долг</p>
                       <p className="text-xl font-medium text-rose-600">{formatMoney(selectedCustomer.balance)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-10">
-                  <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                  <div className="space-y-3">
                     {statementData.length === 0 && (
                       <div className="rounded-3xl bg-slate-50 p-8 text-center text-sm text-slate-500">
                         У клиента пока нет накладных.
@@ -367,15 +367,15 @@ export default function CustomerView() {
                       <div
                         key={invoice.id}
                         onClick={() => openInvoiceDetails(invoice)}
-                        className="flex cursor-pointer items-center justify-between rounded-3xl bg-slate-50 p-6 transition-colors hover:bg-slate-100"
+                        className="flex cursor-pointer items-center justify-between rounded-[24px] bg-slate-50 p-4 transition-colors hover:bg-slate-100 md:rounded-3xl md:p-6"
                       >
-                        <div className="flex items-center space-x-6">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
-                            <FileText size={24} />
+                        <div className="flex items-center space-x-4 md:space-x-6">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 md:h-14 md:w-14">
+                            <FileText size={20} />
                           </div>
                           <div>
-                            <p className="text-lg font-medium text-slate-900">Накладная #{invoice.id}</p>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-base font-medium text-slate-900 md:text-lg">Накладная #{invoice.id}</p>
+                            <p className="text-xs text-slate-400 md:text-sm">
                               {new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
                                 day: 'numeric',
                                 month: 'long',
@@ -384,19 +384,19 @@ export default function CustomerView() {
                                 minute: '2-digit',
                               })}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-[11px] text-slate-500">
                               Оплаты: {formatCount(invoice.paymentEvents?.length || 0)} · Возвраты: {formatCount(invoice.returnEvents?.length || 0)}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-medium text-slate-900">{formatMoney(invoice.netAmount)}</p>
-                          <div className="mt-2 flex justify-end">
+                          <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoney(invoice.netAmount)}</p>
+                          <div className="mt-1.5 flex justify-end">
                             <Badge variant={invoice.status === 'paid' ? 'success' : invoice.invoiceBalance > 0 ? 'warning' : 'default'}>
                               {invoice.status === 'paid' ? 'Оплачено' : invoice.invoiceBalance > 0 ? 'Есть долг' : 'Закрыто'}
                             </Badge>
                           </div>
-                          <p className="mt-2 text-xs text-slate-500">Остаток: {formatMoney(invoice.invoiceBalance)}</p>
+                          <p className="mt-1.5 text-[11px] text-slate-500">Остаток: {formatMoney(invoice.invoiceBalance)}</p>
                         </div>
                       </div>
                     ))}
@@ -470,7 +470,7 @@ export default function CustomerView() {
                         <span>-{formatMoney(selectedInvoice.returnedAmount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between pt-2 text-xl font-medium text-slate-900">
+                    <div className="flex justify-between pt-2 text-lg font-medium text-slate-900 md:text-xl">
                       <span>Итого</span>
                       <span>{formatMoney(selectedInvoice.netAmount)}</span>
                     </div>
@@ -499,7 +499,7 @@ export default function CustomerView() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-slate-400">Оплат по этой накладной нет.</p>
+                      <p className="text-xs text-slate-400 md:text-sm">Оплат по этой накладной нет.</p>
                     )}
                   </div>
 
@@ -517,7 +517,7 @@ export default function CustomerView() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-slate-400">Возвратов по этой накладной нет.</p>
+                      <p className="text-xs text-slate-400 md:text-sm">Возвратов по этой накладной нет.</p>
                     )}
                   </div>
                 </div>
@@ -529,3 +529,5 @@ export default function CustomerView() {
     </div>
   );
 }
+
+

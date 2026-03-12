@@ -332,7 +332,81 @@ export default function SalesView() {
         </div>
       </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {sortedInvoices.map((inv) => (
+            <div key={`mobile-invoice-${inv.id}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-base text-slate-900">Накладная #{inv.id}</p>
+                  <p className="mt-1 text-sm text-slate-500">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</p>
+                  <p className="mt-2 break-words text-sm text-slate-700">{inv.customer_name}</p>
+                  <p className="mt-1 text-xs text-slate-400">{inv.staff_name}</p>
+                </div>
+                <div className="shrink-0">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
+                  <p className="mt-1 break-words text-sm text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
+                  <p className="mt-1 break-words text-sm text-emerald-600">{formatMoney(inv.paidAmount || 0)}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
+                  <p className="mt-1 break-words text-sm text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Склад</p>
+                  <p className="mt-1 break-words text-sm text-slate-900">{inv.warehouse?.name || '---'}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {getInvoiceBalance(inv) > 0 && !inv.cancelled && (
+                  <button
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
+                      setShowPaymentModal(true);
+                    }}
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+                  >
+                    Оплата
+                  </button>
+                )}
+                {!inv.cancelled && getEffectiveStatus(inv) !== 'paid' && (
+                  <button
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
+                      setShowReturnModal(true);
+                    }}
+                    className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+                  >
+                    Возврат
+                  </button>
+                )}
+                <button
+                  onClick={() => fetchInvoiceDetails(inv.id)}
+                  className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700"
+                >
+                  Детали
+                </button>
+                <button
+                  onClick={() => handleDeleteInvoice(inv.id)}
+                  className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#fafbfe] text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
@@ -434,11 +508,11 @@ export default function SalesView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl md:rounded-[2.5rem]"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4 md:p-8">
                 <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-indigo-600 text-white rounded-2xl">
+                  <div className="rounded-2xl bg-indigo-600 p-2.5 text-white md:p-3">
                     <Receipt size={24} />
                   </div>
                   <div>
@@ -451,9 +525,9 @@ export default function SalesView() {
                 </button>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-6 bg-slate-50 rounded-3xl">
+              <div className="flex-1 overflow-y-auto p-4 space-y-5 md:p-8 md:space-y-8">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-6">
+                  <div className="rounded-[22px] bg-slate-50 p-4 md:rounded-3xl md:p-6">
                     <div className="flex items-center space-x-3 text-slate-400 mb-4">
                       <UserIcon size={18} />
                       <span className="text-[10px] font-black uppercase tracking-widest">Клиент</span>
@@ -461,7 +535,7 @@ export default function SalesView() {
                     <p className="text-lg font-black text-slate-900">{selectedInvoice.customer_name}</p>
                     <p className="text-sm font-bold text-slate-500 mt-1">{selectedInvoice.customer_phone || 'Нет телефона'}</p>
                   </div>
-                  <div className="p-6 bg-slate-50 rounded-3xl">
+                  <div className="rounded-[22px] bg-slate-50 p-4 md:rounded-3xl md:p-6">
                     <div className="flex items-center space-x-3 text-slate-400 mb-4">
                       <WarehouseIcon size={18} />
                       <span className="text-[10px] font-black uppercase tracking-widest">Склад</span>
@@ -469,7 +543,7 @@ export default function SalesView() {
                     <p className="text-lg font-black text-slate-900">{selectedInvoice.warehouse?.name}</p>
                     <p className="text-sm font-bold text-slate-500 mt-1">{selectedInvoice.warehouse?.address || '---'}</p>
                   </div>
-                  <div className="p-6 bg-slate-50 rounded-3xl">
+                  <div className="rounded-[22px] bg-slate-50 p-4 md:rounded-3xl md:p-6">
                     <div className="flex items-center space-x-3 text-slate-400 mb-4">
                       <Clock size={18} />
                       <span className="text-[10px] font-black uppercase tracking-widest">Статус</span>
@@ -481,8 +555,29 @@ export default function SalesView() {
 
                 <div className="space-y-4">
                   <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2">Товары</h4>
-                  <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
-                    <table className="w-full text-left">
+                  <div className="overflow-hidden rounded-[22px] border border-slate-100 bg-white md:rounded-3xl">
+                    <div className="space-y-3 p-3 md:hidden">
+                      {selectedInvoice.items.map((item: any) => (
+                        <div key={`mobile-item-${item.id}`} className="rounded-2xl bg-slate-50 p-3">
+                          <p className="break-words text-sm font-black text-slate-900">{item.product_name}</p>
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                            <div className="rounded-xl bg-white px-2.5 py-2">
+                              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-400">Кол-во</p>
+                              <p className="mt-1 font-bold text-slate-700">{item.quantity} {item.unit}</p>
+                            </div>
+                            <div className="rounded-xl bg-white px-2.5 py-2">
+                              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-400">Цена</p>
+                              <p className="mt-1 font-bold text-slate-700">{formatMoney(item.sellingPrice)}</p>
+                            </div>
+                            <div className="rounded-xl bg-white px-2.5 py-2">
+                              <p className="text-[9px] uppercase tracking-[0.14em] text-slate-400">Итого</p>
+                              <p className="mt-1 font-black text-slate-900">{formatMoney(item.totalPrice)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <table className="hidden w-full text-left md:table">
                       <thead>
                         <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
                           <th className="px-6 py-4">Товар</th>
@@ -520,29 +615,29 @@ export default function SalesView() {
 
                 <div className="flex justify-end">
                   <div className="w-full max-w-xs space-y-3">
-                    <div className="flex justify-between items-center text-slate-500">
+                    <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Подытог:</span>
                       <span className="font-black">{formatMoney(getInvoiceSubtotal(selectedInvoice))}</span>
                     </div>
-                    <div className="flex justify-between items-center text-slate-500">
+                    <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Скидка ({selectedInvoice.discount}%):</span>
                       <span className="font-black">-{toFixedNumber(getInvoiceDiscountAmount(selectedInvoice))} TJS</span>
                     </div>
                     {selectedInvoice.returnedAmount > 0 && (
-                      <div className="flex justify-between items-center text-rose-500">
+                      <div className="flex items-center justify-between text-sm text-rose-500">
                         <span className="font-bold">Возвращено:</span>
                         <span className="font-black">-{toFixedNumber(selectedInvoice.returnedAmount || 0)} TJS</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center text-2xl font-black text-slate-900 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xl font-black text-slate-900 md:text-2xl">
                       <span>Итого:</span>
                       <span>{formatMoney(getInvoiceNetAmount(selectedInvoice))}</span>
                     </div>
-                    <div className="flex justify-between items-center text-slate-500 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-500">
                       <span className="font-bold">Оплачено:</span>
                       <span className="font-black text-emerald-600">{formatMoney(selectedInvoice.paidAmount || 0)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-slate-500">
+                    <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Остаток (Долг):</span>
                       <span className="font-black text-rose-600">{formatMoney(getInvoiceBalance(selectedInvoice))}</span>
                     </div>
@@ -604,10 +699,10 @@ export default function SalesView() {
                 )}
               </div>
               
-              <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-4 md:p-8">
                 <button 
                   onClick={() => setShowDetailsModal(false)}
-                  className="px-10 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+                  className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 md:px-10 md:py-4"
                 >
                   Закрыть
                 </button>

@@ -21,7 +21,7 @@ router.post('/parse-invoice', authenticate, upload.single('invoice'), async (req
     if (Number(error?.status) === 503) {
       return res.status(503).json({ error: error.message });
     }
-    next(error);
+    return res.status(500).json({ error: error?.message || 'OCR parse failed' });
   } finally {
     if (req.file?.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
@@ -42,7 +42,7 @@ router.post('/invoice', authenticate, upload.single('image'), async (req, res, n
     if (Number(error?.status) === 503) {
       return res.status(503).json({ error: error.message });
     }
-    next(error);
+    return res.status(500).json({ error: error?.message || 'OCR parse failed' });
   } finally {
     if (req.file?.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);

@@ -27,6 +27,37 @@ import ConfirmationModal from '../components/common/ConfirmationModal';
 import { formatMoney, toFixedNumber } from '../utils/format';
 import { getProductBatches } from '../api/products.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
+import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
+
+const normalizeOcrProductName = (name: string) => {
+  const trimmed = String(name || '').trim();
+  const bracketIndex = trimmed.indexOf('(');
+  return (bracketIndex >= 0 ? trimmed.slice(0, bracketIndex) : trimmed).trim();
+};
+
+const normalizeCatalogName = (name: string) =>
+  String(name || '')
+    .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/[ёЁ]/g, 'е')
+    .replace(/plasticковых/gi, 'пластиковых')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const detectCategoryName = (name: string) => {
+  const normalized = String(name || '').toLowerCase().replace(/[ё]/g, 'е');
+
+  if (normalized.includes('порошок') && normalized.includes('автомат')) return 'Стиральные порошки';
+  if (normalized.includes('порошок')) return 'Стиральные средства';
+  if (normalized.includes('жидк') && normalized.includes('стира')) return 'Жидкие средства для стирки';
+  if (normalized.includes('гель') && normalized.includes('посуд')) return 'Гели для посуды';
+  if (normalized.includes('капля') && normalized.includes('посуд')) return 'Средства для мытья посуды';
+  if (normalized.includes('посуд')) return 'Средства для мытья посуды';
+  if (normalized.includes('чистящее средство')) return 'Чистящие средства';
+
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).join(' ') || 'Прочее';
+};
 
 export default function ProductsView() {
   const user = getCurrentUser();
@@ -66,7 +97,6 @@ export default function ProductsView() {
 
   const [formData, setFormData] = useState({
     name: '',
-    sku: '',
     unit: 'шт',
     categoryId: '',
     warehouseId: '',
@@ -188,9 +218,11 @@ export default function ProductsView() {
       const rawItems = Array.isArray(res.data) ? res.data : [];
       const items = rawItems
         .map((item: any, index: number) => ({
+          enabled: true,
           lineIndex: Number(item.lineIndex || index + 1),
-          name: item.name || '',
-          sku: item.sku || '',
+          name: normalizeOcrProductName(item.name || ''),
+          packageCount: Number(item.packageCount || 0),
+          unitsPerPackage: Number(item.unitsPerPackage || 0),
           quantity: Number(item.quantity || 0),
           price: Number(item.price || 0),
           rawQuantity: item.rawQuantity || '',
@@ -217,31 +249,72 @@ export default function ProductsView() {
 
   const handleAddOcrToStock = async () => {
     if (!ocrResults || !selectedWarehouseId) return;
-    if (!categories.length) {
-      toast.error('Сначала создайте хотя бы одну категорию товаров');
-      return;
-    }
     const rate = parseFloat(usdRate) || 1;
     try {
       setIsLoading(true);
+      const categoryCache = new Map(
+        categories.map((category) => [String(category.name || '').trim().toLowerCase(), category])
+      );
+
+      const ensureCategoryId = async (productName: string) => {
+        const categoryName = detectCategoryName(productName);
+        const categoryKey = categoryName.trim().toLowerCase();
+        const existingCategory = categoryCache.get(categoryKey);
+        if (existingCategory?.id) {
+          return Number(existingCategory.id);
+        }
+
+        const createdCategory = await client.post('/settings/categories', { name: categoryName }).then((res) => res.data);
+        categoryCache.set(categoryKey, createdCategory);
+        setCategories((prev) => {
+          const hasSame = prev.some((item) => String(item.name || '').trim().toLowerCase() === categoryKey);
+          return hasSame ? prev : [...prev, createdCategory].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        });
+        return Number(createdCategory.id);
+      };
+
       const preparedResults = ocrResults
         .map((item) => {
-          const normalizedName = String(item.name || '').trim();
-          const normalizedSku = String(item.sku || '').trim();
-          const quantity = Number(item.quantity || 0);
+          if (item.enabled === false) {
+            return null;
+          }
+          const normalizedName = normalizeOcrProductName(item.name || '');
+          const packageCount = Number(item.packageCount || 0);
+          const unitsPerPackage = Number(item.unitsPerPackage || 0);
+          const normalizedQuantity = Number(item.quantity || 0);
+          const quantity =
+            packageCount > 0 && unitsPerPackage > 0
+              ? packageCount * unitsPerPackage
+              : normalizedQuantity;
           const price = Number(item.price || 0);
           const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0;
+          const costPricePerPieceTJS =
+            unitsPerPackage > 0
+              ? (price * rate) / unitsPerPackage
+              : quantity > 0
+                ? (price * rate) / quantity
+                : 0;
 
-          if (!normalizedName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
+          if (
+            !normalizedName ||
+            !Number.isFinite(quantity) ||
+            quantity <= 0 ||
+            !Number.isFinite(price) ||
+            price < 0 ||
+            !Number.isFinite(costPricePerPieceTJS) ||
+            costPricePerPieceTJS < 0
+          ) {
             return null;
           }
 
           return {
             lineIndex: Number(item.lineIndex || 0),
             name: normalizedName,
-            sku: normalizedSku || null,
+            packageCount,
+            unitsPerPackage,
             quantity,
             price,
+            costPricePerPieceTJS,
             sellingPrice,
             rawQuantity: String(item.rawQuantity || '').trim(),
             lineTotal: Number(item.lineTotal || 0),
@@ -250,9 +323,11 @@ export default function ProductsView() {
         .filter(Boolean) as Array<{
           lineIndex: number;
           name: string;
-          sku: string | null;
+          packageCount: number;
+          unitsPerPackage: number;
           quantity: number;
           price: number;
+          costPricePerPieceTJS: number;
           sellingPrice: number;
           rawQuantity: string;
           lineTotal: number;
@@ -264,12 +339,11 @@ export default function ProductsView() {
       }
       const currentProducts = [...products];
       for (const item of preparedResults) {
-        const costPriceTJS = item.price * rate;
+        const costPriceTJS = item.costPricePerPieceTJS;
         const normalizedItemName = item.name.trim().toLowerCase();
-        const normalizedItemSku = String(item.sku || '').trim().toLowerCase();
+        const categoryId = await ensureCategoryId(item.name);
         const product = currentProducts.find((p) => {
           const productName = String(p.name || '').trim().toLowerCase();
-          const productSku = String(p.sku || '').trim().toLowerCase();
           const productWarehouseId = Number(p.warehouseId || 0);
           const targetWarehouseId = Number(selectedWarehouseId);
 
@@ -277,11 +351,7 @@ export default function ProductsView() {
             return false;
           }
 
-          if (productName === normalizedItemName && (!normalizedItemSku || productSku === normalizedItemSku)) {
-            return true;
-          }
-
-          return Boolean(normalizedItemSku && productSku === normalizedItemSku);
+          return productName === normalizedItemName;
         });
         if (product) {
           await restockProduct(product.id, {
@@ -300,9 +370,8 @@ export default function ProductsView() {
         try {
           const createdProduct = await createProduct({
             name: item.name,
-            sku: item.sku || undefined,
             unit: 'шт',
-            categoryId: Number(categories[0].id),
+            categoryId,
             warehouseId: Number(selectedWarehouseId),
             costPrice: costPriceTJS,
             sellingPrice: Number(item.sellingPrice) || costPriceTJS * 1.2,
@@ -313,12 +382,8 @@ export default function ProductsView() {
         } catch (createErr: any) {
           const duplicateByName = currentProducts.find((p) => {
             const productName = String(p.name || '').trim().toLowerCase();
-            const productSku = String(p.sku || '').trim().toLowerCase();
             const sameWarehouse = Number(p.warehouseId || 0) === Number(selectedWarehouseId);
-            return sameWarehouse && (
-              (productName === normalizedItemName && (!normalizedItemSku || productSku === normalizedItemSku)) ||
-              Boolean(normalizedItemSku && productSku === normalizedItemSku)
-            );
+            return sameWarehouse && productName === normalizedItemName;
           });
 
           if (!duplicateByName) {
@@ -436,7 +501,6 @@ export default function ProductsView() {
   const resetForm = () => {
     setFormData({
       name: '',
-      sku: '',
       unit: 'шт',
       categoryId: '',
       warehouseId: '',
@@ -468,9 +532,43 @@ export default function ProductsView() {
     return 0;
   });
 
-  const filteredProducts = sortedProducts.filter(p => {
+  const aggregatedProducts = Object.values(
+    products.reduce((acc, product) => {
+      const key = normalizeCatalogName(product.name);
+      if (!acc[key]) {
+        acc[key] = {
+          ...product,
+          name: String(product.name || '').replace(/\s*\[[^\]]*\]\s*$/u, '').trim(),
+          stock: Number(product.stock || 0),
+          totalIncoming: Number(product.totalIncoming || 0),
+          isAggregateRow: true,
+        };
+      } else {
+        acc[key].stock += Number(product.stock || 0);
+        acc[key].totalIncoming += Number(product.totalIncoming || 0);
+        if (!acc[key].photoUrl && product.photoUrl) {
+          acc[key].photoUrl = product.photoUrl;
+        }
+      }
+      return acc;
+    }, {} as Record<string, any>)
+  );
+
+  const sortedAggregatedProducts = [...aggregatedProducts].sort((a, b) => {
+    if (!sortConfig.direction) return 0;
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const baseProducts = selectedWarehouseId ? sortedProducts : sortedAggregatedProducts;
+  const isAggregateMode = !selectedWarehouseId;
+
+  const filteredProducts = baseProducts.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()));
+      false;
     
     // If a warehouse is selected, we only show products that have stock in that warehouse
     // OR are assigned to that warehouse as their default warehouse.
@@ -480,27 +578,17 @@ export default function ProductsView() {
   });
 
   return (
-    <div className="rounded-[30px] border border-white/70 bg-[#f4f5fb] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
+    <div className="rounded-[26px] border border-white/70 bg-[#f4f5fb] p-3 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
       <div className="space-y-6">
-      <div className="rounded-[28px] border border-white bg-white px-5 py-5 shadow-sm sm:px-6">
+      <div className="rounded-[24px] border border-white bg-white px-4 py-4 shadow-sm sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Товары</h1>
-          <p className="text-slate-500 mt-0.5 font-medium text-sm">Управление ассортиментом, ценами и остатками.</p>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">Товары</h1>
+          <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select 
-            value={selectedWarehouseId}
-            onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            disabled={!isAdmin}
-            className="min-w-[190px] rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
-          >
-            <option value="">Все склады</option>
-            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
           {isAdmin && <label className={clsx(
-            "flex items-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all",
+            "flex w-full items-center justify-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all sm:w-auto",
             selectedWarehouseId
               ? "cursor-pointer border-sky-100 bg-sky-50 text-slate-700 hover:bg-white"
               : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
@@ -520,7 +608,7 @@ export default function ProductsView() {
               setShowAddModal(true);
             }}
             className={clsx(
-              "flex items-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95",
+              "flex w-full items-center justify-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95 sm:w-auto",
               selectedWarehouseId 
                 ? "bg-violet-500 text-white shadow-sm hover:bg-violet-600" 
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
@@ -594,16 +682,6 @@ export default function ProductsView() {
                       onChange={e => setFormData({...formData, name: e.target.value})}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       placeholder="Напр: iPhone 15 Pro Max"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Артикул (SKU)</label>
-                    <input 
-                      type="text" 
-                      value={formData.sku}
-                      onChange={e => setFormData({...formData, sku: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
-                      placeholder="SKU-12345"
                     />
                   </div>
                   <div>
@@ -706,7 +784,13 @@ export default function ProductsView() {
                       {formData.photoUrl && (
                         <div className="flex items-center gap-3">
                           <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                            <img src={formData.photoUrl} alt="Фото товара" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            <img
+                              src={resolveMediaUrl(formData.photoUrl, formData.name || 'preview')}
+                              alt="Фото товара"
+                              className="h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                              onError={(event) => handleBrokenImage(event, formData.name || 'preview')}
+                            />
                           </div>
                           <button
                             type="button"
@@ -817,26 +901,26 @@ export default function ProductsView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-[28rem] rounded-[2rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-slate-100 bg-emerald-50/50">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-3 bg-emerald-600 text-white rounded-2xl">
-                    <PlusCircle size={24} />
+              <div className="border-b border-slate-100 bg-emerald-50/50 p-6">
+                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
+                  <div className="rounded-2xl bg-emerald-600 p-2.5 text-white">
+                    <PlusCircle size={20} />
                   </div>
                   <span>Пополнение товара</span>
                 </h3>
-                <p className="text-slate-500 mt-2 font-bold">{selectedProduct?.name}</p>
+                <p className="mt-2 text-sm font-bold text-slate-500">{selectedProduct?.name}</p>
               </div>
-              <form onSubmit={handleRestock} className="p-8 space-y-6">
+              <form onSubmit={handleRestock} className="space-y-5 p-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Склад</label>
+                    <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Склад</label>
                     <select 
                       required
                       value={restockData.warehouseId}
                       onChange={e => setRestockData({ ...restockData, warehouseId: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold appearance-none bg-white"
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -844,43 +928,43 @@ export default function ProductsView() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Количество</label>
+                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Количество</label>
                       <input 
                         type="number" 
                         required
                         value={restockData.quantity}
                         onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                       />
                     </div>
                     {isAdmin && (
                       <div>
-                        <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Цена закупки</label>
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена закупки</label>
                         <input 
                           type="number" 
                           step="0.01"
                           required
                           value={restockData.costPrice}
                           onChange={e => setRestockData({ ...restockData, costPrice: e.target.value })}
-                          className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                         />
                       </div>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Причина / Комментарий</label>
+                    <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Причина / Комментарий</label>
                     <input 
                       type="text" 
                       value={restockData.reason}
                       onChange={e => setRestockData({ ...restockData, reason: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                       placeholder="Напр: Новая поставка"
                     />
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3 pt-6">
-                  <button type="button" onClick={() => setShowRestockModal(false)} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
-                  <button type="submit" className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95">Пополнить</button>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" onClick={() => setShowRestockModal(false)} className="rounded-2xl px-6 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="submit" className="rounded-2xl bg-emerald-600 px-8 py-3 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-95">Пополнить</button>
                 </div>
               </form>
             </motion.div>
@@ -921,40 +1005,107 @@ export default function ProductsView() {
                 </div>
               </div>
               <div className="p-8 overflow-y-auto flex-1 space-y-4">
+                <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+                  <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
+                  <p className="mt-2 text-sm font-medium text-slate-600">
+                    Считываем все данные из накладной, автоматически считаем количество в штуках, цену мешка в сомони и закупку за 1 шт.
+                    На склад добавляются только нужные поля: название, артикул, количество в шт, себестоимость за 1 шт и цена продажи.
+                  </p>
+                </div>
                 <div className="grid grid-cols-12 gap-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <div className="col-span-4">Товар</div>
                   <div className="col-span-2 text-center">Кол-во</div>
-                  <div className="col-span-2 text-right">Закупка ($)</div>
-                  <div className="col-span-2 text-right">Сумма</div>
-                  <div className="col-span-2 text-right">Цена продажи (TJS)</div>
+                  <div className="col-span-2 text-right">Закупка</div>
+                  <div className="col-span-2 text-right">За 1 шт</div>
+                  <div className="col-span-2 text-right">Цена продажи</div>
                 </div>
                 {ocrResults.map((item, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-4 items-center p-4 bg-sky-50 rounded-2xl group hover:bg-sky-100/50 transition-colors">
+                  <div key={i} className={clsx(
+                    "grid grid-cols-12 gap-4 items-center p-4 rounded-2xl group transition-colors",
+                    item.enabled === false ? "bg-slate-100 opacity-65" : "bg-sky-50 hover:bg-sky-100/50"
+                  )}>
                     <div className="col-span-4">
-                      <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-sky-500">
-                        Строка #{item.lineIndex || i + 1}
-                      </p>
+                      <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled !== false}
+                          onChange={(e) => {
+                            const newResults = [...ocrResults];
+                            newResults[i].enabled = e.target.checked;
+                            setOcrResults(newResults);
+                          }}
+                          className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                        />
+                        Добавить строку #{item.lineIndex || i + 1}
+                      </label>
                       <p className="font-bold text-slate-900 break-words whitespace-normal">{item.name}</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase">Артикул: {item.sku || '---'}</p>
+                      {item.rawQuantity && (
+                        <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>
+                      )}
+                      {item.lineTotal > 0 && (
+                        <p className="mt-1 text-[10px] font-bold text-slate-400">
+                          Сумма строки: {item.lineTotal} $ / ≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}
+                        </p>
+                      )}
                       {item.note && <p className="mt-1 text-[10px] text-slate-500">{item.note}</p>}
                     </div>
                     <div className="col-span-2 text-center">
-                      <p className="font-black text-sky-600">{item.quantity} {item.unit || 'шт'}</p>
-                      {item.rawQuantity && <p className="text-[10px] font-bold text-slate-400">{item.rawQuantity}</p>}
+                      <div className="flex items-center justify-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.packageCount || ''}
+                          onChange={(e) => {
+                            const newResults = [...ocrResults];
+                            newResults[i].packageCount = Number(e.target.value || 0);
+                            setOcrResults(newResults);
+                          }}
+                          className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
+                        />
+                        <span className="text-xs font-black text-slate-400">x</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.unitsPerPackage || ''}
+                          onChange={(e) => {
+                            const newResults = [...ocrResults];
+                            newResults[i].unitsPerPackage = Number(e.target.value || 0);
+                            setOcrResults(newResults);
+                          }}
+                          className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-500">
+                        = {item.packageCount > 0 && item.unitsPerPackage > 0 ? item.packageCount * item.unitsPerPackage : item.quantity} шт
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-400">итог для склада</p>
                     </div>
                     <div className="col-span-2 text-right">
-                      <p className="font-black text-slate-900">{item.price} $</p>
-                      <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))}</p>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.price || ''}
+                        onChange={(e) => {
+                          const newResults = [...ocrResults];
+                          newResults[i].price = Number(e.target.value || 0);
+                          setOcrResults(newResults);
+                        }}
+                        className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-right text-sm font-black text-slate-900 outline-none focus:border-sky-500"
+                      />
+                      <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))} / мешок</p>
                     </div>
                     <div className="col-span-2 text-right">
                       <p className="font-black text-slate-900">
-                        {item.lineTotal ? `${item.lineTotal} $` : '---'}
+                        {formatMoney(
+                          item.unitsPerPackage > 0
+                            ? (item.price * parseFloat(usdRate || '0')) / item.unitsPerPackage
+                            : item.quantity > 0
+                              ? (item.price * parseFloat(usdRate || '0')) / item.quantity
+                              : 0
+                        )}
                       </p>
-                      {item.lineTotal ? (
-                        <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}</p>
-                      ) : (
-                        <p className="text-[10px] font-bold text-slate-400">Нет суммы строки</p>
-                      )}
+                      <p className="text-[10px] font-bold text-slate-400">за 1 шт</p>
                     </div>
                     <div className="col-span-2 text-right">
                       <input 
@@ -999,12 +1150,12 @@ export default function ProductsView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-[56rem] rounded-[2rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-3 bg-sky-500 text-white rounded-2xl">
-                    <History size={24} />
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-6">
+                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
+                  <div className="rounded-2xl bg-sky-500 p-2.5 text-white">
+                    <History size={20} />
                   </div>
                   <span>История товара: {selectedProduct?.name}</span>
                 </h3>
@@ -1012,23 +1163,23 @@ export default function ProductsView() {
                   <X size={24} />
                 </button>
               </div>
-              <div className="p-8 max-h-[60vh] overflow-y-auto">
-                <table className="w-full text-left">
+              <div className="max-h-[56vh] overflow-y-auto p-6">
+                <table className="w-full table-fixed text-left">
                   <thead>
                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                      <th className="pb-4">Дата</th>
-                      <th className="pb-4">Тип</th>
-                      <th className="pb-4">Кол-во</th>
-                      <th className="pb-4">Склад</th>
-                      <th className="pb-4">Причина</th>
-                      <th className="pb-4">Пользователь</th>
+                      <th className="w-[18%] pb-4">Дата</th>
+                      <th className="w-[11%] pb-4">Тип</th>
+                      <th className="w-[10%] pb-4">Кол-во</th>
+                      <th className="w-[13%] pb-4">Склад</th>
+                      <th className="w-[33%] pb-4">Причина</th>
+                      <th className="w-[15%] pb-4">Пользователь</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {productHistory.map((t, i) => (
-                      <tr key={i} className="text-sm">
-                        <td className="py-4 text-slate-500">{new Date(t.createdAt).toLocaleString()}</td>
-                        <td className="py-4">
+                      <tr key={i} className="text-[13px]">
+                        <td className="py-3 pr-3 align-top text-slate-500">{new Date(t.createdAt).toLocaleString()}</td>
+                        <td className="py-3 pr-3 align-top">
                           <span className={clsx(
                             "px-2 py-1 rounded-lg text-[10px] font-black uppercase",
                             t.type === 'incoming' ? "bg-emerald-50 text-emerald-600" :
@@ -1045,10 +1196,10 @@ export default function ProductsView() {
                                   : 'Перенос'}
                           </span>
                         </td>
-                        <td className="py-4 font-black">{Number(t.qtyChange || 0) > 0 ? `+${t.qtyChange}` : (t.qtyChange ?? 0)}</td>
-                        <td className="py-4 text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
-                        <td className="py-4 text-slate-500 italic">{t.reason || '---'}</td>
-                        <td className="py-4 text-slate-500">{t.username}</td>
+                        <td className="py-3 pr-3 align-top font-black">{Number(t.qtyChange || 0) > 0 ? `+${t.qtyChange}` : (t.qtyChange ?? 0)}</td>
+                        <td className="py-3 pr-3 align-top break-words text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
+                        <td className="py-3 pr-3 align-top break-words text-slate-500 italic">{t.reason || '---'}</td>
+                        <td className="py-3 align-top break-words text-slate-500">{t.username}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1070,12 +1221,12 @@ export default function ProductsView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-[52rem] rounded-[2rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-violet-50/50">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-3 bg-violet-500 text-white rounded-2xl">
-                    <Layers size={24} />
+              <div className="flex items-center justify-between border-b border-slate-100 bg-violet-50/50 p-6">
+                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
+                  <div className="rounded-2xl bg-violet-500 p-2.5 text-white">
+                    <Layers size={20} />
                   </div>
                   <span>Партии товара (FIFO): {selectedProduct.name}</span>
                 </h3>
@@ -1083,8 +1234,8 @@ export default function ProductsView() {
                   <X size={24} />
                 </button>
               </div>
-              <div className="p-8 max-h-[60vh] overflow-y-auto">
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-sm font-medium">
+              <div className="max-h-[56vh] overflow-y-auto p-6">
+                <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-medium text-amber-800">
                   Система списывает товар из самых старых партий в первую очередь (FIFO).
                 </div>
                 <table className="w-full text-left">
@@ -1099,15 +1250,15 @@ export default function ProductsView() {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {productBatches.map((b, i) => (
-                      <tr key={b.id} className={clsx("text-sm", i === 0 && "bg-violet-50/40")}>
-                        <td className="py-4 text-slate-500 font-bold">
+                      <tr key={b.id} className={clsx("text-[13px]", i === 0 && "bg-violet-50/40")}>
+                        <td className="py-3 text-slate-500 font-bold">
                           {new Date(b.createdAt).toLocaleDateString('ru-RU')}
                           {i === 0 && <span className="ml-2 px-2 py-0.5 bg-violet-500 text-white text-[8px] rounded-md uppercase">След. на списание</span>}
                         </td>
-                        <td className="py-4 text-slate-600 font-bold">{b.warehouse?.name}</td>
-                        <td className="py-4 text-right text-slate-400 font-bold">{b.quantity} {selectedProduct.unit}</td>
-                        <td className="py-4 text-right font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</td>
-                        <td className="py-4 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
+                        <td className="py-3 text-slate-600 font-bold">{b.warehouse?.name}</td>
+                        <td className="py-3 text-right text-slate-400 font-bold">{b.quantity} {selectedProduct.unit}</td>
+                        <td className="py-3 text-right font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</td>
+                        <td className="py-3 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
                       </tr>
                     ))}
                     {productBatches.length === 0 && (
@@ -1118,10 +1269,10 @@ export default function ProductsView() {
                   </tbody>
                 </table>
               </div>
-              <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-6">
                 <button 
                   onClick={() => setShowBatchesModal(false)}
-                  className="px-10 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+                  className="rounded-2xl border border-slate-200 bg-white px-8 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                 >
                   Закрыть
                 </button>
@@ -1140,13 +1291,13 @@ export default function ProductsView() {
       />
 
       <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col md:flex-row gap-3 flex-1 max-w-2xl">
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row flex-1 max-w-2xl">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
               <input 
                 type="text" 
-                placeholder="Поиск по названию или SKU..."
+                placeholder="Поиск по названию..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
@@ -1174,7 +1325,151 @@ export default function ProductsView() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-3 md:hidden">
+          {filteredProducts.map((product, index) => (
+            <div key={`mobile-${product.id ?? product.name}-${index}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                  {product.photoUrl ? (
+                    <img
+                      src={resolveMediaUrl(product.photoUrl, product.id)}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(event) => handleBrokenImage(event, product.id)}
+                    />
+                  ) : (
+                    <ImageIcon className="text-slate-300" size={18} />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 break-words text-[15px] leading-5 text-slate-900">{product.name}</p>
+                    <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                      #{index + 1}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-xl bg-violet-50 px-2.5 py-1 text-[11px] text-violet-700">
+                      {product.category?.name || 'Без категории'}
+                    </span>
+                    <span className="rounded-xl bg-slate-50 px-2.5 py-1 text-[11px] text-slate-500">
+                      {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Остаток</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                    {product.stock} <span className="text-[10px] uppercase text-slate-400">{product.unit}</span>
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Приход</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                    {product.totalIncoming} <span className="text-[10px] uppercase text-slate-400">{product.unit}</span>
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                    {isAggregateMode ? '-' : `${toFixedNumber(product.costPrice)} TJS`}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                    {isAggregateMode ? '-' : `${toFixedNumber(product.sellingPrice)} TJS`}
+                  </p>
+                </div>
+              </div>
+
+              {!isAggregateMode && (
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setFormData({
+                        name: product.name || '',
+                        unit: product.unit || '',
+                        categoryId: product.categoryId?.toString() || '',
+                        warehouseId: product.warehouseId?.toString() || '',
+                        costPrice: product.costPrice?.toString() || '0',
+                        sellingPrice: product.sellingPrice?.toString() || '0',
+                        minStock: product.minStock?.toString() || '0',
+                        initialStock: product.initialStock?.toString() || '0',
+                        photoUrl: product.photoUrl || ''
+                      });
+                      setShowEditModal(true);
+                    }}
+                    className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold text-violet-700"
+                  >
+                    Изменить
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
+                      setShowRestockModal(true);
+                    }}
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-semibold text-emerald-700"
+                  >
+                    Приход
+                  </button>
+                  <button
+                    onClick={() => handleShowHistory(product)}
+                    className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs font-semibold text-sky-700"
+                  >
+                    История
+                  </button>
+                  <button
+                    onClick={() => handleShowBatches(product)}
+                    className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold text-violet-700"
+                  >
+                    Партии
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
+                      setShowTransferModal(true);
+                    }}
+                    className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold text-amber-700"
+                  >
+                    Перенос
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (Number(product.stock || 0) > 0) {
+                        toast.error('Нельзя удалить товар, пока на складе есть запас');
+                        return;
+                      }
+                      setSelectedProduct(product);
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-semibold text-rose-700"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {filteredProducts.length === 0 && !isLoading && (
+            <div className="rounded-[22px] border border-slate-200 bg-white px-5 py-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
+                <Package size={28} />
+              </div>
+              <p className="mt-4 text-lg font-black text-slate-900">Товары не найдены</p>
+              <p className="mt-1 text-sm text-slate-500">Измените поиск или выберите другой склад.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1217,24 +1512,37 @@ export default function ProductsView() {
                     <div className="flex items-center space-x-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-transform duration-500 group-hover:scale-105">
                         {product.photoUrl ? (
-                          <img src={product.photoUrl} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img
+                            src={resolveMediaUrl(product.photoUrl, product.id)}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(event) => handleBrokenImage(event, product.id)}
+                          />
                         ) : (
                           <ImageIcon className="text-slate-300" size={16} />
                         )}
                       </div>
                       <div>
                         <p className="text-sm font-medium leading-tight text-slate-900">{product.name}</p>
-                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">SKU: {product.sku || '---'}</p>
                       </div>
                     </div>
                   </td>
                   {isAdmin && (
                     <td className="px-5 py-3">
-                      <p className="text-xs font-medium text-slate-500">{toFixedNumber(product.costPrice)} <span className="text-[10px] uppercase">TJS</span></p>
+                      {selectedWarehouseId ? (
+                        <p className="text-xs font-medium text-slate-500">{toFixedNumber(product.costPrice)} <span className="text-[10px] uppercase">TJS</span></p>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
                     </td>
                   )}
                   <td className="px-5 py-3">
-                    <p className="text-sm font-semibold text-slate-900">{toFixedNumber(product.sellingPrice)} <span className="text-[10px] font-medium uppercase text-slate-400">TJS</span></p>
+                    {selectedWarehouseId ? (
+                      <p className="text-sm font-semibold text-slate-900">{toFixedNumber(product.sellingPrice)} <span className="text-[10px] font-medium uppercase text-slate-400">TJS</span></p>
+                    ) : (
+                      <span className="text-xs text-slate-300">-</span>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center space-x-2">
@@ -1254,6 +1562,7 @@ export default function ProductsView() {
                     <p className="text-xs font-medium text-slate-500">{product.totalIncoming} <span className="text-[10px] font-medium text-slate-400 uppercase">{product.unit}</span></p>
                   </td>
                   <td className="px-5 py-3 text-right">
+                    {selectedWarehouseId ? (
                     <div className="flex flex-col items-end space-y-1.5">
                       <div className="flex items-center space-x-1.5">
                         <button 
@@ -1261,7 +1570,6 @@ export default function ProductsView() {
                             setSelectedProduct(product);
                             setFormData({
                               name: product.name || '',
-                              sku: product.sku || '',
                               unit: product.unit || '',
                               categoryId: product.categoryId?.toString() || '',
                               warehouseId: product.warehouseId?.toString() || '',
@@ -1318,6 +1626,10 @@ export default function ProductsView() {
                         </button>
                         <button 
                           onClick={() => {
+                            if (Number(product.stock || 0) > 0) {
+                              toast.error('Нельзя удалить товар, пока на складе есть запас');
+                              return;
+                            }
                             setSelectedProduct(product);
                             setShowDeleteConfirm(true);
                           }}
@@ -1328,6 +1640,9 @@ export default function ProductsView() {
                         </button>
                       </div>
                     </div>
+                    ) : (
+                      <span className="text-xs text-slate-300">-</span>
+                    )}
                   </td>
                 </tr>
               ))}
