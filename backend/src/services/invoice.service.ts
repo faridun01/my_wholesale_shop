@@ -1,6 +1,20 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 
+const PAYMENT_EPSILON = 0.01;
+
+function getInvoiceStatus(paidAmount: number, netAmount: number) {
+  if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
+    return 'paid';
+  }
+
+  if (paidAmount > 0) {
+    return 'partial';
+  }
+
+  return 'unpaid';
+}
+
 export class InvoiceService {
   /**
    * Creates a new invoice and allocates stock.
@@ -27,7 +41,7 @@ export class InvoiceService {
       }
 
       const netAmount = totalAmount - (totalAmount * discount / 100) + tax;
-      const status = paidAmount >= netAmount ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid';
+      const status = getInvoiceStatus(Number(paidAmount), Number(netAmount));
 
       // 2. Create Invoice
       const invoice = await tx.invoice.create({
@@ -249,7 +263,7 @@ export class InvoiceService {
       const newNetAmount = Number(invoice.netAmount) - totalRefundValue;
       
       // Update status based on new net amount
-      const status = Number(invoice.paidAmount) >= newNetAmount ? 'paid' : Number(invoice.paidAmount) > 0 ? 'partial' : 'unpaid';
+      const status = getInvoiceStatus(Number(invoice.paidAmount), Number(newNetAmount));
 
       await tx.invoice.update({
         where: { id: invoiceId },

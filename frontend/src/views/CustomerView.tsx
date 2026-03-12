@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, FileText, Phone, MapPin, X, ChevronRight, User, RotateCcw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, Plus, Edit2, Trash2, FileText, Phone, MapPin, X, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
-import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { formatCount, formatMoney } from '../utils/format';
 
 interface Customer {
   id: number;
@@ -16,16 +17,58 @@ interface Customer {
   balance: number;
 }
 
+interface StatementPayment {
+  id: number;
+  amount: number;
+  method: string;
+  createdAt: string;
+  staff_name: string;
+}
+
+interface StatementReturn {
+  id: number;
+  totalValue: number;
+  reason?: string;
+  createdAt: string;
+  staff_name: string;
+}
+
+interface StatementItem {
+  id: number;
+  product?: { name?: string };
+  quantity: number;
+  returnedQty?: number;
+  sellingPrice: number;
+}
+
+interface StatementInvoice {
+  id: number;
+  createdAt: string;
+  totalAmount: number;
+  discount: number;
+  netAmount: number;
+  paidAmount: number;
+  returnedAmount: number;
+  status: string;
+  warehouse?: { name?: string };
+  items?: StatementItem[];
+  invoiceBalance: number;
+  paymentEvents: StatementPayment[];
+  returnEvents: StatementReturn[];
+}
+
+const emptyForm = { name: '', phone: '', address: '', notes: '' };
+
 export default function CustomerView() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<StatementInvoice | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [statementData, setStatementData] = useState<any[]>([]);
-  const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [statementData, setStatementData] = useState<StatementInvoice[]>([]);
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     fetchCustomers();
@@ -34,14 +77,15 @@ export default function CustomerView() {
   const fetchCustomers = async () => {
     try {
       const res = await client.get('/customers');
-      setCustomers(res.data);
-    } catch (err) {
+      setCustomers(Array.isArray(res.data) ? res.data : []);
+    } catch {
       toast.error('Ошибка при загрузке клиентов');
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
       if (selectedCustomer) {
         await client.put(`/customers/${selectedCustomer.id}`, formData);
@@ -50,311 +94,438 @@ export default function CustomerView() {
         await client.post('/customers', formData);
         toast.success('Клиент добавлен');
       }
+
       setIsModalOpen(false);
+      setSelectedCustomer(null);
+      setFormData(emptyForm);
       fetchCustomers();
-    } catch (err) {
+    } catch {
       toast.error('Ошибка при сохранении');
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Вы уверены?')) return;
+
     try {
       await client.delete(`/customers/${id}`);
       toast.success('Клиент удален');
       fetchCustomers();
-    } catch (err) {
+    } catch {
       toast.error('Ошибка при удалении');
     }
   };
 
   const openStatement = async (customer: Customer) => {
     setSelectedCustomer(customer);
+
     try {
-      const [invRes, payRes, retRes] = await Promise.all([
-        client.get(`/customers/${customer.id}/invoices`),
-        client.get(`/customers/${customer.id}/payments`),
-        client.get(`/customers/${customer.id}/returns`)
-      ]);
-      const combined = [
-        ...invRes.data.map((i: any) => ({ ...i, type: 'invoice', date: i.createdAt })),
-        ...payRes.data.map((p: any) => ({ ...p, type: 'payment', date: p.createdAt })),
-        ...retRes.data.map((r: any) => ({ ...r, type: 'return', date: r.createdAt }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setStatementData(combined);
+      const res = await client.get(`/customers/${customer.id}/history`);
+      setStatementData(Array.isArray(res.data) ? res.data : []);
       setIsStatementOpen(true);
-    } catch (err) {
-      toast.error('Ошибка при загрузке выписки');
+    } catch {
+      toast.error('Ошибка при загрузке истории клиента');
     }
   };
 
-  const openInvoiceDetails = (invoice: any) => {
+  const openInvoiceDetails = (invoice: StatementInvoice) => {
     setSelectedInvoice(invoice);
     setIsInvoiceDetailsOpen(true);
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone?.includes(searchTerm)
+  const filteredCustomers = customers.filter((customer) =>
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.phone?.includes(searchTerm),
   );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Клиенты</h1>
-          <p className="text-slate-500 mt-1 font-medium">Управление базой клиентов и их балансами.</p>
+    <div className="rounded-[30px] border border-white/70 bg-[#f4f5fb] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="rounded-[28px] border border-white bg-white px-5 py-5 shadow-sm sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-4xl font-medium tracking-tight text-slate-900">Клиенты</h1>
+              <p className="mt-1 text-slate-500">Только накладные формируют историю операций и баланс клиента.</p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedCustomer(null);
+                setFormData(emptyForm);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center justify-center space-x-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-800"
+            >
+              <Plus size={18} />
+              <span>Новый клиент</span>
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => { setSelectedCustomer(null); setFormData({ name: '', phone: '', address: '', notes: '' }); setIsModalOpen(true); }}
-          className="flex items-center justify-center space-x-3 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
-        >
-          <Plus size={20} strokeWidth={3} />
-          <span>Новый клиент</span>
-        </button>
-      </div>
 
-      <div className="relative group">
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-        <input
-          type="text"
-          placeholder="Поиск по имени или телефону..."
-          className="w-full pl-16 pr-8 py-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm outline-none focus:ring-4 focus:ring-indigo-50 transition-all font-bold text-slate-700"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-      </div>
+        <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-5">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Поиск по имени или телефону..."
+                className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCustomers.map(customer => (
-          <motion.div layout key={customer.id}>
-            <Card className="hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 group">
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
-                  <User size={28} strokeWidth={2.5} />
-                </div>
-                <div className="flex space-x-1">
-                  <button onClick={() => { 
-                    setSelectedCustomer(customer); 
-                    setFormData({
-                      name: customer.name || '',
-                      phone: customer.phone || '',
-                      address: customer.address || '',
-                      notes: customer.notes || ''
-                    }); 
-                    setIsModalOpen(true); 
-                  }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                    <Edit2 size={18} />
+          <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-3">
+            {filteredCustomers.map((customer) => (
+              <motion.div layout key={customer.id}>
+                <Card className="rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
+                  <div className="mb-6 flex items-start justify-between">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f4f5fb] text-slate-700 transition-colors duration-300 group-hover:bg-slate-900 group-hover:text-white">
+                      <User size={28} strokeWidth={2.2} />
+                    </div>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setFormData({
+                            name: customer.name || '',
+                            phone: customer.phone || '',
+                            address: customer.address || '',
+                            notes: customer.notes || '',
+                          });
+                          setIsModalOpen(true);
+                        }}
+                        className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(customer.id)}
+                        className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <h3 className="mb-2 text-xl font-medium text-slate-900">{customer.name}</h3>
+                  <div className="mb-6 space-y-2">
+                    <div className="flex items-center text-sm text-slate-500">
+                      <Phone size={14} className="mr-2" /> {customer.phone || 'Нет телефона'}
+                    </div>
+                    <div className="flex items-center text-sm text-slate-500">
+                      <MapPin size={14} className="mr-2" /> {customer.address || 'Нет адреса'}
+                    </div>
+                  </div>
+
+                  <div className="mb-6 grid grid-cols-3 gap-4 rounded-2xl bg-[#f4f5fb] p-4">
+                    <div>
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Накладные</p>
+                      <p className="text-sm font-medium text-slate-900">{formatMoney(customer.total_invoiced)}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Оплачено</p>
+                      <p className="text-sm font-medium text-emerald-600">{formatMoney(customer.total_paid)}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Долг</p>
+                      <p className={`text-sm font-medium ${customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoney(customer.balance)}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => openStatement(customer)}
+                    className="flex w-full items-center justify-center space-x-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <FileText size={16} />
+                    <span>Накладные клиента</span>
                   </button>
-                  <button onClick={() => handleDelete(customer.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-              
-              <h3 className="text-xl font-black text-slate-900 mb-2">{customer.name}</h3>
-              <div className="space-y-2 mb-6">
-                <div className="flex items-center text-sm font-bold text-slate-500">
-                  <Phone size={14} className="mr-2" /> {customer.phone || 'Нет телефона'}
-                </div>
-                <div className="flex items-center text-sm font-bold text-slate-500">
-                  <MapPin size={14} className="mr-2" /> {customer.address || 'Нет адреса'}
-                </div>
-              </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl mb-6">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Оплачено</p>
-                  <p className="text-sm font-black text-emerald-600">{customer.total_paid?.toFixed(2) || '0.00'} TJS</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Долг</p>
-                  <p className={`text-sm font-black ${customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{customer.balance?.toFixed(2) || '0.00'} TJS</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => openStatement(customer)}
-                className="w-full flex items-center justify-center space-x-2 py-4 bg-white border-2 border-slate-100 rounded-xl font-black text-xs uppercase tracking-widest text-slate-600 hover:border-indigo-600 hover:text-indigo-600 transition-all"
+        <AnimatePresence>
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsModalOpen(false)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
               >
-                <FileText size={16} />
-                <span>История чеков</span>
-              </button>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-10 py-8">
+                  <h2 className="text-2xl font-medium tracking-tight text-slate-900">
+                    {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
+                  </h2>
+                  <button onClick={() => setIsModalOpen(false)} className="rounded-xl p-2 transition-colors hover:bg-white">
+                    <X />
+                  </button>
+                </div>
+                <form onSubmit={handleSave} className="space-y-6 p-10">
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Имя клиента</label>
+                    <input
+                      required
+                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Телефон</label>
+                    <input
+                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Адрес</label>
+                    <input
+                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] uppercase tracking-widest text-slate-400">Заметки</label>
+                    <textarea
+                      className="min-h-[100px] w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
+                  </div>
+                  <button type="submit" className="w-full rounded-2xl bg-slate-900 py-5 text-white transition-all hover:bg-slate-800">
+                    Сохранить
+                  </button>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
-      {/* Modal for Add/Edit */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden">
-              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">{selectedCustomer ? 'Редактировать' : 'Новый клиент'}</h2>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-colors"><X /></button>
-              </div>
-              <form onSubmit={handleSave} className="p-10 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Имя клиента</label>
-                  <input required className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+        <AnimatePresence>
+          {isStatementOpen && selectedCustomer && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsStatementOpen(false)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 50, opacity: 0 }}
+                className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3rem] bg-white shadow-2xl"
+              >
+                <div className="border-b border-slate-100 bg-slate-50/50 px-10 py-10">
+                  <div className="mb-6 flex items-start justify-between">
+                    <div>
+                      <h2 className="text-3xl font-medium tracking-tight text-slate-900">{selectedCustomer.name}</h2>
+                      <p className="mt-1 text-slate-500">История и баланс строятся только по накладным.</p>
+                    </div>
+                    <button onClick={() => setIsStatementOpen(false)} className="rounded-2xl p-3 shadow-sm transition-colors hover:bg-white">
+                      <X />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Всего по накладным</p>
+                      <p className="text-xl font-medium text-slate-900">{formatMoney(selectedCustomer.total_invoiced)}</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Всего оплачено</p>
+                      <p className="text-xl font-medium text-emerald-600">{formatMoney(selectedCustomer.total_paid)}</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+                      <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">Текущий долг</p>
+                      <p className="text-xl font-medium text-rose-600">{formatMoney(selectedCustomer.balance)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Телефон</label>
-                  <input className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Адрес</label>
-                  <input className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" value={formData.address || ''} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Заметки</label>
-                  <textarea className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold min-h-[100px]" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
-                </div>
-                <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95">
-                  Сохранить
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
-      {/* Modal for Statement */}
-      <AnimatePresence>
-        {isStatementOpen && selectedCustomer && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsStatementOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-              <div className="px-10 py-10 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedCustomer.name}</h2>
-                    <p className="text-slate-500 font-bold mt-1">История операций и баланс</p>
-                  </div>
-                  <button onClick={() => setIsStatementOpen(false)} className="p-3 hover:bg-white rounded-2xl transition-colors shadow-sm"><X /></button>
-                </div>
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Всего выставлено</p>
-                    <p className="text-xl font-black text-slate-900">{selectedCustomer.total_invoiced?.toFixed(2)} TJS</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Всего оплачено</p>
-                    <p className="text-xl font-black text-emerald-600">{selectedCustomer.total_paid?.toFixed(2)} TJS</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Текущий долг</p>
-                    <p className="text-xl font-black text-rose-600">{selectedCustomer.balance?.toFixed(2)} TJS</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-10">
-                <div className="space-y-4">
-                  {statementData.map((item, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => item.type === 'invoice' && openInvoiceDetails(item)}
-                      className={`flex items-center justify-between p-6 bg-slate-50 rounded-3xl hover:bg-slate-100 transition-colors group ${item.type === 'invoice' ? 'cursor-pointer' : ''}`}
-                    >
-                      <div className="flex items-center space-x-6">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                          item.type === 'invoice' ? 'bg-indigo-100 text-indigo-600' : 
-                          item.type === 'payment' ? 'bg-emerald-100 text-emerald-600' : 
-                          'bg-amber-100 text-amber-600'
-                        }`}>
-                          {item.type === 'invoice' ? <FileText size={24} /> : 
-                           item.type === 'payment' ? <ChevronRight size={24} /> : 
-                           <RotateCcw size={24} />}
+                <div className="flex-1 overflow-y-auto p-10">
+                  <div className="space-y-4">
+                    {statementData.length === 0 && (
+                      <div className="rounded-3xl bg-slate-50 p-8 text-center text-sm text-slate-500">
+                        У клиента пока нет накладных.
+                      </div>
+                    )}
+
+                    {statementData.map((invoice) => (
+                      <div
+                        key={invoice.id}
+                        onClick={() => openInvoiceDetails(invoice)}
+                        className="flex cursor-pointer items-center justify-between rounded-3xl bg-slate-50 p-6 transition-colors hover:bg-slate-100"
+                      >
+                        <div className="flex items-center space-x-6">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                            <FileText size={24} />
+                          </div>
+                          <div>
+                            <p className="text-lg font-medium text-slate-900">Накладная #{invoice.id}</p>
+                            <p className="text-sm text-slate-400">
+                              {new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Оплаты: {formatCount(invoice.paymentEvents?.length || 0)} · Возвраты: {formatCount(invoice.returnEvents?.length || 0)}
+                            </p>
+                          </div>
                         </div>
+                        <div className="text-right">
+                          <p className="text-xl font-medium text-slate-900">{formatMoney(invoice.netAmount)}</p>
+                          <div className="mt-2 flex justify-end">
+                            <Badge variant={invoice.status === 'paid' ? 'success' : invoice.invoiceBalance > 0 ? 'warning' : 'default'}>
+                              {invoice.status === 'paid' ? 'Оплачено' : invoice.invoiceBalance > 0 ? 'Есть долг' : 'Закрыто'}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">Остаток: {formatMoney(invoice.invoiceBalance)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isInvoiceDetailsOpen && selectedInvoice && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsInvoiceDetailsOpen(false)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-8">
+                  <h3 className="text-2xl font-medium text-slate-900">Накладная #{selectedInvoice.id}</h3>
+                  <button onClick={() => setIsInvoiceDetailsOpen(false)} className="rounded-xl p-2 transition-colors hover:bg-white">
+                    <X />
+                  </button>
+                </div>
+
+                <div className="flex-1 space-y-6 overflow-y-auto p-8">
+                  <div className="flex justify-between text-sm text-slate-500">
+                    <span>Дата: {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</span>
+                    <span>Склад: {selectedInvoice.warehouse?.name || '---'}</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {selectedInvoice.items?.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
                         <div>
-                          <p className="font-black text-slate-900 text-lg">
-                            {item.type === 'invoice' ? `Накладная #${item.id}` : 
-                             item.type === 'payment' ? 'Оплата наличными' : 
-                             `Возврат товара (#${item.invoiceId})`}
+                          <p className="font-medium text-slate-900">{item.product?.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {formatCount(item.quantity)} x {formatMoney(item.sellingPrice)}
                           </p>
-                          <p className="text-sm font-bold text-slate-400">
-                            {new Date(item.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
+                          {Number(item.returnedQty || 0) > 0 && (
+                            <p className="mt-1 text-xs text-amber-600">Возвращено: {formatCount(item.returnedQty || 0)}</p>
+                          )}
                         </div>
+                        <p className="font-medium text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
                       </div>
-                      <div className="text-right">
-                        <p className={`text-xl font-black ${
-                          item.type === 'invoice' ? 'text-slate-900' : 
-                          item.type === 'payment' ? 'text-emerald-600' : 
-                          'text-amber-600'
-                        }`}>
-                          {item.type === 'invoice' ? `+${item.netAmount?.toFixed(2)}` : 
-                           item.type === 'payment' ? `-${item.amount?.toFixed(2)}` : 
-                           `-${item.totalValue?.toFixed(2)}`} TJS
-                        </p>
-                        <Badge variant={
-                          item.type === 'invoice' ? (item.status === 'paid' ? 'success' : 'warning') : 
-                          item.type === 'payment' ? 'success' : 
-                          'warning'
-                        }>
-                          {item.type === 'invoice' ? (item.status === 'paid' ? 'Оплачено' : 'Ожидает') : 
-                           item.type === 'payment' ? 'Принято' : 
-                           'Возврат'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                    ))}
+                  </div>
 
-      {/* Invoice Details Modal */}
-      <AnimatePresence>
-        {isInvoiceDetailsOpen && selectedInvoice && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInvoiceDetailsOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden">
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="text-2xl font-black text-slate-900">Накладная #{selectedInvoice.id}</h3>
-                <button onClick={() => setIsInvoiceDetailsOpen(false)} className="p-2 hover:bg-white rounded-xl transition-colors"><X /></button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="flex justify-between text-sm font-bold text-slate-500">
-                  <span>Дата: {new Date(selectedInvoice.createdAt).toLocaleString()}</span>
-                  <span>Склад: {selectedInvoice.warehouse?.name}</span>
-                </div>
-                <div className="space-y-4">
-                  {selectedInvoice.items?.map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
-                      <div>
-                        <p className="font-bold text-slate-900">{item.product?.name}</p>
-                        <p className="text-xs text-slate-400">{item.quantity} x {item.sellingPrice.toFixed(2)} TJS</p>
+                  <div className="space-y-2 border-t border-slate-100 pt-6">
+                    <div className="flex justify-between text-sm text-slate-500">
+                      <span>Сумма</span>
+                      <span>{formatMoney(selectedInvoice.totalAmount)}</span>
+                    </div>
+                    {Number(selectedInvoice.discount || 0) > 0 && (
+                      <div className="flex justify-between text-sm text-rose-500">
+                        <span>Скидка ({selectedInvoice.discount}%)</span>
+                        <span>-{formatMoney((Number(selectedInvoice.totalAmount || 0) * Number(selectedInvoice.discount || 0)) / 100)}</span>
                       </div>
-                      <p className="font-black text-slate-900">{(item.quantity * item.sellingPrice).toFixed(2)} TJS</p>
+                    )}
+                    {Number(selectedInvoice.returnedAmount || 0) > 0 && (
+                      <div className="flex justify-between text-sm text-amber-600">
+                        <span>Возвраты</span>
+                        <span>-{formatMoney(selectedInvoice.returnedAmount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 text-xl font-medium text-slate-900">
+                      <span>Итого</span>
+                      <span>{formatMoney(selectedInvoice.netAmount)}</span>
                     </div>
-                  ))}
-                </div>
-                <div className="pt-6 border-t border-slate-100 space-y-2">
-                  <div className="flex justify-between text-sm font-bold text-slate-500">
-                    <span>Сумма</span>
-                    <span>{selectedInvoice.totalAmount?.toFixed(2)} TJS</span>
-                  </div>
-                  {selectedInvoice.discount > 0 && (
-                    <div className="flex justify-between text-sm font-bold text-rose-500">
-                      <span>Скидка ({selectedInvoice.discount}%)</span>
-                      <span>-{(selectedInvoice.totalAmount * selectedInvoice.discount / 100).toFixed(2)} TJS</span>
+                    <div className="flex justify-between text-sm text-emerald-600">
+                      <span>Оплачено</span>
+                      <span>{formatMoney(selectedInvoice.paidAmount)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-xl font-black text-slate-900 pt-2">
-                    <span>Итого</span>
-                    <span>{selectedInvoice.netAmount?.toFixed(2)} TJS</span>
+                    <div className="flex justify-between text-sm text-rose-600">
+                      <span>Остаток</span>
+                      <span>{formatMoney(selectedInvoice.invoiceBalance)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 border-t border-slate-100 pt-6">
+                    <h4 className="text-sm font-medium text-slate-900">Оплаты по накладной</h4>
+                    {selectedInvoice.paymentEvents?.length ? (
+                      selectedInvoice.paymentEvents.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3">
+                          <div>
+                            <p className="text-sm font-medium text-emerald-700">{formatMoney(payment.amount)}</p>
+                            <p className="text-xs text-emerald-600">
+                              {new Date(payment.createdAt).toLocaleString('ru-RU')} · {payment.staff_name}
+                            </p>
+                          </div>
+                          <span className="text-xs uppercase tracking-wider text-emerald-600">{payment.method}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400">Оплат по этой накладной нет.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 border-t border-slate-100 pt-6">
+                    <h4 className="text-sm font-medium text-slate-900">Возвраты по накладной</h4>
+                    {selectedInvoice.returnEvents?.length ? (
+                      selectedInvoice.returnEvents.map((itemReturn) => (
+                        <div key={itemReturn.id} className="rounded-2xl bg-amber-50 px-4 py-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-sm font-medium text-amber-700">{formatMoney(itemReturn.totalValue)}</p>
+                            <p className="text-xs text-amber-600">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</p>
+                          </div>
+                          <p className="mt-1 text-xs text-amber-700">{itemReturn.staff_name}</p>
+                          {itemReturn.reason && <p className="mt-1 text-xs text-amber-600">{itemReturn.reason}</p>}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400">Возвратов по этой накладной нет.</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

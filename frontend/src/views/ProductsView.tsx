@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import client from '../api/client';
 import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory } from '../api/products.api';
 import { 
@@ -24,9 +24,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import { formatMoney, toFixedNumber } from '../utils/format';
 import { getProductBatches } from '../api/products.api';
+import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 
 export default function ProductsView() {
+  const user = getCurrentUser();
+  const isAdmin = isAdminUser(user);
+  const userWarehouseId = getUserWarehouseId(user);
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -43,12 +48,21 @@ export default function ProductsView() {
   const [productHistory, setProductHistory] = useState<any[]>([]);
   const [productBatches, setProductBatches] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
   const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', reason: '' });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [usdRate, setUsdRate] = useState<string>('10.95'); // Default rate
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+
+  const availableTransferStock = selectedProduct && transferData.fromWarehouseId
+    ? String(selectedProduct.warehouseId || '') === transferData.fromWarehouseId || selectedWarehouseId === transferData.fromWarehouseId
+      ? Number(selectedProduct.stock || 0)
+      : null
+    : selectedProduct
+      ? Number(selectedProduct.stock || 0)
+      : null;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -63,12 +77,9 @@ export default function ProductsView() {
     photoUrl: ''
   });
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
-
   useEffect(() => {
     fetchInitialData();
-  }, [selectedWarehouseId]);
+  }, [selectedWarehouseId, isAdmin, userWarehouseId]);
 
   const fetchInitialData = async () => {
     setIsLoading(true);
@@ -79,7 +90,11 @@ export default function ProductsView() {
         client.get('/settings/categories').then(res => res.data)
       ]);
       setProducts(Array.isArray(productsData) ? productsData : []);
-      setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
+      const filteredWarehouses = filterWarehousesForUser(Array.isArray(warehousesData) ? warehousesData : [], user);
+      setWarehouses(filteredWarehouses);
+      if (!isAdmin && filteredWarehouses[0]) {
+        setSelectedWarehouseId(String(filteredWarehouses[0].id));
+      }
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (err) {
       console.error(err);
@@ -98,7 +113,7 @@ export default function ProductsView() {
         toWarehouseId: Number(transferData.toWarehouseId),
         quantity: Number(transferData.quantity)
       });
-      toast.success('Товар успешно перенесен!');
+      toast.success('Товар успешно перенесён!');
       setShowTransferModal(false);
       setTransferData({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
       fetchInitialData();
@@ -132,8 +147,8 @@ export default function ProductsView() {
       const history = await getProductHistory(product.id);
       setProductHistory(history);
       setShowHistoryModal(true);
-    } catch (err) {
-      toast.error('Ошибка при загрузке истории');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при загрузке истории');
     }
   };
 
@@ -143,8 +158,8 @@ export default function ProductsView() {
       const batches = await getProductBatches(product.id);
       setProductBatches(batches);
       setShowBatchesModal(true);
-    } catch (err) {
-      toast.error('Ошибка при загрузке партий');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при загрузке партий');
     }
   };
 
@@ -157,72 +172,114 @@ export default function ProductsView() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Поддерживаются JPG, PNG, WEBP или PDF файлы');
+      e.target.value = '';
+      return;
+    }
+
     setIsScanning(true);
     const formData = new FormData();
     formData.append('invoice', file);
 
     try {
       const res = await client.post('/ocr/parse-invoice', formData);
-      // Initialize sellingPrice for each item if not present
-      const items = res.data.map((item: any) => ({
+      const rawItems = Array.isArray(res.data) ? res.data : [];
+      const items = rawItems.map((item: any) => ({
         ...item,
         sellingPrice: item.sellingPrice || ''
       }));
+      if (!items.length) {
+        toast.error('Сканирование завершено, но товары не были распознаны');
+        setOcrResults([]);
+        return;
+      }
       setOcrResults(items);
       toast.success('Накладная успешно отсканирована!');
-    } catch (err) {
-      toast.error('Ошибка при сканировании накладной');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при сканировании накладной');
     } finally {
       setIsScanning(false);
+      e.target.value = '';
     }
   };
 
   const handleAddOcrToStock = async () => {
     if (!ocrResults || !selectedWarehouseId) return;
-
+    if (!categories.length) {
+      toast.error('Сначала создайте хотя бы одну категорию товаров');
+      return;
+    }
     const rate = parseFloat(usdRate) || 1;
-    
     try {
       setIsLoading(true);
+      const normalizedResults = new Map<string, any>();
       for (const item of ocrResults) {
+        const normalizedName = String(item.name || '').trim();
+        const normalizedSku = String(item.sku || '').trim();
+        const key = normalizedSku || normalizedName.toLowerCase();
+        const quantity = Number(item.quantity || 0);
+        const price = Number(item.price || 0);
+        const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0;
+        if (!key || !normalizedName || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
+          continue;
+        }
+        const existing = normalizedResults.get(key);
+        if (existing) {
+          existing.quantity += quantity;
+          existing.price = price || existing.price;
+          existing.sellingPrice = sellingPrice || existing.sellingPrice;
+        } else {
+          normalizedResults.set(key, {
+            name: normalizedName,
+            sku: normalizedSku || null,
+            quantity,
+            price,
+            sellingPrice,
+          });
+        }
+      }
+      if (!normalizedResults.size) {
+        toast.error('После сканирования не осталось корректных товаров для добавления');
+        return;
+      }
+      const currentProducts = [...products];
+      for (const item of normalizedResults.values()) {
         const costPriceTJS = item.price * rate;
-        
-        // Try to find existing product by SKU or Name
-        let product = products.find(p => (item.sku && p.sku === item.sku) || p.name === item.name);
-        
+        const normalizedItemName = item.name.trim().toLowerCase();
+        const product = currentProducts.find((p) => {
+          const productName = String(p.name || '').trim().toLowerCase();
+          return (item.sku && p.sku === item.sku) || productName === normalizedItemName;
+        });
         if (product) {
-          // Restock existing product
           await restockProduct(product.id, {
             warehouseId: Number(selectedWarehouseId),
             quantity: Number(item.quantity),
             costPrice: costPriceTJS,
             reason: 'OCR Restock'
           });
-          
-          // Update selling price if provided
           if (item.sellingPrice) {
             await updateProduct(product.id, {
-              sellingPrice: parseFloat(item.sellingPrice)
+              sellingPrice: Number(item.sellingPrice)
             });
           }
-        } else {
-          // Create new product
-          // We need a category, let's use the first one or a default
-          const categoryId = categories[0]?.id || 1;
-          await createProduct({
-            name: item.name,
-            sku: item.sku,
-            unit: 'шт',
-            categoryId: Number(categoryId),
-            warehouseId: Number(selectedWarehouseId),
-            costPrice: costPriceTJS,
-            sellingPrice: parseFloat(item.sellingPrice) || costPriceTJS * 1.2, // Default 20% margin
-            initialStock: Number(item.quantity)
-          });
+          continue;
         }
+        const createdProduct = await createProduct({
+          name: item.name,
+          sku: item.sku || undefined,
+          unit: 'шт',
+          categoryId: Number(categories[0].id),
+          warehouseId: Number(selectedWarehouseId),
+          costPrice: costPriceTJS,
+          sellingPrice: Number(item.sellingPrice) || costPriceTJS * 1.2,
+          initialStock: Number(item.quantity),
+          minStock: 0,
+        });
+        currentProducts.push(createdProduct);
       }
-      
-      toast.success('Все товары успешно добавлены на склад! 📦');
+      toast.success('Все товары успешно добавлены на склад');
       setOcrResults(null);
       fetchInitialData();
     } catch (err: any) {
@@ -232,6 +289,36 @@ export default function ProductsView() {
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Для фото поддерживаются JPG, PNG и WEBP');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setIsPhotoUploading(true);
+      const uploadFormData = new FormData();
+      uploadFormData.append('photo', file);
+      const res = await client.post('/ocr/upload', uploadFormData);
+
+      if (res.data?.photoUrl) {
+        setFormData((prev) => ({ ...prev, photoUrl: res.data.photoUrl }));
+        toast.success('Фото успешно загружено');
+      } else {
+        toast.error('Не удалось получить ссылку на фото');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при загрузке фото');
+    } finally {
+      setIsPhotoUploading(false);
+      e.target.value = '';
+    }
+  };
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -266,7 +353,7 @@ export default function ProductsView() {
         minStock: parseFloat(formData.minStock),
         initialStock: parseFloat(formData.initialStock)
       });
-      toast.success('Товар успешно обновлен!');
+      toast.success('Товар успешно обновлён!');
       setShowEditModal(false);
       resetForm();
       fetchInitialData();
@@ -279,7 +366,7 @@ export default function ProductsView() {
     if (!selectedProduct) return;
     try {
       await deleteProduct(selectedProduct.id);
-      toast.success('Товар успешно удален!');
+      toast.success('Товар успешно удалён!');
       fetchInitialData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при удалении товара');
@@ -333,8 +420,10 @@ export default function ProductsView() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="rounded-[30px] border border-white/70 bg-[#f4f5fb] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
+      <div className="space-y-6">
+      <div className="rounded-[28px] border border-white bg-white px-5 py-5 shadow-sm sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Товары</h1>
           <p className="text-slate-500 mt-0.5 font-medium text-sm">Управление ассортиментом, ценами и остатками.</p>
@@ -343,18 +432,24 @@ export default function ProductsView() {
           <select 
             value={selectedWarehouseId}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm min-w-[180px]"
+            disabled={!isAdmin}
+            className="min-w-[190px] rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
           >
             <option value="">Все склады</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
 
-          <label className="flex items-center space-x-2 px-3 py-2 bg-white border border-slate-100 rounded-xl text-slate-700 font-bold text-sm hover:bg-slate-50 transition-all cursor-pointer shadow-sm">
-            {isScanning ? <Loader2 size={16} className="animate-spin text-indigo-600" /> : <Camera size={16} className="text-indigo-600" />}
+          {isAdmin && <label className={clsx(
+            "flex items-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all",
+            selectedWarehouseId
+              ? "cursor-pointer border-sky-100 bg-sky-50 text-slate-700 hover:bg-white"
+              : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+          )}>
+            {isScanning ? <Loader2 size={16} className="animate-spin text-sky-600" /> : <Camera size={16} className={selectedWarehouseId ? "text-sky-600" : "text-slate-400"} />}
             <span>{isScanning ? 'Сканирование...' : 'Сканировать'}</span>
-            <input type="file" className="hidden" accept="image/*" onChange={handleScanInvoice} disabled={isScanning} />
-          </label>
-          <button 
+            <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleScanInvoice} disabled={isScanning || !selectedWarehouseId} />
+          </label>}
+          {isAdmin && <button 
             onClick={() => {
               if (!selectedWarehouseId) {
                 toast.error('Пожалуйста, выберите склад перед добавлением товара');
@@ -365,16 +460,17 @@ export default function ProductsView() {
               setShowAddModal(true);
             }}
             className={clsx(
-              "flex items-center space-x-2 px-4 py-2 rounded-xl font-bold text-sm shadow-xl transition-all active:scale-95",
+              "flex items-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95",
               selectedWarehouseId 
-                ? "bg-indigo-600 text-white shadow-indigo-600/20 hover:bg-indigo-700 hover:-translate-y-0.5" 
+                ? "bg-violet-500 text-white shadow-sm hover:bg-violet-600" 
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             )}
           >
             <Plus size={18} />
             <span>Добавить</span>
-          </button>
+          </button>}
         </div>
+      </div>
       </div>
       
       <AnimatePresence>
@@ -392,7 +488,7 @@ export default function ProductsView() {
             >
               <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-2 bg-indigo-600 text-white rounded-xl">
+                  <div className="p-2 bg-violet-500 text-white rounded-xl">
                     <Package size={20} />
                   </div>
                   <span>{showEditModal ? 'Редактировать товар' : 'Новый товар'}</span>
@@ -410,7 +506,7 @@ export default function ProductsView() {
                       required 
                       value={formData.name}
                       onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       placeholder="Напр: iPhone 15 Pro Max"
                     />
                   </div>
@@ -420,7 +516,7 @@ export default function ProductsView() {
                       type="text" 
                       value={formData.sku}
                       onChange={e => setFormData({...formData, sku: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       placeholder="SKU-12345"
                     />
                   </div>
@@ -431,7 +527,7 @@ export default function ProductsView() {
                       required
                       value={formData.unit}
                       onChange={e => setFormData({...formData, unit: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       placeholder="шт, кг, литр..."
                     />
                   </div>
@@ -441,7 +537,7 @@ export default function ProductsView() {
                       required
                       value={formData.categoryId}
                       onChange={e => setFormData({...formData, categoryId: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm appearance-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm appearance-none bg-white"
                     >
                       <option value="">Выберите категорию</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -453,7 +549,7 @@ export default function ProductsView() {
                       required
                       value={formData.warehouseId}
                       onChange={e => setFormData({...formData, warehouseId: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm appearance-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm appearance-none bg-white"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -468,7 +564,7 @@ export default function ProductsView() {
                         required
                         value={formData.costPrice}
                         onChange={e => setFormData({...formData, costPrice: e.target.value})}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       />
                     </div>
                   )}
@@ -480,7 +576,7 @@ export default function ProductsView() {
                       required
                       value={formData.sellingPrice}
                       onChange={e => setFormData({...formData, sellingPrice: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                     />
                   </div>
                   {!showEditModal && (
@@ -492,35 +588,55 @@ export default function ProductsView() {
                           required
                           value={formData.initialStock}
                           onChange={e => setFormData({...formData, initialStock: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Миним. остаток</label>
+                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Мин. остаток</label>
                         <input 
                           type="number" 
                           required
                           value={formData.minStock}
                           onChange={e => setFormData({...formData, minStock: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                         />
                       </div>
                     </>
                   )}
                   <div className="md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Ссылка на фото (URL)</label>
-                    <input 
-                      type="url" 
-                      value={formData.photoUrl}
-                      onChange={e => setFormData({...formData, photoUrl: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
-                      placeholder="https://example.com/image.jpg"
-                    />
+                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Фото товара</label>
+                    <div className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-sky-600">
+                        {isPhotoUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                        <span>{isPhotoUploading ? 'Загрузка...' : 'Выбрать фото'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handlePhotoUpload}
+                          disabled={isPhotoUploading}
+                        />
+                      </label>
+                      {formData.photoUrl && (
+                        <div className="flex items-center gap-3">
+                          <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <img src={formData.photoUrl} alt="Фото товара" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, photoUrl: '' }))}
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition-all hover:bg-white"
+                          >
+                            Убрать фото
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2 pt-4">
                   <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
-                  <button type="submit" className="px-8 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95 text-sm">
+                  <button type="submit" className="px-8 py-2 bg-violet-500 text-white rounded-xl font-bold shadow-xl shadow-violet-500/20 hover:bg-violet-600 transition-all active:scale-95 text-sm">
                     {showEditModal ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
@@ -560,7 +676,7 @@ export default function ProductsView() {
                       required
                       value={transferData.fromWarehouseId}
                       onChange={e => setTransferData({ ...transferData, fromWarehouseId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm appearance-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -572,7 +688,7 @@ export default function ProductsView() {
                       required
                       value={transferData.toWarehouseId}
                       onChange={e => setTransferData({ ...transferData, toWarehouseId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm appearance-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -580,6 +696,9 @@ export default function ProductsView() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Количество</label>
+                    {availableTransferStock !== null && (
+                      <p className="mb-2 text-xs font-bold text-slate-500">Доступно: {availableTransferStock} {selectedProduct?.unit || 'шт'}</p>
+                    )}
                     <input 
                       type="number" 
                       required
@@ -587,7 +706,7 @@ export default function ProductsView() {
                       placeholder="Введите количество"
                       value={transferData.quantity}
                       onChange={e => setTransferData({ ...transferData, quantity: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-sm" 
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm" 
                     />
                   </div>
                 </div>
@@ -631,7 +750,7 @@ export default function ProductsView() {
                       required
                       value={restockData.warehouseId}
                       onChange={e => setRestockData({ ...restockData, warehouseId: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold appearance-none bg-white"
+                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold appearance-none bg-white"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -645,7 +764,7 @@ export default function ProductsView() {
                         required
                         value={restockData.quantity}
                         onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" 
+                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
                       />
                     </div>
                     {isAdmin && (
@@ -657,7 +776,7 @@ export default function ProductsView() {
                           required
                           value={restockData.costPrice}
                           onChange={e => setRestockData({ ...restockData, costPrice: e.target.value })}
-                          className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" 
+                          className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
                         />
                       </div>
                     )}
@@ -668,7 +787,7 @@ export default function ProductsView() {
                       type="text" 
                       value={restockData.reason}
                       onChange={e => setRestockData({ ...restockData, reason: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold" 
+                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold" 
                       placeholder="Напр: Новая поставка"
                     />
                   </div>
@@ -701,7 +820,7 @@ export default function ProductsView() {
                   <h3 className="text-2xl font-black text-slate-900">Результаты сканирования</h3>
                   <p className="text-slate-500 font-bold">Проверьте данные и установите цены.</p>
                 </div>
-                <div className="flex items-center space-x-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex items-center space-x-4 bg-sky-50 p-4 rounded-2xl border border-sky-100 shadow-sm">
                   <div className="text-right">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Курс USD ($)</p>
                     <input 
@@ -709,10 +828,10 @@ export default function ProductsView() {
                       step="0.01"
                       value={usdRate}
                       onChange={(e) => setUsdRate(e.target.value)}
-                      className="w-24 text-right font-black text-indigo-600 outline-none"
+                      className="w-24 text-right font-black text-sky-600 outline-none"
                     />
                   </div>
-                  <DollarSign className="text-slate-300" size={20} />
+                  <DollarSign className="text-sky-300" size={20} />
                 </div>
               </div>
               <div className="p-8 overflow-y-auto flex-1 space-y-4">
@@ -723,17 +842,17 @@ export default function ProductsView() {
                   <div className="col-span-3 text-right">Цена продажи (TJS)</div>
                 </div>
                 {ocrResults.map((item, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-4 items-center p-4 bg-slate-50 rounded-2xl group hover:bg-indigo-50/30 transition-colors">
+                  <div key={i} className="grid grid-cols-12 gap-4 items-center p-4 bg-sky-50 rounded-2xl group hover:bg-sky-100/50 transition-colors">
                     <div className="col-span-5">
                       <p className="font-bold text-slate-900 line-clamp-2">{item.name}</p>
                       <p className="text-[10px] text-slate-400 font-black uppercase">Артикул: {item.sku || '---'}</p>
                     </div>
                     <div className="col-span-2 text-center">
-                      <p className="font-black text-indigo-600">{item.quantity} шт.</p>
+                      <p className="font-black text-sky-600">{item.quantity} шт.</p>
                     </div>
                     <div className="col-span-2 text-right">
                       <p className="font-black text-slate-900">{item.price} $</p>
-                      <p className="text-[10px] font-bold text-slate-400">≈ {(item.price * parseFloat(usdRate || '0')).toFixed(2)} TJS</p>
+                      <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))}</p>
                     </div>
                     <div className="col-span-3 text-right">
                       <input 
@@ -745,18 +864,18 @@ export default function ProductsView() {
                           newResults[i].sellingPrice = e.target.value;
                           setOcrResults(newResults);
                         }}
-                        className="w-full text-right bg-white px-4 py-2 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-black text-emerald-600"
+                        className="w-full text-right bg-white px-4 py-2 rounded-xl border border-sky-200 focus:border-sky-500 outline-none font-black text-emerald-600"
                       />
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="p-8 bg-slate-50 flex justify-end space-x-3 border-t border-slate-100">
+              <div className="p-8 bg-sky-50/60 flex justify-end space-x-3 border-t border-slate-100">
                 <button onClick={() => setOcrResults(null)} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
                 <button 
                   onClick={handleAddOcrToStock}
                   disabled={isLoading}
-                  className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center space-x-2"
+                  className="px-10 py-4 bg-sky-500 text-white rounded-2xl font-bold shadow-xl shadow-sky-500/20 hover:bg-sky-600 transition-all disabled:opacity-50 flex items-center space-x-2"
                 >
                   {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Package size={20} />}
                   <span>Добавить всё на склад</span>
@@ -782,7 +901,7 @@ export default function ProductsView() {
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-3 bg-slate-900 text-white rounded-2xl">
+                  <div className="p-3 bg-sky-500 text-white rounded-2xl">
                     <History size={24} />
                   </div>
                   <span>История товара: {selectedProduct?.name}</span>
@@ -812,13 +931,20 @@ export default function ProductsView() {
                             "px-2 py-1 rounded-lg text-[10px] font-black uppercase",
                             t.type === 'incoming' ? "bg-emerald-50 text-emerald-600" :
                             t.type === 'outgoing' ? "bg-rose-50 text-rose-600" :
+                            t.type === 'price_change' || t.type === 'adjustment' ? "bg-sky-50 text-sky-600" :
                             "bg-amber-50 text-amber-600"
                           )}>
-                            {t.type === 'incoming' ? 'Приход' : t.type === 'outgoing' ? 'Расход' : 'Перенос'}
+                            {t.type === 'incoming'
+                              ? 'Приход'
+                              : t.type === 'outgoing'
+                                ? 'Расход'
+                                : t.type === 'price_change' || t.type === 'adjustment'
+                                  ? 'Изменение цены'
+                                  : 'Перенос'}
                           </span>
                         </td>
-                        <td className="py-4 font-black">{t.quantityChange > 0 ? `+${t.quantityChange}` : t.quantityChange}</td>
-                        <td className="py-4 text-slate-600">{t.warehouse?.name || '---'}</td>
+                        <td className="py-4 font-black">{Number(t.qtyChange || 0) > 0 ? `+${t.qtyChange}` : (t.qtyChange ?? 0)}</td>
+                        <td className="py-4 text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
                         <td className="py-4 text-slate-500 italic">{t.reason || '---'}</td>
                         <td className="py-4 text-slate-500">{t.username}</td>
                       </tr>
@@ -844,9 +970,9 @@ export default function ProductsView() {
               animate={{ scale: 1, opacity: 1 }}
               className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-violet-50/50">
                 <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-3 bg-indigo-600 text-white rounded-2xl">
+                  <div className="p-3 bg-violet-500 text-white rounded-2xl">
                     <Layers size={24} />
                   </div>
                   <span>Партии товара (FIFO): {selectedProduct.name}</span>
@@ -871,15 +997,15 @@ export default function ProductsView() {
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {productBatches.map((b, i) => (
-                      <tr key={b.id} className={clsx("text-sm", i === 0 && "bg-indigo-50/30")}>
+                      <tr key={b.id} className={clsx("text-sm", i === 0 && "bg-violet-50/40")}>
                         <td className="py-4 text-slate-500 font-bold">
                           {new Date(b.createdAt).toLocaleDateString('ru-RU')}
-                          {i === 0 && <span className="ml-2 px-2 py-0.5 bg-indigo-600 text-white text-[8px] rounded-md uppercase">След. на списание</span>}
+                          {i === 0 && <span className="ml-2 px-2 py-0.5 bg-violet-500 text-white text-[8px] rounded-md uppercase">След. на списание</span>}
                         </td>
                         <td className="py-4 text-slate-600 font-bold">{b.warehouse?.name}</td>
                         <td className="py-4 text-right text-slate-400 font-bold">{b.quantity} {selectedProduct.unit}</td>
                         <td className="py-4 text-right font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</td>
-                        <td className="py-4 text-right font-black text-emerald-600">{b.costPrice.toFixed(2)} TJS</td>
+                        <td className="py-4 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
                       </tr>
                     ))}
                     {productBatches.length === 0 && (
@@ -911,25 +1037,26 @@ export default function ProductsView() {
         message={`Вы уверены, что хотите удалить товар "${selectedProduct?.name}"? Это действие нельзя отменить.`}
       />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/30">
+      <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col md:flex-row gap-3 flex-1 max-w-2xl">
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
               <input 
                 type="text" 
                 placeholder="Поиск по названию или SKU..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all font-bold text-slate-700 text-sm shadow-sm"
+                className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
               />
             </div>
             <div className="relative min-w-[180px]">
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
               <select
                 value={selectedWarehouseId}
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="w-full pl-11 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all font-bold text-slate-700 text-sm shadow-sm appearance-none bg-white"
+                disabled={!isAdmin}
+                className="w-full appearance-none rounded-2xl border border-violet-100 bg-violet-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
               >
                 <option value="">Все склады</option>
                 {warehouses.map(w => (
@@ -939,8 +1066,8 @@ export default function ProductsView() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="px-3 py-1.5 bg-white rounded-lg border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Всего: {filteredProducts.length}
+            <div className="rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+              Товаров: {filteredProducts.length}
             </div>
           </div>
         </div>
@@ -948,7 +1075,7 @@ export default function ProductsView() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-[9px] font-black uppercase tracking-[0.2em]">
+              <tr className="bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 <th className="px-5 py-3">№</th>
                 <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('name')}>
                   <div className="flex items-center space-x-1.5">
@@ -972,7 +1099,7 @@ export default function ProductsView() {
                 </th>
                 <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('stock')}>
                   <div className="flex items-center space-x-1.5">
-                    <span>Запас</span>
+                    <span>Остаток</span>
                     {sortConfig.key === 'stock' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                   </div>
                 </th>
@@ -980,13 +1107,13 @@ export default function ProductsView() {
                 <th className="px-5 py-3 text-right">Действия</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {filteredProducts.map((product, index) => (
-                <tr key={product.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                  <td className="px-5 py-3 font-bold text-slate-400 text-xs">{index + 1}</td>
+                <tr key={product.id} className="group transition-all duration-300 hover:bg-slate-50/70">
+                  <td className="px-5 py-4 text-xs font-medium text-slate-400">{index + 1}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-110 transition-transform duration-500 border border-slate-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-transform duration-500 group-hover:scale-105">
                         {product.photoUrl ? (
                           <img src={product.photoUrl} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
@@ -994,18 +1121,18 @@ export default function ProductsView() {
                         )}
                       </div>
                       <div>
-                        <p className="font-black text-slate-900 leading-tight text-xs">{product.name}</p>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">SKU: {product.sku || '---'}</p>
+                        <p className="text-sm font-medium leading-tight text-slate-900">{product.name}</p>
+                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">SKU: {product.sku || '---'}</p>
                       </div>
                     </div>
                   </td>
                   {isAdmin && (
                     <td className="px-5 py-3">
-                      <p className="font-bold text-slate-500 text-xs">{product.costPrice.toFixed(2)} <span className="text-[9px] uppercase">TJS</span></p>
+                      <p className="text-xs font-medium text-slate-500">{toFixedNumber(product.costPrice)} <span className="text-[10px] uppercase">TJS</span></p>
                     </td>
                   )}
                   <td className="px-5 py-3">
-                    <p className="font-black text-indigo-600 text-sm">{product.sellingPrice.toFixed(2)} <span className="text-[10px] font-bold uppercase">TJS</span></p>
+                    <p className="text-sm font-semibold text-slate-900">{toFixedNumber(product.sellingPrice)} <span className="text-[10px] font-medium uppercase text-slate-400">TJS</span></p>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center space-x-2">
@@ -1014,19 +1141,19 @@ export default function ProductsView() {
                         product.stock <= product.minStock ? "bg-rose-600 animate-pulse" : "bg-emerald-500"
                       )} />
                       <span className={clsx(
-                        "font-black text-sm",
+                        "text-sm font-semibold",
                         product.stock <= product.minStock ? "text-rose-600" : "text-slate-900"
                       )}>
-                        {product.stock} <span className="text-[10px] font-bold text-slate-400 uppercase">{product.unit}</span>
+                        {product.stock} <span className="text-[10px] font-medium uppercase text-slate-400">{product.unit}</span>
                       </span>
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <p className="font-bold text-slate-500 text-xs">{product.totalIncoming} <span className="text-[10px] font-bold text-slate-400 uppercase">{product.unit}</span></p>
+                    <p className="text-xs font-medium text-slate-500">{product.totalIncoming} <span className="text-[10px] font-medium text-slate-400 uppercase">{product.unit}</span></p>
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <div className="flex flex-col items-end space-y-1 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300">
-                      <div className="flex items-center space-x-1">
+                    <div className="flex flex-col items-end space-y-1.5">
+                      <div className="flex items-center space-x-1.5">
                         <button 
                           onClick={() => {
                             setSelectedProduct(product);
@@ -1044,7 +1171,7 @@ export default function ProductsView() {
                             });
                             setShowEditModal(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
                           title="Редактировать"
                         >
                           <Edit size={14} />
@@ -1055,23 +1182,23 @@ export default function ProductsView() {
                             setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
                             setShowRestockModal(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600" 
                           title="Пополнить"
                         >
                           <PlusCircle size={14} />
                         </button>
                         <button 
                           onClick={() => handleShowBatches(product)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
                           title="Партии (FIFO)"
                         >
                           <Layers size={14} />
                         </button>
                       </div>
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-1.5">
                         <button 
                           onClick={() => handleShowHistory(product)}
-                          className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600" 
                           title="История"
                         >
                           <History size={14} />
@@ -1082,7 +1209,7 @@ export default function ProductsView() {
                             setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
                             setShowTransferModal(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600" 
                           title="Перенос"
                         >
                           <ArrowRightLeft size={14} />
@@ -1092,7 +1219,7 @@ export default function ProductsView() {
                             setSelectedProduct(product);
                             setShowDeleteConfirm(true);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600" 
                           title="Удалить"
                         >
                           <Trash2 size={14} />
@@ -1106,18 +1233,18 @@ export default function ProductsView() {
                 <tr>
                   <td colSpan={7} className="px-5 py-20 text-center">
                     <div className="flex flex-col items-center justify-center space-y-4">
-                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                         <Package size={32} />
                       </div>
                       <div>
                         <p className="text-xl font-black text-slate-900">Товары не найдены</p>
-                        <p className="text-slate-500 font-medium text-sm">Попробуйте изменить параметры поиска или добавьте новый товар.</p>
+                        <p className="text-slate-500 font-medium text-sm">Измените параметры поиска или выберите другой склад.</p>
                       </div>
                       <button 
                         onClick={() => { resetForm(); setShowAddModal(true); }}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 transition-all text-sm"
+                        className="rounded-2xl bg-violet-500 px-6 py-3 text-sm font-medium text-white transition-all hover:bg-violet-600"
                       >
-                        Добавить первый товар
+                        Добавить товар
                       </button>
                     </div>
                   </td>
@@ -1128,5 +1255,8 @@ export default function ProductsView() {
         </div>
       </div>
     </div>
+    </div>
   );
 }
+
+

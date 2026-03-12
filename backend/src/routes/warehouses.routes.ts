@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
+import { authorize } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const warehouse = await prisma.warehouse.create({ data: req.body });
     res.status(201).json(warehouse);
@@ -21,7 +22,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const warehouse = await prisma.warehouse.update({
       where: { id: Number(req.params.id) },
@@ -33,7 +34,7 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     await prisma.warehouse.update({
       where: { id: Number(req.params.id) },

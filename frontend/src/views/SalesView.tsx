@@ -5,6 +5,8 @@ import {
   Search, 
   Filter, 
   Receipt, 
+  ChevronUp,
+  ChevronDown,
   ChevronRight, 
   Eye, 
   Trash2, 
@@ -22,12 +24,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
+import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
+import { formatMoney, toFixedNumber } from '../utils/format';
 
 export default function SalesView() {
+  const PAYMENT_EPSILON = 0.01;
   const [invoices, setInvoices] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const user = getCurrentUser();
+  const isAdmin = isAdminUser(user);
+  const userWarehouseId = getUserWarehouseId(user);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [search, setSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+    key: 'createdAt',
+    direction: 'desc',
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -40,18 +52,16 @@ export default function SalesView() {
   const [isReturning, setIsReturning] = useState(false);
   const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
-
   useEffect(() => {
     fetchInvoices();
     fetchWarehouses();
-  }, [selectedWarehouseId]);
+  }, [selectedWarehouseId, isAdmin, userWarehouseId]);
 
   const fetchInvoices = async () => {
     setIsLoading(true);
     try {
-      const query = selectedWarehouseId ? `?warehouseId=${selectedWarehouseId}` : '';
+      const effectiveWarehouseId = !isAdmin && userWarehouseId ? String(userWarehouseId) : selectedWarehouseId;
+      const query = effectiveWarehouseId ? `?warehouseId=${effectiveWarehouseId}` : '';
       const res = await client.get(`/invoices${query}`);
       setInvoices(res.data);
     } catch (err) {
@@ -64,7 +74,11 @@ export default function SalesView() {
   const fetchWarehouses = async () => {
     try {
       const res = await client.get('/warehouses');
-      setWarehouses(res.data);
+      const filteredWarehouses = filterWarehousesForUser(Array.isArray(res.data) ? res.data : [], user);
+      setWarehouses(filteredWarehouses);
+      if (!isAdmin && filteredWarehouses[0]) {
+        setSelectedWarehouseId(String(filteredWarehouses[0].id));
+      }
     } catch (err) {
       console.error(err);
     }
@@ -145,146 +159,258 @@ export default function SalesView() {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => 
-    inv.id.toString().includes(search) || 
-    inv.customer_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredInvoices = invoices.filter((inv) => {
+    const matchesSearch =
+      inv.id.toString().includes(search) ||
+      inv.customer_name.toLowerCase().includes(search.toLowerCase());
+
+    if (isAdmin || !userWarehouseId) {
+      return matchesSearch;
+    }
+
+    const invoiceWarehouseId = inv.warehouseId || inv.warehouse?.id;
+    return matchesSearch && Number(invoiceWarehouseId) === userWarehouseId;
+  });
+
+  const handleSort = (key: string) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   const getStatusBadge = (status: string, cancelled: boolean) => {
-    if (cancelled) return <span className="px-3 py-1 bg-rose-100 text-rose-600 rounded-full text-[10px] font-black uppercase tracking-widest">Отменена</span>;
+    if (cancelled) return <span className="rounded-full bg-rose-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-rose-500">Отменена</span>;
     switch (status) {
-      case 'paid': return <span className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">Оплачено</span>;
-      case 'partial': return <span className="px-3 py-1 bg-amber-100 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest">Частично</span>;
-      default: return <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">Не оплачено</span>;
+      case 'paid': return <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-500">Оплачено</span>;
+      case 'partial': return <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-500">Частично</span>;
+      default: return <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">Не оплачено</span>;
     }
   };
 
+  const getInvoiceSubtotal = (invoice: any) =>
+    Array.isArray(invoice?.items)
+      ? invoice.items.reduce((sum: number, item: any) => sum + Number(item.totalPrice || 0), 0)
+      : Number(invoice?.totalAmount || 0);
+
+  const getInvoiceDiscountAmount = (invoice: any) => {
+    const subtotal = getInvoiceSubtotal(invoice);
+    const discount = Number(invoice?.discount || 0);
+    return subtotal * (discount / 100);
+  };
+
+  const getInvoiceNetAmount = (invoice: any) => {
+    const subtotal = getInvoiceSubtotal(invoice);
+    const discountAmount = getInvoiceDiscountAmount(invoice);
+    const returnedAmount = Number(invoice?.returnedAmount || 0);
+    const calculatedNet = subtotal - discountAmount - returnedAmount;
+    const storedNet = Number(invoice?.netAmount || 0);
+
+    if (Math.abs(calculatedNet - storedNet) <= PAYMENT_EPSILON) {
+      return storedNet;
+    }
+
+    return Math.max(0, calculatedNet);
+  };
+
+  const getEffectiveStatus = (invoice: any) => {
+    if (invoice?.cancelled) {
+      return 'cancelled';
+    }
+
+    const paidAmount = Number(invoice?.paidAmount || 0);
+    const netAmount = getInvoiceNetAmount(invoice);
+
+    if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
+      return 'paid';
+    }
+
+    if (paidAmount > 0) {
+      return 'partial';
+    }
+
+    return 'unpaid';
+  };
+
+  const getInvoiceBalance = (invoice: any) => {
+    const balance = getInvoiceNetAmount(invoice) - Number(invoice?.paidAmount || 0);
+    if (balance <= PAYMENT_EPSILON) {
+      return 0;
+    }
+
+    return balance;
+  };
+
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+
+    switch (sortConfig.key) {
+      case 'id':
+        return (Number(a.id) - Number(b.id)) * direction;
+      case 'createdAt':
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+      case 'customer_name':
+        return String(a.customer_name || '').localeCompare(String(b.customer_name || '')) * direction;
+      case 'netAmount':
+        return (getInvoiceNetAmount(a) - getInvoiceNetAmount(b)) * direction;
+      case 'paidAmount':
+        return (Number(a.paidAmount || 0) - Number(b.paidAmount || 0)) * direction;
+      case 'balance':
+        return (getInvoiceBalance(a) - getInvoiceBalance(b)) * direction;
+      case 'status':
+        return String(getEffectiveStatus(a)).localeCompare(String(getEffectiveStatus(b))) * direction;
+      case 'staff_name':
+        return String(a.staff_name || '').localeCompare(String(b.staff_name || '')) * direction;
+      default:
+        return 0;
+    }
+  });
+
+  const renderSortLabel = (label: string, key: string) => (
+    <button
+      type="button"
+      onClick={() => handleSort(key)}
+      className="inline-flex items-center gap-1 transition-colors hover:text-slate-600"
+    >
+      <span>{label}</span>
+      {sortConfig.key === key ? (
+        sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+      ) : (
+        <Filter size={13} className="opacity-40" />
+      )}
+    </button>
+  );
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="rounded-[30px] border border-white/80 bg-[#f8f9fc] p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,0.22)] sm:p-6">
+      <div className="space-y-6">
+        <div className="rounded-[28px] border border-slate-100 bg-white/95 px-5 py-5 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Продажи</h1>
-          <p className="text-slate-500 mt-1 font-medium">Управление накладными и заказами клиентов.</p>
+          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Продажи</h1>
+          <p className="mt-1 text-slate-500">Управление накладными и заказами клиентов.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-4 mr-4">
              <div className="text-right hidden sm:block">
-                <p className="text-sm font-black text-slate-900 leading-none">{user.username}</p>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{user.role}</p>
+                <p className="text-sm font-medium text-slate-900 leading-none">{user.username}</p>
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-widest text-slate-400">{user.role}</p>
              </div>
           </div>
           <select 
             value={selectedWarehouseId}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-700 font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm min-w-[200px]"
+            disabled={!isAdmin}
+            className="min-w-[200px] rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
           >
             <option value="">Все склады</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button 
             onClick={() => navigate('/pos')}
-            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95"
+            className="flex items-center space-x-2 rounded-2xl bg-slate-800 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-700"
           >
-            <Plus size={20} />
+            <Plus size={18} />
             <span>Новая продажа</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-8 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-slate-50/30">
-          <h2 className="text-2xl font-black text-slate-900">Накладные</h2>
+      <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)]">
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-[#fbfcfe] p-5 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="text-2xl font-semibold text-slate-900">Накладные</h2>
           <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
               placeholder="Поиск по ID или клиенту..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 rounded-[1.25rem] border border-slate-200 focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all font-bold text-slate-700 shadow-sm"
+              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-600 outline-none transition-all focus:border-slate-300 focus:bg-white"
             />
           </div>
         </div>
+      </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                <th className="px-8 py-6">ID</th>
-                <th className="px-8 py-6">Дата</th>
-                <th className="px-8 py-6">Клиент</th>
-                <th className="px-8 py-6">Сумма</th>
-                <th className="px-8 py-6">Оплачено</th>
-                <th className="px-8 py-6">Остаток</th>
-                <th className="px-8 py-6">Статус</th>
-                <th className="px-8 py-6">Сотрудник</th>
-                <th className="px-8 py-6 text-right">Действия</th>
+              <tr className="bg-[#fafbfe] text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                <th className="px-5 py-5">{renderSortLabel('ID', 'id')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Date', 'createdAt')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Customer', 'customer_name')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Amount', 'netAmount')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Paid', 'paidAmount')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Balance', 'balance')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Status', 'status')}</th>
+                <th className="px-5 py-5">{renderSortLabel('Staff', 'staff_name')}</th>
+                <th className="px-5 py-5 text-right">Действия</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                  <td className="px-8 py-6 font-black text-slate-400">#{inv.id}</td>
-                  <td className="px-8 py-6 text-slate-500 font-bold">
+            <tbody className="divide-y divide-slate-100">
+              {sortedInvoices.map((inv) => (
+                <tr key={inv.id} className="transition-all duration-300 hover:bg-[#fafbfe]">
+                  <td className="px-5 py-5 text-sm text-slate-400">#{inv.id}</td>
+                  <td className="px-5 py-5 text-sm text-slate-500">
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
-                  <td className="px-8 py-6 font-black text-slate-900">{inv.customer_name}</td>
-                  <td className="px-8 py-6 font-black text-slate-900">{inv.netAmount.toFixed(2)} TJS</td>
-                  <td className="px-8 py-6 font-bold text-emerald-600">{inv.paidAmount.toFixed(2)} TJS</td>
-                  <td className="px-8 py-6 font-bold text-rose-600">{(inv.netAmount - inv.paidAmount).toFixed(2)} TJS</td>
-                  <td className="px-8 py-6">{getStatusBadge(inv.status, inv.cancelled)}</td>
-                  <td className="px-8 py-6 text-slate-500 font-bold">{inv.staff_name}</td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="flex items-center justify-end space-x-2 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300">
-                      {inv.netAmount > inv.paidAmount && !inv.cancelled && (
+                  <td className="px-5 py-5 text-sm text-slate-700">{inv.customer_name}</td>
+                  <td className="px-5 py-5 text-sm text-slate-700">{formatMoney(getInvoiceNetAmount(inv))}</td>
+                  <td className="px-5 py-5 text-sm text-emerald-500">{formatMoney(inv.paidAmount || 0)}</td>
+                  <td className="px-5 py-5 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
+                  <td className="px-5 py-5">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
+                  <td className="px-5 py-5 text-sm text-slate-500">{inv.staff_name}</td>
+                  <td className="px-5 py-5 text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      {getInvoiceBalance(inv) > 0 && !inv.cancelled && (
                         <button 
                           onClick={() => {
                             setSelectedInvoice(inv);
-                            setPaymentAmount((inv.netAmount - inv.paidAmount).toFixed(2));
+                            setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
                             setShowPaymentModal(true);
                           }}
-                          className="p-3 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-emerald-500 transition-all hover:border-emerald-100 hover:bg-emerald-50" 
                           title="Принять оплату"
                         >
-                          <Banknote size={20} />
+                          <Banknote size={18} />
                         </button>
                       )}
-                      {!inv.cancelled && inv.status !== 'paid' && (
+                      {!inv.cancelled && getEffectiveStatus(inv) !== 'paid' && (
                         <button 
                           onClick={() => {
                             setSelectedInvoice(inv);
                             setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
                             setShowReturnModal(true);
                           }}
-                          className="p-3 text-amber-600 hover:bg-amber-50 rounded-xl transition-all" 
+                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-amber-500 transition-all hover:border-amber-100 hover:bg-amber-50" 
                           title="Возврат"
                         >
-                          <RotateCcw size={20} />
+                          <RotateCcw size={18} />
                         </button>
                       )}
                       <button 
                         onClick={() => fetchInvoiceDetails(inv.id)}
-                        className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" 
+                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition-all hover:border-sky-100 hover:bg-sky-50 hover:text-sky-500" 
                         title="Просмотр"
                       >
-                        <Eye size={20} />
+                        <Eye size={18} />
                       </button>
                       <button 
                         onClick={() => handleDeleteInvoice(inv.id)}
-                        className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" 
+                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500" 
                         title="Удалить"
                       >
-                        <Trash2 size={20} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {filteredInvoices.length === 0 && !isLoading && (
+              {sortedInvoices.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={9} className="px-8 py-32 text-center">
                     <div className="flex flex-col items-center justify-center space-y-6">
-                      <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
+                      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                         <Receipt size={48} />
                       </div>
                       <p className="text-slate-400 font-bold">Накладные не найдены</p>
@@ -348,7 +474,7 @@ export default function SalesView() {
                       <Clock size={18} />
                       <span className="text-[10px] font-black uppercase tracking-widest">Статус</span>
                     </div>
-                    <div>{getStatusBadge(selectedInvoice.status, selectedInvoice.cancelled)}</div>
+                    <div>{getStatusBadge(getEffectiveStatus(selectedInvoice), selectedInvoice.cancelled)}</div>
                     <p className="text-sm font-bold text-slate-500 mt-2">Сотрудник: {selectedInvoice.staff_name}</p>
                   </div>
                 </div>
@@ -382,8 +508,8 @@ export default function SalesView() {
                                 )}
                               </td>
                               <td className="px-6 py-4 font-bold text-slate-500">{item.quantity} {item.unit}</td>
-                              <td className="px-6 py-4 font-bold text-slate-500">{item.sellingPrice.toFixed(2)} TJS</td>
-                              <td className="px-6 py-4 text-right font-black text-slate-900">{item.totalPrice.toFixed(2)} TJS</td>
+                              <td className="px-6 py-4 font-bold text-slate-500">{formatMoney(item.sellingPrice)}</td>
+                              <td className="px-6 py-4 text-right font-black text-slate-900">{formatMoney(item.totalPrice)}</td>
                             </tr>
                           );
                         })}
@@ -396,29 +522,29 @@ export default function SalesView() {
                   <div className="w-full max-w-xs space-y-3">
                     <div className="flex justify-between items-center text-slate-500">
                       <span className="font-bold">Подытог:</span>
-                      <span className="font-black">{selectedInvoice.totalAmount.toFixed(2)} TJS</span>
+                      <span className="font-black">{formatMoney(getInvoiceSubtotal(selectedInvoice))}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-500">
                       <span className="font-bold">Скидка ({selectedInvoice.discount}%):</span>
-                      <span className="font-black">-{((selectedInvoice.totalAmount * selectedInvoice.discount) / 100).toFixed(2)} TJS</span>
+                      <span className="font-black">-{toFixedNumber(getInvoiceDiscountAmount(selectedInvoice))} TJS</span>
                     </div>
                     {selectedInvoice.returnedAmount > 0 && (
                       <div className="flex justify-between items-center text-rose-500">
                         <span className="font-bold">Возвращено:</span>
-                        <span className="font-black">-{selectedInvoice.returnedAmount.toFixed(2)} TJS</span>
+                        <span className="font-black">-{toFixedNumber(selectedInvoice.returnedAmount || 0)} TJS</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center text-2xl font-black text-slate-900 pt-3 border-t border-slate-100">
                       <span>Итого:</span>
-                      <span>{selectedInvoice.netAmount.toFixed(2)} TJS</span>
+                      <span>{formatMoney(getInvoiceNetAmount(selectedInvoice))}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-500 pt-3 border-t border-slate-100">
                       <span className="font-bold">Оплачено:</span>
-                      <span className="font-black text-emerald-600">{selectedInvoice.paidAmount.toFixed(2)} TJS</span>
+                      <span className="font-black text-emerald-600">{formatMoney(selectedInvoice.paidAmount || 0)}</span>
                     </div>
                     <div className="flex justify-between items-center text-slate-500">
                       <span className="font-bold">Остаток (Долг):</span>
-                      <span className="font-black text-rose-600">{(selectedInvoice.netAmount - selectedInvoice.paidAmount).toFixed(2)} TJS</span>
+                      <span className="font-black text-rose-600">{formatMoney(getInvoiceBalance(selectedInvoice))}</span>
                     </div>
                   </div>
                 </div>
@@ -439,7 +565,7 @@ export default function SalesView() {
                           {selectedInvoice.payments.map((p: any) => (
                             <tr key={p.id}>
                               <td className="px-6 py-4 font-bold text-slate-500">{new Date(p.createdAt).toLocaleString('ru-RU')}</td>
-                              <td className="px-6 py-4 font-black text-emerald-600">{p.amount.toFixed(2)} TJS</td>
+                              <td className="px-6 py-4 font-black text-emerald-600">{formatMoney(p.amount)}</td>
                               <td className="px-6 py-4 text-slate-500">{p.staff_name}</td>
                             </tr>
                           ))}
@@ -466,7 +592,7 @@ export default function SalesView() {
                           {selectedInvoice.returns.map((r: any) => (
                             <tr key={r.id}>
                               <td className="px-6 py-4 font-bold text-slate-500">{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
-                              <td className="px-6 py-4 font-black text-rose-600">-{r.totalValue.toFixed(2)} TJS</td>
+                              <td className="px-6 py-4 font-black text-rose-600">-{toFixedNumber(r.totalValue)} TJS</td>
                               <td className="px-6 py-4 text-slate-500 italic">{r.reason}</td>
                               <td className="px-6 py-4 text-slate-500">{r.staff_name}</td>
                             </tr>
@@ -525,11 +651,11 @@ export default function SalesView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 rounded-2xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Итого</p>
-                    <p className="text-lg font-black text-slate-900">{selectedInvoice.netAmount.toFixed(2)} TJS</p>
+                    <p className="text-lg font-black text-slate-900">{formatMoney(getInvoiceNetAmount(selectedInvoice))}</p>
                   </div>
                   <div className="p-4 bg-rose-50 rounded-2xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Долг</p>
-                    <p className="text-lg font-black text-rose-600">{(selectedInvoice.netAmount - selectedInvoice.paidAmount).toFixed(2)} TJS</p>
+                    <p className="text-lg font-black text-rose-600">{formatMoney(getInvoiceBalance(selectedInvoice))}</p>
                   </div>
                 </div>
 
@@ -664,6 +790,7 @@ export default function SalesView() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
