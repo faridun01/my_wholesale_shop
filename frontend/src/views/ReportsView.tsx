@@ -11,12 +11,12 @@ import {
   YAxis,
   Cell,
 } from 'recharts';
-import { FileSpreadsheet, FileText, Warehouse } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { FileSpreadsheet, Warehouse } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import { formatCount, formatMoney, toFixedNumber } from '../utils/format';
+import { formatProductName } from '../utils/productName';
+import { getCurrentUser } from '../utils/userAccess';
 
 interface ReportsViewProps {
   warehouseId?: number | null;
@@ -47,6 +47,33 @@ type ReportRow = {
 
 const PIE_COLORS = ['#5b8def', '#7c6cf2', '#f3cb5d', '#5ec98f', '#ef6fae'];
 
+function PieTooltip({
+  active,
+  payload,
+  reportType,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; payload?: { name?: string; value?: number } }>;
+  reportType: ReportType;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const item = payload[0]?.payload;
+  const label = item?.name || payload[0]?.name || 'Без названия';
+  const value = Number(item?.value ?? payload[0]?.value ?? 0);
+
+  return (
+    <div className="max-w-[min(260px,calc(100vw-32px))] rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+      <p className="break-words text-xs font-medium leading-5 text-slate-700">{label}</p>
+      <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
+        {reportType === 'returns' ? formatCount(value) : formatMoney(value)}
+      </p>
+    </div>
+  );
+}
+
 function csvCell(value: unknown) {
   const normalized = value === null || value === undefined ? '' : String(value);
   return `"${normalized.replace(/"/g, '""')}"`;
@@ -54,6 +81,22 @@ function csvCell(value: unknown) {
 
 function buildCsv(rows: unknown[][]) {
   return ['sep=;', ...rows.map((row) => row.map(csvCell).join(';'))].join('\r\n');
+}
+
+function xmlEscape(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function normalizeSheetName(value: string) {
+  return String(value || 'Лист')
+    .replace(/[\\/*?:[\]]/g, ' ')
+    .trim()
+    .slice(0, 31) || 'Лист';
 }
 
 const reportMeta: Record<
@@ -139,7 +182,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   });
   const [reportData, setReportData] = useState<ReportRow[]>([]);
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = getCurrentUser();
   const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
   const currentMeta = reportMeta[reportType];
 
@@ -226,7 +269,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         if (existing) {
           existing.value += value;
         } else {
-          acc.push({ name: row.product_name, value });
+          acc.push({ name: formatProductName(row.product_name), value });
         }
 
         return acc;
@@ -277,7 +320,37 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     },
   ];
 
-  const exportToCSV = () => {
+  const productProfitData = useMemo(() => {
+    if (reportType !== 'profit') {
+      return [];
+    }
+
+    return reportData
+      .reduce((acc: Array<{ name: string; quantity: number; revenue: number; profit: number }>, row) => {
+        const existing = acc.find((item) => item.name === row.product_name);
+        const quantity = Number(row.quantity || 0);
+        const revenue = Number(row.net_sales || 0);
+        const profit = Number(row.profit || 0);
+
+        if (existing) {
+          existing.quantity += quantity;
+          existing.revenue += revenue;
+          existing.profit += profit;
+        } else {
+          acc.push({
+            name: formatProductName(row.product_name),
+            quantity,
+            revenue,
+            profit,
+          });
+        }
+
+        return acc;
+      }, [])
+      .sort((a, b) => b.profit - a.profit);
+  }, [reportData, reportType]);
+
+  const buildReportRows = (rows: ReportRow[]) => {
     const detailHeaders =
       reportType === 'sales'
         ? ['Дата', 'Накладная', 'Склад', 'Клиент', 'Товар', 'Ед.', 'Кол-во', 'Цена продажи', 'Сумма без скидки', 'Скидка %', 'Сумма после скидки']
@@ -285,14 +358,14 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           ? ['Дата', 'Накладная', 'Склад', 'Клиент', 'Товар', 'Ед.', 'Кол-во', 'Цена продажи', 'Сумма без скидки', 'Скидка %', 'Чистая выручка', 'Себестоимость за ед.', 'Прибыль']
           : ['Дата', 'Возврат', 'Склад', 'Сотрудник', 'Товар', 'Ед.', 'Кол-во', 'Цена продажи', 'Сумма возврата', 'Причина'];
 
-    const detailRows = reportData.map((row) => {
+    const detailRows = rows.map((row) => {
       if (reportType === 'sales') {
         return [
           new Date(row.date).toLocaleDateString('ru-RU'),
           row.invoice_id ? '#' + row.invoice_id : '',
           row.warehouse_name || '',
           row.customer_name || '',
-          row.product_name,
+          formatProductName(row.product_name),
           row.unit || '',
           formatCount(row.quantity),
           toFixedNumber(row.selling_price || 0),
@@ -308,7 +381,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           row.invoice_id ? '#' + row.invoice_id : '',
           row.warehouse_name || '',
           row.customer_name || '',
-          row.product_name,
+          formatProductName(row.product_name),
           row.unit || '',
           formatCount(row.quantity),
           toFixedNumber(row.selling_price || 0),
@@ -325,7 +398,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         row.return_id ? '#' + row.return_id : '',
         row.warehouse_name || '',
         row.staff_name || '',
-        row.product_name,
+        formatProductName(row.product_name),
         row.unit || '',
         formatCount(row.quantity),
         toFixedNumber(row.selling_price || 0),
@@ -334,76 +407,152 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       ];
     });
 
-    const warehouseName =
-      warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
+    return { detailHeaders, detailRows };
+  };
 
-    const csvRows: unknown[][] = [
+  const buildSummaryRows = (rows: ReportRow[], warehouseName: string) => {
+    const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+    const totalValue = rows.reduce((sum, row) => {
+      if (reportType === 'sales') {
+        return sum + Number(row.total_sales || 0);
+      }
+
+      if (reportType === 'profit') {
+        return sum + Number(row.profit || 0);
+      }
+
+      return sum + Number(row.quantity || 0);
+    }, 0);
+
+    return [
       ['Отчёт', currentMeta.title],
       ['Период с', dateRange.start],
       ['Период по', dateRange.end],
       ['Склад', warehouseName],
-      ['Строк в отчёте', summary.rows],
-      ['Общее количество', formatCount(summary.totalQuantity)],
-      ['Сумма периода', reportType === 'returns' ? formatCount(summary.totalQuantity) : toFixedNumber(summary.totalValue)],
+      ['Строк в отчёте', String(rows.length)],
+      ['Общее количество', formatCount(totalQuantity)],
+      ['Сумма периода', reportType === 'returns' ? formatCount(totalQuantity) : toFixedNumber(totalValue)],
+    ];
+  };
+
+  const exportToExcel = () => {
+    const { detailHeaders, detailRows } = buildReportRows(reportData);
+    const warehouseName =
+      warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
+
+    const workbookSheets: Array<{ name: string; rows: unknown[][] }> = [];
+
+    const overallRows: unknown[][] = [
+      ...buildSummaryRows(reportData, warehouseName),
       [],
       detailHeaders,
       ...detailRows,
     ];
 
-    const csvContent = '\uFEFF' + buildCsv(csvRows);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    if (reportType === 'profit' && productProfitData.length) {
+      overallRows.push(
+        [],
+        ['Прибыль по товарам'],
+        ['Товар', 'Количество', 'Чистая выручка', 'Прибыль'],
+        ...productProfitData.map((row) => [
+          row.name,
+          formatCount(row.quantity),
+          toFixedNumber(row.revenue),
+          toFixedNumber(row.profit),
+        ])
+      );
+    }
+
+    workbookSheets.push({ name: 'Общий отчёт', rows: overallRows });
+
+    const groupedByWarehouse = reportData.reduce((acc, row) => {
+      const key = row.warehouse_name || 'Без склада';
+      if (!acc.has(key)) {
+        acc.set(key, []);
+      }
+      acc.get(key)!.push(row);
+      return acc;
+    }, new Map<string, ReportRow[]>());
+
+    groupedByWarehouse.forEach((rows, name) => {
+      const { detailRows: warehouseDetailRows } = buildReportRows(rows);
+      const sheetRows: unknown[][] = [
+        ...buildSummaryRows(rows, name),
+        [],
+        detailHeaders,
+        ...warehouseDetailRows,
+      ];
+
+      if (reportType === 'profit' && productProfitData.length) {
+        const warehouseProfitData = rows
+          .reduce((acc: Array<{ name: string; quantity: number; revenue: number; profit: number }>, row) => {
+            const existing = acc.find((item) => item.name === row.product_name);
+            const quantity = Number(row.quantity || 0);
+            const revenue = Number(row.net_sales || 0);
+            const profit = Number(row.profit || 0);
+
+            if (existing) {
+              existing.quantity += quantity;
+              existing.revenue += revenue;
+              existing.profit += profit;
+            } else {
+              acc.push({ name: formatProductName(row.product_name), quantity, revenue, profit });
+            }
+
+            return acc;
+          }, [])
+          .sort((a, b) => b.profit - a.profit);
+
+        if (warehouseProfitData.length) {
+          sheetRows.push(
+            [],
+            ['Прибыль по товарам'],
+            ['Товар', 'Количество', 'Чистая выручка', 'Прибыль'],
+            ...warehouseProfitData.map((row) => [
+              row.name,
+              formatCount(row.quantity),
+              toFixedNumber(row.revenue),
+              toFixedNumber(row.profit),
+            ])
+          );
+        }
+      }
+
+      workbookSheets.push({ name, rows: sheetRows });
+    });
+
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ ${workbookSheets
+   .map(({ name, rows }) => {
+     const xmlRows = rows
+       .map((row) => {
+         const cells = row
+           .map((cell) => {
+             const value = cell ?? '';
+             const isNumber = typeof value === 'number' || (/^-?\d+([.,]\d+)?$/.test(String(value)) && String(value) !== '');
+             const normalizedValue = isNumber ? String(value).replace(',', '.') : String(value);
+             return `<Cell><Data ss:Type="${isNumber ? 'Number' : 'String'}">${xmlEscape(normalizedValue)}</Data></Cell>`;
+           })
+           .join('');
+         return `<Row>${cells}</Row>`;
+       })
+       .join('');
+
+     return `<Worksheet ss:Name="${xmlEscape(normalizeSheetName(name))}"><Table>${xmlRows}</Table></Worksheet>`;
+   })
+   .join('')}
+</Workbook>`;
+
+    const blob = new Blob(['\uFEFF' + workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `report_${reportType}_${dateRange.start}_${dateRange.end}.csv`;
+    link.download = `otchet_${reportType}_${dateRange.start}_${dateRange.end}.xls`;
     link.click();
     URL.revokeObjectURL(link.href);
-  };
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.text(`Отчет: ${currentMeta.title}`, 14, 15);
-    doc.text(`Период: ${dateRange.start} - ${dateRange.end}`, 14, 25);
-
-    const headers =
-      reportType === 'sales'
-        ? [['Дата', 'Товар', 'Кол-во', 'Цена прод.', 'Итого']]
-        : reportType === 'profit'
-          ? [['Дата', 'Товар', 'Кол-во', 'Цена прод.', 'Себест.', 'Прибыль']]
-          : [['Дата', 'Товар', 'Кол-во', 'Причина']];
-
-    const rows = reportData.map((row) => {
-      if (reportType === 'sales') {
-        return [
-          row.date,
-          row.product_name,
-          row.quantity,
-          toFixedNumber(row.selling_price || 0),
-          toFixedNumber(row.total_sales || 0),
-        ];
-      }
-
-      if (reportType === 'profit') {
-        return [
-          row.date,
-          row.product_name,
-          row.quantity,
-          toFixedNumber(row.selling_price || 0),
-          toFixedNumber(row.cost_price || 0),
-          toFixedNumber(row.profit || 0),
-        ];
-      }
-
-      return [row.date, row.product_name, row.quantity, row.reason || ''];
-    });
-
-    autoTable(doc, {
-      head: headers,
-      body: rows,
-      startY: 35,
-      theme: 'grid',
-      styles: { fontSize: 8 },
-    });
-
-    doc.save(`report_${reportType}_${dateRange.start}_${dateRange.end}.pdf`);
   };
 
   return (
@@ -418,18 +567,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
-              onClick={exportToCSV}
+              onClick={exportToExcel}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800"
             >
               <FileSpreadsheet size={16} />
-              <span>CSV</span>
-            </button>
-            <button
-              onClick={exportToPDF}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <FileText size={16} />
-              <span>PDF</span>
+              <span>Excel</span>
             </button>
           </div>
         </div>
@@ -558,11 +700,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   ))}
                 </Pie>
                 <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: 16,
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
-                  }}
+                  content={<PieTooltip reportType={reportType} />}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -570,12 +708,12 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
           <div className="space-y-3">
             {pieData.map((item, index) => (
-              <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                  <span className="truncate text-slate-600">{item.name}</span>
+              <div key={item.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                  <span className="truncate text-[13px] leading-5 text-slate-600">{item.name}</span>
                 </div>
-                <span className="text-slate-900">
+                <span className="whitespace-nowrap text-right font-medium tabular-nums text-slate-900">
                   {reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}
                 </span>
               </div>
@@ -586,21 +724,50 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         </Panel>
       </section>
 
+      {reportType === 'profit' && (
+        <Panel title="Прибыль по товарам">
+          <div className="max-h-[420px] overflow-auto -mx-5">
+            <table className="min-w-[720px] w-full text-left">
+              <thead className="bg-slate-50 text-sm text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Товар</th>
+                  <th className="px-5 py-3">Количество</th>
+                  <th className="px-5 py-3">Чистая выручка</th>
+                  <th className="px-5 py-3">Прибыль</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {productProfitData.map((row) => (
+                  <tr key={row.name} className="text-sm text-slate-700">
+                    <td className="px-5 py-4 text-slate-900">{row.name}</td>
+                    <td className="px-5 py-4">{formatCount(row.quantity)}</td>
+                    <td className="px-5 py-4">{formatMoney(row.revenue)}</td>
+                    <td className="px-5 py-4 text-emerald-700">{formatMoney(row.profit)}</td>
+                  </tr>
+                ))}
+
+                {!productProfitData.length && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-16 text-center text-sm text-slate-400">
+                      Нет данных о прибыли по товарам
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+
       <Panel
         title="Детализация"
         headerActions={
           <div className="flex items-center gap-2">
             <button
-              onClick={exportToCSV}
+              onClick={exportToExcel}
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
             >
-              CSV
-            </button>
-            <button
-              onClick={exportToPDF}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              PDF
+              Excel
             </button>
           </div>
         }
@@ -632,7 +799,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               {reportData.map((row, index) => (
                 <tr key={`${row.date}-${row.product_name}-${index}`} className="text-sm text-slate-700">
                   <td className="px-5 py-4">{new Date(row.date).toLocaleDateString('ru-RU')}</td>
-                  <td className="px-5 py-4 text-slate-900">{row.product_name}</td>
+                  <td className="px-5 py-4 text-slate-900">{formatProductName(row.product_name)}</td>
                   <td className="px-5 py-4">{row.quantity}</td>
                   {reportType === 'sales' && (
                     <>

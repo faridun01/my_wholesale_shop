@@ -28,6 +28,7 @@ import { formatMoney, toFixedNumber } from '../utils/format';
 import { getProductBatches } from '../api/products.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
+import { formatProductName } from '../utils/productName';
 
 const normalizeOcrProductName = (name: string) => {
   const trimmed = String(name || '').trim();
@@ -38,6 +39,8 @@ const normalizeOcrProductName = (name: string) => {
 const normalizeCatalogName = (name: string) =>
   String(name || '')
     .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/[«»“”„‟"']/gu, '')
+    .replace(/[(),]/gu, ' ')
     .replace(/[ёЁ]/g, 'е')
     .replace(/plasticковых/gi, 'пластиковых')
     .replace(/\s+/g, ' ')
@@ -57,6 +60,15 @@ const detectCategoryName = (name: string) => {
 
   const words = String(name || '').trim().split(/\s+/).filter(Boolean);
   return words.slice(0, 2).join(' ') || 'Прочее';
+};
+
+const formatPriceInput = (value: unknown) => {
+  if (value === '' || value === null || value === undefined) {
+    return '';
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? toFixedNumber(numeric) : '';
 };
 
 export default function ProductsView() {
@@ -340,10 +352,10 @@ export default function ProductsView() {
       const currentProducts = [...products];
       for (const item of preparedResults) {
         const costPriceTJS = item.costPricePerPieceTJS;
-        const normalizedItemName = item.name.trim().toLowerCase();
+        const normalizedItemName = normalizeCatalogName(item.name);
         const categoryId = await ensureCategoryId(item.name);
         const product = currentProducts.find((p) => {
-          const productName = String(p.name || '').trim().toLowerCase();
+          const productName = normalizeCatalogName(String(p.name || ''));
           const productWarehouseId = Number(p.warehouseId || 0);
           const targetWarehouseId = Number(selectedWarehouseId);
 
@@ -381,7 +393,7 @@ export default function ProductsView() {
           currentProducts.push(createdProduct);
         } catch (createErr: any) {
           const duplicateByName = currentProducts.find((p) => {
-            const productName = String(p.name || '').trim().toLowerCase();
+            const productName = normalizeCatalogName(String(p.name || ''));
             const sameWarehouse = Number(p.warehouseId || 0) === Number(selectedWarehouseId);
             return sameWarehouse && productName === normalizedItemName;
           });
@@ -532,7 +544,7 @@ export default function ProductsView() {
     return 0;
   });
 
-  const aggregatedProducts = Object.values(
+  const aggregatedProducts: any[] = Object.values(
     products.reduce((acc, product) => {
       const key = normalizeCatalogName(product.name);
       if (!acc[key]) {
@@ -728,6 +740,7 @@ export default function ProductsView() {
                         required
                         value={formData.costPrice}
                         onChange={e => setFormData({...formData, costPrice: e.target.value})}
+                        onBlur={e => setFormData({...formData, costPrice: formatPriceInput(e.target.value)})}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       />
                     </div>
@@ -740,6 +753,7 @@ export default function ProductsView() {
                       required
                       value={formData.sellingPrice}
                       onChange={e => setFormData({...formData, sellingPrice: e.target.value})}
+                      onBlur={e => setFormData({...formData, sellingPrice: formatPriceInput(e.target.value)})}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                     />
                   </div>
@@ -1038,7 +1052,7 @@ export default function ProductsView() {
                         />
                         Добавить строку #{item.lineIndex || i + 1}
                       </label>
-                      <p className="font-bold text-slate-900 break-words whitespace-normal">{item.name}</p>
+                    <p className="font-bold text-slate-900 break-words whitespace-normal">{formatProductName(item.name)}</p>
                       {item.rawQuantity && (
                         <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>
                       )}
@@ -1157,7 +1171,7 @@ export default function ProductsView() {
                   <div className="rounded-2xl bg-sky-500 p-2.5 text-white">
                     <History size={20} />
                   </div>
-                  <span>История товара: {selectedProduct?.name}</span>
+                  <span>История товара: {formatProductName(selectedProduct?.name)}</span>
                 </h3>
                 <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
@@ -1178,7 +1192,7 @@ export default function ProductsView() {
                   <tbody className="divide-y divide-slate-50">
                     {productHistory.map((t, i) => (
                       <tr key={i} className="text-[13px]">
-                        <td className="py-3 pr-3 align-top text-slate-500">{new Date(t.createdAt).toLocaleString()}</td>
+                        <td className="py-3 pr-3 align-top text-slate-500">{new Date(t.createdAt).toLocaleString('ru-RU')}</td>
                         <td className="py-3 pr-3 align-top">
                           <span className={clsx(
                             "px-2 py-1 rounded-lg text-[10px] font-black uppercase",
@@ -1287,7 +1301,7 @@ export default function ProductsView() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDeleteProduct}
         title="Удалить товар?"
-        message={`Вы уверены, что хотите удалить товар "${selectedProduct?.name}"? Это действие нельзя отменить.`}
+        message={`Вы уверены, что хотите удалить товар "${formatProductName(selectedProduct?.name)}"? Это действие нельзя отменить.`}
       />
 
       <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
@@ -1344,7 +1358,7 @@ export default function ProductsView() {
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 break-words text-[15px] leading-5 text-slate-900">{product.name}</p>
+                    <p className="min-w-0 break-words text-[15px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
                     <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-500">
                       #{index + 1}
                     </span>
@@ -1397,8 +1411,8 @@ export default function ProductsView() {
                         unit: product.unit || '',
                         categoryId: product.categoryId?.toString() || '',
                         warehouseId: product.warehouseId?.toString() || '',
-                        costPrice: product.costPrice?.toString() || '0',
-                        sellingPrice: product.sellingPrice?.toString() || '0',
+                        costPrice: formatPriceInput(product.costPrice),
+                        sellingPrice: formatPriceInput(product.sellingPrice),
                         minStock: product.minStock?.toString() || '0',
                         initialStock: product.initialStock?.toString() || '0',
                         photoUrl: product.photoUrl || ''
@@ -1524,7 +1538,10 @@ export default function ProductsView() {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium leading-tight text-slate-900">{product.name}</p>
+                        <p className="text-sm font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-400">
+                          {product.category?.name || 'Без категории'}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -1573,8 +1590,8 @@ export default function ProductsView() {
                               unit: product.unit || '',
                               categoryId: product.categoryId?.toString() || '',
                               warehouseId: product.warehouseId?.toString() || '',
-                              costPrice: product.costPrice?.toString() || '0',
-                              sellingPrice: product.sellingPrice?.toString() || '0',
+                              costPrice: formatPriceInput(product.costPrice),
+                              sellingPrice: formatPriceInput(product.sellingPrice),
                               minStock: product.minStock?.toString() || '0',
                               initialStock: product.initialStock?.toString() || '0',
                               photoUrl: product.photoUrl || ''

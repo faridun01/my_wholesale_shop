@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import { getCurrentUser } from '../utils/userAccess';
 
 export default function SettingsView() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -59,7 +60,7 @@ export default function SettingsView() {
     confirmPassword: ''
   });
 
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUser = getCurrentUser();
   const role = String(currentUser.role || '').toUpperCase();
   const isAdmin = role === 'ADMIN';
   const canManageSettings = role === 'ADMIN' || role === 'MANAGER';
@@ -232,7 +233,7 @@ export default function SettingsView() {
       
       // Update local storage if needed, but safer to just let them re-login if they changed sensitive info
       const updatedUser = { ...currentUser, ...res.data };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
       
       setProfileForm({ ...profileForm, password: '', confirmPassword: '' });
     } catch (err) {

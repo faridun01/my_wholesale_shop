@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
+import type { AuthRequest } from '../middlewares/auth.middleware.js';
+import { getAccessContext } from '../utils/access.js';
 
 const router = Router();
 const safePercentChange = (current: number, previous: number) => {
@@ -25,7 +27,7 @@ const getPeriodRevenue = (invoices: Array<{ createdAt: Date; netAmount: number }
     return sum;
   }, 0);
 
-router.get('/summary', async (req, res, next) => {
+router.get('/summary', async (req: AuthRequest, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -35,8 +37,23 @@ router.get('/summary', async (req, res, next) => {
 
     // Get user from request (assuming auth middleware is present)
     // For now, we'll get all stats, but in a real app, we'd filter by role.
-    const user = (req as any).user;
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+    const access = await getAccessContext(req);
+    const isAdmin = access.isAdmin;
+    const invoiceWhere = {
+      cancelled: false,
+      warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1),
+    };
+    const productWhere = {
+      active: true,
+      warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1),
+    };
+    const customerWhere = {
+      active: true,
+      city: isAdmin ? undefined : (access.city ?? '__no_city__'),
+    };
+    const warehouseWhere = isAdmin
+      ? { active: true }
+      : { active: true, id: access.warehouseId ?? -1, city: access.city ?? undefined };
 
     const [
       salesToday,
@@ -56,69 +73,69 @@ router.get('/summary', async (req, res, next) => {
       previousMonthProducts,
     ] = await Promise.all([
       prisma.invoice.aggregate({
-        where: { createdAt: { gte: today }, cancelled: false },
+        where: { ...invoiceWhere, createdAt: { gte: today } },
         _sum: { netAmount: true },
       }),
-      prisma.product.count({ where: { active: true } }),
-      prisma.customer.count({ where: { active: true } }),
-      prisma.warehouse.count({ where: { active: true } }),
-      prisma.invoice.count({ where: { cancelled: false } }),
+      prisma.product.count({ where: productWhere }),
+      prisma.customer.count({ where: customerWhere }),
+      prisma.warehouse.count({ where: warehouseWhere }),
+      prisma.invoice.count({ where: invoiceWhere }),
       prisma.product.findMany({
-        where: { stock: { lte: 10 }, active: true },
+        where: { ...productWhere, stock: { lte: 10 } },
         take: 5,
       }),
       prisma.invoice.findMany({
-        where: { cancelled: false },
+        where: invoiceWhere,
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: { customer: true },
       }),
       prisma.invoice.findMany({
-        where: { cancelled: false },
+        where: invoiceWhere,
         include: {
           items: true
         }
       }),
       prisma.reminder.findMany({
-        where: { userId: user.id, isCompleted: false },
+        where: { userId: req.user!.id, isCompleted: false },
         orderBy: { dueDate: 'asc' },
         take: 5
       }),
       prisma.invoice.findMany({
         where: {
-          cancelled: false,
+          ...invoiceWhere,
           createdAt: { gte: monthStart, lt: nextMonthStart },
         },
         select: { netAmount: true },
       }),
       prisma.invoice.findMany({
         where: {
-          cancelled: false,
+          ...invoiceWhere,
           createdAt: { gte: prevMonthStart, lt: monthStart },
         },
         select: { netAmount: true },
       }),
       prisma.customer.count({
         where: {
-          active: true,
+          ...customerWhere,
           createdAt: { gte: monthStart, lt: nextMonthStart },
         },
       }),
       prisma.customer.count({
         where: {
-          active: true,
+          ...customerWhere,
           createdAt: { gte: prevMonthStart, lt: monthStart },
         },
       }),
       prisma.product.count({
         where: {
-          active: true,
+          ...productWhere,
           createdAt: { gte: monthStart, lt: nextMonthStart },
         },
       }),
       prisma.product.count({
         where: {
-          active: true,
+          ...productWhere,
           createdAt: { gte: prevMonthStart, lt: monthStart },
         },
       }),
@@ -155,7 +172,7 @@ router.get('/summary', async (req, res, next) => {
       .map(Number);
 
     const topProductsRaw = await prisma.product.findMany({
-      where: { id: { in: topProductIds } },
+      where: { id: { in: topProductIds }, warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1) },
       include: { category: true }
     });
 
@@ -220,6 +237,11 @@ router.get('/summary', async (req, res, next) => {
       totalDebts,
       lowStock,
       recentSales,
+      overviewSales: allInvoices.map((invoice: any) => ({
+        id: invoice.id,
+        createdAt: invoice.createdAt,
+        netAmount: invoice.netAmount,
+      })),
       topProducts,
       reminders: reminders || [],
       metricChanges: {

@@ -57,7 +57,7 @@ export default function RemindersView() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await client.post('/reminders', newReminder);
+      await client.post('/reminders', { ...newReminder, dueDate: `${newReminder.dueDate}T12:00:00` });
       toast.success('Напоминание создано');
       setShowAddModal(false);
       setNewReminder({ title: '', description: '', dueDate: '', type: 'general' });
@@ -197,21 +197,21 @@ export default function RemindersView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 backdrop-blur-sm md:p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+              className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl md:max-w-md md:rounded-3xl"
             >
-              <div className="border-b border-slate-100 bg-indigo-50/50 p-8">
-                <h3 className="flex items-center space-x-2 text-2xl font-bold text-slate-900">
-                  <Bell className="text-indigo-600" size={24} />
+              <div className="border-b border-slate-100 bg-indigo-50/50 p-5 md:p-8">
+                <h3 className="flex items-center space-x-2 text-xl font-bold text-slate-900 md:text-2xl">
+                  <Bell className="text-indigo-600" size={22} />
                   <span>Новое напоминание</span>
                 </h3>
               </div>
-              <form onSubmit={handleCreate} className="space-y-6 p-8">
-                <div className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-5 p-5 md:space-y-6 md:p-8">
+                <div className="space-y-3 md:space-y-4">
                   <div>
                     <label className="mb-2 block text-sm font-bold text-slate-700">Заголовок</label>
                     <input
@@ -220,7 +220,7 @@ export default function RemindersView() {
                       placeholder="Напр: Позвонить клиенту"
                       value={newReminder.title}
                       onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 md:px-4 md:py-3"
                     />
                   </div>
                   <div>
@@ -229,25 +229,25 @@ export default function RemindersView() {
                       placeholder="Дополнительные детали..."
                       value={newReminder.description}
                       onChange={(e) => setNewReminder({ ...newReminder, description: e.target.value })}
-                      className="h-24 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="h-20 w-full resize-none rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 md:h-24 md:px-4 md:py-3"
                     />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-bold text-slate-700">Дата и время</label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       required
                       value={newReminder.dueDate}
                       onChange={(e) => setNewReminder({ ...newReminder, dueDate: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 md:px-4 md:py-3"
                     />
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="rounded-xl px-6 py-3 font-bold text-slate-500 transition-all hover:bg-slate-50">
+                <div className="flex justify-end space-x-2 pt-2 md:space-x-3 md:pt-4">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 md:px-6 md:py-3">
                     Отмена
                   </button>
-                  <button type="submit" className="rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700">
+                  <button type="submit" className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 md:px-8 md:py-3">
                     Создать
                   </button>
                 </div>

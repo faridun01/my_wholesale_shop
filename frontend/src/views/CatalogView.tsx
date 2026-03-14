@@ -18,12 +18,22 @@ import { useNavigate } from 'react-router-dom';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
+import { formatProductName } from '../utils/productName';
 
 function shell(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
 }
 
+function getStoredWarehouseId() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return sessionStorage.getItem('pos_warehouse_session') || localStorage.getItem('pos_warehouse_session') || '';
+}
+
 export default function CatalogView() {
+  const warehouseStorageKey = 'pos_warehouse_session';
   const user = getCurrentUser();
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
@@ -31,7 +41,9 @@ export default function CatalogView() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
   const [search, setSearch] = useState('');
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(() => {
+    return getStoredWarehouseId() || (userWarehouseId ? String(userWarehouseId) : '');
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
   const [loading, setLoading] = useState(true);
@@ -59,6 +71,13 @@ export default function CatalogView() {
       })
       .finally(() => setLoading(false));
   }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+
+  useEffect(() => {
+    if (selectedWarehouseId) {
+      sessionStorage.setItem(warehouseStorageKey, selectedWarehouseId);
+      localStorage.setItem(warehouseStorageKey, selectedWarehouseId);
+    }
+  }, [selectedWarehouseId]);
 
   const shouldShowPrice = (product: any) => {
     const visibility = settings.priceVisibility || 'everyone';
@@ -112,9 +131,14 @@ export default function CatalogView() {
     }
 
     sessionStorage.setItem('pending_cart', JSON.stringify(newCart));
+    sessionStorage.setItem('pos_cart_session', JSON.stringify(newCart));
+    sessionStorage.setItem('pos_warehouse_session', selectedWarehouseId);
+    localStorage.setItem('pending_cart', JSON.stringify(newCart));
+    localStorage.setItem('pos_cart_session', JSON.stringify(newCart));
+    localStorage.setItem('pos_warehouse_session', selectedWarehouseId);
     const updatedItem = newCart.find((item: any) => item.id === product.id);
     setCartNotice({
-      productName: product.name,
+      productName: formatProductName(product.name),
       count: updatedItem?.quantity || 1,
     });
   };
@@ -125,23 +149,23 @@ export default function CatalogView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Catalog</h1>
-              <p className="mt-1 text-sm text-slate-500">Browse products and add positions to the sales cart.</p>
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Каталог</h1>
+              <p className="mt-1 text-sm text-slate-500">Просмотр товаров и добавление позиций в корзину продаж.</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span>Home</span>
+              <span>Главная</span>
               <span>/</span>
-              <span className="text-slate-600">Catalog</span>
+              <span className="text-slate-600">Каталог</span>
             </div>
           </div>
 
           <section className="rounded-[24px] border border-white bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="space-y-2">
-                <p className="text-sm text-slate-500">Product Catalog</p>
-                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Find products fast</h2>
+                <p className="text-sm text-slate-500">Каталог товаров</p>
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Быстрый поиск товаров</h2>
                 <p className="max-w-2xl text-sm leading-6 text-slate-500">
-                  Search by product name, filter by stock and category, then add items straight into the sale queue.
+                  Ищите по названию, фильтруйте по остатку и категории, затем сразу добавляйте товар в продажу.
                 </p>
               </div>
 
@@ -151,7 +175,7 @@ export default function CatalogView() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-3 text-sm text-white transition-colors hover:bg-violet-600"
                 >
                   <Plus size={16} />
-                  <span>Add Product</span>
+                  <span>Добавить товар</span>
                 </button>
               )}
             </div>
@@ -163,7 +187,7 @@ export default function CatalogView() {
                 <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   type="text"
-                  placeholder="Search by product name..."
+                  placeholder="Поиск по названию товара..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
@@ -178,7 +202,7 @@ export default function CatalogView() {
                   disabled={!isAdmin}
                   className="w-full appearance-none bg-transparent text-sm text-slate-700 outline-none"
                 >
-                  <option value="">All warehouses</option>
+                  <option value="">Все склады</option>
                   {warehouses.map((warehouse) => (
                     <option key={warehouse.id} value={warehouse.id}>
                       {warehouse.name}
@@ -194,7 +218,7 @@ export default function CatalogView() {
                   onChange={(event) => setSelectedCategory(event.target.value)}
                   className="w-full appearance-none bg-transparent text-sm text-slate-700 outline-none"
                 >
-                  <option value="">All categories</option>
+                  <option value="">Все категории</option>
                   {categories.map((category) => (
                     <option key={category} value={category}>
                       {category}
@@ -205,9 +229,9 @@ export default function CatalogView() {
 
               <div className="grid grid-cols-3 rounded-[24px] border border-emerald-100 bg-emerald-50/60 p-1 shadow-sm">
                 {[
-                  { id: 'all', label: 'All' },
-                  { id: 'in_stock', label: 'In stock' },
-                  { id: 'out_of_stock', label: 'Out' },
+                  { id: 'all', label: 'Все' },
+                  { id: 'in_stock', label: 'В наличии' },
+                  { id: 'out_of_stock', label: 'Нет' },
                 ].map((option) => (
                   <button
                     key={option.id}
@@ -239,7 +263,7 @@ export default function CatalogView() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
                   onClick={() => handleProductClick(product)}
-                  className="cursor-pointer overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:rounded-[24px]"
+                  className="flex h-full cursor-pointer flex-col overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:rounded-[24px]"
                 >
                   <div className="aspect-square bg-slate-100">
                     <img
@@ -251,31 +275,36 @@ export default function CatalogView() {
                     />
                   </div>
 
-                  <div className="space-y-3 p-3 md:space-y-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-1 flex-col p-3 md:p-5">
+                    <div className="min-h-[112px] md:min-h-[132px]">
                       <div className="min-w-0">
-                        <h3 className="line-clamp-2 text-[13px] leading-4 text-slate-900 md:text-base md:leading-6">{product.name}</h3>
+                        <h3
+                          title={formatProductName(product.name)}
+                          className="mt-3 line-clamp-4 break-words text-[13px] leading-5 text-slate-900 md:mt-4 md:min-h-[84px] md:text-base md:leading-7"
+                        >
+                          {formatProductName(product.name)}
+                        </h3>
                       </div>
-                      <span className="rounded-lg bg-violet-100 px-2 py-1 text-[10px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-xs">
-                        {product.category?.name || 'General'}
+                      <span className="inline-flex rounded-lg bg-violet-100 px-2 py-1 text-[10px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-xs">
+                        {product.category?.name || 'Без категории'}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-3 md:pt-4">
                       {shouldShowPrice(product) ? (
                         <span className="text-[16px] font-semibold tracking-tight text-slate-900 md:text-2xl">
                           {formatMoney(product.sellingPrice)}
                         </span>
                       ) : (
-                        <span className="text-sm italic text-slate-400">Price hidden</span>
+                        <span className="text-sm italic text-slate-400">Цена скрыта</span>
                       )}
                       <span
                         className={shell(
-                          'rounded-lg px-2 py-1 text-[10px] md:rounded-xl md:px-3 md:py-1.5 md:text-xs',
+                          'shrink-0 rounded-lg px-2 py-1 text-[10px] md:rounded-xl md:px-3 md:py-1.5 md:text-xs',
                           product.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                         )}
                       >
-                        {product.stock > 0 ? `${product.stock} ${product.unit}` : 'Out'}
+                        {product.stock > 0 ? `${product.stock} ${product.unit}` : 'Нет'}
                       </span>
                     </div>
 
@@ -285,10 +314,10 @@ export default function CatalogView() {
                         handleAddToSale(product);
                       }}
                       disabled={product.stock <= 0 || !selectedWarehouseId}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
+                      className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-4 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
                     >
                       <ShoppingCart size={14} className="md:h-4 md:w-4" />
-                      <span>Add to Sale</span>
+                      <span>В продажу</span>
                     </button>
                   </div>
                 </motion.div>
@@ -299,7 +328,7 @@ export default function CatalogView() {
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                     <Package size={28} />
                   </div>
-                  <p className="text-base text-slate-500">No products found</p>
+                  <p className="text-base text-slate-500">Товары не найдены</p>
                 </div>
               )}
             </section>
@@ -318,10 +347,10 @@ export default function CatalogView() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-900">
-                  {cartNotice.count > 0 ? 'Product added' : 'Warehouse required'}
+                  {cartNotice.count > 0 ? 'Товар добавлен' : 'Нужно выбрать склад'}
                 </p>
                 <p className="mt-1 break-words text-sm text-slate-500">{cartNotice.productName}</p>
-                {cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">In cart: {cartNotice.count}</p>}
+                {cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">В корзине: {cartNotice.count}</p>}
               </div>
               <button
                 onClick={() => setCartNotice(null)}
@@ -336,7 +365,7 @@ export default function CatalogView() {
                 onClick={() => setCartNotice(null)}
                 className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50"
               >
-                Stay
+                Остаться
               </button>
               {cartNotice.count > 0 ? (
                 <button
@@ -346,14 +375,14 @@ export default function CatalogView() {
                   }}
                   className="flex-1 rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600"
                 >
-                  Go to Cart
+                  Перейти в корзину
                 </button>
               ) : (
                 <button
                   onClick={() => setCartNotice(null)}
                   className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800"
                 >
-                  OK
+                  Понятно
                 </button>
               )}
             </div>
@@ -392,7 +421,7 @@ export default function CatalogView() {
                 <div className="flex max-h-[88vh] flex-col overflow-y-auto p-3 md:max-h-[90vh] md:p-9">
                   <div className="flex items-start justify-between">
                     <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-600 md:px-4 md:py-2 md:text-xs">
-                      {selectedProduct.category?.name || 'General'}
+                      {selectedProduct.category?.name || 'Без категории'}
                     </span>
                     <button
                       onClick={() => setShowDetails(false)}
@@ -413,7 +442,7 @@ export default function CatalogView() {
                         <Tag size={16} />
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Selling Price</p>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Цена продажи</p>
                           <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 md:text-2xl">
                             {formatMoney(selectedProduct.sellingPrice)}
                           </p>
@@ -428,7 +457,7 @@ export default function CatalogView() {
                             <Layers size={16} />
                           </div>
                           <div>
-                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Stock</p>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Остаток</p>
                             <p className={shell('mt-1 text-lg font-semibold tracking-tight md:text-2xl', selectedProduct.stock > 0 ? 'text-emerald-600' : 'text-rose-600')}>
                               {selectedProduct.stock} {selectedProduct.unit}
                             </p>
@@ -442,8 +471,8 @@ export default function CatalogView() {
                             <Warehouse size={16} />
                           </div>
                           <div>
-                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Warehouse</p>
-                            <p className="mt-1 break-words text-sm text-slate-900 md:text-lg">{selectedProduct.warehouse?.name || 'Main warehouse'}</p>
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Склад</p>
+                            <p className="mt-1 break-words text-sm text-slate-900 md:text-lg">{selectedProduct.warehouse?.name || 'Основной склад'}</p>
                           </div>
                         </div>
                       </div>
@@ -461,7 +490,7 @@ export default function CatalogView() {
                     className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-auto md:py-4 md:text-base"
                   >
                     <ShoppingCart size={18} />
-                    <span>Add to Sale</span>
+                    <span>В продажу</span>
                     <ChevronRight size={18} />
                   </button>
                 </div>

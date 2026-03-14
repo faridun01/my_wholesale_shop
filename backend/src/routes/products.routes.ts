@@ -2,12 +2,15 @@
 import prisma from '../db/prisma.js';
 import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
+import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 
 const router = Router();
 
-const normalizeBracketSuffix = (value: string | null | undefined) =>
+const normalizeProductName = (value: string | null | undefined) =>
   String(value || '')
     .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/[«»“”„‟"']/gu, '')
+    .replace(/[(),]/gu, ' ')
     .replace(/plasticковых/giu, 'пластиковых')
     .replace(/Ñ‘/giu, 'Ðµ')
     .replace(/\s+/g, ' ')
@@ -15,11 +18,12 @@ const normalizeBracketSuffix = (value: string | null | undefined) =>
 
 router.get('/', async (req, res, next) => {
   try {
-    const { warehouseId } = req.query;
+    const access = await getAccessContext(req as AuthRequest);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const products = await prisma.product.findMany({
       where: {
         active: true,
-        warehouseId: warehouseId ? Number(warehouseId) : undefined,
+        warehouseId: warehouseId ?? undefined,
       },
       include: { 
         category: true, 
@@ -46,19 +50,29 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const { initialStock, warehouseId, costPrice, ...rest } = req.body;
     const userId = req.user?.id || 1;
-    const wId = warehouseId ? Number(warehouseId) : null;
-    const normalizedName = normalizeBracketSuffix(rest.name);
+    const requestedWarehouseId = warehouseId ? Number(warehouseId) : null;
+    const wId = access.isAdmin ? requestedWarehouseId : access.warehouseId;
+
+    if (!access.isAdmin && !wId) {
+      return res.status(400).json({ error: 'Warehouse ID is required' });
+    }
+    const normalizedName = normalizeProductName(rest.name);
 
     // Check for unique constraints
-    const existingProduct = await prisma.product.findFirst({
+    const existingProducts = await prisma.product.findMany({
       where: {
-        name: normalizedName,
         warehouseId: wId,
         active: true
+      },
+      select: {
+        id: true,
+        name: true,
       }
     });
+    const existingProduct = existingProducts.find((product) => normalizeProductName(product.name) === normalizedName);
 
     if (existingProduct) {
       return res.status(400).json({
@@ -104,10 +118,10 @@ router.post('/', async (req: AuthRequest, res, next) => {
     });
 
     // Then add initial stock via StockService to create batches and transactions
-    if (initialStock > 0 && warehouseId) {
+    if (initialStock > 0 && wId) {
       await StockService.addStock(
         product.id,
-        Number(warehouseId),
+        Number(wId),
         Number(initialStock),
         Number(costPrice || 0),
         userId,
@@ -123,6 +137,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const productId = Number(req.params.id);
     const userId = req.user?.id || 1;
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
@@ -131,19 +146,30 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       return res.status(404).json({ error: 'Ð¢Ð¾Ð²Ð°Ñ€ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
     }
 
+    if (!access.isAdmin && !ensureWarehouseAccess(access, oldProduct.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     // Check for unique constraints if name or warehouseId changed
-    const newName = normalizeBracketSuffix(req.body.name || oldProduct.name);
-    const newWarehouseId = req.body.warehouseId !== undefined ? Number(req.body.warehouseId) : oldProduct.warehouseId;
+    const newName = normalizeProductName(req.body.name || oldProduct.name);
+    const newWarehouseId = access.isAdmin
+      ? (req.body.warehouseId !== undefined ? Number(req.body.warehouseId) : oldProduct.warehouseId)
+      : access.warehouseId;
 
     if (newName !== oldProduct.name || newWarehouseId !== oldProduct.warehouseId) {
-      const existingProduct = await prisma.product.findFirst({
+      const existingProducts = await prisma.product.findMany({
         where: {
-          name: newName,
           warehouseId: newWarehouseId,
-          id: { not: productId },
           active: true
+        },
+        select: {
+          id: true,
+          name: true,
         }
       });
+      const existingProduct = existingProducts.find((product) => (
+        product.id !== productId && normalizeProductName(product.name) === newName
+      ));
 
       if (existingProduct) {
         return res.status(400).json({
@@ -180,6 +206,8 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       const newSelling = req.body.sellingPrice !== undefined ? Number(req.body.sellingPrice) : oldProduct.sellingPrice;
       
       if (newCost !== oldProduct.costPrice || newSelling !== oldProduct.sellingPrice) {
+        const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
+
         await prisma.priceHistory.create({
           data: {
             productId,
@@ -188,18 +216,20 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           }
         });
 
-        await prisma.inventoryTransaction.create({
-          data: {
-            productId,
-            warehouseId: oldProduct.warehouseId || newWarehouseId,
-            userId,
-            qtyChange: 0,
-            type: 'adjustment',
-            reason: `Ð˜Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ðµ Ñ†ÐµÐ½Ñ‹: ${oldProduct.sellingPrice} -> ${newSelling}`,
-            costAtTime: newCost,
-            sellingAtTime: newSelling,
-          }
-        });
+        if (historyWarehouseId) {
+          await prisma.inventoryTransaction.create({
+            data: {
+              productId,
+              warehouseId: historyWarehouseId,
+              userId,
+              qtyChange: 0,
+              type: 'adjustment',
+              reason: `Изменение цены: ${oldProduct.sellingPrice} -> ${newSelling}`,
+              costAtTime: newCost,
+              sellingAtTime: newSelling,
+            }
+          });
+        }
       }
     }
 
@@ -211,6 +241,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const access = await getAccessContext(req as AuthRequest);
     const productId = Number(req.params.id);
     const product = await prisma.product.findUnique({
       where: { id: productId },
@@ -224,6 +255,10 @@ router.delete('/:id', async (req, res, next) => {
 
     if (!product) {
       return res.status(404).json({ error: 'Товар не найден' });
+    }
+
+    if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const remainingStock = product.batches.reduce((sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0), 0);
@@ -243,9 +278,15 @@ router.delete('/:id', async (req, res, next) => {
 
 router.post('/:id/restock', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const productId = Number(req.params.id);
     const userId = req.user!.id;
-    const { warehouseId, quantity, costPrice, reason } = req.body;
+    const warehouseId = access.isAdmin ? Number(req.body.warehouseId) : access.warehouseId;
+    const { quantity, costPrice, reason } = req.body;
+
+    if (!warehouseId || !ensureWarehouseAccess(access, warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const batch = await StockService.addStock(
       productId,
@@ -263,9 +304,16 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const productId = Number(req.params.id);
     const userId = req.user!.id;
-    const { fromWarehouseId, toWarehouseId, quantity } = req.body;
+    const { quantity } = req.body;
+    const fromWarehouseId = access.isAdmin ? Number(req.body.fromWarehouseId) : access.warehouseId;
+    const toWarehouseId = Number(req.body.toWarehouseId);
+
+    if (!fromWarehouseId || !ensureWarehouseAccess(access, fromWarehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const result = await StockService.transferStock(
       productId,
@@ -282,8 +330,14 @@ router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
 
 router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const userId = req.user!.id;
-    const { product_id, warehouse_id, quantity_change, type, reason, cost_at_time } = req.body;
+    const { product_id, quantity_change, type, reason, cost_at_time } = req.body;
+    const warehouse_id = access.isAdmin ? Number(req.body.warehouse_id) : access.warehouseId;
+
+    if (!warehouse_id || !ensureWarehouseAccess(access, warehouse_id)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const batch = await StockService.addStock(
       Number(product_id),
@@ -299,8 +353,20 @@ router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.get('/:id/price-history', async (req, res, next) => {
+router.get('/:id/price-history', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
+    const product = await prisma.product.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { warehouseId: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+    if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const history = await prisma.priceHistory.findMany({
       where: { productId: Number(req.params.id) },
       orderBy: { createdAt: 'desc' }
@@ -311,9 +377,33 @@ router.get('/:id/price-history', async (req, res, next) => {
   }
 });
 
-router.get('/:id/history', async (req, res, next) => {
+router.get('/:id/history', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const productId = Number(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { warehouseId: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+    if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const decodeMojibake = (value: string) => {
+      const source = String(value || '');
+      if (!/[ÐÑ]/.test(source)) {
+        return source;
+      }
+
+      try {
+        return Buffer.from(source, 'latin1').toString('utf8');
+      } catch {
+        return source;
+      }
+    };
 
     const [transactions, priceHistory] = await Promise.all([
       prisma.inventoryTransaction.findMany({
@@ -350,11 +440,41 @@ router.get('/:id/history', async (req, res, next) => {
         )
       : new Map<number, string>();
 
-    const formatHistoryReason = (reason: string | null | undefined) =>
-      String(reason || '').replace(/Warehouse\s+#(\d+)/gi, (_match: string, idText: string): string => {
-        const warehouseName = warehousesById.get(Number(idText));
-        return String(warehouseName || `Склад #${idText}`);
-      });
+    const formatHistoryReason = (reason: string | null | undefined) => {
+      const normalized = decodeMojibake(String(reason || ''))
+        .replace(/Warehouse\s+#(\d+)/gi, (_match: string, idText: string): string => {
+          const warehouseName = warehousesById.get(Number(idText));
+          return String(warehouseName || `Склад #${idText}`);
+        });
+
+      if (!normalized) {
+        return '';
+      }
+
+      if (/^OCR Restock$/i.test(normalized)) {
+        return 'Пополнение по OCR';
+      }
+      if (/^Initial Stock$/i.test(normalized)) {
+        return 'Начальный остаток';
+      }
+      if (/^Stock Arrival$/i.test(normalized)) {
+        return 'Приход товара';
+      }
+      if (/^Transfer to (.+)$/i.test(normalized)) {
+        return normalized.replace(/^Transfer to (.+)$/i, 'Перенос на $1');
+      }
+      if (/^Transfer from (.+)$/i.test(normalized)) {
+        return normalized.replace(/^Transfer from (.+)$/i, 'Перенос со $1');
+      }
+      if (/^Invoice #(\d+) Cancelled$/i.test(normalized)) {
+        return normalized.replace(/^Invoice #(\d+) Cancelled$/i, 'Отмена накладной #$1');
+      }
+
+      return normalized
+        .replace(/^Price change:/i, 'Изменение цены:')
+        .replace(/^Selling price:/i, 'Цена продажи:')
+        .replace(/^Cost price:/i, 'Себестоимость:');
+    };
 
     const transactionHistory = transactions.map((t: any) => ({
       id: `tx-${t.id}`,
@@ -375,7 +495,7 @@ router.get('/:id/history', async (req, res, next) => {
       warehouse: null,
       warehouseName: '---',
       username: 'system',
-      reason: `Ð¦ÐµÐ½Ð° Ð¿Ñ€Ð¾Ð´Ð°Ð¶Ð¸: ${p.sellingPrice}, ÑÐµÐ±ÐµÑÑ‚Ð¾Ð¸Ð¼Ð¾ÑÑ‚ÑŒ: ${p.costPrice}`,
+      reason: `Цена продажи: ${p.sellingPrice}, себестоимость: ${p.costPrice}`,
     }));
 
     const history = [...transactionHistory, ...priceEvents].sort(
@@ -388,8 +508,20 @@ router.get('/:id/history', async (req, res, next) => {
   }
 });
 
-router.get('/:id/batches', async (req, res, next) => {
+router.get('/:id/batches', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
+    const product = await prisma.product.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { warehouseId: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+    if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const batches = await prisma.productBatch.findMany({
       where: { 
         productId: Number(req.params.id),

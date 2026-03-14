@@ -16,9 +16,10 @@ import Sidebar from './components/layout/Sidebar';
 import { Toaster } from 'react-hot-toast';
 import { Menu, X, Warehouse } from 'lucide-react';
 import { getCurrentUser, isAdminUser } from './utils/userAccess';
+import { clearAuthSession, getAuthToken } from './utils/authStorage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   return token ? <>{children}</> : <Navigate to="/login" />;
 };
 
@@ -58,6 +59,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+  React.useEffect(() => {
+    if (localStorage.getItem('token') || localStorage.getItem('user')) {
+      clearAuthSession();
+    }
+  }, []);
+
   const user = getCurrentUser();
   const isAdmin = isAdminUser(user);
 

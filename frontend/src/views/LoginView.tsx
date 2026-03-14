@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { login } from '../api/auth.api';
 import { Warehouse, Mail, Lock, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { setAuthSession } from '../utils/authStorage';
 
 export default function LoginView() {
   const [username, setUsername] = useState('');
@@ -18,8 +19,7 @@ export default function LoginView() {
 
     try {
       const { token, user } = await login({ username, password });
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      setAuthSession(token, user);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Login failed');

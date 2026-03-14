@@ -21,7 +21,7 @@ type PublicUser = {
   canDeleteData: boolean;
   createdAt: Date;
   updatedAt: Date;
-  warehouse: { id: number; name: string } | null;
+  warehouse: { id: number; name: string; city: string | null } | null;
 };
 
 const toPublicUser = (user: any): PublicUser => ({
@@ -36,7 +36,7 @@ const toPublicUser = (user: any): PublicUser => ({
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
   warehouse: user.warehouse
-    ? { id: user.warehouse.id, name: user.warehouse.name }
+    ? { id: user.warehouse.id, name: user.warehouse.name, city: user.warehouse.city ?? null }
     : null,
 });
 

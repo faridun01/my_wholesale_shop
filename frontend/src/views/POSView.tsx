@@ -21,13 +21,22 @@ import { createInvoice } from '../api/invoices.api';
 import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatDollar, formatMoney, toFixedNumber } from '../utils/format';
+import { formatMoney, toFixedNumber } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
+import { formatProductName } from '../utils/productName';
 
 type PaymentMethod = 'cash' | 'card' | 'transfer';
 
 function tone(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
+}
+
+function getStoredWarehouseId() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return sessionStorage.getItem('pos_warehouse_session') || localStorage.getItem('pos_warehouse_session') || '';
 }
 
 const posTheme = {
@@ -55,6 +64,7 @@ const posTheme = {
 export default function POSView() {
   const cartStorageKey = 'pos_cart_session';
   const pendingCartStorageKey = 'pending_cart';
+  const warehouseStorageKey = 'pos_warehouse_session';
   const navigate = useNavigate();
   const user = getCurrentUser();
   const isAdmin = isAdminUser(user);
@@ -64,15 +74,42 @@ export default function POSView() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [cart, setCart] = useState<any[]>([]);
   const [customerId, setCustomerId] = useState<number | null>(null);
-  const [warehouseId, setWarehouseId] = useState(userWarehouseId ? String(userWarehouseId) : '');
+  const [warehouseId, setWarehouseId] = useState(() => {
+    return getStoredWarehouseId() || (userWarehouseId ? String(userWarehouseId) : '');
+  });
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [discount, setDiscount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
   const [productSearch, setProductSearch] = useState('');
+  const [isStorageHydrated, setIsStorageHydrated] = useState(false);
   const productListRef = useRef<HTMLDivElement | null>(null);
   const lastProductScrollRef = useRef(0);
+
+  useEffect(() => {
+    const savedCart =
+      sessionStorage.getItem(cartStorageKey) ||
+      localStorage.getItem(cartStorageKey);
+    const pendingCart =
+      sessionStorage.getItem(pendingCartStorageKey) ||
+      localStorage.getItem(pendingCartStorageKey);
+
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
+    }
+
+    if (pendingCart) {
+      const parsedPendingCart = JSON.parse(pendingCart);
+      setCart(parsedPendingCart);
+      sessionStorage.setItem(cartStorageKey, JSON.stringify(parsedPendingCart));
+      localStorage.setItem(cartStorageKey, JSON.stringify(parsedPendingCart));
+      sessionStorage.removeItem(pendingCartStorageKey);
+      localStorage.removeItem(pendingCartStorageKey);
+    }
+
+    setIsStorageHydrated(true);
+  }, []);
 
   useEffect(() => {
     const effectiveWarehouseId = warehouseId || (userWarehouseId ? String(userWarehouseId) : '');
@@ -92,23 +129,23 @@ export default function POSView() {
         }
       })
       .catch(console.error);
-
-    const savedCart = sessionStorage.getItem(cartStorageKey);
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
-
-    const pending = sessionStorage.getItem(pendingCartStorageKey) || localStorage.getItem(pendingCartStorageKey);
-    if (pending) {
-      setCart(JSON.parse(pending));
-      sessionStorage.removeItem(pendingCartStorageKey);
-      localStorage.removeItem(pendingCartStorageKey);
-    }
   }, [warehouseId, isAdmin, userWarehouseId]);
 
   useEffect(() => {
+    if (!isStorageHydrated) {
+      return;
+    }
+
     sessionStorage.setItem(cartStorageKey, JSON.stringify(cart));
-  }, [cart]);
+    localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  }, [cart, isStorageHydrated]);
+
+  useEffect(() => {
+    if (warehouseId) {
+      sessionStorage.setItem(warehouseStorageKey, warehouseId);
+      localStorage.setItem(warehouseStorageKey, warehouseId);
+    }
+  }, [warehouseId]);
 
   const addToCart = (product: any) => {
     if (productListRef.current) {
@@ -242,13 +279,13 @@ export default function POSView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">POS Terminal</h1>
-              <p className="mt-1 text-sm text-slate-500">Sales checkout, customer selection and invoice creation.</p>
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">{'POS Терминал'}</h1>
+              <p className="mt-1 text-sm text-slate-500">{'Оформление продаж, выбор клиента и создание накладной.'}</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span>Home</span>
+              <span>{'Главная'}</span>
               <span>/</span>
-              <span className="text-slate-600">POS Terminal</span>
+              <span className="text-slate-600">{'POS Терминал'}</span>
             </div>
           </div>
 
@@ -260,7 +297,7 @@ export default function POSView() {
                 activeTab === 'products' ? posTheme.products.tab : 'bg-sky-50 text-sky-700'
               )}
             >
-              Products
+              {'Товары'}
             </button>
             <button
               onClick={() => setActiveTab('cart')}
@@ -269,7 +306,7 @@ export default function POSView() {
                 activeTab === 'cart' ? posTheme.cart.tab : 'bg-emerald-50 text-emerald-700'
               )}
             >
-              Cart {cart.length ? `(${cart.length})` : ''}
+              {'Корзина'} {cart.length ? `(${cart.length})` : ''}
             </button>
           </div>
 
@@ -279,8 +316,8 @@ export default function POSView() {
                 <div className="border-b border-slate-200 px-5 py-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <h2 className="text-2xl font-semibold text-slate-900">Products</h2>
-                      <p className="mt-1 text-sm text-slate-500">{filteredProducts.length} available items</p>
+                      <h2 className="text-2xl font-semibold text-slate-900">{'Товары'}</h2>
+                      <p className="mt-1 text-sm text-slate-500">{filteredProducts.length} {'доступных позиций'}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 shadow-sm">
@@ -294,7 +331,7 @@ export default function POSView() {
                           disabled={!isAdmin}
                           className="min-w-[170px] appearance-none bg-transparent text-sm text-slate-700 outline-none"
                         >
-                          <option value="">Выберите склад</option>
+                          <option value="">{'Выберите склад'}</option>
                           {warehouses.map((warehouse) => (
                             <option key={warehouse.id} value={warehouse.id}>
                               {warehouse.name}
@@ -312,28 +349,41 @@ export default function POSView() {
                     </div>
                   </div>
 
+                  <div className="mt-4">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input
+                        type="text"
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder={'Поиск товара или ID...'}
+                        className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
+                      />
+                    </div>
+                  </div>
+
                   {isAdmin && !warehouseId && (
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                      Перед добавлением товара выберите склад.
+                      {'Перед добавлением товара выберите склад.'}
                     </div>
                   )}
-                  <div className="relative mt-4">
+                  <div className="hidden">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
                     <input
                       type="text"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder="Search product or ID..."
+                      placeholder={'Поиск товара или ID...'}
                       className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
                     />
                   </div>
                 </div>
 
                 <div className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500 md:grid">
-                  <div>Product</div>
-                  <div className="text-center">Stock</div>
-                  <div className="text-center">Price</div>
-                  <div className="text-right">Action</div>
+                  <div>{'Товар'}</div>
+                  <div className="text-center">{'Остаток'}</div>
+                  <div className="text-center">{'Цена'}</div>
+                  <div className="text-right">{'Действие'}</div>
                 </div>
 
                 <div ref={productListRef} className="h-[560px] overflow-y-auto">
@@ -355,19 +405,19 @@ export default function POSView() {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="break-words text-[12px] leading-4 text-slate-900">{product.name}</p>
+                            <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
                             <p className="mt-1 text-[11px] text-slate-400">ID {product.id}</p>
                           </div>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <div className="rounded-xl bg-sky-50 px-3 py-2">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Stock</p>
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">{'Остаток'}</p>
                             <p className="mt-1 text-sm text-slate-900">{product.stock}</p>
                           </div>
                           <div className="rounded-xl bg-sky-50 px-3 py-2">
-                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Price</p>
-                            <p className="mt-1 break-words text-sm text-slate-900">{formatDollar(product.sellingPrice)}</p>
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">{'Цена'}</p>
+                            <p className="mt-1 break-words text-sm text-slate-900">{formatMoney(product.sellingPrice)}</p>
                           </div>
                         </div>
 
@@ -377,7 +427,7 @@ export default function POSView() {
                           className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-sky-500 px-3 py-2.5 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus size={15} />
-                          <span>Add</span>
+                          <span>{'Добавить'}</span>
                         </button>
                       </div>
                     ))}
@@ -403,7 +453,7 @@ export default function POSView() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="break-words text-[13px] leading-5 text-slate-900">{product.name}</p>
+                          <p className="break-words text-[13px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
                           <p className="text-xs text-slate-400">ID {product.id}</p>
                         </div>
                       </div>
@@ -412,7 +462,7 @@ export default function POSView() {
                         <span className="rounded-xl bg-sky-100 px-3 py-1.5 text-sm text-sky-700">{product.stock}</span>
                       </div>
 
-                      <div className="text-center text-sm text-slate-900">{formatDollar(product.sellingPrice)}</div>
+                      <div className="text-center text-sm text-slate-900">{formatMoney(product.sellingPrice)}</div>
 
                       <div className="text-right">
                         <button
@@ -421,7 +471,7 @@ export default function POSView() {
                           className="inline-flex items-center gap-1 rounded-xl bg-sky-500 px-3 py-2 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus size={15} />
-                          <span>Add</span>
+                          <span>{'Добавить'}</span>
                         </button>
                       </div>
                     </div>
@@ -432,7 +482,7 @@ export default function POSView() {
                       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-300">
                         <Search size={28} />
                       </div>
-                      <p className="text-sm text-slate-500">Товары не найдены</p>
+                      <p className="text-sm text-slate-500">{'Товары не найдены'}</p>
                     </div>
                   )}
                 </div>
@@ -443,8 +493,8 @@ export default function POSView() {
               <div className="flex h-full flex-col overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                   <div>
-                    <h2 className="text-2xl font-semibold text-slate-900">Cart</h2>
-                    <p className="mt-1 text-sm text-slate-500">{cart.length} items selected</p>
+                    <h2 className="text-2xl font-semibold text-slate-900">{'Корзина'}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{'Выбрано позиций:'} {cart.length}</p>
                   </div>
                   <div className="rounded-full bg-emerald-100 p-3 text-emerald-600">
                     <ShoppingCart size={18} />
@@ -459,7 +509,7 @@ export default function POSView() {
                       onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
                       className="w-full rounded-2xl border border-emerald-100 bg-emerald-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-emerald-300 focus:bg-white"
                     >
-                      <option value="">Выберите клиента</option>
+                      <option value="">{'Выберите клиента'}</option>
                       {customers.map((customer) => (
                         <option key={customer.id} value={customer.id}>
                           {customer.name}
@@ -496,12 +546,12 @@ export default function POSView() {
                               WebkitBoxOrient: 'vertical',
                             }}
                           >
-                            {item.name}
+                            {formatProductName(item.name)}
                           </p>
 
                           <div className="mt-3 flex items-center justify-between gap-2">
                             <p className="min-w-[78px] text-[13px] font-medium text-slate-900">
-                              {formatDollar(item.sellingPrice * item.quantity)}
+                              {formatMoney(item.sellingPrice * item.quantity)}
                             </p>
 
                             <div className="flex items-center overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50">
@@ -544,7 +594,7 @@ export default function POSView() {
                       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-300">
                         <ShoppingCart size={28} />
                       </div>
-                      <p className="text-sm text-slate-500">Корзина пуста</p>
+                      <p className="text-sm text-slate-500">{'Корзина пуста'}</p>
                     </div>
                   )}
                 </div>
@@ -556,22 +606,22 @@ export default function POSView() {
                       min={0}
                       value={discount === 0 ? '' : discount}
                       onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                      placeholder="Скидка %"
+                      placeholder={'Скидка %'}
                       className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-amber-300 focus:bg-white"
                     />
                     <input
                       type="number"
                       value={paidAmount}
                       onChange={(e) => setPaidAmount(e.target.value)}
-                      placeholder="Paid amount"
+                      placeholder={'Оплачено'}
                       className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-emerald-300 focus:bg-white"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { id: 'cash', label: 'Cash', icon: Banknote },
-                      { id: 'transfer', label: 'Transfer', icon: Receipt },
+                      { id: 'cash', label: 'Наличные', icon: Banknote },
+                      { id: 'transfer', label: 'Перевод', icon: Receipt },
                     ].map((method) => (
                       <button
                         key={method.id}
@@ -591,24 +641,24 @@ export default function POSView() {
 
                   <div className="space-y-3 rounded-[20px] bg-amber-50 px-4 py-4 text-sm">
                     <div className="flex items-center justify-between text-slate-500">
-                      <span>Subtotal</span>
-                      <span className="text-slate-900">{formatDollar(subtotal)}</span>
+                      <span>{'Подытог'}</span>
+                      <span className="text-slate-900">{formatMoney(subtotal)}</span>
                     </div>
                     <div className="flex items-center justify-between text-slate-500">
-                      <span>Discount</span>
+                      <span>{'Скидка'}</span>
                       <span className="text-slate-900">-{toFixedNumber(discountAmount)} TJS</span>
                     </div>
                     {paidAmount && (
                       <div className="flex items-center justify-between text-slate-500">
-                        <span>{balance >= 0 ? 'Change' : 'Debt'}</span>
+                        <span>{balance >= 0 ? 'Сдача' : 'Долг'}</span>
                         <span className={balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                          {formatDollar(Math.abs(balance))}
+                          {formatMoney(Math.abs(balance))}
                         </span>
                       </div>
                     )}
                     <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-medium text-slate-900">
-                      <span>Total</span>
-                      <span>{formatDollar(total)}</span>
+                      <span>Итого</span>
+                      <span>{formatMoney(total)}</span>
                     </div>
                   </div>
 
@@ -617,7 +667,7 @@ export default function POSView() {
                     disabled={isSubmitting || cart.length === 0}
                     className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3.5 text-base text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isSubmitting ? 'Processing...' : 'Checkout'}
+                    {isSubmitting ? 'Обработка...' : 'Оформить'}
                     {!isSubmitting && <ChevronRight className="ml-2" size={18} />}
                   </button>
                 </div>

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import type { AuthRequest } from '../middlewares/auth.middleware.js';
+import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 
 const router = Router();
 const MONEY_EPSILON = 0.0001;
@@ -48,18 +50,16 @@ function getLineCost(item: any) {
   return averageCost * remainingQty;
 }
 
-// Apply authentication to all routes in this router
 router.use(authenticate);
 
-router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
   try {
-    const user = (req as any).user;
-    const role = user?.role?.toUpperCase();
-    const isAdmin = role === 'ADMIN' || role === 'MANAGER';
-    const { warehouse_id } = req.query;
+    const access = await getAccessContext(req);
+    const isAdmin = access.isAdmin;
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
 
     const whereClause: any = { cancelled: false };
-    if (warehouse_id) whereClause.warehouseId = Number(warehouse_id);
+    if (warehouseId) whereClause.warehouseId = warehouseId;
 
     const [invoices, products, customers, warehouses, batches] = await Promise.all([
       prisma.invoice.findMany({
@@ -75,21 +75,21 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req, res, next)
           warehouse: true
         }
       }),
-      prisma.product.findMany({ where: { active: true } }),
-      prisma.customer.findMany({ where: { active: true } }),
-      prisma.warehouse.findMany({ where: { active: true } }),
-      prisma.productBatch.findMany({ 
-        where: { 
+      prisma.product.findMany({ where: { active: true, warehouseId: warehouseId ?? undefined } }),
+      prisma.customer.findMany({ where: { active: true, city: access.isAdmin ? undefined : (access.city ?? '__no_city__') } }),
+      prisma.warehouse.findMany({ where: access.isAdmin ? { active: true } : { active: true, id: access.warehouseId ?? -1, city: access.city ?? undefined } }),
+      prisma.productBatch.findMany({
+        where: {
           remainingQuantity: { gt: 0 },
-          warehouseId: warehouse_id ? Number(warehouse_id) : undefined
-        } 
+          warehouseId: warehouseId ?? undefined
+        }
       }),
     ]);
 
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalCost = 0;
-    let totalSalesCount = invoices.length;
+    const totalSalesCount = invoices.length;
     let totalDebts = 0;
 
     const monthlyData: any = {};
@@ -103,7 +103,7 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req, res, next)
 
       const netAmount = Number(inv.netAmount);
       const paidAmount = Number(inv.paidAmount);
-      
+
       totalRevenue += netAmount;
       totalDebts += (netAmount - paidAmount);
       monthlyData[month].sales += netAmount;
@@ -117,7 +117,7 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req, res, next)
         for (const alloc of item.saleAllocations) {
           const cost = Number(alloc.batch.costPrice) * alloc.quantity;
           const profit = (Number(item.sellingPrice) - Number(alloc.batch.costPrice)) * alloc.quantity;
-          
+
           totalCost += cost;
           if (isAdmin) {
             totalProfit += profit;
@@ -150,9 +150,11 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req, res, next)
   }
 });
 
-router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
   try {
-    const { start, end, warehouse_id } = req.query;
+    const access = await getAccessContext(req);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const { start, end } = req.query;
     const where: any = {
       cancelled: false,
       createdAt: {
@@ -160,7 +162,7 @@ router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => 
         lte: end ? new Date(end as string) : undefined,
       },
     };
-    if (warehouse_id) where.warehouseId = Number(warehouse_id);
+    if (warehouseId) where.warehouseId = warehouseId;
 
     const invoices = await prisma.invoice.findMany({
       where,
@@ -201,16 +203,15 @@ router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => 
   }
 });
 
-router.get('/profit', async (req, res, next) => {
+router.get('/profit', async (req: AuthRequest, res, next) => {
   try {
-    const user = (req as any).user;
-    const role = user?.role?.toUpperCase();
-    const isAdmin = role === 'ADMIN' || role === 'MANAGER';
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Доступ запрещен. Только для администраторов.' });
+    const access = await getAccessContext(req);
+    if (!access.isAdmin) {
+      return res.status(403).json({ error: '?????? ????????. ?????? ??? ???????????????.' });
     }
 
-    const { start, end, warehouse_id } = req.query;
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const { start, end } = req.query;
     const where: any = {
       cancelled: false,
       createdAt: {
@@ -218,7 +219,7 @@ router.get('/profit', async (req, res, next) => {
         lte: end ? new Date(end as string) : undefined,
       },
     };
-    if (warehouse_id) where.warehouseId = Number(warehouse_id);
+    if (warehouseId) where.warehouseId = warehouseId;
 
     const invoices = await prisma.invoice.findMany({
       where,
@@ -269,9 +270,11 @@ router.get('/profit', async (req, res, next) => {
   }
 });
 
-router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
   try {
-    const { start, end, warehouse_id } = req.query;
+    const access = await getAccessContext(req);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const { start, end } = req.query;
     const where: any = {
       type: 'return',
       createdAt: {
@@ -279,7 +282,7 @@ router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req, res, next) =
         lte: end ? new Date(end as string) : undefined,
       },
     };
-    if (warehouse_id) where.warehouseId = Number(warehouse_id);
+    if (warehouseId) where.warehouseId = warehouseId;
 
     const transactions = await prisma.inventoryTransaction.findMany({
       where,
@@ -310,13 +313,15 @@ router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req, res, next) =
   }
 });
 
-router.get('/transactions', async (req, res, next) => {
+router.get('/transactions', async (req: AuthRequest, res, next) => {
   try {
-    const { productId, warehouseId, type, limit = 50 } = req.query;
+    const access = await getAccessContext(req);
+    const { productId, type, limit = 50 } = req.query;
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const transactions = await prisma.inventoryTransaction.findMany({
       where: {
         productId: productId ? Number(productId) : undefined,
-        warehouseId: warehouseId ? Number(warehouseId) : undefined,
+        warehouseId: warehouseId ?? undefined,
         type: type as string || undefined,
       },
       include: {

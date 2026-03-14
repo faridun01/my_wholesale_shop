@@ -1,11 +1,20 @@
+import { getStoredUser } from './authStorage';
+
 export type AppUser = {
+  id?: number;
+  username?: string;
   role?: string;
   warehouseId?: number | string | null;
+  warehouse?: {
+    id?: number;
+    name?: string;
+    city?: string | null;
+  } | null;
 };
 
 export function getCurrentUser(): AppUser {
   try {
-    return JSON.parse(localStorage.getItem('user') || '{}');
+    return JSON.parse(getStoredUser() || '{}');
   } catch {
     return {};
   }

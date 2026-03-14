@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
+import { getAccessContext } from '../utils/access.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -29,25 +30,15 @@ const mapCustomerWithTotals = (customer: any) => {
 
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    const role = req.user?.role?.toUpperCase();
-    const isAdmin = role === 'ADMIN';
+    const access = await getAccessContext(req);
 
     let where: any = { active: true };
 
-    if (!isAdmin && req.user?.id) {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        include: { warehouse: true },
-      });
-
+    if (!access.isAdmin) {
       where = {
         ...where,
-        createdByUserId: req.user.id,
+        city: access.city ?? '__no_city__',
       };
-
-      if (currentUser?.warehouse?.city) {
-        where.city = currentUser.warehouse.city;
-      }
     }
 
     let customers;
@@ -90,12 +81,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
-    const currentUser = req.user?.id
-      ? await prisma.user.findUnique({
-          where: { id: req.user.id },
-          include: { warehouse: true },
-        })
-      : null;
+    const access = await getAccessContext(req);
 
     let customer;
 
@@ -103,7 +89,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       customer = await prisma.customer.create({
         data: {
           ...req.body,
-          city: req.body.city || currentUser?.warehouse?.city || null,
+          city: access.isAdmin ? (req.body.city || null) : (access.city || null),
           createdByUserId: req.user?.id || null,
         },
       });
@@ -117,11 +103,23 @@ router.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
+    const current = await prisma.customer.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { city: true },
+    });
+    if (!current) {
+      return res.status(404).json({ error: 'Клиент не найден' });
+    }
+    if (!access.isAdmin && current.city !== access.city) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const customer = await prisma.customer.update({
       where: { id: Number(req.params.id) },
-      data: req.body
+      data: access.isAdmin ? req.body : { ...req.body, city: access.city || null }
     });
     res.json(customer);
   } catch (error) {
@@ -129,8 +127,20 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
+    const current = await prisma.customer.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { city: true },
+    });
+    if (!current) {
+      return res.status(404).json({ error: 'Клиент не найден' });
+    }
+    if (!access.isAdmin && current.city !== access.city) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     await prisma.customer.update({
       where: { id: Number(req.params.id) },
       data: { active: false }
@@ -141,10 +151,15 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
-router.get('/:id/invoices', async (req, res, next) => {
+router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const invoices = await prisma.invoice.findMany({
-      where: { customerId: Number(req.params.id), cancelled: false },
+      where: {
+        customerId: Number(req.params.id),
+        cancelled: false,
+        warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
+      },
       include: {
         items: { include: { product: true } },
         payments: {
@@ -166,10 +181,14 @@ router.get('/:id/invoices', async (req, res, next) => {
   }
 });
 
-router.get('/:id/payments', async (req, res, next) => {
+router.get('/:id/payments', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const payments = await prisma.payment.findMany({
-      where: { customerId: Number(req.params.id) },
+      where: {
+        customerId: Number(req.params.id),
+        invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1 },
+      },
       include: {
         user: true,
         invoice: true
@@ -185,10 +204,14 @@ router.get('/:id/payments', async (req, res, next) => {
   }
 });
 
-router.get('/:id/returns', async (req, res, next) => {
+router.get('/:id/returns', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const returns = await prisma.return.findMany({
-      where: { customerId: Number(req.params.id) },
+      where: {
+        customerId: Number(req.params.id),
+        invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1 },
+      },
       include: {
         user: true,
         invoice: true
@@ -204,10 +227,15 @@ router.get('/:id/returns', async (req, res, next) => {
   }
 });
 
-router.get('/:id/history', async (req, res, next) => {
+router.get('/:id/history', async (req: AuthRequest, res, next) => {
   try {
+    const access = await getAccessContext(req);
     const invoices = await prisma.invoice.findMany({
-      where: { customerId: Number(req.params.id), cancelled: false },
+      where: {
+        customerId: Number(req.params.id),
+        cancelled: false,
+        warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
+      },
       include: {
         items: { include: { product: true } },
         payments: {

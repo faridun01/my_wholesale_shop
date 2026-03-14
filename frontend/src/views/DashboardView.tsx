@@ -27,7 +27,8 @@ import {
   YAxis,
 } from 'recharts';
 import { getDashboardSummary } from '../api/dashboard.api';
-import { formatCount, formatDollar, formatPercent } from '../utils/format';
+import { formatCount, formatMoney, formatPercent } from '../utils/format';
+import { getCurrentUser } from '../utils/userAccess';
 
 const statusTone = (status: string) => {
   if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
@@ -36,9 +37,9 @@ const statusTone = (status: string) => {
 };
 
 const statusLabel = (status: string) => {
-  if (status === 'paid') return 'Paid';
-  if (status === 'partial') return 'Pending';
-  return 'Debt';
+  if (status === 'paid') return 'Оплачено';
+  if (status === 'partial') return 'Частично';
+  return 'Долг';
 };
 
 const ringColors = ['#5b8def', '#7c6cf2', '#f3cb5d', '#5ec98f', '#ef6fae'];
@@ -58,13 +59,14 @@ export default function DashboardView() {
   const [summary, setSummary] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [overviewPeriod, setOverviewPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = getCurrentUser();
 
   useEffect(() => {
     getDashboardSummary().then(setSummary).catch(console.error);
   }, []);
 
   const recentSales = summary?.recentSales || [];
+  const overviewSales = summary?.overviewSales || [];
   const topProducts = summary?.topProducts || [];
   const lowStock = summary?.lowStock || [];
   const reminders = summary?.reminders || [];
@@ -72,36 +74,36 @@ export default function DashboardView() {
 
   const metrics = [
     {
-      title: 'Revenue',
-      value: formatDollar(summary?.totalRevenue || 0),
-      subtitle: 'Revenue',
+      title: 'Выручка',
+      value: formatMoney(summary?.totalRevenue || 0),
+      subtitle: 'Общая выручка',
       deltaValue: Number(summary?.metricChanges?.revenue || 0),
       delta: formatMetricDelta(summary?.metricChanges?.revenue || 0),
       iconWrap: 'bg-emerald-100 text-emerald-600',
       icon: Wallet,
     },
     {
-      title: 'Orders',
+      title: 'Заказы',
       value: formatCount(summary?.totalOrders || 0),
-      subtitle: 'Orders',
+      subtitle: 'Количество заказов',
       deltaValue: Number(summary?.metricChanges?.orders || 0),
       delta: formatMetricDelta(summary?.metricChanges?.orders || 0),
       iconWrap: 'bg-sky-100 text-sky-600',
       icon: ShoppingBag,
     },
     {
-      title: 'Customers',
+      title: 'Клиенты',
       value: formatCount(summary?.totalCustomers || 0),
-      subtitle: 'Customers',
+      subtitle: 'Активные клиенты',
       deltaValue: Number(summary?.metricChanges?.customers || 0),
       delta: formatMetricDelta(summary?.metricChanges?.customers || 0),
       iconWrap: 'bg-violet-100 text-violet-600',
       icon: Users,
     },
     {
-      title: 'Products in Stock',
+      title: 'Товары в наличии',
       value: formatCount(summary?.totalProducts || 0),
-      subtitle: 'Products',
+      subtitle: 'Активные товары',
       deltaValue: Number(summary?.metricChanges?.products || 0),
       delta: formatMetricDelta(summary?.metricChanges?.products || 0),
       iconWrap: 'bg-orange-100 text-orange-500',
@@ -176,7 +178,7 @@ export default function DashboardView() {
   const dropdownCustomers = useMemo(() => filteredCustomers.slice(0, 4), [filteredCustomers]);
 
   const overviewData = useMemo(() => {
-    const salesSource = (searchQuery ? filteredSales : recentSales)
+    const salesSource = (searchQuery ? filteredSales : overviewSales)
       .slice()
       .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
@@ -241,7 +243,7 @@ export default function DashboardView() {
       const buckets = Array.from({ length: 3 }).map((_, index) => {
         const monthIndex = startMonth + index;
         return {
-          label: new Date(now.getFullYear(), monthIndex, 1).toLocaleDateString('en-US', { month: 'short' }),
+          label: new Date(now.getFullYear(), monthIndex, 1).toLocaleDateString('ru-RU', { month: 'short' }),
           monthIndex,
           total: 0,
         };
@@ -258,7 +260,7 @@ export default function DashboardView() {
     }
 
     const buckets = Array.from({ length: 12 }).map((_, index) => ({
-      label: new Date(now.getFullYear(), index, 1).toLocaleDateString('en-US', { month: 'short' }),
+      label: new Date(now.getFullYear(), index, 1).toLocaleDateString('ru-RU', { month: 'short' }),
       monthIndex: index,
       total: 0,
     }));
@@ -271,27 +273,14 @@ export default function DashboardView() {
     });
 
     return buckets.map(({ label, total }) => ({ label, total }));
-  }, [filteredSales, overviewPeriod, recentSales, searchQuery]);
-
-  const overviewTotal = useMemo(
-    () => overviewData.reduce((sum: number, item: { total: number }) => sum + Number(item.total || 0), 0),
-    [overviewData],
-  );
+  }, [filteredSales, overviewPeriod, overviewSales, searchQuery]);
 
   const overviewDescription = useMemo(() => {
-    if (overviewPeriod === 'week') return 'Revenue for the current week.';
-    if (overviewPeriod === 'month') return 'Revenue for the current month.';
-    if (overviewPeriod === 'quarter') return 'Revenue for the current quarter.';
-    return 'Revenue for the current year.';
+    if (overviewPeriod === 'week') return 'Динамика выручки за текущую неделю.';
+    if (overviewPeriod === 'month') return 'Динамика выручки за текущий месяц.';
+    if (overviewPeriod === 'quarter') return 'Динамика выручки за текущий квартал.';
+    return 'Динамика выручки за текущий год.';
   }, [overviewPeriod]);
-
-  const overviewChange = useMemo(() => {
-    const value = Number(summary?.overviewChanges?.[overviewPeriod] || 0);
-    return {
-      value,
-      label: formatMetricDelta(value),
-    };
-  }, [overviewPeriod, summary]);
 
   const categoryData = useMemo(() => {
     const source = filteredTopProducts.length ? filteredTopProducts.slice(0, 5) : filteredLowStock.slice(0, 5);
@@ -321,7 +310,7 @@ export default function DashboardView() {
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search..."
+                placeholder="Поиск..."
                 className="w-full rounded-full border border-slate-200 bg-[#f4f5fb] py-3 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-slate-300"
               />
 
@@ -330,7 +319,7 @@ export default function DashboardView() {
                   <div className="max-h-105 overflow-y-auto p-3">
                     <div className="space-y-3">
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Products</p>
+                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Товары</p>
                         <div className="space-y-1">
                           {dropdownProducts.map((item: any) => (
                             <button
@@ -343,17 +332,17 @@ export default function DashboardView() {
                             >
                               <div className="min-w-0">
                                 <p className="truncate text-sm text-slate-900">{item.name}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">{item.category?.name || 'General'}</p>
+                                <p className="mt-0.5 text-xs text-slate-400">{item.category?.name || 'Без категории'}</p>
                               </div>
                               <span className="ml-3 shrink-0 text-xs text-slate-500">{item.stock} {item.unit}</span>
                             </button>
                           ))}
-                          {!dropdownProducts.length && <p className="px-3 py-2 text-sm text-slate-400">No products</p>}
+                          {!dropdownProducts.length && <p className="px-3 py-2 text-sm text-slate-400">Нет товаров</p>}
                         </div>
                       </div>
 
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Sales</p>
+                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Продажи</p>
                         <div className="space-y-1">
                           {dropdownSales.map((sale: any) => (
                             <button
@@ -365,18 +354,18 @@ export default function DashboardView() {
                               className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-[#f4f5fb]"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-sm text-slate-900">Sale #{sale.id}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">{sale.customer?.name || 'Customer'}</p>
+                                <p className="truncate text-sm text-slate-900">Продажа #{sale.id}</p>
+                                <p className="mt-0.5 text-xs text-slate-400">{sale.customer?.name || 'Клиент'}</p>
                               </div>
-                              <span className="ml-3 shrink-0 text-xs text-slate-500">{formatDollar(sale.netAmount || 0)}</span>
+                              <span className="ml-3 shrink-0 text-xs text-slate-500">{formatMoney(sale.netAmount || 0)}</span>
                             </button>
                           ))}
-                          {!dropdownSales.length && <p className="px-3 py-2 text-sm text-slate-400">No sales</p>}
+                          {!dropdownSales.length && <p className="px-3 py-2 text-sm text-slate-400">Нет продаж</p>}
                         </div>
                       </div>
 
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Customers</p>
+                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Клиенты</p>
                         <div className="space-y-1">
                           {dropdownCustomers.map((sale: any, index: number) => (
                             <button
@@ -389,12 +378,12 @@ export default function DashboardView() {
                             >
                               <div className="min-w-0">
                                 <p className="truncate text-sm text-slate-900">{sale.customer?.name}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">From recent sales</p>
+                                <p className="mt-0.5 text-xs text-slate-400">Из последних продаж</p>
                               </div>
-                              <span className="ml-3 shrink-0 text-xs text-slate-500">View</span>
+                              <span className="ml-3 shrink-0 text-xs text-slate-500">Открыть</span>
                             </button>
                           ))}
-                          {!dropdownCustomers.length && <p className="px-3 py-2 text-sm text-slate-400">No customers</p>}
+                          {!dropdownCustomers.length && <p className="px-3 py-2 text-sm text-slate-400">Нет клиентов</p>}
                         </div>
                       </div>
                     </div>
@@ -431,24 +420,24 @@ export default function DashboardView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">Dashboard</h1>
-              <p className="mt-1 text-[11px] text-slate-500">Overview of sales, stock and customer activity.</p>
+              <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">Дашборд</h1>
+              <p className="mt-1 text-[11px] text-slate-500">Обзор продаж, остатков и активности клиентов.</p>
               {searchQuery && (
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Results for "{search}": products {Math.max(filteredTopProducts.length, filteredLowStock.length)}, sales {filteredSales.length}, customers {filteredCustomers.length}
+                  Результаты по запросу "{search}": товары {Math.max(filteredTopProducts.length, filteredLowStock.length)}, продажи {filteredSales.length}, клиенты {filteredCustomers.length}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span>Home</span>
+              <span>Главная</span>
               <span>/</span>
-              <span className="text-slate-600">Dashboard</span>
+              <span className="text-slate-600">Дашборд</span>
             </div>
           </div>
 
           {searchQuery && !hasSearchResults && (
             <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              No results found for "{search}".
+              Ничего не найдено по запросу "{search}".
             </div>
           )}
 
@@ -479,9 +468,9 @@ export default function DashboardView() {
             <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Today Sales</p>
+                  <p className="text-[11px] text-slate-500">Продажи за сегодня</p>
                   <p className="mt-2 wrap-break-word text-[clamp(1rem,1.35vw,1.35rem)] font-semibold leading-none tracking-tight text-slate-900">
-                    {formatDollar(summary?.todaySales || 0)}
+                    {formatMoney(summary?.todaySales || 0)}
                   </p>
                 </div>
                 <div className="rounded-full bg-sky-100 p-4 text-sky-600">
@@ -493,9 +482,9 @@ export default function DashboardView() {
             <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Customer Debts</p>
+                  <p className="text-[11px] text-slate-500">Долги клиентов</p>
                   <p className="mt-2 wrap-break-word text-[clamp(1rem,1.35vw,1.35rem)] font-semibold leading-none tracking-tight text-slate-900">
-                    {formatDollar(summary?.totalDebts || 0)}
+                    {formatMoney(summary?.totalDebts || 0)}
                   </p>
                 </div>
                 <div className="rounded-full bg-rose-100 p-4 text-rose-600">
@@ -507,7 +496,7 @@ export default function DashboardView() {
             <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Reminders</p>
+                  <p className="text-[11px] text-slate-500">Напоминания</p>
                   <p className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
                     {formatCount(reminders.length || 0)}
                   </p>
@@ -526,15 +515,15 @@ export default function DashboardView() {
             <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Sales Overview</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">Обзор продаж</h2>
                   <p className="mt-2 text-[11px] text-slate-500">{overviewDescription}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 rounded-[22px] bg-[#f4f5fb] p-1 text-sm sm:flex sm:items-center sm:rounded-full">
                   {[
-                    { key: 'week', label: 'Week' },
-                    { key: 'month', label: 'Month' },
-                    { key: 'quarter', label: 'Quarter' },
-                    { key: 'year', label: 'Year' },
+                    { key: 'week', label: 'Неделя' },
+                    { key: 'month', label: 'Месяц' },
+                    { key: 'quarter', label: 'Квартал' },
+                    { key: 'year', label: 'Год' },
                   ].map((period) => (
                     <button
                       key={period.key}
@@ -552,19 +541,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <p className="text-[11px] text-slate-500">Recent revenue</p>
-                <div className="text-left sm:text-right">
-                  <p className="wrap-break-word text-[clamp(1.05rem,1.45vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
-                    {formatDollar(overviewTotal)}
-                  </p>
-                  <p className={card('mt-1 text-[11px]', overviewChange.value < 0 ? 'text-rose-500' : 'text-emerald-500')}>
-                    {overviewChange.label}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 h-[220px] sm:h-[280px] lg:h-70">
+              <div className="mt-5 h-[220px] sm:h-[280px] lg:h-70">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={overviewData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
@@ -582,7 +559,7 @@ export default function DashboardView() {
                         border: '1px solid #e2e8f0',
                         boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
                       }}
-                      formatter={(value: number) => [formatDollar(value), 'Revenue']}
+                      formatter={(value: number) => [formatMoney(value), 'Выручка']}
                     />
                     <Area
                       type="monotone"
@@ -600,10 +577,10 @@ export default function DashboardView() {
 
             <div className="min-w-0 rounded-[24px] border border-white bg-white p-4 shadow-sm">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Sales by Category</h2>
-                <p className="mt-2 text-[11px] text-slate-500">Total revenue</p>
+                <h2 className="text-lg font-semibold text-slate-900">Продажи по категориям</h2>
+                <p className="mt-2 text-[11px] text-slate-500">Общая выручка</p>
                 <p className="mt-2 break-words text-[clamp(1.05rem,1.45vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
-                  {formatDollar(summary?.totalRevenue || 0)}
+                  {formatMoney(summary?.totalRevenue || 0)}
                 </p>
               </div>
 
@@ -646,7 +623,7 @@ export default function DashboardView() {
                     </span>
                   </div>
                 ))}
-                {!categoryData.length && <p className="text-sm text-slate-400">No category data</p>}
+                {!categoryData.length && <p className="text-sm text-slate-400">Нет данных по категориям</p>}
               </div>
             </div>
           </section>
@@ -654,24 +631,24 @@ export default function DashboardView() {
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
             <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
               <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-2xl font-semibold text-slate-900">Recent Sales</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">Последние продажи</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-[#f4f5fb] text-sm text-slate-500">
                     <tr>
-                      <th className="px-5 py-4">Order</th>
-                      <th className="px-5 py-4">Customer</th>
-                      <th className="px-5 py-4">Total</th>
-                      <th className="px-5 py-4">Status</th>
+                      <th className="px-5 py-4">Заказ</th>
+                      <th className="px-5 py-4">Клиент</th>
+                      <th className="px-5 py-4">Сумма</th>
+                      <th className="px-5 py-4">Статус</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredSales.slice(0, 5).map((sale: any) => (
                       <tr key={sale.id}>
                         <td className="px-5 py-4 text-sm text-slate-700">#{sale.id}</td>
-                        <td className="px-5 py-4 text-sm text-slate-900">{sale.customer?.name || 'Customer'}</td>
-                        <td className="px-5 py-4 text-sm text-slate-900">{formatDollar(sale.netAmount || 0)}</td>
+                        <td className="px-5 py-4 text-sm text-slate-900">{sale.customer?.name || 'Клиент'}</td>
+                        <td className="px-5 py-4 text-sm text-slate-900">{formatMoney(sale.netAmount || 0)}</td>
                         <td className="px-5 py-4">
                           <span className={card('rounded-xl px-3 py-1.5 text-sm', statusTone(sale.status))}>
                             {statusLabel(sale.status)}
@@ -682,7 +659,7 @@ export default function DashboardView() {
                     {!filteredSales.length && (
                       <tr>
                         <td colSpan={4} className="px-5 py-16 text-center text-sm text-slate-400">
-                          No recent sales
+                          Нет недавних продаж
                         </td>
                       </tr>
                     )}
@@ -693,12 +670,12 @@ export default function DashboardView() {
 
             <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <h2 className="text-2xl font-semibold text-slate-900">Low Stock Products</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">Товары с низким остатком</h2>
                 <button
                   onClick={() => navigate('/products')}
                   className="inline-flex items-center gap-1 text-sm text-[#5b8def] transition-colors hover:text-[#3d73da]"
                 >
-                  <span>View All</span>
+                  <span>Смотреть все</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -706,10 +683,10 @@ export default function DashboardView() {
                 <table className="w-full text-left">
                   <thead className="bg-[#f4f5fb] text-sm text-slate-500">
                     <tr>
-                      <th className="px-5 py-4">Product</th>
-                      <th className="px-5 py-4">Category</th>
-                      <th className="px-5 py-4">Stock</th>
-                      <th className="px-5 py-4">Status</th>
+                      <th className="px-5 py-4">Товар</th>
+                      <th className="px-5 py-4">Категория</th>
+                      <th className="px-5 py-4">Остаток</th>
+                      <th className="px-5 py-4">Статус</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -725,7 +702,7 @@ export default function DashboardView() {
                               <span className="break-words text-[12px] leading-4 text-slate-900">{item.name}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-sm text-slate-500">{item.category?.name || 'General'}</td>
+                          <td className="px-5 py-4 text-sm text-slate-500">{item.category?.name || 'Без категории'}</td>
                           <td className="px-5 py-4 text-sm text-slate-900">
                             {item.stock} {item.unit}
                           </td>
@@ -737,7 +714,7 @@ export default function DashboardView() {
                               )}
                             >
                               <AlertTriangle size={14} />
-                              <span>{outOfStock ? 'Out of Stock' : 'Low Stock'}</span>
+                              <span>{outOfStock ? 'Нет в наличии' : 'Низкий остаток'}</span>
                             </span>
                           </td>
                         </tr>
@@ -746,7 +723,7 @@ export default function DashboardView() {
                     {!filteredLowStock.length && (
                       <tr>
                         <td colSpan={4} className="px-5 py-16 text-center text-sm text-slate-400">
-                          No matching low stock products
+                          Нет товаров с таким фильтром
                         </td>
                       </tr>
                     )}

@@ -18,6 +18,7 @@ import { clsx } from 'clsx';
 import { motion } from 'motion/react';
 import client from '../../api/client';
 import { getCurrentUser, isAdminUser } from '../../utils/userAccess';
+import { clearAuthSession, getAuthToken } from '../../utils/authStorage';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Дашборд' },
@@ -43,7 +44,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [remindersCount, setRemindersCount] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (!token) return;
 
     const refreshRemindersCount = () => {
@@ -68,7 +69,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    clearAuthSession();
     navigate('/login');
   };
 
@@ -83,7 +84,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       <div
         className={clsx(
-          'fixed inset-0 bg-[#202223]/30 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300',
+          'fixed inset-0 bg-[#0f172a]/45 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -91,18 +92,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 w-72 bg-[#fbfbfb] text-[#202223] flex flex-col h-screen z-50 transition-transform duration-300 lg:translate-x-0 lg:sticky lg:top-0 lg:shrink-0 border-r border-[#e1e3e5]',
+          'fixed inset-y-0 left-0 w-72 bg-[#243042] text-[#eaf1f8] flex flex-col h-screen z-50 transition-transform duration-300 lg:translate-x-0 lg:sticky lg:top-0 lg:shrink-0 border-r border-[#314155]',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="p-6">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#e3f1df] text-[#008060]">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#5b8def] text-white shadow-lg shadow-[#5b8def]/25">
               <Warehouse size={20} />
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-semibold tracking-tight leading-none">Wholesale</span>
-              <span className="text-[10px] text-[#6d7175] mt-0.5">Commerce admin</span>
+              <span className="text-[10px] text-[#94a3b8] mt-0.5">Commerce admin</span>
             </div>
           </div>
         </div>
@@ -118,10 +119,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               className={({ isActive }) =>
                 clsx(
                   'flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden border',
-                  item.primary && !isActive && 'bg-[#eef7f4] text-[#008060] border-[#cae9dd] mb-3',
+                  item.primary && !isActive && 'bg-[#2d3b4f] text-[#eaf1f8] border-[#3a4b63] mb-3',
                   isActive
-                    ? 'bg-[#edf6f3] text-[#008060] border-[#cae9dd]'
-                    : 'text-[#4a4f55] border-transparent hover:bg-[#f6f6f7] hover:text-[#202223]'
+                    ? 'bg-[#5b8def] text-white border-[#5b8def] shadow-lg shadow-[#5b8def]/20'
+                    : 'text-[#c9d5e3] border-transparent hover:bg-[#2d3b4f] hover:text-white'
                 )
               }
             >
@@ -129,7 +130,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <>
                   <item.icon size={18} className="relative z-10" />
                   <span className="text-sm relative z-10">{item.label}</span>
-                  {isActive && <motion.div layoutId="active-pill" className="absolute inset-0 bg-[#edf6f3]" />}
+                  {isActive && <motion.div layoutId="active-pill" className="absolute inset-0 bg-[#5b8def]" />}
                 </>
               )}
             </NavLink>
@@ -137,23 +138,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         <div className="p-4 mt-auto">
-          <div className="rounded-[18px] border border-[#e1e3e5] bg-white p-4">
+          <div className="rounded-[18px] border border-[#314155] bg-[#1d2736] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.28)]">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-xl bg-[#eef1f3] flex items-center justify-center text-xs font-semibold text-[#202223]">
+              <div className="w-9 h-9 rounded-xl bg-[#32445c] flex items-center justify-center text-xs font-semibold text-white">
                 {user.username?.[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-[#202223] truncate">{user.username}</p>
-                <p className="text-[10px] text-[#6d7175] uppercase tracking-[0.12em] truncate">{user.role}</p>
+                <p className="text-xs font-semibold text-[#eaf1f8] truncate">{user.username}</p>
+                <p className="text-[10px] text-[#94a3b8] uppercase tracking-[0.12em] truncate">{user.role}</p>
               </div>
               <button
                 onClick={() => navigate('/reminders')}
-                className="relative w-9 h-9 shrink-0 rounded-xl bg-[#f6f6f7] hover:bg-[#eef1f3] text-[#6d7175] hover:text-[#202223] flex items-center justify-center transition-all duration-200"
+                className="relative w-9 h-9 shrink-0 rounded-xl bg-[#2d3b4f] hover:bg-[#354861] text-[#c9d5e3] hover:text-white flex items-center justify-center transition-all duration-200"
                 title="Напоминания"
               >
                 <Bell size={16} />
                 {remindersCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#d82c0d] text-white rounded-full text-[9px] font-semibold flex items-center justify-center border-2 border-white">
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#ef4444] text-white rounded-full text-[9px] font-semibold flex items-center justify-center border-2 border-[#1d2736]">
                     {remindersCount > 9 ? '9+' : remindersCount}
                   </span>
                 )}
@@ -161,7 +162,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <button
               onClick={handleLogout}
-              className="mt-3 flex items-center justify-center space-x-2 w-full py-2.5 rounded-lg bg-[#f6f6f7] hover:bg-[#fde7e9] hover:text-[#8e1f0b] text-[#4a4f55] transition-all duration-200 text-[10px] font-semibold uppercase tracking-[0.14em]"
+              className="mt-3 flex items-center justify-center space-x-2 w-full py-2.5 rounded-lg bg-[#2d3b4f] hover:bg-[#3a2430] hover:text-[#fecdd3] text-[#c9d5e3] transition-all duration-200 text-[10px] font-semibold uppercase tracking-[0.14em]"
             >
               <LogOut size={14} />
               <span>Выйти</span>

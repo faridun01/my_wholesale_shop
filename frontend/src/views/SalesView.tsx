@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +27,7 @@ import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney, toFixedNumber } from '../utils/format';
+import { formatProductName } from '../utils/productName';
 
 export default function SalesView() {
   const PAYMENT_EPSILON = 0.01;
@@ -51,6 +53,14 @@ export default function SalesView() {
   const [isPaying, setIsPaying] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const navigate = useNavigate();
+
+  const escapeHtml = (value: unknown) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
 
   useEffect(() => {
     fetchInvoices();
@@ -241,6 +251,296 @@ export default function SalesView() {
     return balance;
   };
 
+  const getPrintableStatus = (invoice: any) => {
+    if (invoice?.cancelled) return 'Отменена';
+
+    const status = getEffectiveStatus(invoice);
+    if (status === 'paid') return 'Оплачено';
+    if (status === 'partial') return 'Частично оплачено';
+    return 'Не оплачено';
+  };
+
+  const handlePrintInvoice = (invoice: any) => {
+    if (typeof window === 'undefined' || !invoice) {
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=980,height=900');
+    if (!printWindow) {
+      toast.error('Разрешите всплывающие окна для печати накладной');
+      return;
+    }
+
+    const itemsRows = Array.isArray(invoice.items)
+      ? invoice.items
+          .map(
+            (item: any, index: number) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(formatProductName(item.product_name))}</td>
+                <td>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td>
+                <td>${escapeHtml(formatMoney(item.sellingPrice))}</td>
+                <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
+              </tr>
+            `
+          )
+          .join('')
+      : '';
+
+    const discountAmount = getInvoiceDiscountAmount(invoice);
+    const netAmount = getInvoiceNetAmount(invoice);
+    const balanceAmount = getInvoiceBalance(invoice);
+    const paymentsBlock = Array.isArray(invoice.payments) && invoice.payments.length > 0
+      ? `
+        <div class="section">
+          <h3>Оплаты</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Сотрудник</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoice.payments
+                .map(
+                  (payment: any) => `
+                    <tr>
+                      <td>${escapeHtml(new Date(payment.createdAt).toLocaleString('ru-RU'))}</td>
+                      <td>${escapeHtml(formatMoney(payment.amount))}</td>
+                      <td>${escapeHtml(payment.staff_name)}</td>
+                    </tr>
+                  `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `
+      : '';
+
+    const returnsBlock = Array.isArray(invoice.returns) && invoice.returns.length > 0
+      ? `
+        <div class="section">
+          <h3>Возвраты</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>Причина</th>
+                <th>Сотрудник</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoice.returns
+                .map(
+                  (itemReturn: any) => `
+                    <tr>
+                      <td>${escapeHtml(new Date(itemReturn.createdAt).toLocaleString('ru-RU'))}</td>
+                      <td>-${escapeHtml(formatMoney(itemReturn.totalValue))}</td>
+                      <td>${escapeHtml(itemReturn.reason || '---')}</td>
+                      <td>${escapeHtml(itemReturn.staff_name)}</td>
+                    </tr>
+                  `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `
+      : '';
+
+    const html = `
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <meta charset="utf-8" />
+          <title>Накладная #${invoice.id}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              padding: 32px;
+              font-family: Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+            }
+            .sheet {
+              max-width: 900px;
+              margin: 0 auto;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 24px;
+              border-bottom: 2px solid #e2e8f0;
+              padding-bottom: 20px;
+              margin-bottom: 24px;
+            }
+            .title {
+              font-size: 30px;
+              font-weight: 700;
+              margin: 0 0 8px;
+            }
+            .muted {
+              color: #475569;
+              font-size: 14px;
+              line-height: 1.6;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 16px;
+              margin-bottom: 24px;
+            }
+            .card {
+              border: 1px solid #e2e8f0;
+              border-radius: 16px;
+              padding: 16px;
+              background: #f8fafc;
+            }
+            .label {
+              margin: 0 0 8px;
+              color: #64748b;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.12em;
+              font-weight: 700;
+            }
+            .value {
+              margin: 0;
+              font-size: 18px;
+              font-weight: 700;
+            }
+            .subvalue {
+              margin: 8px 0 0;
+              color: #475569;
+              font-size: 14px;
+              line-height: 1.5;
+            }
+            .section {
+              margin-top: 24px;
+            }
+            .section h3 {
+              margin: 0 0 12px;
+              font-size: 16px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              border: 1px solid #e2e8f0;
+              padding: 12px;
+              font-size: 14px;
+              text-align: left;
+              vertical-align: top;
+            }
+            th {
+              background: #f8fafc;
+              font-weight: 700;
+            }
+            .summary {
+              margin-left: auto;
+              margin-top: 24px;
+              width: 320px;
+            }
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              gap: 16px;
+              padding: 8px 0;
+              border-bottom: 1px solid #e2e8f0;
+              font-size: 14px;
+            }
+            .summary-row.total {
+              font-size: 20px;
+              font-weight: 700;
+              border-top: 2px solid #cbd5e1;
+              margin-top: 8px;
+              padding-top: 12px;
+            }
+            @media print {
+              body { padding: 0; }
+              .sheet { max-width: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sheet">
+            <div class="header">
+              <div>
+                <h1 class="title">Накладная #${invoice.id}</h1>
+                <div class="muted">
+                  <div>Дата: ${escapeHtml(new Date(invoice.createdAt).toLocaleString('ru-RU'))}</div>
+                  <div>Статус: ${escapeHtml(getPrintableStatus(invoice))}</div>
+                  <div>Сотрудник: ${escapeHtml(invoice.staff_name || '---')}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid">
+              <div class="card">
+                <p class="label">Клиент</p>
+                <p class="value">${escapeHtml(invoice.customer_name || 'Обычный клиент')}</p>
+                <p class="subvalue">${escapeHtml(invoice.customer_phone || 'Нет телефона')}</p>
+              </div>
+              <div class="card">
+                <p class="label">Склад</p>
+                <p class="value">${escapeHtml(invoice.warehouse?.name || '---')}</p>
+                <p class="subvalue">${escapeHtml(invoice.warehouse?.address || '---')}</p>
+              </div>
+              <div class="card">
+                <p class="label">Оплата</p>
+                <p class="value">${escapeHtml(formatMoney(invoice.paidAmount || 0))}</p>
+                <p class="subvalue">Остаток: ${escapeHtml(formatMoney(balanceAmount))}</p>
+              </div>
+            </div>
+
+            <div class="section">
+              <h3>Товары</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 52px;">№</th>
+                    <th>Товар</th>
+                    <th style="width: 120px;">Количество</th>
+                    <th style="width: 140px;">Цена</th>
+                    <th style="width: 140px;">Сумма</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRows}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="summary">
+              <div class="summary-row"><span>Подытог</span><strong>${escapeHtml(formatMoney(getInvoiceSubtotal(invoice)))}</strong></div>
+              <div class="summary-row"><span>Скидка (${escapeHtml(invoice.discount || 0)}%)</span><strong>-${escapeHtml(formatMoney(discountAmount))}</strong></div>
+              ${Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount || 0))}</strong></div>` : ''}
+              <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoney(netAmount))}</span></div>
+            </div>
+
+            ${paymentsBlock}
+            ${returnsBlock}
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
+
   const sortedInvoices = [...filteredInvoices].sort((a, b) => {
     const direction = sortConfig.direction === 'asc' ? 1 : -1;
 
@@ -337,7 +637,7 @@ export default function SalesView() {
             <div key={`mobile-invoice-${inv.id}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base text-slate-900">Накладная #{inv.id}</p>
+                  <p className="text-base text-slate-900">{isAdmin ? `Накладная #${inv.id}` : 'Накладная'}</p>
                   <p className="mt-1 text-sm text-slate-500">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</p>
                   <p className="mt-2 break-words text-sm text-slate-700">{inv.customer_name}</p>
                   <p className="mt-1 text-xs text-slate-400">{inv.staff_name}</p>
@@ -410,21 +710,21 @@ export default function SalesView() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#fafbfe] text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                <th className="px-5 py-5">{renderSortLabel('ID', 'id')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Date', 'createdAt')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Customer', 'customer_name')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Amount', 'netAmount')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Paid', 'paidAmount')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Balance', 'balance')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Status', 'status')}</th>
-                <th className="px-5 py-5">{renderSortLabel('Staff', 'staff_name')}</th>
+                {isAdmin && <th className="px-5 py-5">{renderSortLabel('ID', 'id')}</th>}
+                <th className="px-5 py-5">{renderSortLabel("Дата", "createdAt")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Клиент", "customer_name")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Сумма", "netAmount")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Оплачено", "paidAmount")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Остаток", "balance")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Статус", "status")}</th>
+                <th className="px-5 py-5">{renderSortLabel("Сотрудник", "staff_name")}</th>
                 <th className="px-5 py-5 text-right">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedInvoices.map((inv) => (
                 <tr key={inv.id} className="transition-all duration-300 hover:bg-[#fafbfe]">
-                  <td className="px-5 py-5 text-sm text-slate-400">#{inv.id}</td>
+                  {isAdmin && <td className="px-5 py-5 text-sm text-slate-400">#{inv.id}</td>}
                   <td className="px-5 py-5 text-sm text-slate-500">
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
@@ -482,7 +782,7 @@ export default function SalesView() {
               ))}
               {sortedInvoices.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={9} className="px-8 py-32 text-center">
+                  <td colSpan={isAdmin ? 9 : 8} className="px-8 py-32 text-center">
                     <div className="flex flex-col items-center justify-center space-y-6">
                       <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                         <Receipt size={48} />
@@ -559,7 +859,7 @@ export default function SalesView() {
                     <div className="space-y-3 p-3 md:hidden">
                       {selectedInvoice.items.map((item: any) => (
                         <div key={`mobile-item-${item.id}`} className="rounded-2xl bg-slate-50 p-3">
-                          <p className="break-words text-sm font-black text-slate-900">{item.product_name}</p>
+                          <p className="break-words text-sm font-black text-slate-900">{formatProductName(item.product_name)}</p>
                           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                             <div className="rounded-xl bg-white px-2.5 py-2">
                               <p className="text-[9px] uppercase tracking-[0.14em] text-slate-400">Кол-во</p>
@@ -591,7 +891,7 @@ export default function SalesView() {
                           return (
                             <tr key={item.id}>
                               <td className="px-6 py-4">
-                                <p className="font-black text-slate-900">{item.product_name}</p>
+                                <p className="font-black text-slate-900">{formatProductName(item.product_name)}</p>
                                 {item.saleAllocations && item.saleAllocations.length > 0 && (
                                   <div className="mt-1 flex flex-wrap gap-1">
                                     {item.saleAllocations.map((sa: any) => (
@@ -699,7 +999,14 @@ export default function SalesView() {
                 )}
               </div>
               
-              <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-4 md:p-8">
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4 md:p-8">
+                <button
+                  onClick={() => handlePrintInvoice(selectedInvoice)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100 md:px-8 md:py-4"
+                >
+                  <Printer size={18} />
+                  <span>Печать</span>
+                </button>
                 <button 
                   onClick={() => setShowDetailsModal(false)}
                   className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 md:px-10 md:py-4"
@@ -832,7 +1139,7 @@ export default function SalesView() {
                       <tbody className="divide-y divide-slate-50">
                         {returnItems.map((item: any, idx: number) => (
                           <tr key={item.id}>
-                            <td className="px-6 py-4 font-black text-slate-900">{item.product_name}</td>
+                            <td className="px-6 py-4 font-black text-slate-900">{formatProductName(item.product_name)}</td>
                             <td className="px-6 py-4 font-bold text-slate-500">{item.quantity} {item.unit}</td>
                             <td className="px-6 py-4">
                               <input 
