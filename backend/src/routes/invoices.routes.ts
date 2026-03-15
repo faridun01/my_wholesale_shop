@@ -5,9 +5,41 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 
 const router = Router();
+const DEFAULT_CUSTOMER_NAME = 'Без названия';
 const canCancelInvoice = (req: AuthRequest) => {
   const role = req.user?.role?.toUpperCase();
   return role === 'ADMIN' || role === 'MANAGER' || Boolean(req.user?.canCancelInvoices);
+};
+
+const resolveDefaultCustomerId = async (warehouseId: number, userId: number, fallbackCity?: string | null) => {
+  const warehouse = await prisma.warehouse.findUnique({
+    where: { id: warehouseId },
+    select: { city: true },
+  });
+  const city = warehouse?.city ?? fallbackCity ?? null;
+
+  let customer = await prisma.customer.findFirst({
+    where: {
+      active: true,
+      name: DEFAULT_CUSTOMER_NAME,
+      city,
+    },
+    select: { id: true },
+  });
+
+  if (!customer) {
+    customer = await prisma.customer.create({
+      data: {
+        name: DEFAULT_CUSTOMER_NAME,
+        city,
+        createdByUserId: userId,
+        notes: 'Технический клиент по умолчанию',
+      },
+      select: { id: true },
+    });
+  }
+
+  return customer.id;
 };
 
 router.get('/', async (req: AuthRequest, res, next) => {
@@ -72,8 +104,15 @@ router.post('/', async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'Warehouse ID is required' });
     }
 
+    const requestedCustomerId = Number(req.body.customerId);
+    const customerId =
+      Number.isFinite(requestedCustomerId) && requestedCustomerId > 0
+        ? requestedCustomerId
+        : await resolveDefaultCustomerId(warehouseId, userId, access.city);
+
     const invoice = await InvoiceService.createInvoice({
       ...req.body,
+      customerId,
       userId,
       warehouseId,
     });

@@ -413,11 +413,11 @@ export default function SettingsView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="rounded-2xl bg-violet-500 p-3 text-white shadow-lg shadow-violet-500/20">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
+                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900 sm:text-2xl">
+                  <div className="rounded-2xl bg-violet-500 p-2.5 text-white shadow-lg shadow-violet-500/20 sm:p-3">
                     <Users size={24} />
                   </div>
                   <span>{showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}</span>
@@ -426,8 +426,8 @@ export default function SettingsView() {
                   <X size={24} />
                 </button>
               </div>
-              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-5 p-5 sm:space-y-6 sm:p-8">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Логин</label>
                     <input 
@@ -488,7 +488,7 @@ export default function SettingsView() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-8 p-6 bg-slate-50 rounded-3xl">
+                <div className="space-y-3 rounded-3xl bg-slate-50 p-4 sm:flex sm:flex-wrap sm:gap-8 sm:space-y-0 sm:p-6">
                   <label className="flex items-center space-x-4 cursor-pointer group">
                     <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${newUser.canCancelInvoices ? 'bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/20' : 'bg-white border-slate-200 group-hover:border-slate-400'}`}>
                       {newUser.canCancelInvoices && <CheckCircle2 size={20} className="text-white" />}
@@ -516,8 +516,8 @@ export default function SettingsView() {
                   </label>
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-6">
-                  <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); }} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
+                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
+                  <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-violet-500 px-10 py-4 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
                     {showEditUser ? 'Сохранить' : 'Создать'}
                   </button>

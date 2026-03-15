@@ -5,6 +5,7 @@ import { getAccessContext } from '../utils/access.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
+const DEFAULT_CUSTOMER_NAME = 'Без названия';
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
   const balance = Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
@@ -31,6 +32,25 @@ const mapCustomerWithTotals = (customer: any) => {
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    const defaultCustomerCity = access.isAdmin ? null : (access.city ?? null);
+    let defaultCustomer = await prisma.customer.findFirst({
+      where: {
+        active: true,
+        name: DEFAULT_CUSTOMER_NAME,
+        city: defaultCustomerCity,
+      },
+    });
+
+    if (!defaultCustomer) {
+      defaultCustomer = await prisma.customer.create({
+        data: {
+          name: DEFAULT_CUSTOMER_NAME,
+          city: defaultCustomerCity,
+          createdByUserId: req.user?.id || null,
+          notes: 'Технический клиент по умолчанию',
+        },
+      });
+    }
 
     let where: any = { active: true };
 
@@ -73,7 +93,14 @@ router.get('/', async (req: AuthRequest, res, next) => {
       });
     }
 
-    res.json(customers.map(mapCustomerWithTotals));
+    const mappedCustomers = customers.map(mapCustomerWithTotals);
+    mappedCustomers.sort((a: any, b: any) => {
+      if (a.id === defaultCustomer?.id) return -1;
+      if (b.id === defaultCustomer?.id) return 1;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+
+    res.json(mappedCustomers);
   } catch (error) {
     next(error);
   }
