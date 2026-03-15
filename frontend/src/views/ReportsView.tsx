@@ -556,10 +556,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
    .join('')}
 </Workbook>`;
 
-    const blob = new Blob(['\uFEFF' + workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + workbookXml], { type: 'application/xml;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `otchet_${reportType}_${dateRange.start}_${dateRange.end}.xls`;
+    link.download = `otchet_${reportType}_${dateRange.start}_${dateRange.end}.xml`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
