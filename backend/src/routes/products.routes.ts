@@ -18,6 +18,15 @@ const normalizeProductName = (value: string | null | undefined) =>
 
 const formatMoneyValue = (value: unknown) => Number(value || 0).toFixed(2);
 
+const ensureAdminProductAccess = (access: Awaited<ReturnType<typeof getAccessContext>>, res: any) => {
+  if (!access.isAdmin) {
+    res.status(403).json({ error: 'Только администратор может выполнять это действие' });
+    return false;
+  }
+
+  return true;
+};
+
 router.get('/', async (req, res, next) => {
   try {
     const access = await getAccessContext(req as AuthRequest);
@@ -39,12 +48,21 @@ router.get('/', async (req, res, next) => {
     if (warehouseId) {
       const productsWithWarehouseStock = products.map((p: any) => {
         const warehouseStock = p.batches.reduce((sum: number, b: any) => sum + b.remainingQuantity, 0);
-        return { ...p, stock: warehouseStock };
+        return {
+          ...p,
+          stock: warehouseStock,
+          costPrice: access.isAdmin ? p.costPrice : null,
+        };
       });
       return res.json(productsWithWarehouseStock);
     }
 
-    res.json(products);
+    res.json(
+      products.map((product: any) => ({
+        ...product,
+        costPrice: access.isAdmin ? product.costPrice : null,
+      }))
+    );
   } catch (error) {
     next(error);
   }
@@ -53,6 +71,9 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const { initialStock, warehouseId, costPrice, ...rest } = req.body;
     const userId = req.user?.id || 1;
     const requestedWarehouseId = warehouseId ? Number(warehouseId) : null;
@@ -129,6 +150,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const productId = Number(req.params.id);
     const userId = req.user?.id || 1;
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
@@ -233,6 +257,9 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const access = await getAccessContext(req as AuthRequest);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const productId = Number(req.params.id);
     const product = await prisma.product.findUnique({
       where: { id: productId },
@@ -270,6 +297,9 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/restock', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const productId = Number(req.params.id);
     const userId = req.user!.id;
     const warehouseId = access.isAdmin ? Number(req.body.warehouseId) : access.warehouseId;
@@ -296,6 +326,9 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
 router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const productId = Number(req.params.id);
     const userId = req.user!.id;
     const { quantity } = req.body;
@@ -322,6 +355,9 @@ router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
 router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
     const userId = req.user!.id;
     const { product_id, quantity_change, type, reason, cost_at_time } = req.body;
     const warehouse_id = access.isAdmin ? Number(req.body.warehouse_id) : access.warehouseId;
@@ -493,7 +529,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    res.json(history);
+    res.json(access.isAdmin ? history : history.filter((item) => item.type !== 'price_change'));
   } catch (error) {
     next(error);
   }

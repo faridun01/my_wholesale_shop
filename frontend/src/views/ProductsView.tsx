@@ -1460,12 +1460,14 @@ export default function ProductsView() {
                     {product.totalIncoming} <span className="text-[10px] uppercase text-slate-400">{product.unit}</span>
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
-                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                    {isAggregateMode ? '-' : `${toFixedNumber(product.costPrice)} TJS`}
-                  </p>
-                </div>
+                {isAdmin && (
+                  <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                      {isAggregateMode ? '-' : `${toFixedNumber(product.costPrice)} TJS`}
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
                   <p className="mt-1 break-words text-sm font-semibold text-slate-900">
@@ -1476,36 +1478,40 @@ export default function ProductsView() {
 
               {!isAggregateMode && (
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setFormData({
-                        name: product.name || '',
-                        unit: product.unit || '',
-                        categoryId: product.categoryId?.toString() || '',
-                        warehouseId: product.warehouseId?.toString() || '',
-                        costPrice: formatPriceInput(product.costPrice),
-                        sellingPrice: formatPriceInput(product.sellingPrice),
-                        minStock: product.minStock?.toString() || '0',
-                        initialStock: product.initialStock?.toString() || '0',
-                        photoUrl: product.photoUrl || ''
-                      });
-                      setShowEditModal(true);
-                    }}
-                    className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold text-violet-700"
-                  >
-                    Изменить
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
-                      setShowRestockModal(true);
-                    }}
-                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-semibold text-emerald-700"
-                  >
-                    Приход
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setFormData({
+                          name: product.name || '',
+                          unit: product.unit || '',
+                          categoryId: product.categoryId?.toString() || '',
+                          warehouseId: product.warehouseId?.toString() || '',
+                          costPrice: formatPriceInput(product.costPrice),
+                          sellingPrice: formatPriceInput(product.sellingPrice),
+                          minStock: product.minStock?.toString() || '0',
+                          initialStock: product.initialStock?.toString() || '0',
+                          photoUrl: product.photoUrl || ''
+                        });
+                        setShowEditModal(true);
+                      }}
+                      className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold text-violet-700"
+                    >
+                      Изменить
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
+                        setShowRestockModal(true);
+                      }}
+                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-semibold text-emerald-700"
+                    >
+                      Приход
+                    </button>
+                  )}
                   <button
                     onClick={() => handleShowHistory(product)}
                     className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs font-semibold text-sky-700"
@@ -1518,29 +1524,33 @@ export default function ProductsView() {
                   >
                     Партии
                   </button>
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
-                      setShowTransferModal(true);
-                    }}
-                    className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold text-amber-700"
-                  >
-                    Перенос
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (Number(product.stock || 0) > 0) {
-                        toast.error('Нельзя удалить товар, пока на складе есть запас');
-                        return;
-                      }
-                      setSelectedProduct(product);
-                      setShowDeleteConfirm(true);
-                    }}
-                    className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-semibold text-rose-700"
-                  >
-                    Удалить
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
+                        setShowTransferModal(true);
+                      }}
+                      className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold text-amber-700"
+                    >
+                      Перенос
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        if (Number(product.stock || 0) > 0) {
+                          toast.error('Нельзя удалить товар, пока на складе есть запас');
+                          return;
+                        }
+                        setSelectedProduct(product);
+                        setShowDeleteConfirm(true);
+                      }}
+                      className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-semibold text-rose-700"
+                    >
+                      Удалить
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1655,38 +1665,42 @@ export default function ProductsView() {
                     {selectedWarehouseId ? (
                     <div className="flex flex-col items-end space-y-1.5">
                       <div className="flex items-center space-x-1.5">
-                        <button 
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setFormData({
-                              name: product.name || '',
-                              unit: product.unit || '',
-                              categoryId: product.categoryId?.toString() || '',
-                              warehouseId: product.warehouseId?.toString() || '',
-                              costPrice: formatPriceInput(product.costPrice),
-                              sellingPrice: formatPriceInput(product.sellingPrice),
-                              minStock: product.minStock?.toString() || '0',
-                              initialStock: product.initialStock?.toString() || '0',
-                              photoUrl: product.photoUrl || ''
-                            });
-                            setShowEditModal(true);
-                          }}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
-                          title="Редактировать"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
-                            setShowRestockModal(true);
-                          }}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600" 
-                          title="Пополнить"
-                        >
-                          <PlusCircle size={14} />
-                        </button>
+                        {isAdmin && (
+                          <button 
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setFormData({
+                                name: product.name || '',
+                                unit: product.unit || '',
+                                categoryId: product.categoryId?.toString() || '',
+                                warehouseId: product.warehouseId?.toString() || '',
+                                costPrice: formatPriceInput(product.costPrice),
+                                sellingPrice: formatPriceInput(product.sellingPrice),
+                                minStock: product.minStock?.toString() || '0',
+                                initialStock: product.initialStock?.toString() || '0',
+                                photoUrl: product.photoUrl || ''
+                              });
+                              setShowEditModal(true);
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
+                            title="Редактировать"
+                          >
+                            <Edit size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
+                              setShowRestockModal(true);
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600" 
+                            title="Пополнить"
+                          >
+                            <PlusCircle size={14} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleShowBatches(product)}
                           className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
@@ -1703,31 +1717,35 @@ export default function ProductsView() {
                         >
                           <History size={14} />
                         </button>
-                        <button 
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
-                            setShowTransferModal(true);
-                          }}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600" 
-                          title="Перенос"
-                        >
-                          <ArrowRightLeft size={14} />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (Number(product.stock || 0) > 0) {
-                              toast.error('Нельзя удалить товар, пока на складе есть запас');
-                              return;
-                            }
-                            setSelectedProduct(product);
-                            setShowDeleteConfirm(true);
-                          }}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600" 
-                          title="Удалить"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {isAdmin && (
+                          <button 
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
+                              setShowTransferModal(true);
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600" 
+                            title="Перенос"
+                          >
+                            <ArrowRightLeft size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => {
+                              if (Number(product.stock || 0) > 0) {
+                                toast.error('Нельзя удалить товар, пока на складе есть запас');
+                                return;
+                              }
+                              setSelectedProduct(product);
+                              setShowDeleteConfirm(true);
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600" 
+                            title="Удалить"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                     ) : (
