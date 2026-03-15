@@ -32,15 +32,15 @@ export default function LoginView() {
     <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] px-4 py-8 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-[#5b8def]/15 blur-3xl" />
-        <div className="absolute right-[-80px] top-24 h-80 w-80 rounded-full bg-[#5ec98f]/12 blur-3xl" />
-        <div className="absolute bottom-[-80px] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
+        <div className="absolute -right-20 top-24 h-80 w-80 rounded-full bg-[#5ec98f]/12 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid w-full overflow-hidden rounded-[32px] border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:min-h-[720px] lg:grid-cols-[1.15fr_0.85fr]"
+          className="grid w-full overflow-hidden rounded-4xl border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:min-h-180 lg:grid-cols-[1.15fr_0.85fr]"
         >
           <div className="relative hidden bg-[linear-gradient(160deg,#243042_0%,#1c2634_52%,#151d29_100%)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.12),transparent_30%)]" />
@@ -91,7 +91,7 @@ export default function LoginView() {
           </div>
 
           <div className="flex items-center justify-center p-5 sm:p-8 lg:bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] lg:p-12">
-            <div className="w-full max-w-md lg:max-w-[420px]">
+            <div className="w-full max-w-md lg:max-w-105">
               <div className="mb-8 text-center lg:mb-10 lg:text-left">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#e7f4e4] text-[#178f76] shadow-inner lg:mx-0">
                   <Warehouse size={30} />

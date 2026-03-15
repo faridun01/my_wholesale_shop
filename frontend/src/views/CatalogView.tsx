@@ -144,7 +144,7 @@ export default function CatalogView() {
   };
 
   return (
-    <div className="min-h-full rounded-[32px] bg-[#f4f5fb] p-4 md:p-6">
+    <div className="min-h-full rounded-4xl bg-[#f4f5fb] p-4 md:p-6">
       <div className="overflow-hidden rounded-[30px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -159,7 +159,7 @@ export default function CatalogView() {
             </div>
           </div>
 
-          <section className="rounded-[24px] border border-white bg-white p-5 shadow-sm">
+          <section className="rounded-3xl border border-white bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="space-y-2">
                 <p className="text-sm text-slate-500">Каталог товаров</p>
@@ -190,11 +190,11 @@ export default function CatalogView() {
                   placeholder="Поиск по названию товара..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
+                  className="w-full rounded-3xl border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
                 />
               </div>
 
-              <div className="flex items-center gap-2 rounded-[24px] border border-violet-100 bg-violet-50 px-4 py-4">
+              <div className="flex items-center gap-2 rounded-3xl border border-violet-100 bg-violet-50 px-4 py-4">
                 <Warehouse size={18} className="text-violet-500" />
                 <select
                   value={selectedWarehouseId}
@@ -211,7 +211,7 @@ export default function CatalogView() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 rounded-[24px] border border-amber-100 bg-amber-50 px-4 py-4">
+              <div className="flex items-center gap-2 rounded-3xl border border-amber-100 bg-amber-50 px-4 py-4">
                 <Filter size={18} className="text-amber-500" />
                 <select
                   value={selectedCategory}
@@ -227,7 +227,7 @@ export default function CatalogView() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 rounded-[24px] border border-emerald-100 bg-emerald-50/60 p-1 shadow-sm">
+              <div className="grid grid-cols-3 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-1 shadow-sm">
                 {[
                   { id: 'all', label: 'Все' },
                   { id: 'in_stock', label: 'В наличии' },
@@ -251,7 +251,7 @@ export default function CatalogView() {
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="h-[360px] rounded-[24px] border border-white bg-white animate-pulse" />
+                <div key={item} className="h-90 rounded-3xl border border-white bg-white animate-pulse" />
               ))}
             </div>
           ) : (
@@ -263,7 +263,7 @@ export default function CatalogView() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
                   onClick={() => handleProductClick(product)}
-                  className="flex h-full cursor-pointer flex-col overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:rounded-[24px]"
+                  className="flex h-full cursor-pointer flex-col overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:rounded-3xl"
                 >
                   <div className="aspect-square bg-slate-100">
                     {product.photoUrl ? (
@@ -282,11 +282,11 @@ export default function CatalogView() {
                   </div>
 
                   <div className="flex flex-1 flex-col p-3 md:p-5">
-                    <div className="min-h-[112px] md:min-h-[132px]">
+                    <div className="min-h-28 md:min-h-33">
                       <div className="min-w-0">
                         <h3
                           title={formatProductName(product.name)}
-                          className="mt-3 line-clamp-4 break-words text-[13px] leading-5 text-slate-900 md:mt-4 md:min-h-[84px] md:text-base md:leading-7"
+                          className="mt-3 line-clamp-4 wrap-break-word text-[13px] leading-5 text-slate-900 md:mt-4 md:min-h-21 md:text-base md:leading-7"
                         >
                           {formatProductName(product.name)}
                         </h3>
@@ -330,7 +330,7 @@ export default function CatalogView() {
               ))}
 
               {!filteredProducts.length && (
-                <div className="col-span-full flex flex-col items-center justify-center rounded-[24px] border border-white bg-white px-6 py-24 text-center shadow-sm">
+                <div className="col-span-full flex flex-col items-center justify-center rounded-3xl border border-white bg-white px-6 py-24 text-center shadow-sm">
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                     <Package size={28} />
                   </div>
@@ -348,14 +348,14 @@ export default function CatalogView() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            className="fixed bottom-6 right-6 z-50 w-[min(92vw,420px)] rounded-[24px] border border-emerald-100 bg-white p-5 shadow-2xl"
+            className="fixed bottom-6 right-6 z-50 w-[min(92vw,420px)] rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-900">
                   {cartNotice.count > 0 ? 'Товар добавлен' : 'Нужно выбрать склад'}
                 </p>
-                <p className="mt-1 break-words text-sm text-slate-500">{cartNotice.productName}</p>
+                <p className="mt-1 wrap-break-word text-sm text-slate-500">{cartNotice.productName}</p>
                 {cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">В корзине: {cartNotice.count}</p>}
               </div>
               <button
@@ -409,21 +409,21 @@ export default function CatalogView() {
               initial={{ scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
-              className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl md:block md:max-h-[92vh] md:rounded-[28px]"
+              className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl md:block md:max-h-[92vh] md:rounded-[28px]"
             >
               <div className="grid max-h-[88vh] md:max-h-[92vh] md:grid-cols-[1.05fr_0.95fr]">
                 <div className="flex items-center justify-center bg-slate-50 p-3 md:max-h-[90vh] md:p-6">
-                  <div className="w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm md:rounded-[24px]">
+                  <div className="w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm md:rounded-3xl">
                   {selectedProduct.photoUrl ? (
                     <img
                       src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)}
                       alt={selectedProduct.name}
-                      className="h-[170px] w-full object-contain md:h-[620px]"
+                      className="h-42.5 w-full object-contain md:h-155"
                       referrerPolicy="no-referrer"
                       onError={(event) => handleBrokenImage(event, selectedProduct.id)}
                     />
                   ) : (
-                    <div className="flex h-[170px] w-full items-center justify-center bg-slate-100 text-slate-300 md:h-[620px]">
+                    <div className="flex h-42.5 w-full items-center justify-center bg-slate-100 text-slate-300 md:h-155">
                       <Package size={72} />
                     </div>
                   )}
@@ -443,12 +443,12 @@ export default function CatalogView() {
                     </button>
                   </div>
 
-                  <h2 className="mt-3 break-words text-[1.05rem] font-semibold leading-[1.15] tracking-tight text-slate-900 md:mt-6 md:max-w-[14ch] md:text-[2.2rem] md:leading-[1.15]">
+                  <h2 className="mt-3 wrap-break-word text-[1.05rem] font-semibold leading-[1.15] tracking-tight text-slate-900 md:mt-6 md:max-w-[14ch] md:text-[2.2rem] md:leading-[1.15]">
                     {selectedProduct.name}
                   </h2>
 
                   <div className="mt-4 grid gap-2.5 md:mt-8 md:gap-4">
-                    <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                    <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-3xl md:p-4">
                       <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
                         <Tag size={16} />
@@ -463,7 +463,7 @@ export default function CatalogView() {
                     </div>
 
                     <div className="grid gap-2.5 sm:grid-cols-2 md:gap-4">
-                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-3xl md:p-4">
                         <div className="flex items-center gap-3">
                           <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
                             <Layers size={16} />
@@ -477,14 +477,14 @@ export default function CatalogView() {
                         </div>
                       </div>
 
-                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-[24px] md:p-4">
+                      <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-3xl md:p-4">
                         <div className="flex items-center gap-3">
                           <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
                             <Warehouse size={16} />
                           </div>
                           <div>
                             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Склад</p>
-                            <p className="mt-1 break-words text-sm text-slate-900 md:text-lg">{selectedProduct.warehouse?.name || 'Основной склад'}</p>
+                            <p className="mt-1 wrap-break-word text-sm text-slate-900 md:text-lg">{selectedProduct.warehouse?.name || 'Основной склад'}</p>
                           </div>
                         </div>
                       </div>
