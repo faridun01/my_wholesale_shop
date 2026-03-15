@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock3,
   Package,
+  Store,
   Search,
   ShoppingBag,
   TrendingDown,
@@ -28,7 +29,8 @@ import {
 } from 'recharts';
 import { getDashboardSummary } from '../api/dashboard.api';
 import { formatCount, formatMoney, formatPercent } from '../utils/format';
-import { getCurrentUser } from '../utils/userAccess';
+import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
+import client from '../api/client';
 
 const statusTone = (status: string) => {
   if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
@@ -59,11 +61,24 @@ export default function DashboardView() {
   const [summary, setSummary] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [overviewPeriod, setOverviewPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const user = getCurrentUser();
+  const isAdmin = isAdminUser(user);
+  const defaultWarehouseId = getUserWarehouseId(user);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(defaultWarehouseId ? String(defaultWarehouseId) : '');
 
   useEffect(() => {
-    getDashboardSummary().then(setSummary).catch(console.error);
-  }, []);
+    getDashboardSummary(selectedWarehouseId ? Number(selectedWarehouseId) : null).then(setSummary).catch(console.error);
+  }, [selectedWarehouseId]);
+
+  useEffect(() => {
+    client.get('/warehouses')
+      .then((res) => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        setWarehouses(filterWarehousesForUser(items, user));
+      })
+      .catch(console.error);
+  }, [user]);
 
   const recentSales = summary?.recentSales || [];
   const overviewSales = summary?.overviewSales || [];
@@ -103,7 +118,7 @@ export default function DashboardView() {
     {
       title: 'Товары в наличии',
       value: formatCount(summary?.totalProducts || 0),
-      subtitle: 'Активные товары',
+      subtitle: selectedWarehouseId ? 'Товары выбранного склада' : 'Уникальные товары по всем складам',
       deltaValue: Number(summary?.metricChanges?.products || 0),
       delta: formatMetricDelta(summary?.metricChanges?.products || 0),
       iconWrap: 'bg-orange-100 text-orange-500',
@@ -165,9 +180,10 @@ export default function DashboardView() {
     const seen = new Set<string>();
     return [...filteredTopProducts, ...filteredLowStock]
       .filter((item: any) => {
-        if (!item?.id) return false;
-        if (seen.has(String(item.id))) return false;
-        seen.add(String(item.id));
+        const key = String(item?.name || '').trim().toLowerCase();
+        if (!key) return false;
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
       })
       .slice(0, 4);
@@ -393,17 +409,6 @@ export default function DashboardView() {
             </div>
 
             <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => navigate('/reminders')}
-                className="relative flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-600 transition-colors hover:bg-slate-200"
-              >
-                <Bell size={18} />
-                {reminders.length > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] text-white">
-                    {reminders.length > 9 ? '9+' : reminders.length}
-                  </span>
-                )}
-              </button>
               <div className="flex items-center gap-3 rounded-full bg-white pl-1 pr-3 py-1">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
                   {(user.username || 'A').slice(0, 1).toUpperCase()}
@@ -429,6 +434,21 @@ export default function DashboardView() {
               )}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+                <Store size={14} className="text-slate-400" />
+                <select
+                  value={selectedWarehouseId}
+                  onChange={(event) => setSelectedWarehouseId(event.target.value)}
+                  className="bg-transparent pr-1 outline-none"
+                >
+                  {isAdmin && <option value="">Все склады</option>}
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <span>Главная</span>
               <span>/</span>
               <span className="text-slate-600">Дашборд</span>
