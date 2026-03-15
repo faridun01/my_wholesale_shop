@@ -99,6 +99,16 @@ function normalizeSheetName(value: string) {
     .slice(0, 31) || 'Лист';
 }
 
+function getMonthRange(year: number, monthIndex: number) {
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0);
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  };
+}
+
 const reportMeta: Record<
   ReportType,
   {
@@ -173,13 +183,11 @@ function Panel({
 }
 
 export default function ReportsView({ warehouseId: initialWarehouseId = null }: ReportsViewProps) {
+  const today = new Date();
   const [reportType, setReportType] = useState<ReportType>('sales');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initialWarehouseId?.toString() || '');
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
+  const [dateRange, setDateRange] = useState(() => getMonthRange(today.getFullYear(), today.getMonth()));
   const [reportData, setReportData] = useState<ReportRow[]>([]);
 
   const user = getCurrentUser();
@@ -224,13 +232,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
   const handleMonthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const [year, month] = event.target.value.split('-');
-    const start = new Date(Number(year), Number(month) - 1, 1);
-    const end = new Date(Number(year), Number(month), 0);
-
-    setDateRange({
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
-    });
+    setDateRange(getMonthRange(Number(year), Number(month) - 1));
   };
 
   const chartData = useMemo(() => {
@@ -633,14 +635,14 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               <input
                 type="date"
                 value={dateRange.start}
-                onChange={(event) => setDateRange({ ...dateRange, start: event.target.value })}
+                readOnly
                 className="bg-transparent text-sm text-slate-700 outline-none"
               />
               <span className="text-slate-300">→</span>
               <input
                 type="date"
                 value={dateRange.end}
-                onChange={(event) => setDateRange({ ...dateRange, end: event.target.value })}
+                readOnly
                 className="bg-transparent text-sm text-slate-700 outline-none"
               />
             </div>
