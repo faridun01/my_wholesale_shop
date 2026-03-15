@@ -29,20 +29,20 @@ export default function LoginView() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] px-4 py-8 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] px-4 py-8 sm:px-6 lg:h-screen lg:px-6 lg:py-4">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-[#5b8def]/15 blur-3xl" />
         <div className="absolute -right-20 top-24 h-80 w-80 rounded-full bg-[#5ec98f]/12 blur-3xl" />
         <div className="absolute -bottom-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center">
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center lg:min-h-0 lg:h-full">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid w-full overflow-hidden rounded-4xl border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:min-h-180 lg:grid-cols-[1.15fr_0.85fr]"
+          className="grid w-full overflow-hidden rounded-4xl border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:h-full lg:max-h-[calc(100vh-2rem)] lg:grid-cols-[1.08fr_0.92fr]"
         >
-          <div className="relative hidden bg-[linear-gradient(160deg,#243042_0%,#1c2634_52%,#151d29_100%)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="relative hidden bg-[linear-gradient(160deg,#243042_0%,#1c2634_52%,#151d29_100%)] p-10 text-white lg:flex lg:flex-col lg:justify-between lg:overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.12),transparent_30%)]" />
             <div className="relative">
               <div className="inline-flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/8 px-4 py-3 backdrop-blur">
@@ -56,7 +56,7 @@ export default function LoginView() {
               </div>
             </div>
 
-            <div className="relative mt-12 space-y-10">
+            <div className="relative mt-8 space-y-8">
               <div>
                 <p className="text-sm uppercase tracking-[0.24em] text-[#9db8df]">Система для опта</p>
                 <h1 className="mt-5 max-w-lg text-[56px] font-semibold leading-[1.02] tracking-tight">
@@ -85,14 +85,14 @@ export default function LoginView() {
               </div>
             </div>
 
-            <div className="relative mt-10 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <div className="relative mt-8 text-xs uppercase tracking-[0.2em] text-slate-400">
               Wholesale • CRM • TJS
             </div>
           </div>
 
-          <div className="flex items-center justify-center p-5 sm:p-8 lg:bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] lg:p-12">
+          <div className="flex items-center justify-center p-5 sm:p-8 lg:bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] lg:p-8">
             <div className="w-full max-w-md lg:max-w-105">
-              <div className="mb-8 text-center lg:mb-10 lg:text-left">
+              <div className="mb-7 text-center lg:mb-8 lg:text-left">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#e7f4e4] text-[#178f76] shadow-inner lg:mx-0">
                   <Warehouse size={30} />
                 </div>
@@ -108,7 +108,7 @@ export default function LoginView() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5 rounded-[30px] lg:border lg:border-slate-200 lg:bg-white lg:p-7 lg:shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)]">
+              <form onSubmit={handleSubmit} className="space-y-5 rounded-[30px] lg:border lg:border-slate-200 lg:bg-white lg:p-6 lg:shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)]">
                 <div className="space-y-2">
                   <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Логин
