@@ -36,46 +36,46 @@ export default function LoginView() {
         <div className="absolute bottom-[-80px] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center justify-center">
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid w-full overflow-hidden rounded-[32px] border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:grid-cols-[1.05fr_0.95fr]"
+          className="grid w-full overflow-hidden rounded-[32px] border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:min-h-[720px] lg:grid-cols-[1.15fr_0.85fr]"
         >
-          <div className="relative hidden bg-[#243042] p-10 text-white lg:flex lg:flex-col lg:justify-between">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.24),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.18),transparent_38%)]" />
+          <div className="relative hidden bg-[linear-gradient(160deg,#243042_0%,#1c2634_52%,#151d29_100%)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.18),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.12),transparent_30%)]" />
             <div className="relative">
-              <div className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#5b8def] text-white shadow-lg shadow-[#5b8def]/30">
+              <div className="inline-flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/8 px-4 py-3 backdrop-blur">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#5b8def] text-white shadow-lg shadow-[#5b8def]/30">
                   <Warehouse size={22} />
                 </div>
                 <div>
                   <p className="text-xl font-semibold tracking-tight">Wholesale CRM</p>
-                  <p className="text-xs text-slate-300">Система управления оптовым магазином</p>
+                  <p className="text-xs text-slate-300">Управление оптовым магазином</p>
                 </div>
               </div>
             </div>
 
-            <div className="relative mt-12 space-y-8">
+            <div className="relative mt-12 space-y-10">
               <div>
                 <p className="text-sm uppercase tracking-[0.24em] text-[#9db8df]">Вход в систему</p>
-                <h1 className="mt-5 max-w-md text-5xl font-semibold leading-[1.05] tracking-tight">
-                  Контроль продаж, складов и клиентов в одном месте
+                <h1 className="mt-5 max-w-lg text-[56px] font-semibold leading-[1.02] tracking-tight">
+                  Рабочее пространство для складов, продаж и клиентов
                 </h1>
-                <p className="mt-5 max-w-lg text-sm leading-7 text-slate-300">
-                  Используйте рабочий логин сотрудника, чтобы открыть CRM и работать только со своими данными и складами.
+                <p className="mt-6 max-w-xl text-[15px] leading-8 text-slate-300">
+                  Авторизуйтесь под своей учётной записью и продолжайте работу только с теми складами и данными, которые доступны вашей роли.
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-5 backdrop-blur">
+                <div className="rounded-[28px] border border-white/10 bg-white/7 p-6 backdrop-blur">
                   <ShieldCheck className="text-[#8ed7a8]" size={20} />
                   <p className="mt-4 text-base font-semibold">Безопасный доступ</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     Сессия завершается после закрытия браузера, повторный вход обязателен.
                   </p>
                 </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-5 backdrop-blur">
+                <div className="rounded-[28px] border border-white/10 bg-white/7 p-6 backdrop-blur">
                   <Building2 className="text-[#8fb7ff]" size={20} />
                   <p className="mt-4 text-base font-semibold">Привязка к складу</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
@@ -90,9 +90,9 @@ export default function LoginView() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center p-5 sm:p-8 lg:p-10">
-            <div className="w-full max-w-md">
-              <div className="mb-8 text-center lg:text-left">
+          <div className="flex items-center justify-center p-5 sm:p-8 lg:bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] lg:p-12">
+            <div className="w-full max-w-md lg:max-w-[420px]">
+              <div className="mb-8 text-center lg:mb-10 lg:text-left">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#e7f4e4] text-[#178f76] shadow-inner lg:mx-0">
                   <Warehouse size={30} />
                 </div>
@@ -108,7 +108,7 @@ export default function LoginView() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5 rounded-[30px] lg:border lg:border-slate-200 lg:bg-white lg:p-7 lg:shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)]">
                 <div className="space-y-2">
                   <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Логин
