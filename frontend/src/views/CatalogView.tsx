@@ -182,7 +182,7 @@ export default function CatalogView() {
           </section>
 
           <section className="space-y-4">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_220px_220px_260px]">
+            <div className="grid gap-4 xl:grid-cols-4">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
