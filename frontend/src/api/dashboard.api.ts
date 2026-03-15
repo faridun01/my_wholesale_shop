@@ -1,6 +1,10 @@
 import client from './client';
 
-export const getDashboardSummary = async () => {
-  const response = await client.get('/dashboard/summary');
+export const getDashboardSummary = async (warehouseId?: number | null) => {
+  const response = await client.get('/dashboard/summary', {
+    params: {
+      warehouseId: warehouseId || undefined,
+    },
+  });
   return response.data;
 };

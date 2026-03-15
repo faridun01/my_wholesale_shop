@@ -38,6 +38,22 @@ export class ReminderService {
     });
   }
 
+  static async updateReminder(id: number, data: {
+    title?: string;
+    description?: string;
+    dueDate?: string;
+    type?: string;
+    isCompleted?: boolean;
+  }) {
+    return await prisma.reminder.update({
+      where: { id },
+      data: {
+        ...data,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+      },
+    });
+  }
+
   static async deleteReminder(id: number) {
     return await prisma.reminder.delete({
       where: { id },

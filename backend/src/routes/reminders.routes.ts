@@ -26,6 +26,15 @@ router.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
+router.put('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const reminder = await ReminderService.updateReminder(Number(req.params.id), req.body);
+    res.json(reminder);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.put('/:id/complete', async (req, res, next) => {
   try {
     const reminder = await ReminderService.completeReminder(Number(req.params.id));

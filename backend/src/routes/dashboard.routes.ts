@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
-import { getAccessContext } from '../utils/access.js';
+import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 
 const router = Router();
 const safePercentChange = (current: number, previous: number) => {
@@ -39,13 +39,14 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     // For now, we'll get all stats, but in a real app, we'd filter by role.
     const access = await getAccessContext(req);
     const isAdmin = access.isAdmin;
+    const selectedWarehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const invoiceWhere = {
       cancelled: false,
-      warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1),
+      warehouseId: selectedWarehouseId ?? (isAdmin ? undefined : (access.warehouseId ?? -1)),
     };
     const productWhere = {
       active: true,
-      warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1),
+      warehouseId: selectedWarehouseId ?? (isAdmin ? undefined : (access.warehouseId ?? -1)),
     };
     const customerWhere = {
       active: true,
@@ -57,7 +58,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
 
     const [
       salesToday,
-      totalProducts,
+      totalProductsRaw,
       totalCustomers,
       totalWarehouses,
       totalOrders,
@@ -69,14 +70,17 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       previousMonthInvoices,
       currentMonthCustomers,
       previousMonthCustomers,
-      currentMonthProducts,
-      previousMonthProducts,
+      currentMonthProductsRaw,
+      previousMonthProductsRaw,
     ] = await Promise.all([
       prisma.invoice.aggregate({
         where: { ...invoiceWhere, createdAt: { gte: today } },
         _sum: { netAmount: true },
       }),
-      prisma.product.count({ where: productWhere }),
+      prisma.product.findMany({
+        where: productWhere,
+        select: { id: true, name: true, createdAt: true },
+      }),
       prisma.customer.count({ where: customerWhere }),
       prisma.warehouse.count({ where: warehouseWhere }),
       prisma.invoice.count({ where: invoiceWhere }),
@@ -127,19 +131,39 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
           createdAt: { gte: prevMonthStart, lt: monthStart },
         },
       }),
-      prisma.product.count({
+      prisma.product.findMany({
         where: {
           ...productWhere,
           createdAt: { gte: monthStart, lt: nextMonthStart },
         },
+        select: { name: true },
       }),
-      prisma.product.count({
+      prisma.product.findMany({
         where: {
           ...productWhere,
           createdAt: { gte: prevMonthStart, lt: monthStart },
         },
+        select: { name: true },
       }),
     ]);
+
+    const normalizeProductKey = (value: string) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    const totalProducts = selectedWarehouseId
+      ? totalProductsRaw.length
+      : new Set(totalProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
+
+    const currentMonthProducts = selectedWarehouseId
+      ? currentMonthProductsRaw.length
+      : new Set(currentMonthProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
+
+    const previousMonthProducts = selectedWarehouseId
+      ? previousMonthProductsRaw.length
+      : new Set(previousMonthProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
 
     // Calculate total profit and debts
     let totalProfit = 0;
@@ -232,6 +256,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       totalCustomers,
       totalWarehouses,
       totalOrders,
+      selectedWarehouseId,
       totalRevenue,
       totalProfit: isAdmin ? totalProfit : null,
       totalDebts,
