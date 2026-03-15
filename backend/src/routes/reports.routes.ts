@@ -105,7 +105,7 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req: AuthReques
       const paidAmount = Number(inv.paidAmount);
 
       totalRevenue += netAmount;
-      totalDebts += (netAmount - paidAmount);
+      totalDebts += Math.max(0, netAmount - paidAmount);
       monthlyData[month].sales += netAmount;
 
       if (!warehousePerformance[inv.warehouseId]) {

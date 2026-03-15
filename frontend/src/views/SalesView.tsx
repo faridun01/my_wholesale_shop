@@ -251,6 +251,18 @@ export default function SalesView() {
     return balance;
   };
 
+  const getInvoiceChangeAmount = (invoice: any) => {
+    const change = Number(invoice?.paidAmount || 0) - getInvoiceNetAmount(invoice);
+    if (change <= PAYMENT_EPSILON) {
+      return 0;
+    }
+
+    return change;
+  };
+
+  const getInvoiceAppliedPaidAmount = (invoice: any) =>
+    Math.max(0, Number(invoice?.paidAmount || 0) - getInvoiceChangeAmount(invoice));
+
   const getPrintableStatus = (invoice: any) => {
     if (invoice?.cancelled) return 'Отменена';
 
@@ -290,6 +302,8 @@ export default function SalesView() {
     const discountAmount = getInvoiceDiscountAmount(invoice);
     const netAmount = getInvoiceNetAmount(invoice);
     const balanceAmount = getInvoiceBalance(invoice);
+    const changeAmount = getInvoiceChangeAmount(invoice);
+    const appliedPaidAmount = getInvoiceAppliedPaidAmount(invoice);
     const paymentsBlock = Array.isArray(invoice.payments) && invoice.payments.length > 0
       ? `
         <div class="section">
@@ -495,8 +509,8 @@ export default function SalesView() {
               </div>
               <div class="card">
                 <p class="label">Оплата</p>
-                <p class="value">${escapeHtml(formatMoney(invoice.paidAmount || 0))}</p>
-                <p class="subvalue">Остаток: ${escapeHtml(formatMoney(balanceAmount))}</p>
+                <p class="value">${escapeHtml(formatMoney(appliedPaidAmount))}</p>
+                <p class="subvalue">${changeAmount > PAYMENT_EPSILON ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}` : `Остаток: ${escapeHtml(formatMoney(balanceAmount))}`}</p>
               </div>
             </div>
 
@@ -523,6 +537,7 @@ export default function SalesView() {
               <div class="summary-row"><span>Скидка (${escapeHtml(invoice.discount || 0)}%)</span><strong>-${escapeHtml(formatMoney(discountAmount))}</strong></div>
               ${Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount || 0))}</strong></div>` : ''}
               <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoney(netAmount))}</span></div>
+              ${changeAmount > PAYMENT_EPSILON ? `<div class="summary-row"><span>Сдача клиенту</span><strong>${escapeHtml(formatMoney(changeAmount))}</strong></div>` : ''}
             </div>
 
             ${paymentsBlock}
@@ -554,7 +569,7 @@ export default function SalesView() {
       case 'netAmount':
         return (getInvoiceNetAmount(a) - getInvoiceNetAmount(b)) * direction;
       case 'paidAmount':
-        return (Number(a.paidAmount || 0) - Number(b.paidAmount || 0)) * direction;
+        return (getInvoiceAppliedPaidAmount(a) - getInvoiceAppliedPaidAmount(b)) * direction;
       case 'balance':
         return (getInvoiceBalance(a) - getInvoiceBalance(b)) * direction;
       case 'status':
@@ -652,11 +667,15 @@ export default function SalesView() {
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
-                  <p className="mt-1 break-words text-sm text-emerald-600">{formatMoney(inv.paidAmount || 0)}</p>
+                  <p className="mt-1 break-words text-sm text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                  <p className="mt-1 break-words text-sm text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
+                  <p className="mt-1 break-words text-sm text-rose-600">
+                    {getInvoiceChangeAmount(inv) > PAYMENT_EPSILON
+                      ? `Сдача ${formatMoney(getInvoiceChangeAmount(inv))}`
+                      : formatMoney(getInvoiceBalance(inv))}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Склад</p>
@@ -730,8 +749,12 @@ export default function SalesView() {
                   </td>
                   <td className="px-5 py-5 text-sm text-slate-700">{inv.customer_name}</td>
                   <td className="px-5 py-5 text-sm text-slate-700">{formatMoney(getInvoiceNetAmount(inv))}</td>
-                  <td className="px-5 py-5 text-sm text-emerald-500">{formatMoney(inv.paidAmount || 0)}</td>
-                  <td className="px-5 py-5 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
+                  <td className="px-5 py-5 text-sm text-emerald-500">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
+                  <td className={clsx('px-5 py-5 text-sm', getInvoiceChangeAmount(inv) > PAYMENT_EPSILON ? 'text-amber-500' : 'text-rose-500')}>
+                    {getInvoiceChangeAmount(inv) > PAYMENT_EPSILON
+                      ? `Сдача ${formatMoney(getInvoiceChangeAmount(inv))}`
+                      : formatMoney(getInvoiceBalance(inv))}
+                  </td>
                   <td className="px-5 py-5">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
                   <td className="px-5 py-5 text-sm text-slate-500">{inv.staff_name}</td>
                   <td className="px-5 py-5 text-right">
@@ -919,6 +942,12 @@ export default function SalesView() {
                       <span className="font-bold">Подытог:</span>
                       <span className="font-black">{formatMoney(getInvoiceSubtotal(selectedInvoice))}</span>
                     </div>
+                    {getInvoiceChangeAmount(selectedInvoice) > PAYMENT_EPSILON && (
+                      <div className="flex items-center justify-between text-sm text-slate-500">
+                        <span className="font-bold">Сдача клиенту:</span>
+                        <span className="font-black text-amber-600">{formatMoney(getInvoiceChangeAmount(selectedInvoice))}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Скидка ({selectedInvoice.discount}%):</span>
                       <span className="font-black">-{toFixedNumber(getInvoiceDiscountAmount(selectedInvoice))} TJS</span>
@@ -935,7 +964,7 @@ export default function SalesView() {
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-500">
                       <span className="font-bold">Оплачено:</span>
-                      <span className="font-black text-emerald-600">{formatMoney(selectedInvoice.paidAmount || 0)}</span>
+                      <span className="font-black text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Остаток (Долг):</span>
