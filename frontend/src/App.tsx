@@ -23,6 +23,11 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return token ? <>{children}</> : <Navigate to="/login" />;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const user = getCurrentUser();
+  return isAdminUser(user) ? <>{children}</> : <Navigate to="/" replace />;
+};
+
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
@@ -65,9 +70,6 @@ export default function App() {
     }
   }, []);
 
-  const user = getCurrentUser();
-  const isAdmin = isAdminUser(user);
-
   return (
     <Router>
       <Toaster position="top-right" />
@@ -87,10 +89,10 @@ export default function App() {
           <Route path="/sales" element={<SalesView />} />
           <Route path="/pos" element={<POSView />} />
           <Route path="/customers" element={<CustomerView />} />
-          <Route path="/reports" element={isAdmin ? <ReportsView /> : <Navigate to="/" replace />} />
+          <Route path="/reports" element={<AdminRoute><ReportsView /></AdminRoute>} />
           <Route path="/reminders" element={<RemindersView />} />
           <Route path="/history" element={<HistoryView />} />
-          <Route path="/settings" element={isAdmin ? <SettingsView /> : <Navigate to="/" replace />} />
+          <Route path="/settings" element={<AdminRoute><SettingsView /></AdminRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
