@@ -37,6 +37,7 @@ model Warehouse {
   name        String
   address     String?
   city        String?
+  phone       String?
   note        String?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")

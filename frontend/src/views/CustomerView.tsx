@@ -248,7 +248,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -260,9 +260,9 @@ export default function CustomerView() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-10 py-8">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-5 sm:px-10 sm:py-8">
                   <h2 className="text-2xl font-medium tracking-tight text-slate-900">
                     {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
                   </h2>
@@ -270,7 +270,7 @@ export default function CustomerView() {
                     <X />
                   </button>
                 </div>
-                <form onSubmit={handleSave} className="space-y-6 p-10">
+                <form onSubmit={handleSave} className="space-y-5 p-5 sm:space-y-6 sm:p-10">
                   <div className="space-y-2">
                     <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Имя клиента</label>
                     <input
@@ -315,7 +315,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isStatementOpen && selectedCustomer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -327,10 +327,10 @@ export default function CustomerView() {
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 50, opacity: 0 }}
-                className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3rem] bg-white shadow-2xl"
+                className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl sm:rounded-[3rem]"
               >
-                <div className="border-b border-slate-100 bg-slate-50/50 px-10 py-10">
-                  <div className="mb-6 flex items-start justify-between">
+                <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-5 sm:px-10 sm:py-10">
+                  <div className="mb-5 flex items-start justify-between gap-4 sm:mb-6">
                     <div>
                       <h2 className="text-3xl font-medium tracking-tight text-slate-900">{selectedCustomer.name}</h2>
                       <p className="mt-1 text-slate-500">История и баланс строятся только по накладным.</p>
@@ -339,7 +339,7 @@ export default function CustomerView() {
                       <X />
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
                     <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
                       <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Всего по накладным</p>
                       <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoney(selectedCustomer.total_invoiced)}</p>
@@ -355,7 +355,7 @@ export default function CustomerView() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10">
                   <div className="space-y-3">
                     {statementData.length === 0 && (
                       <div className="rounded-3xl bg-slate-50 p-8 text-center text-sm text-slate-500">
@@ -367,9 +367,9 @@ export default function CustomerView() {
                       <div
                         key={invoice.id}
                         onClick={() => openInvoiceDetails(invoice)}
-                        className="flex cursor-pointer items-center justify-between rounded-[24px] bg-slate-50 p-4 transition-colors hover:bg-slate-100 md:rounded-3xl md:p-6"
+                        className="flex cursor-pointer flex-col items-start gap-4 rounded-[24px] bg-slate-50 p-4 transition-colors hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between md:rounded-3xl md:p-6"
                       >
-                        <div className="flex items-center space-x-4 md:space-x-6">
+                        <div className="flex w-full min-w-0 items-center space-x-4 md:space-x-6">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 md:h-14 md:w-14">
                             <FileText size={20} />
                           </div>
@@ -389,7 +389,7 @@ export default function CustomerView() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="w-full text-left sm:w-auto sm:text-right">
                           <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoney(invoice.netAmount)}</p>
                           <div className="mt-1.5 flex justify-end">
                             <Badge variant={invoice.status === 'paid' ? 'success' : invoice.invoiceBalance > 0 ? 'warning' : 'default'}>
@@ -409,7 +409,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isInvoiceDetailsOpen && selectedInvoice && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -421,24 +421,24 @@ export default function CustomerView() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+                className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-8">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
                   <h3 className="text-2xl font-medium text-slate-900">Накладная #{selectedInvoice.id}</h3>
                   <button onClick={() => setIsInvoiceDetailsOpen(false)} className="rounded-xl p-2 transition-colors hover:bg-white">
                     <X />
                   </button>
                 </div>
 
-                <div className="flex-1 space-y-6 overflow-y-auto p-8">
-                  <div className="flex justify-between text-sm text-slate-500">
+                <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-8">
+                  <div className="flex flex-col gap-1 text-sm text-slate-500 sm:flex-row sm:justify-between">
                     <span>Дата: {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</span>
                     <span>Склад: {selectedInvoice.warehouse?.name || '---'}</span>
                   </div>
 
                   <div className="space-y-4">
                     {selectedInvoice.items?.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                      <div key={item.id} className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="font-medium text-slate-900">{item.product?.name}</p>
                           <p className="text-xs text-slate-400">

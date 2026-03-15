@@ -38,7 +38,8 @@ export default function SettingsView() {
   const [warehouseForm, setWarehouseForm] = useState({
     name: '',
     city: '',
-    address: ''
+    address: '',
+    phone: ''
   });
 
   const [showAddUser, setShowAddUser] = useState(false);
@@ -139,7 +140,7 @@ export default function SettingsView() {
   };
 
   const resetWarehouseForm = () => {
-    setWarehouseForm({ name: '', city: '', address: '' });
+    setWarehouseForm({ name: '', city: '', address: '', phone: '' });
     setSelectedWarehouse(null);
   };
 
@@ -285,24 +286,24 @@ export default function SettingsView() {
       </div>
 
       <section className="space-y-4">
-      <div className="flex w-fit flex-wrap gap-1 rounded-2xl border border-white bg-white p-1 shadow-sm">
+      <div className="grid w-full grid-cols-2 gap-1 rounded-2xl border border-white bg-white p-1 shadow-sm sm:flex sm:w-fit sm:flex-wrap">
         <button 
           onClick={() => setActiveTab('warehouses')}
-          className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${activeTab === 'warehouses' ? tabTheme.warehouses : 'text-slate-500 hover:bg-sky-50 hover:text-sky-700'}`}
+          className={`flex items-center justify-center space-x-2 rounded-xl px-4 py-3 text-sm font-medium transition-all sm:justify-start sm:px-5 sm:py-2.5 ${activeTab === 'warehouses' ? tabTheme.warehouses : 'text-slate-500 hover:bg-sky-50 hover:text-sky-700'}`}
         >
           <Warehouse size={18} />
           <span>Склады</span>
         </button>
         <button 
           onClick={() => setActiveTab('users')}
-          className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${activeTab === 'users' ? tabTheme.users : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'}`}
+          className={`flex items-center justify-center space-x-2 rounded-xl px-4 py-3 text-sm font-medium transition-all sm:justify-start sm:px-5 sm:py-2.5 ${activeTab === 'users' ? tabTheme.users : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'}`}
         >
           <Users size={18} />
           <span>Пользователи</span>
         </button>
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${activeTab === 'profile' ? tabTheme.profile : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+          className={`flex items-center justify-center space-x-2 rounded-xl px-4 py-3 text-sm font-medium transition-all sm:justify-start sm:px-5 sm:py-2.5 ${activeTab === 'profile' ? tabTheme.profile : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
         >
           <User size={18} />
           <span>Профиль</span>
@@ -310,7 +311,7 @@ export default function SettingsView() {
         {canManageSettings && (
           <button 
             onClick={() => setActiveTab('general')}
-            className={`flex items-center space-x-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${activeTab === 'general' ? tabTheme.general : 'text-slate-500 hover:bg-amber-50 hover:text-amber-700'}`}
+            className={`flex items-center justify-center space-x-2 rounded-xl px-4 py-3 text-sm font-medium transition-all sm:justify-start sm:px-5 sm:py-2.5 ${activeTab === 'general' ? tabTheme.general : 'text-slate-500 hover:bg-amber-50 hover:text-amber-700'}`}
           >
             <SettingsIcon size={18} />
             <span>Общие</span>
@@ -330,11 +331,11 @@ export default function SettingsView() {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center space-x-3">
-                  <div className="rounded-2xl bg-sky-500 p-3 text-white shadow-lg shadow-sky-500/20">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
+                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900 sm:text-2xl">
+                  <div className="rounded-2xl bg-sky-500 p-2.5 text-white shadow-lg shadow-sky-500/20 sm:p-3">
                     <Warehouse size={24} />
                   </div>
                   <span>{showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}</span>
@@ -343,7 +344,7 @@ export default function SettingsView() {
                   <X size={24} />
                 </button>
               </div>
-              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="p-8 space-y-6">
+              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="space-y-5 p-5 sm:p-8">
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Название</label>
@@ -378,9 +379,19 @@ export default function SettingsView() {
                       placeholder="Напр: ул. Рудаки 10"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Телефон</label>
+                    <input
+                      type="text"
+                      value={warehouseForm.phone}
+                      onChange={e => setWarehouseForm({...warehouseForm, phone: e.target.value})}
+                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold"
+                      placeholder="Напр: +992 900 00 00 00"
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-end space-x-3 pt-6">
-                  <button type="button" onClick={() => { setShowAddWarehouse(false); setShowEditWarehouse(false); }} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
+                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
+                  <button type="button" onClick={() => { setShowAddWarehouse(false); setShowEditWarehouse(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-sky-500 px-10 py-4 font-bold text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95">
                     {showEditWarehouse ? 'Сохранить' : 'Создать'}
                   </button>
@@ -524,21 +535,22 @@ export default function SettingsView() {
       />
 
       {activeTab === 'warehouses' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           {warehouses.map(w => (
-            <div key={w.id} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl">
-              <div className="flex justify-between items-start mb-8">
+            <div key={w.id} className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-8">
+              <div className="mb-6 flex items-start justify-between sm:mb-8">
                 <div className="rounded-2xl bg-sky-100 p-4 text-sky-700 shadow-inner transition-all duration-500 group-hover:bg-sky-500 group-hover:text-white">
                   <Warehouse size={28} />
                 </div>
-                <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex space-x-1 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
                   <button 
                     onClick={() => {
                       setSelectedWarehouse(w);
                       setWarehouseForm({ 
                         name: w.name || '', 
                         city: w.city || '', 
-                        address: w.address || '' 
+                        address: w.address || '',
+                        phone: w.phone || ''
                       });
                       setShowEditWarehouse(true);
                     }}
@@ -557,19 +569,19 @@ export default function SettingsView() {
                   </button>
                 </div>
               </div>
-              <h3 className="text-xl font-black text-slate-900">{w.name}</h3>
+              <h3 className="break-words text-xl font-black text-slate-900">{w.name}</h3>
               <div className="mt-6 space-y-4">
-                <div className="flex items-center text-slate-500 font-bold">
+                <div className="flex items-start text-slate-500 font-bold">
                   <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 text-slate-400">
                     <MapPin size={16} />
                   </div>
-                  <span>{w.city}, {w.address}</span>
+                  <span className="break-words">{[w.city, w.address].filter(Boolean).join(', ') || 'Адрес не указан'}</span>
                 </div>
-                <div className="flex items-center text-slate-500 font-bold">
+                <div className="flex items-start text-slate-500 font-bold">
                   <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 text-slate-400">
                     <Phone size={16} />
                   </div>
-                  <span>+992 900 00 00 00</span>
+                  <span className="break-words">{w.phone || 'Телефон не указан'}</span>
                 </div>
               </div>
             </div>
@@ -591,7 +603,7 @@ export default function SettingsView() {
           <div className="flex justify-end">
             <button 
               onClick={() => setShowAddUser(true)}
-              className="flex items-center space-x-2 rounded-2xl bg-violet-500 px-8 py-4 font-black text-white shadow-xl shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-600 active:scale-95"
+              className="flex w-full items-center justify-center space-x-2 rounded-2xl bg-violet-500 px-6 py-4 font-black text-white shadow-xl shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-600 active:scale-95 sm:w-auto sm:px-8"
             >
               <Plus size={20} />
               <span>Добавить пользователя</span>
@@ -694,7 +706,75 @@ export default function SettingsView() {
             )}
           </AnimatePresence>
 
-          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="space-y-4 md:hidden">
+            {users.map(u => (
+              <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-lg font-black text-slate-500">
+                      {u.username[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xl font-black text-slate-900">{u.username}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{u.warehouse?.name || 'Все склады'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedUser(u);
+                      setNewUser({
+                        username: u.username || '',
+                        password: '',
+                        confirmPassword: '',
+                        role: u.role || 'SELLER',
+                        warehouseId: u.warehouseId ? String(u.warehouseId) : '',
+                        canCancelInvoices: !!u.canCancelInvoices,
+                        canDeleteData: !!u.canDeleteData
+                      });
+                      setShowEditUser(true);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500"
+                  >
+                    <Edit size={18} />
+                  </button>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Роль</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{u.role}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-3 py-3">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Права</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      {u.canCancelInvoices || u.canDeleteData ? 'Есть доступ' : 'Базовый'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => handleUpdateUserPermission(u.id, 'canCancelInvoices', !u.canCancelInvoices)}
+                    className={`flex-1 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] ${u.canCancelInvoices ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'}`}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={() => handleUpdateUserPermission(u.id, 'canDeleteData', !u.canDeleteData)}
+                    className={`flex-1 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] ${u.canDeleteData ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}
+                  >
+                    Удаление
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(u.id)}
+                    className="rounded-2xl border border-rose-100 px-4 py-3 text-rose-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm md:block">
             <table className="w-full text-left">
               <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
                 <tr>
