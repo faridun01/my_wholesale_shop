@@ -52,14 +52,25 @@ router.get('/', async (req: AuthRequest, res, next) => {
       });
     }
 
-    let where: any = { active: true };
+    const baseWhere: any = {
+      OR: [
+        { active: true },
+        { invoices: { some: {} } },
+        { payments: { some: {} } },
+        { returns: { some: {} } },
+      ],
+    };
 
-    if (!access.isAdmin) {
-      where = {
-        ...where,
-        city: access.city ?? '__no_city__',
-      };
-    }
+    const where: any = access.isAdmin
+      ? baseWhere
+      : {
+          AND: [
+            baseWhere,
+            {
+              city: access.city ?? '__no_city__',
+            },
+          ],
+        };
 
     let customers;
 
@@ -79,7 +90,14 @@ router.get('/', async (req: AuthRequest, res, next) => {
       });
     } catch {
       customers = await prisma.customer.findMany({
-        where: { active: true },
+        where: {
+          OR: [
+            { active: true },
+            { invoices: { some: {} } },
+            { payments: { some: {} } },
+            { returns: { some: {} } },
+          ],
+        },
         include: {
           invoices: {
             where: { cancelled: false },
