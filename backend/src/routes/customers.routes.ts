@@ -118,7 +118,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     });
 
-    res.json(mappedCustomers);
+    res.json(mappedCustomers.filter((customer: any) => customer.id !== defaultCustomer?.id));
   } catch (error) {
     next(error);
   }
