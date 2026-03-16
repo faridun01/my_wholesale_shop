@@ -502,7 +502,7 @@ export default function POSView() {
                   </div>
                 </div>
 
-                <div className="space-y-3 border-b border-slate-200 px-5 py-4">
+                <div className="space-y-3 border-b border-slate-200 px-4 py-4 md:px-5">
                   <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 md:hidden">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium">{'Сумма корзины'}</span>
@@ -527,7 +527,7 @@ export default function POSView() {
                   </div>
                 </div>
 
-                <div className="max-h-[38vh] overflow-y-auto px-5 md:max-h-[320px]">
+                <div className="max-h-[38vh] overflow-y-auto px-4 md:max-h-[320px] md:px-5">
                   {cart.map((item) => (
                     <div key={item.id} className="border-b border-slate-100 py-4 last:border-b-0">
                       <div className="flex items-start gap-3">
@@ -557,8 +557,8 @@ export default function POSView() {
                             {formatProductName(item.name)}
                           </p>
 
-                          <div className="mt-3 flex items-center justify-between gap-2">
-                            <p className="min-w-[78px] text-[13px] font-medium text-slate-900">
+                          <div className="mt-3 flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-between">
+                            <p className="text-[13px] font-medium text-slate-900 md:min-w-[78px]">
                               {formatMoney(item.sellingPrice * item.quantity)}
                             </p>
 
@@ -575,7 +575,7 @@ export default function POSView() {
                                 max={products.find((product) => product.id === item.id)?.stock || undefined}
                                 value={item.quantity}
                                 onChange={(e) => updateQuantity(item.id, Number(e.target.value) || 0)}
-                                className="h-8 w-20 min-w-[80px] border-x border-slate-200 bg-white px-2 text-center text-sm text-slate-900 outline-none"
+                                className="h-8 w-14 min-w-[56px] border-x border-slate-200 bg-white px-2 text-center text-sm text-slate-900 outline-none md:w-20 md:min-w-[80px]"
                               />
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
@@ -587,7 +587,7 @@ export default function POSView() {
 
                             <button
                               onClick={() => removeFromCart(item.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                              className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-500 md:ml-0"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -607,8 +607,8 @@ export default function POSView() {
                   )}
                 </div>
 
-                <div className="sticky bottom-0 z-10 space-y-4 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur md:bg-white md:px-5 md:py-5">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="sticky bottom-0 z-10 space-y-4 border-t border-slate-200 bg-white/95 px-4 py-4 backdrop-blur md:bg-white md:px-5 md:py-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <input
                       type="number"
                       min={0}
@@ -626,7 +626,7 @@ export default function POSView() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {[
                       { id: 'cash', label: 'Наличные', icon: Banknote },
                       { id: 'transfer', label: 'Перевод', icon: Receipt },
