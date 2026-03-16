@@ -282,21 +282,21 @@ export default function CatalogView() {
                   </div>
 
                   <div className="flex flex-1 flex-col p-3 md:p-5">
-                    <div className="min-h-32 md:min-h-44">
+                    <div className="min-h-28 md:min-h-44">
                       <div className="min-w-0">
                         <h3
                           title={formatProductName(product.name)}
-                          className="mt-3 line-clamp-4 min-h-14 wrap-break-word text-[12px] leading-[1.35rem] text-slate-900 md:mt-4 md:min-h-23 md:text-[15px] md:leading-6"
+                          className="mt-2 line-clamp-4 min-h-12 wrap-break-word text-[12px] leading-[1.3rem] text-slate-900 md:mt-4 md:min-h-23 md:text-[15px] md:leading-6"
                         >
                           {formatProductName(product.name)}
                         </h3>
                       </div>
-                      <span className="inline-flex rounded-lg bg-violet-100 px-2 py-1 text-[9px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-[11px]">
+                      <span className="inline-flex rounded-lg bg-violet-100 px-2 py-0.5 text-[9px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-[11px]">
                         {product.category?.name || 'Без категории'}
                       </span>
                     </div>
 
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-2 md:pt-3">
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-1 md:pt-3">
                       {shouldShowPrice(product) ? (
                         <span className="text-[15px] font-semibold tracking-tight text-slate-900 md:text-[22px]">
                           {formatMoney(product.sellingPrice)}
@@ -320,7 +320,7 @@ export default function CatalogView() {
                         handleAddToSale(product);
                       }}
                       disabled={product.stock <= 0 || !selectedWarehouseId}
-                      className="mt-2 inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-3 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
+                      className="mt-1 inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-3 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
                     >
                       <ShoppingCart size={14} className="md:h-4 md:w-4" />
                       <span>В продажу</span>
