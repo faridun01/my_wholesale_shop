@@ -1,25 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../api/auth.api';
-import { Warehouse, User, Lock, Loader2, ShieldCheck, Building2, BarChart3 } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  Building2,
+  Loader2,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  User,
+  Warehouse,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { setAuthSession } from '../utils/authStorage';
 
-const desktopHighlights = [
-  {
-    icon: ShieldCheck,
-    title: 'Меньше ошибок в продаже',
-    description: 'Продажи, возвраты и движения товара фиксируются в системе, а не теряются в чатах и бумагах.',
-  },
+const highlights = [
   {
     icon: Building2,
-    title: 'Контроль по складам',
-    description: 'В любой момент видно остатки, приходы и реальное движение товара по каждому складу.',
+    title: 'Склады под контролем',
+    text: 'Остатки, перемещения и пополнения по каждому складу в одном интерфейсе.',
   },
   {
     icon: BarChart3,
-    title: 'Понятная прибыль',
-    description: 'Вы быстрее видите выручку, долги клиентов и товары, которые приносят основной доход.',
+    title: 'Продажи без хаоса',
+    text: 'Накладные, оплаты, возвраты и долги клиентов без ручных таблиц и потерь.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Управление по ролям',
+    text: 'Админ контролирует все данные, а сотрудники работают только в своих рамках.',
   },
 ];
 
@@ -47,153 +57,161 @@ export default function LoginView() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] px-4 py-8 sm:px-6 lg:h-screen lg:px-6 lg:py-4">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,#eef3fb_38%,#edf6f3_100%)] px-4 py-8 sm:px-6 lg:flex lg:h-screen lg:items-center lg:justify-center lg:px-6 lg:py-5">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-[#5b8def]/15 blur-3xl" />
-        <div className="absolute -right-20 top-24 h-80 w-80 rounded-full bg-[#5ec98f]/12 blur-3xl" />
-        <div className="absolute -bottom-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
+        <div className="absolute left-[-8rem] top-[-6rem] h-72 w-72 rounded-full bg-[#5b8def]/15 blur-3xl" />
+        <div className="absolute right-[-5rem] top-16 h-80 w-80 rounded-full bg-[#5ec98f]/16 blur-3xl" />
+        <div className="absolute bottom-[-7rem] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/12 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center lg:h-full lg:min-h-0">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid w-full overflow-hidden rounded-[34px] border border-white/80 bg-white shadow-[0_30px_90px_-48px_rgba(15,23,42,0.45)] lg:h-full lg:max-h-[calc(100vh-2rem)] lg:grid-cols-[0.96fr_1.04fr]"
-        >
-          <div className="relative hidden bg-[linear-gradient(155deg,#243042_0%,#1d2a3a_48%,#16202d_100%)] p-8 text-white lg:flex lg:flex-col lg:justify-between lg:overflow-hidden xl:p-9">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.13),transparent_30%)]" />
-            <div className="absolute inset-y-0 right-0 w-px bg-white/8" />
-
-            <div className="relative">
-              <div className="inline-flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-xl">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#5b8def] text-white shadow-lg shadow-[#5b8def]/30">
-                  <Warehouse size={22} />
+      <motion.div
+        initial={{ opacity: 0, y: 26 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mx-auto grid w-full max-w-7xl overflow-hidden rounded-[36px] border border-white/70 bg-white/88 shadow-[0_40px_120px_-55px_rgba(15,23,42,0.45)] backdrop-blur-xl lg:h-[min(860px,calc(100vh-2.5rem))] lg:grid-cols-[1.08fr_0.92fr]"
+      >
+        <section className="relative hidden overflow-hidden bg-[linear-gradient(150deg,#243042_0%,#1d2736_55%,#151c28_100%)] text-white lg:flex lg:flex-col">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.20),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.18),transparent_28%)]" />
+          <div className="relative flex h-full flex-col justify-between p-10 xl:p-12">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-4 rounded-[26px] border border-white/10 bg-white/10 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(145deg,#5b8def,#7aa5ff)] text-white shadow-[0_20px_35px_-20px_rgba(91,141,239,0.85)]">
+                  <Warehouse size={24} />
                 </div>
                 <div>
-                  <p className="text-xl font-semibold tracking-tight">Wholesale CRM</p>
-                  <p className="text-xs text-slate-300">Управление складом, продажами и клиентами</p>
+                  <p className="text-2xl font-semibold tracking-tight">Wholesale CRM</p>
+                  <p className="mt-1 text-sm text-slate-300">Система учёта для оптового склада и продаж</p>
                 </div>
               </div>
-            </div>
 
-            <div className="relative mt-6 space-y-6">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-[#9db8df]">Система для оптовой торговли</p>
-                <h1 className="mt-4 max-w-lg text-[36px] font-semibold leading-[1.08] tracking-tight xl:text-[42px]">
-                  Полный контроль над складом, продажами и клиентами в одной системе
+              <div className="max-w-2xl space-y-5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/7 px-4 py-2 text-xs uppercase tracking-[0.24em] text-[#a9c6ff]">
+                  <Sparkles size={14} />
+                  <span>Премиум управление торговлей</span>
+                </div>
+
+                <h1 className="max-w-3xl text-[42px] font-semibold leading-[1.02] tracking-tight xl:text-[56px]">
+                  Управляйте оптовым бизнесом через один чистый и понятный рабочий экран
                 </h1>
-                <p className="mt-4 max-w-lg text-[14px] leading-7 text-slate-300">
-                  Учитывайте остатки по складам, оформляйте продажи без ошибок, контролируйте долги клиентов и
-                  получайте понятные отчёты по выручке и прибыли.
+
+                <p className="max-w-2xl text-[15px] leading-8 text-slate-300">
+                  Контролируйте склады, накладные, клиентов, оплату и прибыль в системе, которая выглядит
+                  строго, работает быстро и даёт владельцу полную картину бизнеса.
                 </p>
               </div>
 
               <div className="grid gap-4 xl:grid-cols-3">
-                {desktopHighlights.map((item) => {
+                {highlights.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <div key={item.title} className="rounded-[24px] border border-white/10 bg-white/8 p-4 backdrop-blur-xl">
-                      <Icon className="text-[#8fb7ff]" size={20} />
-                      <p className="mt-3 text-[15px] font-semibold leading-6">{item.title}</p>
-                      <p className="mt-2 text-sm leading-5 text-slate-300">{item.description}</p>
+                    <div
+                      key={item.title}
+                      className="rounded-[28px] border border-white/10 bg-white/[0.07] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#a9c6ff]">
+                        <Icon size={18} />
+                      </div>
+                      <p className="mt-4 text-[17px] font-semibold leading-6">{item.title}</p>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">{item.text}</p>
                     </div>
                   );
                 })}
               </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-[20px] border border-white/10 bg-[#1a2431]/80 px-4 py-3.5">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Склады</p>
-                  <p className="mt-2 text-lg font-semibold text-white">Под контролем</p>
-                </div>
-                <div className="rounded-[20px] border border-white/10 bg-[#1a2431]/80 px-4 py-3.5">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Продажи</p>
-                  <p className="mt-2 text-lg font-semibold text-white">Без ошибок</p>
-                </div>
-                <div className="rounded-[20px] border border-white/10 bg-[#1a2431]/80 px-4 py-3.5">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Клиенты</p>
-                  <p className="mt-2 text-lg font-semibold text-white">В одном месте</p>
-                </div>
-              </div>
             </div>
 
-            <div className="relative mt-6 text-xs uppercase tracking-[0.2em] text-slate-400">
-              Wholesale • CRM • TJS
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Выручка</p>
+                <p className="mt-2 text-xl font-semibold text-white">Под рукой</p>
+              </div>
+              <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Остатки</p>
+                <p className="mt-2 text-xl font-semibold text-white">Без потерь</p>
+              </div>
+              <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Клиенты</p>
+                <p className="mt-2 text-xl font-semibold text-white">Под контролем</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="flex items-center justify-center bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 sm:p-8 lg:p-8 xl:p-10">
-            <div className="w-full max-w-md lg:max-w-[30rem]">
-              <div className="mb-7 text-center lg:mb-8 lg:text-left">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] bg-[#e7f4e4] text-[#178f76] shadow-inner lg:mx-0">
-                  <Warehouse size={26} />
+        <section className="relative flex items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,251,255,0.96)_100%)] px-5 py-6 sm:px-8 lg:px-10 lg:py-10">
+          <div className="w-full max-w-md">
+            <div className="mb-7 text-center lg:mb-8 lg:text-left">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[linear-gradient(145deg,#e7f4e4,#f4fbf1)] text-[#178f76] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_18px_38px_-22px_rgba(23,143,118,0.45)] lg:mx-0">
+                <Warehouse size={28} />
+              </div>
+              <h2 className="text-[2.15rem] font-semibold tracking-tight text-slate-900">Вход в CRM</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">
+                Войдите и начните работать со складами, продажами и клиентами в одном аккуратном интерфейсе.
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600">
+                {error}
+              </div>
+            )}
+
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 rounded-[32px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_80px_-42px_rgba(15,23,42,0.35)] backdrop-blur xl:p-6"
+            >
+              <div className="space-y-2">
+                <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Логин
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-[#edf4ff] py-4 pl-12 pr-4 text-[15px] text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-[#5b8def] focus:bg-white focus:ring-4 focus:ring-[#5b8def]/10"
+                    placeholder="Введите логин"
+                  />
                 </div>
-                <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl lg:text-[34px]">Вход в CRM</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500 lg:max-w-md">
-                  Войдите в систему и управляйте складом, продажами и клиентами из одного рабочего окна.
-                </p>
               </div>
 
-              {error && (
-                <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600">
-                  {error}
+              <div className="space-y-2">
+                <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Пароль
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-[#edf4ff] py-4 pl-12 pr-4 text-[15px] text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-[#5b8def] focus:bg-white focus:ring-4 focus:ring-[#5b8def]/10"
+                    placeholder="Введите пароль"
+                  />
                 </div>
-              )}
+              </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5 rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)] lg:p-7">
-                <div className="space-y-2">
-                  <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Логин
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="text"
-                      required
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-[#edf4ff] py-4 pl-12 pr-4 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#5b8def] focus:bg-white focus:ring-4 focus:ring-[#5b8def]/10"
-                      placeholder="Введите логин"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="ml-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Пароль
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-[#edf4ff] py-4 pl-12 pr-4 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#5b8def] focus:bg-white focus:ring-4 focus:ring-[#5b8def]/10"
-                      placeholder="Введите пароль"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#243042] py-4 text-sm font-semibold text-white shadow-[0_18px_35px_-18px_rgba(36,48,66,0.7)] transition-all hover:bg-[#1b2533] disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      <span>Вход...</span>
-                    </>
-                  ) : (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#243042,#1b2533)] px-5 py-4 text-sm font-semibold text-white shadow-[0_24px_40px_-22px_rgba(36,48,66,0.75)] transition-all hover:translate-y-[-1px] hover:shadow-[0_26px_46px_-20px_rgba(36,48,66,0.85)] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Вход...</span>
+                  </>
+                ) : (
+                  <>
                     <span>Войти</span>
-                  )}
-                </button>
-              </form>
-            </div>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
           </div>
-        </motion.div>
-      </div>
+        </section>
+      </motion.div>
     </div>
   );
 }
