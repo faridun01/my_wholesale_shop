@@ -496,12 +496,20 @@ export default function POSView() {
                     <h2 className="text-2xl font-semibold text-slate-900">{'Корзина'}</h2>
                     <p className="mt-1 text-sm text-slate-500">{'Выбрано позиций:'} {cart.length}</p>
                   </div>
-                  <div className="rounded-full bg-emerald-100 p-3 text-emerald-600">
+                  <div className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-2 text-emerald-700">
                     <ShoppingCart size={18} />
+                    <span className="text-sm font-semibold">{cart.length}</span>
                   </div>
                 </div>
 
                 <div className="space-y-3 border-b border-slate-200 px-5 py-4">
+                  <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 md:hidden">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">{'Сумма корзины'}</span>
+                      <span className="text-base font-semibold text-slate-900">{formatMoney(total)}</span>
+                    </div>
+                  </div>
+
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
                     <select
@@ -519,7 +527,7 @@ export default function POSView() {
                   </div>
                 </div>
 
-                <div className="max-h-[320px] overflow-y-auto px-5">
+                <div className="max-h-[38vh] overflow-y-auto px-5 md:max-h-[320px]">
                   {cart.map((item) => (
                     <div key={item.id} className="border-b border-slate-100 py-4 last:border-b-0">
                       <div className="flex items-start gap-3">
@@ -599,7 +607,7 @@ export default function POSView() {
                   )}
                 </div>
 
-                <div className="space-y-4 border-t border-slate-200 px-5 py-5">
+                <div className="sticky bottom-0 z-10 space-y-4 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur md:bg-white md:px-5 md:py-5">
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       type="number"
@@ -639,7 +647,7 @@ export default function POSView() {
                     ))}
                   </div>
 
-                  <div className="space-y-3 rounded-[20px] bg-amber-50 px-4 py-4 text-sm">
+                  <div className="space-y-3 rounded-[20px] bg-amber-50 px-4 py-4 text-sm shadow-[0_12px_28px_rgba(245,158,11,0.08)]">
                     <div className="flex items-center justify-between text-slate-500">
                       <span>{'Подытог'}</span>
                       <span className="text-slate-900">{formatMoney(subtotal)}</span>
@@ -665,7 +673,7 @@ export default function POSView() {
                   <button
                     onClick={handleCheckout}
                     disabled={isSubmitting || cart.length === 0}
-                    className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3.5 text-base text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-4 text-base font-medium text-white shadow-[0_18px_35px_rgba(16,185,129,0.25)] transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSubmitting ? 'Обработка...' : 'Оформить'}
                     {!isSubmitting && <ChevronRight className="ml-2" size={18} />}
