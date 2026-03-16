@@ -263,9 +263,9 @@ export default function CatalogView() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
                   onClick={() => handleProductClick(product)}
-                  className="flex h-128 cursor-pointer flex-col overflow-hidden rounded-[18px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:h-140 md:rounded-3xl"
+                  className="flex min-h-[360px] cursor-pointer flex-col overflow-hidden rounded-[20px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:min-h-[520px] md:rounded-3xl"
                 >
-                  <div className="flex h-36 shrink-0 items-center justify-center bg-slate-100 p-4 md:h-72 md:p-5">
+                  <div className="flex h-40 shrink-0 items-center justify-center bg-slate-100 p-4 md:h-72 md:p-5">
                     {product.photoUrl ? (
                       <img
                         src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -282,21 +282,24 @@ export default function CatalogView() {
                   </div>
 
                   <div className="flex flex-1 flex-col p-3 md:p-5">
-                    <div className="min-h-28 md:min-h-44">
+                    <div className="flex-1">
                       <div className="min-w-0">
                         <h3
                           title={formatProductName(product.name)}
-                          className="mt-2 line-clamp-4 min-h-12 wrap-break-word text-[12px] leading-[1.3rem] text-slate-900 md:mt-4 md:min-h-23 md:text-[15px] md:leading-6"
+                          className="mt-2 line-clamp-4 break-words text-[12px] font-medium leading-5 text-slate-900 md:mt-4 md:text-[15px] md:leading-6"
                         >
                           {formatProductName(product.name)}
                         </h3>
                       </div>
-                      <span className="inline-flex rounded-lg bg-violet-100 px-2 py-0.5 text-[9px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-[11px]">
-                        {product.category?.name || 'Без категории'}
-                      </span>
+
+                      <div className="mt-2 md:mt-3">
+                        <span className="inline-flex rounded-lg bg-violet-100 px-2 py-0.5 text-[9px] text-violet-700 md:rounded-xl md:px-3 md:py-1.5 md:text-[11px]">
+                          {product.category?.name || 'Без категории'}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-1 md:pt-3">
+                    <div className="mt-4 flex items-center justify-between gap-3 md:mt-5">
                       {shouldShowPrice(product) ? (
                         <span className="text-[15px] font-semibold tracking-tight text-slate-900 md:text-[22px]">
                           {formatMoney(product.sellingPrice)}
@@ -304,6 +307,7 @@ export default function CatalogView() {
                       ) : (
                         <span className="text-sm italic text-slate-400">Цена скрыта</span>
                       )}
+
                       <span
                         className={shell(
                           'shrink-0 rounded-lg px-2 py-1 text-[9px] md:rounded-xl md:px-3 md:py-1.5 md:text-[11px]',
@@ -320,7 +324,7 @@ export default function CatalogView() {
                         handleAddToSale(product);
                       }}
                       disabled={product.stock <= 0 || !selectedWarehouseId}
-                      className="mt-1 inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-3 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
+                      className="mt-3 inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2.5 text-xs text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 md:mt-4 md:gap-2 md:rounded-2xl md:px-4 md:py-3 md:text-sm"
                     >
                       <ShoppingCart size={14} className="md:h-4 md:w-4" />
                       <span>В продажу</span>
@@ -414,20 +418,20 @@ export default function CatalogView() {
               <div className="grid max-h-[88vh] md:max-h-[92vh] md:grid-cols-[1.05fr_0.95fr]">
                 <div className="flex items-center justify-center bg-slate-50 p-3 md:max-h-[90vh] md:p-6">
                   <div className="flex w-full items-center justify-center overflow-hidden rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm md:rounded-3xl md:p-6">
-                  {selectedProduct.photoUrl ? (
-                    <img
-                      src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)}
-                      alt={selectedProduct.name}
-                      className="max-h-64 max-w-full rounded-2xl object-contain md:max-h-136"
-                      referrerPolicy="no-referrer"
-                      onError={(event) => handleBrokenImage(event, selectedProduct.id)}
-                    />
-                  ) : (
-                    <div className="flex h-42.5 w-full items-center justify-center rounded-2xl bg-slate-100 text-slate-300 md:h-155">
-                      <Package size={72} />
-                    </div>
-                  )}
-                </div>
+                    {selectedProduct.photoUrl ? (
+                      <img
+                        src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)}
+                        alt={selectedProduct.name}
+                        className="max-h-64 max-w-full rounded-2xl object-contain md:max-h-136"
+                        referrerPolicy="no-referrer"
+                        onError={(event) => handleBrokenImage(event, selectedProduct.id)}
+                      />
+                    ) : (
+                      <div className="flex h-42.5 w-full items-center justify-center rounded-2xl bg-slate-100 text-slate-300 md:h-155">
+                        <Package size={72} />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex max-h-[88vh] flex-col overflow-y-auto p-3 md:max-h-[90vh] md:p-9">
@@ -451,7 +455,7 @@ export default function CatalogView() {
                     <div className="rounded-[18px] border border-slate-200 bg-slate-50/70 p-2.5 md:rounded-3xl md:p-4">
                       <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-white p-2 text-slate-500 shadow-sm md:p-3">
-                        <Tag size={16} />
+                          <Tag size={16} />
                         </div>
                         <div>
                           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Цена продажи</p>
