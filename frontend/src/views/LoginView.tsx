@@ -8,7 +8,6 @@ import {
   Loader2,
   Lock,
   ShieldCheck,
-  Sparkles,
   User,
   Warehouse,
 } from 'lucide-react';
@@ -19,17 +18,17 @@ const highlights = [
   {
     icon: Building2,
     title: 'Склады под контролем',
-    text: 'Остатки, перемещения и пополнения по каждому складу в одном интерфейсе.',
+    text: 'Остатки, пополнения и движение товара по каждому складу в одном интерфейсе.',
   },
   {
     icon: BarChart3,
-    title: 'Продажи без хаоса',
-    text: 'Накладные, оплаты, возвраты и долги клиентов без ручных таблиц и потерь.',
+    title: 'Продажи без ошибок',
+    text: 'Накладные, оплаты, возвраты и прибыль фиксируются в системе без ручного хаоса.',
   },
   {
     icon: ShieldCheck,
-    title: 'Управление по ролям',
-    text: 'Админ контролирует все данные, а сотрудники работают только в своих рамках.',
+    title: 'Чёткие роли доступа',
+    text: 'Админ контролирует всё, а сотрудники работают только в рамках своего склада.',
   },
 ];
 
@@ -57,49 +56,44 @@ export default function LoginView() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,#eef3fb_38%,#edf6f3_100%)] px-4 py-8 sm:px-6 lg:flex lg:h-screen lg:items-center lg:justify-center lg:px-6 lg:py-5">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#dbeafe_0%,#eef3fb_42%,#eef8f4_100%)] px-4 py-8 sm:px-6 lg:flex lg:h-screen lg:items-center lg:justify-center lg:px-6 lg:py-5">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-[-8rem] top-[-6rem] h-72 w-72 rounded-full bg-[#5b8def]/15 blur-3xl" />
-        <div className="absolute right-[-5rem] top-16 h-80 w-80 rounded-full bg-[#5ec98f]/16 blur-3xl" />
-        <div className="absolute bottom-[-7rem] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/12 blur-3xl" />
+        <div className="absolute right-[-5rem] top-12 h-80 w-80 rounded-full bg-[#5ec98f]/14 blur-3xl" />
+        <div className="absolute bottom-[-7rem] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#243042]/10 blur-3xl" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 26 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative mx-auto grid w-full max-w-7xl overflow-hidden rounded-[36px] border border-white/70 bg-white/88 shadow-[0_40px_120px_-55px_rgba(15,23,42,0.45)] backdrop-blur-xl lg:h-[min(860px,calc(100vh-2.5rem))] lg:grid-cols-[1.08fr_0.92fr]"
+        className="relative mx-auto grid w-full max-w-7xl overflow-hidden rounded-[36px] border border-white/75 bg-white/90 shadow-[0_40px_120px_-55px_rgba(15,23,42,0.45)] backdrop-blur-xl lg:h-[min(840px,calc(100vh-2.5rem))] lg:grid-cols-[1fr_0.92fr]"
       >
         <section className="relative hidden overflow-hidden bg-[linear-gradient(150deg,#243042_0%,#1d2736_55%,#151c28_100%)] text-white lg:flex lg:flex-col">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.20),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.18),transparent_28%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(91,141,239,0.20),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(94,201,143,0.14),transparent_30%)]" />
           <div className="relative flex h-full flex-col justify-between p-10 xl:p-12">
-            <div className="space-y-8">
+            <div>
               <div className="inline-flex items-center gap-4 rounded-[26px] border border-white/10 bg-white/10 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
                 <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(145deg,#5b8def,#7aa5ff)] text-white shadow-[0_20px_35px_-20px_rgba(91,141,239,0.85)]">
                   <Warehouse size={24} />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tracking-tight">Wholesale CRM</p>
-                  <p className="mt-1 text-sm text-slate-300">Система учёта для оптового склада и продаж</p>
+                  <p className="mt-1 text-sm text-slate-300">Система учёта для оптового бизнеса</p>
                 </div>
               </div>
 
-              <div className="max-w-2xl space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/7 px-4 py-2 text-xs uppercase tracking-[0.24em] text-[#a9c6ff]">
-                  <Sparkles size={14} />
-                  <span>Премиум управление торговлей</span>
-                </div>
-
-                <h1 className="max-w-3xl text-[42px] font-semibold leading-[1.02] tracking-tight xl:text-[56px]">
-                  Управляйте оптовым бизнесом через один чистый и понятный рабочий экран
+              <div className="mt-10 max-w-2xl">
+                <p className="text-sm uppercase tracking-[0.24em] text-[#a9c6ff]">Управление торговлей</p>
+                <h1 className="mt-5 text-[40px] font-semibold leading-[1.05] tracking-tight xl:text-[50px]">
+                  Работайте со складами, продажами и клиентами в одном аккуратном CRM-интерфейсе
                 </h1>
-
-                <p className="max-w-2xl text-[15px] leading-8 text-slate-300">
-                  Контролируйте склады, накладные, клиентов, оплату и прибыль в системе, которая выглядит
-                  строго, работает быстро и даёт владельцу полную картину бизнеса.
+                <p className="mt-5 max-w-xl text-[15px] leading-8 text-slate-300">
+                  Контролируйте остатки, оформляйте накладные, принимайте оплату и следите за выручкой без
+                  перегруженных таблиц и разрозненных записей.
                 </p>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-3">
+              <div className="mt-10 grid gap-4 xl:grid-cols-3">
                 {highlights.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -120,22 +114,22 @@ export default function LoginView() {
 
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Выручка</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Склад</p>
                 <p className="mt-2 text-xl font-semibold text-white">Под рукой</p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Остатки</p>
-                <p className="mt-2 text-xl font-semibold text-white">Без потерь</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Продажи</p>
+                <p className="mt-2 text-xl font-semibold text-white">Под контролем</p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-[#1b2432]/85 px-4 py-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Клиенты</p>
-                <p className="mt-2 text-xl font-semibold text-white">Под контролем</p>
+                <p className="mt-2 text-xl font-semibold text-white">В одном месте</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="relative flex items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,251,255,0.96)_100%)] px-5 py-6 sm:px-8 lg:px-10 lg:py-10">
+        <section className="relative flex items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,251,255,0.97)_100%)] px-5 py-6 sm:px-8 lg:px-10 lg:py-10">
           <div className="w-full max-w-md">
             <div className="mb-7 text-center lg:mb-8 lg:text-left">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[linear-gradient(145deg,#e7f4e4,#f4fbf1)] text-[#178f76] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_18px_38px_-22px_rgba(23,143,118,0.45)] lg:mx-0">
@@ -143,7 +137,7 @@ export default function LoginView() {
               </div>
               <h2 className="text-[2.15rem] font-semibold tracking-tight text-slate-900">Вход в CRM</h2>
               <p className="mt-3 text-sm leading-7 text-slate-500">
-                Войдите и начните работать со складами, продажами и клиентами в одном аккуратном интерфейсе.
+                Войдите и начните работать со складами, продажами и клиентами в одном рабочем окне.
               </p>
             </div>
 
