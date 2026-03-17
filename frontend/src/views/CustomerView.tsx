@@ -665,21 +665,6 @@ export default function CustomerView() {
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:p-8">
-                  <button
-                    onClick={() => selectedInvoice && handlePrintInvoice(selectedInvoice)}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100"
-                  >
-                    <Printer size={18} />
-                    <span>Печать</span>
-                  </button>
-                  <button
-                    onClick={() => setIsInvoiceDetailsOpen(false)}
-                    className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                  >
-                    Закрыть
-                  </button>
-                </div>
               </motion.div>
             </div>
           )}
@@ -798,6 +783,21 @@ export default function CustomerView() {
                       <p className="text-xs text-slate-400 md:text-sm">Возвратов по этой накладной нет.</p>
                     )}
                   </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:p-8">
+                  <button
+                    onClick={() => handlePrintInvoice(selectedInvoice)}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100"
+                  >
+                    <Printer size={18} />
+                    <span>Печать</span>
+                  </button>
+                  <button
+                    onClick={() => setIsInvoiceDetailsOpen(false)}
+                    className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                  >
+                    Закрыть
+                  </button>
                 </div>
               </motion.div>
             </div>
