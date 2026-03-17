@@ -109,7 +109,7 @@ export default function SalesView() {
     try {
       await client.delete(`/invoices/${id}`);
       toast.success('Накладная удалена');
-      fetchInvoices();
+      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
     } catch (err) {
       toast.error('Ошибка при удалении накладной');
     }
@@ -128,7 +128,7 @@ export default function SalesView() {
       toast.success('Оплата принята');
       setShowPaymentModal(false);
       setPaymentAmount('');
-      fetchInvoices();
+      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
     } catch (err) {
       toast.error('Ошибка при приеме оплаты');
     } finally {
@@ -262,6 +262,25 @@ export default function SalesView() {
 
   const getInvoiceAppliedPaidAmount = (invoice: any) =>
     Math.max(0, Number(invoice?.paidAmount || 0) - getInvoiceChangeAmount(invoice));
+
+  const isInvoicePaidInFull = (invoice: any) => getEffectiveStatus(invoice) === 'paid';
+
+  const isPaymentActionDisabled = (invoice: any) =>
+    Boolean(invoice?.cancelled) ||
+    isInvoicePaidInFull(invoice) ||
+    getInvoiceBalance(invoice) <= PAYMENT_EPSILON;
+
+  const isReturnActionDisabled = (invoice: any) =>
+    Boolean(invoice?.cancelled) || isInvoicePaidInFull(invoice);
+
+  const refreshSelectedInvoice = async (invoiceId: number) => {
+    try {
+      const res = await client.get(`/invoices/${invoiceId}`);
+      setSelectedInvoice(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const getPrintableStatus = (invoice: any) => {
     if (invoice?.cancelled) return 'Отменена';
@@ -634,6 +653,7 @@ export default function SalesView() {
           )}
         </div>
       </div>
+        </div>
 
       <div className="mt-1 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-[#fbfcfe] p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -649,10 +669,13 @@ export default function SalesView() {
             />
           </div>
         </div>
-      </div>
 
-        <div className="space-y-3 md:hidden">
-          {sortedInvoices.map((inv) => (
+        <div className="space-y-3 p-3 md:hidden">
+          {sortedInvoices.map((inv) => {
+            const paymentDisabled = isPaymentActionDisabled(inv);
+            const returnDisabled = isReturnActionDisabled(inv);
+
+            return (
             <div key={`mobile-invoice-${inv.id}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -683,48 +706,56 @@ export default function SalesView() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {getInvoiceBalance(inv) > 0 && !inv.cancelled && (
-                  <button
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
                     onClick={() => {
+                      if (paymentDisabled) return;
                       setSelectedInvoice(inv);
                       setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
                       setShowPaymentModal(true);
                     }}
-                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+                    disabled={paymentDisabled}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                      paymentDisabled
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    }`}
                   >
                     Оплата
                   </button>
-                )}
-                {!inv.cancelled && (
-                  <button
+                <button
                     onClick={() => {
+                      if (returnDisabled) return;
                       setSelectedInvoice(inv);
                       setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
                       setShowReturnModal(true);
                     }}
-                    className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+                    disabled={returnDisabled}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                      returnDisabled
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                        : 'border-amber-200 bg-amber-50 text-amber-700'
+                    }`}
                   >
                     Возврат
                   </button>
-                )}
                 <button
                   onClick={() => fetchInvoiceDetails(inv.id)}
-                  className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700"
+                  className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700"
                 >
                   Детали
                 </button>
                 {isAdmin && (
                   <button
                     onClick={() => handleDeleteInvoice(inv.id)}
-                    className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                    className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700"
                   >
                   Удалить
                   </button>
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
 
         <div className="hidden overflow-auto md:block lg:min-h-0 lg:flex-1">
@@ -732,87 +763,99 @@ export default function SalesView() {
             <thead>
               <tr className="bg-[#fafbfe] text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
                 {isAdmin && <th className="px-4 py-3">{renderSortLabel('ID', 'id')}</th>}
-                <th className="px-5 py-5">{renderSortLabel("Дата", "createdAt")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Клиент", "customer_name")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Сумма", "netAmount")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Оплачено", "paidAmount")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Остаток", "balance")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Статус", "status")}</th>
-                <th className="px-5 py-5">{renderSortLabel("Сотрудник", "staff_name")}</th>
-                {isAdmin && <th className="px-5 py-5 text-right">Действия</th>}
+                <th className="px-4 py-3">{renderSortLabel("Дата", "createdAt")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Клиент", "customer_name")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Сумма", "netAmount")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Оплачено", "paidAmount")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Остаток", "balance")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Статус", "status")}</th>
+                <th className="px-4 py-3">{renderSortLabel("Сотрудник", "staff_name")}</th>
+                {isAdmin && <th className="px-4 py-3 text-right">Действия</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedInvoices.map((inv) => (
+              {sortedInvoices.map((inv) => {
+                const paymentDisabled = isPaymentActionDisabled(inv);
+                const returnDisabled = isReturnActionDisabled(inv);
+
+                return (
                 <tr
                   key={inv.id}
                   onClick={() => fetchInvoiceDetails(inv.id)}
                   className="cursor-pointer transition-all duration-300 hover:bg-[#fafbfe]"
                 >
-                  {isAdmin && <td className="px-5 py-5 text-sm text-slate-400">#{inv.id}</td>}
-                  <td className="px-5 py-5 text-sm text-slate-500">
+                  {isAdmin && <td className="px-4 py-3 text-sm text-slate-400">#{inv.id}</td>}
+                  <td className="px-4 py-3 text-sm text-slate-500">
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
-                  <td className="px-5 py-5 text-sm text-slate-700">{inv.customer_name}</td>
-                  <td className="px-5 py-5 text-sm text-slate-700">{formatMoney(getInvoiceNetAmount(inv))}</td>
-                  <td className="px-5 py-5 text-sm text-emerald-500">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
-                  <td className="px-5 py-5 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
-                  <td className="px-5 py-5">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
-                  <td className="px-5 py-5 text-sm text-slate-500">{inv.staff_name}</td>
-                  {isAdmin && <td className="px-5 py-5 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      {getInvoiceBalance(inv) > 0 && !inv.cancelled && (
+                  <td className="px-4 py-3 text-sm text-slate-700">{inv.customer_name}</td>
+                  <td className="px-4 py-3 text-sm text-slate-700">{formatMoney(getInvoiceNetAmount(inv))}</td>
+                  <td className="px-4 py-3 text-sm text-emerald-500">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
+                  <td className="px-4 py-3 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
+                  <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
+                  <td className="px-4 py-3 text-sm text-slate-500">{inv.staff_name}</td>
+                  {isAdmin && <td className="w-[116px] px-4 py-3 text-right align-middle">
+                    <div className="ml-auto grid w-[92px] grid-cols-2 gap-2">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (paymentDisabled) return;
                             setSelectedInvoice(inv);
                             setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
                             setShowPaymentModal(true);
                           }}
-                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-emerald-500 transition-all hover:border-emerald-100 hover:bg-emerald-50" 
+                          disabled={paymentDisabled}
+                          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
+                            paymentDisabled
+                              ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                              : 'border-slate-200 bg-white text-emerald-500 hover:border-emerald-100 hover:bg-emerald-50'
+                          }`}
                           title="Принять оплату"
                         >
-                          <Banknote size={18} />
+                          <Banknote size={16} />
                         </button>
-                      )}
-                      {!inv.cancelled && getEffectiveStatus(inv) !== 'paid' && (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (returnDisabled) return;
                             setSelectedInvoice(inv);
                             setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
                             setShowReturnModal(true);
                           }}
-                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-amber-500 transition-all hover:border-amber-100 hover:bg-amber-50" 
+                          disabled={returnDisabled}
+                          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
+                            returnDisabled
+                              ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                              : 'border-slate-200 bg-white text-amber-500 hover:border-amber-100 hover:bg-amber-50'
+                          }`}
                           title="Возврат"
                         >
-                          <RotateCcw size={18} />
+                          <RotateCcw size={16} />
                         </button>
-                      )}
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           fetchInvoiceDetails(inv.id);
                         }}
-                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition-all hover:border-sky-100 hover:bg-sky-50 hover:text-sky-500" 
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-all hover:border-sky-100 hover:bg-sky-50 hover:text-sky-500" 
                         title="Просмотр"
                       >
-                        <Eye size={18} />
+                        <Eye size={16} />
                       </button>
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteInvoice(inv.id);
                         }}
-                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-400 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500" 
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500" 
                         title="Удалить"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>}
                 </tr>
-              ))}
+              )})}
               {sortedInvoices.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={isAdmin ? 9 : 7} className="px-8 py-20 text-center">
@@ -1039,30 +1082,38 @@ export default function SalesView() {
               </div>
               
               <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4 md:p-8">
-                {getInvoiceBalance(selectedInvoice) > 0 && !selectedInvoice.cancelled && (
-                  <button
+                <button
                     onClick={() => {
+                      if (isPaymentActionDisabled(selectedInvoice)) return;
                       setPaymentAmount(toFixedNumber(getInvoiceBalance(selectedInvoice)));
                       setShowPaymentModal(true);
                     }}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-3 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 md:px-8 md:py-4"
+                    disabled={isPaymentActionDisabled(selectedInvoice)}
+                    className={`inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-sm font-bold transition-all md:px-8 md:py-4 ${
+                      isPaymentActionDisabled(selectedInvoice)
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-100 text-slate-300'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
                   >
                     <Banknote size={18} />
                     <span>Оплата</span>
                   </button>
-                )}
-                {!selectedInvoice.cancelled && (
-                  <button
+                <button
                     onClick={() => {
+                      if (isReturnActionDisabled(selectedInvoice)) return;
                       setReturnItems(selectedInvoice.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
                       setShowReturnModal(true);
                     }}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-3 text-sm font-bold text-amber-700 transition-all hover:bg-amber-100 md:px-8 md:py-4"
+                    disabled={isReturnActionDisabled(selectedInvoice)}
+                    className={`inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-sm font-bold transition-all md:px-8 md:py-4 ${
+                      isReturnActionDisabled(selectedInvoice)
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-100 text-slate-300'
+                        : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    }`}
                   >
                     <RotateCcw size={18} />
                     <span>Возврат</span>
                   </button>
-                )}
                 <button
                   onClick={() => handlePrintInvoice(selectedInvoice)}
                   className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100 md:px-8 md:py-4"
