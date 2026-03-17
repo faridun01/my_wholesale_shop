@@ -597,10 +597,10 @@ export default function SalesView() {
   );
 
   return (
-    <div className="rounded-[30px] border border-white/80 bg-[#f8f9fc] p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,0.22)] sm:p-6">
-      <div className="space-y-6">
-        <div className="rounded-[28px] border border-slate-100 bg-white/95 px-5 py-5 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="rounded-[30px] border border-white/80 bg-[#f8f9fc] p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,0.22)] sm:p-5 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
+      <div className="space-y-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        <div className="rounded-[28px] border border-slate-100 bg-white/95 px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Продажи</h1>
           <p className="mt-1 text-slate-500">Управление накладными и заказами клиентов.</p>
@@ -618,14 +618,14 @@ export default function SalesView() {
             value={selectedWarehouseId}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
             disabled={!isAdmin}
-            className="min-w-[200px] rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+            className="min-w-[200px] rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
           >
             <option value="">Все склады</option>
             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button 
             onClick={() => navigate('/pos')}
-            className="flex items-center space-x-2 rounded-2xl bg-slate-800 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-700"
+            className="flex items-center space-x-2 rounded-2xl bg-slate-800 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-700"
           >
             <Plus size={18} />
             <span>Новая продажа</span>
@@ -635,8 +635,8 @@ export default function SalesView() {
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)]">
-        <div className="flex flex-col gap-4 border-b border-slate-100 bg-[#fbfcfe] p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-1 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-[#fbfcfe] p-4 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-2xl font-semibold text-slate-900">Накладные</h2>
           <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -645,7 +645,7 @@ export default function SalesView() {
               placeholder="Поиск по ID или клиенту..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-600 outline-none transition-all focus:border-slate-300 focus:bg-white"
+              className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-sm font-medium text-slate-600 outline-none transition-all focus:border-slate-300 focus:bg-white"
             />
           </div>
         </div>
@@ -727,11 +727,11 @@ export default function SalesView() {
           ))}
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left border-collapse">
+        <div className="hidden overflow-auto md:block lg:min-h-0 lg:flex-1">
+          <table className="w-full border-collapse text-left [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3 [&_th]:text-[10px] [&_th]:tracking-[0.14em]">
             <thead>
-              <tr className="bg-[#fafbfe] text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                {isAdmin && <th className="px-5 py-5">{renderSortLabel('ID', 'id')}</th>}
+              <tr className="bg-[#fafbfe] text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
+                {isAdmin && <th className="px-4 py-3">{renderSortLabel('ID', 'id')}</th>}
                 <th className="px-5 py-5">{renderSortLabel("Дата", "createdAt")}</th>
                 <th className="px-5 py-5">{renderSortLabel("Клиент", "customer_name")}</th>
                 <th className="px-5 py-5">{renderSortLabel("Сумма", "netAmount")}</th>
@@ -815,7 +815,7 @@ export default function SalesView() {
               ))}
               {sortedInvoices.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 7} className="px-8 py-32 text-center">
+                  <td colSpan={isAdmin ? 9 : 7} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center justify-center space-y-6">
                       <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                         <Receipt size={48} />
