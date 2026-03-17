@@ -13,11 +13,17 @@
 }
 
 @layer base {
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable both-edges;
+  }
+
   body {
     @apply font-sans antialiased;
     background: var(--color-shopify-bg);
     color: var(--color-shopify-text);
     selection-background-color: #b9f0dc;
+    min-width: 320px;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -38,6 +44,30 @@
 }
 
 @layer components {
+  .app-page-shell {
+    @apply mx-auto w-full rounded-[28px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)];
+  }
+
+  .app-page-pad {
+    @apply p-3 sm:p-4 lg:p-5;
+  }
+
+  .app-page-inner {
+    @apply mx-auto w-full max-w-[1440px];
+  }
+
+  .app-surface {
+    @apply overflow-hidden rounded-[28px] border border-white bg-white shadow-sm;
+  }
+
+  .app-surface-header {
+    @apply px-4 py-4 sm:px-5 sm:py-5;
+  }
+
+  .app-control {
+    @apply min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-all;
+  }
+
   .btn-primary {
     @apply px-6 py-2.5 rounded-xl text-white transition-all active:scale-95;
     background: var(--color-shopify-green);
@@ -50,7 +80,7 @@
   
   .card {
     @apply bg-white overflow-hidden;
-    border-radius: 18px;
+    border-radius: 24px;
     border: 1px solid var(--color-shopify-border);
     box-shadow: 0 1px 0 rgba(22, 29, 37, 0.04), 0 8px 24px rgba(22, 29, 37, 0.04);
   }

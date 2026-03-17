@@ -274,8 +274,8 @@ export default function POSView() {
   });
 
   return (
-    <div className="min-h-full rounded-[32px] bg-[#f4f5fb] p-4 md:p-6">
-      <div className="overflow-hidden rounded-[30px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+    <div className="app-page-shell app-page-pad min-h-full">
+      <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>

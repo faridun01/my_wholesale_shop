@@ -533,8 +533,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <section className={`rounded-3xl border bg-white p-5 shadow-sm ${currentMeta.border}`}>
+    <div className="app-page-shell app-page-pad">
+      <div className="mx-auto max-w-7xl space-y-6">
+      <section className={`app-surface p-5 ${currentMeta.border}`}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <p className={`text-sm ${currentMeta.text}`}>Аналитика</p>
@@ -809,6 +810,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           </table>
         </div>
       </Panel>
+      </div>
     </div>
   );
 }

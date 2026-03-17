@@ -150,7 +150,8 @@ export default function RemindersView() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 md:space-y-8">
+    <div className="app-page-shell app-page-pad">
+      <div className="mx-auto max-w-4xl space-y-6 md:space-y-8">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Напоминания</h1>
@@ -371,6 +372,7 @@ export default function RemindersView() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

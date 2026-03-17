@@ -616,7 +616,7 @@ export default function SalesView() {
   );
 
   return (
-    <div className="rounded-[30px] border border-white/80 bg-[#f8f9fc] p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,0.22)] sm:p-5 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
+    <div className="app-page-shell app-page-pad lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
       <div className="space-y-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         <div className="rounded-[28px] border border-slate-100 bg-white/95 px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

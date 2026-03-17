@@ -144,8 +144,8 @@ export default function CatalogView() {
   };
 
   return (
-    <div className="min-h-full rounded-[28px] bg-[#f4f5fb] p-3 sm:p-4 lg:p-6">
-      <div className="overflow-hidden rounded-[28px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+    <div className="app-page-shell app-page-pad min-h-full">
+      <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
         <div className="space-y-4 px-3 py-4 sm:px-5 sm:py-5 lg:space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>

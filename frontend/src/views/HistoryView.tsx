@@ -44,7 +44,8 @@ export default function HistoryView() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="app-page-shell app-page-pad">
+      <div className="mx-auto max-w-7xl space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">История</h1>
@@ -95,6 +96,7 @@ export default function HistoryView() {
           </table>
         </div>
       </Card>
+      </div>
     </div>
   );
 }

@@ -590,9 +590,9 @@ export default function ProductsView() {
   });
 
   return (
-    <div className="rounded-[26px] border border-white/70 bg-[#f4f5fb] p-3 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
+    <div className="app-page-shell app-page-pad">
       <div className="space-y-6">
-      <div className="rounded-[24px] border border-white bg-white px-4 py-4 shadow-sm sm:px-6 sm:py-5">
+      <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">Товары</h1>

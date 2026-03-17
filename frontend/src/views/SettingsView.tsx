@@ -273,9 +273,9 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="rounded-[30px] border border-white/70 bg-[#f4f5fb] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] sm:p-6">
+    <div className="app-page-shell app-page-pad">
       <div className="mx-auto max-w-6xl space-y-6 pb-20">
-      <section className="rounded-[28px] border border-white bg-white p-5 shadow-sm sm:px-6 sm:py-6">
+      <section className="app-surface p-5 sm:px-6 sm:py-6">
         <div className="space-y-2">
           <p className="text-sm text-slate-500">Система</p>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Настройки</h1>
