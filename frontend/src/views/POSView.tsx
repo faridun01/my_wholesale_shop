@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Banknote,
@@ -101,6 +101,8 @@ export default function POSView() {
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
   const productListRef = useRef<HTMLDivElement | null>(null);
   const lastProductScrollRef = useRef(0);
+  const deferredProductSearch = useDeferredValue(productSearch);
+  const deferredCustomerSearch = useDeferredValue(customerSearch);
 
   useEffect(() => {
     const savedCart =
@@ -132,6 +134,9 @@ export default function POSView() {
     getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined)
       .then((data) => setProducts(Array.isArray(data) ? data : []))
       .catch(console.error);
+  }, [warehouseId, userWarehouseId]);
+
+  useEffect(() => {
     getCustomers()
       .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -147,7 +152,7 @@ export default function POSView() {
         }
       })
       .catch(console.error);
-  }, [warehouseId, isAdmin, userWarehouseId]);
+  }, [isAdmin, user]);
 
   useEffect(() => {
     if (!isStorageHydrated) {
@@ -336,7 +341,7 @@ export default function POSView() {
   const filteredProducts = products.filter((product) => {
     if (product.stock <= 0) return false;
 
-    const query = productSearch.trim().toLowerCase();
+    const query = deferredProductSearch.trim().toLowerCase();
     if (!query) return true;
 
     return [product.name, String(product.id)]
@@ -346,7 +351,7 @@ export default function POSView() {
 
   const filteredCustomers = [...customers]
     .map((customer) => {
-      const query = customerSearch.trim().toLowerCase();
+      const query = deferredCustomerSearch.trim().toLowerCase();
       const name = String(customer.name || '').toLowerCase();
       const startsWith = query ? name.startsWith(query) : false;
       const includes = query ? name.includes(query) : true;
@@ -444,7 +449,12 @@ export default function POSView() {
                       <input
                         type="text"
                         value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          startTransition(() => {
+                            setProductSearch(value);
+                          });
+                        }}
                         placeholder={'Поиск товара или ID...'}
                         className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
                       />
@@ -456,16 +466,6 @@ export default function POSView() {
                       {'Перед добавлением товара выберите склад.'}
                     </div>
                   )}
-                  <div className="hidden">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder={'Поиск товара или ID...'}
-                      className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
-                    />
-                  </div>
                 </div>
 
                 <div className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500 md:grid">
@@ -604,9 +604,12 @@ export default function POSView() {
                     <input
                       value={customerSearch}
                       onChange={(e) => {
-                        setCustomerSearch(e.target.value);
-                        setCustomerId(null);
-                        setIsCustomerDropdownOpen(true);
+                        const value = e.target.value;
+                        startTransition(() => {
+                          setCustomerSearch(value);
+                          setCustomerId(null);
+                          setIsCustomerDropdownOpen(true);
+                        });
                       }}
                       onFocus={() => setIsCustomerDropdownOpen(true)}
                       onBlur={() => {
