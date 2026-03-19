@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { securityConfig } from '../config/security.js';
 import { createRateLimit, resetRateLimit } from '../middlewares/rate-limit.middleware.js';
+import prisma from '../db/prisma.js';
 
 const router = Router();
 
@@ -190,6 +191,61 @@ router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRe
     const result = await AuthService.disableTwoFactor(req.user!.id, currentPassword, code);
     resetRateLimit(twoFactorRateLimitKey(req));
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/admin/reset-operational-data', authenticate, authorize(['ADMIN']), async (_req, res, next) => {
+  try {
+    const before = await Promise.all([
+      prisma.customer.count(),
+      prisma.product.count(),
+      prisma.invoice.count(),
+      prisma.payment.count(),
+      prisma.return.count(),
+    ]);
+
+    await prisma.$transaction([
+      prisma.saleAllocation.deleteMany(),
+      prisma.invoiceItem.deleteMany(),
+      prisma.payment.deleteMany(),
+      prisma.return.deleteMany(),
+      prisma.invoice.deleteMany(),
+      prisma.inventoryTransaction.deleteMany(),
+      prisma.productBatch.deleteMany(),
+      prisma.priceHistory.deleteMany(),
+      prisma.product.deleteMany(),
+      prisma.customer.deleteMany(),
+    ]);
+
+    const after = await Promise.all([
+      prisma.customer.count(),
+      prisma.product.count(),
+      prisma.invoice.count(),
+      prisma.payment.count(),
+      prisma.return.count(),
+      prisma.user.count(),
+    ]);
+
+    res.json({
+      success: true,
+      before: {
+        customers: before[0],
+        products: before[1],
+        invoices: before[2],
+        payments: before[3],
+        returns: before[4],
+      },
+      after: {
+        customers: after[0],
+        products: after[1],
+        invoices: after[2],
+        payments: after[3],
+        returns: after[4],
+        users: after[5],
+      },
+    });
   } catch (error) {
     next(error);
   }
