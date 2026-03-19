@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight, 
   Eye, 
+  Pencil,
   Trash2, 
   X,
   Calendar,
@@ -32,6 +33,7 @@ import { formatProductName } from '../utils/productName';
 export default function SalesView() {
   const PAYMENT_EPSILON = 0.01;
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const user = getCurrentUser();
   const isAdmin = isAdminUser(user);
@@ -47,11 +49,14 @@ export default function SalesView() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [editCustomerId, setEditCustomerId] = useState<number | ''>('');
   const [returnReason, setReturnReason] = useState('');
   const [returnItems, setReturnItems] = useState<any[]>([]);
   const [isPaying, setIsPaying] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const navigate = useNavigate();
 
   const escapeHtml = (value: unknown) =>
@@ -65,6 +70,7 @@ export default function SalesView() {
   useEffect(() => {
     fetchInvoices();
     fetchWarehouses();
+    fetchCustomers();
   }, [selectedWarehouseId, isAdmin, userWarehouseId]);
 
   const fetchInvoices = async () => {
@@ -117,12 +123,17 @@ export default function SalesView() {
 
   const handlePayment = async () => {
     if (!selectedInvoice || !paymentAmount) return;
+    const normalizedAmount = Number(paymentAmount);
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      toast.error('Сумма оплаты должна быть больше нуля');
+      return;
+    }
     setIsPaying(true);
     try {
       await client.post('/payments', {
         customer_id: selectedInvoice.customerId,
         invoice_id: selectedInvoice.id,
-        amount: parseFloat(paymentAmount),
+        amount: normalizedAmount,
         method: 'cash'
       });
       toast.success('Оплата принята');
@@ -249,6 +260,43 @@ export default function SalesView() {
     }
 
     return balance;
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await client.get('/customers');
+      setCustomers(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const openEditInvoiceModal = async (invoice: any) => {
+    try {
+      const res = await client.get(`/invoices/${invoice.id}`);
+      setSelectedInvoice(res.data);
+      setEditCustomerId(res.data.customerId || '');
+      setShowEditModal(true);
+    } catch (err) {
+      toast.error('Ошибка при загрузке накладной');
+    }
+  };
+
+  const handleUpdateInvoiceCustomer = async () => {
+    if (!selectedInvoice) return;
+    setIsSavingEdit(true);
+    try {
+      await client.put(`/invoices/${selectedInvoice.id}`, {
+        customerId: editCustomerId || null,
+      });
+      toast.success('Клиент продажи обновлён');
+      setShowEditModal(false);
+      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при обновлении продажи');
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   const getInvoiceChangeAmount = (invoice: any) => {
@@ -740,6 +788,12 @@ export default function SalesView() {
                     Возврат
                   </button>
                 <button
+                  onClick={() => openEditInvoiceModal(inv)}
+                  className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700"
+                >
+                  Изменить
+                </button>
+                <button
                   onClick={() => fetchInvoiceDetails(inv.id)}
                   className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700"
                 >
@@ -794,8 +848,8 @@ export default function SalesView() {
                   <td className="px-4 py-3 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
                   <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
                   <td className="px-4 py-3 text-sm text-slate-500">{inv.staff_name}</td>
-                  {isAdmin && <td className="w-[116px] px-4 py-3 text-right align-middle">
-                    <div className="ml-auto grid w-[92px] grid-cols-2 gap-2">
+                  {isAdmin && <td className="w-[164px] px-4 py-3 text-right align-middle">
+                    <div className="ml-auto grid w-[136px] grid-cols-3 gap-2">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -832,6 +886,16 @@ export default function SalesView() {
                         >
                           <RotateCcw size={16} />
                         </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditInvoiceModal(inv);
+                        }}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-violet-500 transition-all hover:border-violet-100 hover:bg-violet-50"
+                        title="Изменить клиента"
+                      >
+                        <Pencil size={16} />
+                      </button>
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1083,6 +1147,16 @@ export default function SalesView() {
               
               <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4 md:p-8">
                 <button
+                  onClick={() => {
+                    setEditCustomerId(selectedInvoice.customerId || '');
+                    setShowEditModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-6 py-3 text-sm font-bold text-violet-700 transition-all hover:bg-violet-100 md:px-8 md:py-4"
+                >
+                  <Pencil size={18} />
+                  <span>Изменить</span>
+                </button>
+                <button
                     onClick={() => {
                       if (isPaymentActionDisabled(selectedInvoice)) return;
                       setPaymentAmount(toFixedNumber(getInvoiceBalance(selectedInvoice)));
@@ -1126,6 +1200,75 @@ export default function SalesView() {
                   className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 md:px-10 md:py-4"
                 >
                   Закрыть
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEditModal && selectedInvoice && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-xl overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-8">
+                <div className="flex items-center space-x-4">
+                  <div className="rounded-2xl bg-violet-600 p-3 text-white">
+                    <Pencil size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Изменить продажу</h3>
+                    <p className="text-sm font-bold text-slate-500">Накладная #{selectedInvoice.id}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowEditModal(false)} className="text-slate-400 transition-colors hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6 p-8">
+                <div>
+                  <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Клиент</label>
+                  <select
+                    value={editCustomerId}
+                    onChange={(e) => setEditCustomerId(e.target.value ? Number(e.target.value) : '')}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
+                  >
+                    <option value="">Без названия</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-3 text-sm text-slate-500">
+                    При смене клиента все связанные оплаты и возвраты этой накладной будут перенесены к новому клиенту.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t border-slate-100 bg-slate-50 p-8">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white py-4 font-bold text-slate-700 transition-all hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleUpdateInvoiceCustomer}
+                  disabled={isSavingEdit}
+                  className="flex-1 rounded-2xl bg-violet-600 py-4 font-black uppercase tracking-widest text-white shadow-lg shadow-violet-600/20 transition-all hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {isSavingEdit ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>
             </motion.div>
@@ -1179,8 +1322,12 @@ export default function SalesView() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Сумма оплаты</label>
                   <input 
                     type="number" 
+                    min={0}
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPaymentAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
+                    }}
                     className="w-full mt-1 px-5 py-4 rounded-2xl border border-slate-200 focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all font-black text-2xl text-slate-900 shadow-sm"
                     placeholder="0.00"
                     autoFocus

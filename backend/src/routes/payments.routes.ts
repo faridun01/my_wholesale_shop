@@ -9,6 +9,14 @@ const PAYMENT_EPSILON = 0.01;
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const { customer_id, invoice_id, amount, method, note } = req.body;
+    const normalizedAmount = Number(amount);
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount < 0) {
+      return res.status(400).json({ error: 'Amount must be a non-negative number' });
+    }
+    if (normalizedAmount === 0) {
+      return res.status(400).json({ error: 'Amount must be greater than zero' });
+    }
+
     const userId = req.user!.id;
     const access = await getAccessContext(req);
     const invoiceId = invoice_id ? Number(invoice_id) : null;
@@ -34,7 +42,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           customerId: invoice?.customerId ?? Number(customer_id),
           invoiceId,
           userId,
-          amount: Number(amount),
+          amount: normalizedAmount,
           method: method || 'cash',
         },
       });
@@ -45,7 +53,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         });
 
         if (currentInvoice) {
-          const newPaidAmount = Number(currentInvoice.paidAmount) + Number(amount);
+          const newPaidAmount = Number(currentInvoice.paidAmount) + normalizedAmount;
           const netAmount = Number(currentInvoice.netAmount);
           const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
           

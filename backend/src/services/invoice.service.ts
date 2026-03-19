@@ -19,6 +19,15 @@ function getInvoiceStatus(paidAmount: number, netAmount: number) {
   return 'unpaid';
 }
 
+function normalizeNonNegativeNumber(value: number, fieldName: string) {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    throw new Error(`${fieldName} must be a non-negative number`);
+  }
+
+  return normalized;
+}
+
 export class InvoiceService {
   /**
    * Creates a new invoice and allocates stock.
@@ -35,17 +44,33 @@ export class InvoiceService {
     paymentDueDate?: string;
   }) {
     const { customerId, userId, warehouseId, items, discount = 0, tax = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
+    const normalizedDiscount = normalizeNonNegativeNumber(discount, 'Discount');
+    const normalizedTax = normalizeNonNegativeNumber(tax, 'Tax');
+    const normalizedPaidAmount = normalizeNonNegativeNumber(paidAmount, 'Paid amount');
+
+    if (normalizedDiscount > 100) {
+      throw new Error('Discount cannot exceed 100%');
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Invoice must contain at least one item');
+    }
 
     // Start Prisma Transaction
     return await prisma.$transaction(async (tx: any) => {
       // 1. Calculate totals
       let totalAmount = 0;
       for (const item of items) {
-        totalAmount += item.quantity * item.sellingPrice;
+        const quantity = normalizeNonNegativeNumber(item.quantity, 'Item quantity');
+        const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
+        if (quantity <= 0) {
+          throw new Error('Item quantity must be greater than zero');
+        }
+
+        totalAmount += quantity * sellingPrice;
       }
 
-      const netAmount = totalAmount - (totalAmount * discount / 100) + tax;
-      const status = getInvoiceStatus(Number(paidAmount), Number(netAmount));
+      const netAmount = totalAmount - (totalAmount * normalizedDiscount / 100) + normalizedTax;
+      const status = getInvoiceStatus(normalizedPaidAmount, Number(netAmount));
 
       // 2. Create Invoice
       const invoice = await tx.invoice.create({
@@ -54,10 +79,10 @@ export class InvoiceService {
           userId,
           warehouseId,
           totalAmount,
-          discount,
-          tax,
+          discount: normalizedDiscount,
+          tax: normalizedTax,
           netAmount,
-          paidAmount,
+          paidAmount: normalizedPaidAmount,
           status,
           paymentDueDate: paymentDueDate ? new Date(paymentDueDate) : null,
         },
@@ -65,19 +90,22 @@ export class InvoiceService {
 
       // 3. Create Items and Allocate Stock
       for (const item of items) {
+        const quantity = normalizeNonNegativeNumber(item.quantity, 'Item quantity');
+        const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
+
         // Create item first with placeholder costPrice
         const invoiceItem = await tx.invoiceItem.create({
           data: {
             invoiceId: invoice.id,
             productId: item.productId,
-            quantity: item.quantity,
-            sellingPrice: item.sellingPrice,
-            totalPrice: item.quantity * item.sellingPrice,
+            quantity,
+            sellingPrice,
+            totalPrice: quantity * sellingPrice,
           },
         });
 
         // FIFO Allocation and get average cost
-        const avgCost = await StockService.allocateStock(item.productId, warehouseId, item.quantity, invoiceItem.id, tx);
+        const avgCost = await StockService.allocateStock(item.productId, warehouseId, quantity, invoiceItem.id, tx);
         
         // Update item with actual cost
         await tx.invoiceItem.update({
@@ -87,19 +115,57 @@ export class InvoiceService {
       }
 
       // 4. Record Payment if any
-      if (paidAmount > 0) {
+      if (normalizedPaidAmount > 0) {
         await tx.payment.create({
           data: {
             customerId,
             invoiceId: invoice.id,
             userId,
-            amount: paidAmount,
+            amount: normalizedPaidAmount,
             method: paymentMethod,
           },
         });
       }
 
       return invoice;
+    }, TRANSACTION_OPTIONS);
+  }
+
+  static async reassignCustomer(invoiceId: number, customerId: number) {
+    return await prisma.$transaction(async (tx: any) => {
+      const invoice = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { id: true, customerId: true },
+      });
+
+      if (!invoice) {
+        throw new Error('Invoice not found');
+      }
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { customerId },
+      });
+
+      await tx.payment.updateMany({
+        where: { invoiceId },
+        data: { customerId },
+      });
+
+      await tx.return.updateMany({
+        where: { invoiceId },
+        data: { customerId },
+      });
+
+      return tx.invoice.findUnique({
+        where: { id: invoiceId },
+        include: {
+          customer: true,
+          user: true,
+          warehouse: true,
+          items: true,
+        },
+      });
     }, TRANSACTION_OPTIONS);
   }
 

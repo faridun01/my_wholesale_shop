@@ -86,6 +86,8 @@ export default function POSView() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState(() => {
     return getStoredWarehouseId() || (userWarehouseId ? String(userWarehouseId) : '');
   });
@@ -151,6 +153,18 @@ export default function POSView() {
     sessionStorage.setItem(cartStorageKey, JSON.stringify(cart));
     localStorage.setItem(cartStorageKey, JSON.stringify(cart));
   }, [cart, isStorageHydrated]);
+
+  useEffect(() => {
+    if (!customerId) {
+      setCustomerSearch('');
+      return;
+    }
+
+    const selectedCustomer = customers.find((customer) => customer.id === customerId);
+    if (selectedCustomer) {
+      setCustomerSearch(selectedCustomer.name || '');
+    }
+  }, [customerId, customers]);
 
   useEffect(() => {
     if (warehouseId) {
@@ -284,20 +298,10 @@ export default function POSView() {
 
     setIsSubmitting(true);
     try {
-      let targetCustomerId = customerId;
 
-      if (!targetCustomerId) {
-        const defaultCustomer = customers.find((customer) => customer.name === 'Обычный клиент') || customers[0];
-        if (!defaultCustomer) {
-          toast.error('Выберите клиента');
-          setIsSubmitting(false);
-          return;
-        }
-        targetCustomerId = defaultCustomer.id;
-      }
 
       await createInvoice({
-        customerId: targetCustomerId,
+        customerId: customerId || undefined,
         warehouseId: Number(warehouseId),
         items: cart.map((item) => ({
           productId: item.id,
@@ -335,6 +339,24 @@ export default function POSView() {
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query));
   });
+
+  const filteredCustomers = [...customers]
+    .map((customer) => {
+      const query = customerSearch.trim().toLowerCase();
+      const name = String(customer.name || '').toLowerCase();
+      const startsWith = query ? name.startsWith(query) : false;
+      const includes = query ? name.includes(query) : true;
+      const index = query ? name.indexOf(query) : 0;
+
+      return {
+        customer,
+        visible: query ? includes : true,
+        score: startsWith ? 0 : index >= 0 ? index + 1 : Number.MAX_SAFE_INTEGER,
+      };
+    })
+    .filter((entry) => entry.visible)
+    .sort((a, b) => a.score - b.score || String(a.customer.name || '').localeCompare(String(b.customer.name || ''), 'ru'))
+    .map((entry) => entry.customer);
 
   return (
     <div className="app-page-shell app-page-pad min-h-full">
@@ -575,18 +597,60 @@ export default function POSView() {
 
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
-                    <select
-                      value={customerId || ''}
-                      onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
+                    <input
+                      value={customerSearch}
+                      onChange={(e) => {
+                        setCustomerSearch(e.target.value);
+                        setCustomerId(null);
+                        setIsCustomerDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsCustomerDropdownOpen(true)}
+                      onBlur={() => {
+                        window.setTimeout(() => {
+                          setIsCustomerDropdownOpen(false);
+                        }, 150);
+                      }}
+                      placeholder="Поиск клиента по имени"
                       className="w-full rounded-2xl border border-emerald-100 bg-emerald-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-emerald-300 focus:bg-white"
-                    >
-                      <option value="">{'Выберите клиента'}</option>
-                      {customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
+                    {isCustomerDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-60 overflow-y-auto rounded-2xl border border-emerald-100 bg-white p-2 shadow-xl">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setCustomerId(null);
+                            setCustomerSearch('');
+                            setIsCustomerDropdownOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-600 transition-colors hover:bg-emerald-50"
+                        >
+                          <span>Без названия</span>
+                          <span className="text-xs text-slate-400">по умолчанию</span>
+                        </button>
+                        {filteredCustomers.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setCustomerId(customer.id);
+                              setCustomerSearch(customer.name || '');
+                              setIsCustomerDropdownOpen(false);
+                            }}
+                            className={clsx(
+                              'flex w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-emerald-50',
+                              customerId === customer.id ? 'bg-emerald-50 text-emerald-700' : 'text-slate-700',
+                            )}
+                          >
+                            {customer.name}
+                          </button>
+                        ))}
+                        {!filteredCustomers.length && (
+                          <div className="px-3 py-2 text-sm text-slate-400">Клиенты не найдены</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -684,7 +748,11 @@ export default function POSView() {
                     <input
                       type="number"
                       value={paidAmount}
-                      onChange={(e) => setPaidAmount(e.target.value)}
+                      min={0}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
+                      }}
                       placeholder={'Оплачено'}
                       className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-emerald-300 focus:bg-white"
                     />

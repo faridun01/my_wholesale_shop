@@ -3,9 +3,9 @@ import prisma from '../db/prisma.js';
 import { InvoiceService } from '../services/invoice.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
 
 const router = Router();
-const DEFAULT_CUSTOMER_NAME = 'Без названия';
 
 const isAdminRequest = (req: AuthRequest) => String(req.user?.role || '').toUpperCase() === 'ADMIN';
 const canAccessInvoice = (
@@ -13,36 +13,6 @@ const canAccessInvoice = (
   invoiceMeta: { warehouseId: number | null; userId: number | null },
 ) => access.isAdmin || (ensureWarehouseAccess(access, invoiceMeta.warehouseId) && invoiceMeta.userId === access.userId);
 
-const resolveDefaultCustomerId = async (warehouseId: number, userId: number, fallbackCity?: string | null) => {
-  const warehouse = await prisma.warehouse.findUnique({
-    where: { id: warehouseId },
-    select: { city: true },
-  });
-  const city = warehouse?.city ?? fallbackCity ?? null;
-
-  let customer = await prisma.customer.findFirst({
-    where: {
-      active: true,
-      name: DEFAULT_CUSTOMER_NAME,
-      city,
-    },
-    select: { id: true },
-  });
-
-  if (!customer) {
-    customer = await prisma.customer.create({
-      data: {
-        name: DEFAULT_CUSTOMER_NAME,
-        city,
-        createdByUserId: userId,
-        notes: 'Технический клиент по умолчанию',
-      },
-      select: { id: true },
-    });
-  }
-
-  return customer.id;
-};
 
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
@@ -113,7 +83,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const customerId =
       Number.isFinite(requestedCustomerId) && requestedCustomerId > 0
         ? requestedCustomerId
-        : await resolveDefaultCustomerId(warehouseId, userId, access.city);
+        : (await getCanonicalDefaultCustomer(prisma, userId)).id;
 
     const invoice = await InvoiceService.createInvoice({
       ...req.body,
@@ -122,6 +92,42 @@ router.post('/', async (req: AuthRequest, res, next) => {
       warehouseId,
     });
     res.status(201).json(invoice);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const invoiceId = Number(req.params.id);
+    const invoiceMeta = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      select: { warehouseId: true, userId: true },
+    });
+    if (!invoiceMeta) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (!canAccessInvoice(access, invoiceMeta)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const requestedCustomerId = Number(req.body.customerId);
+    const customerId =
+      Number.isFinite(requestedCustomerId) && requestedCustomerId > 0
+        ? requestedCustomerId
+        : (await getCanonicalDefaultCustomer(prisma, req.user?.id || null)).id;
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, active: true },
+    });
+    if (!customer || !customer.active) {
+      return res.status(400).json({ error: 'Customer not found' });
+    }
+
+    const invoice = await InvoiceService.reassignCustomer(invoiceId, customerId);
+    res.json(invoice);
   } catch (error) {
     next(error);
   }

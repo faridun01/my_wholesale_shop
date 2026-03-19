@@ -2,10 +2,10 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext } from '../utils/access.js';
+import { DEFAULT_CUSTOMER_NAME, getCanonicalDefaultCustomer, isDefaultCustomerName } from '../utils/defaultCustomer.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
-const DEFAULT_CUSTOMER_NAME = 'Без названия';
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
   const balance = Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
@@ -52,25 +52,8 @@ const getCustomerAccess = async (access: Awaited<ReturnType<typeof getAccessCont
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
-    const defaultCustomerCity = access.isAdmin ? null : (access.city ?? null);
-    let defaultCustomer = await prisma.customer.findFirst({
-      where: {
-        active: true,
-        name: DEFAULT_CUSTOMER_NAME,
-        city: defaultCustomerCity,
-      },
-    });
+    const defaultCustomer = await getCanonicalDefaultCustomer(prisma, req.user?.id || null);
 
-    if (!defaultCustomer) {
-      defaultCustomer = await prisma.customer.create({
-        data: {
-          name: DEFAULT_CUSTOMER_NAME,
-          city: defaultCustomerCity,
-          createdByUserId: req.user?.id || null,
-          notes: 'Технический клиент по умолчанию',
-        },
-      });
-    }
 
     const baseWhere: any = {
       OR: [
@@ -122,6 +105,11 @@ router.get('/', async (req: AuthRequest, res, next) => {
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    if (isDefaultCustomerName(req.body?.name)) {
+      const defaultCustomer = await getCanonicalDefaultCustomer(prisma, req.user?.id || null);
+      return res.json(defaultCustomer);
+    }
+
     const customer = await prisma.customer.create({
       data: {
         ...req.body,
@@ -146,6 +134,13 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (isDefaultCustomerName(req.body?.name)) {
+      const defaultCustomer = await getCanonicalDefaultCustomer(prisma, req.user?.id || null);
+      if (defaultCustomer.id !== customerId) {
+        return res.status(400).json({ error: `Клиент "${DEFAULT_CUSTOMER_NAME}" уже существует` });
+      }
     }
 
     const customer = await prisma.customer.update({
