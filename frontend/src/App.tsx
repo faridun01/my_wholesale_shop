@@ -1,21 +1,31 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import LoginView from './views/LoginView';
-import DashboardView from './views/DashboardView';
-import ProductsView from './views/ProductsView';
-import SalesView from './views/SalesView';
-import CustomerView from './views/CustomerView';
-import SettingsView from './views/SettingsView';
-import CatalogView from './views/CatalogView';
-import ReportsView from './views/ReportsView';
-import RemindersView from './views/RemindersView';
-import HistoryView from './views/HistoryView';
-import POSView from './views/POSView';
 import Sidebar from './components/layout/Sidebar';
 import { Toaster } from 'react-hot-toast';
-import { Menu, X, Warehouse } from 'lucide-react';
+import { Loader2, Menu, X, Warehouse } from 'lucide-react';
 import { getCurrentUser, isAdminUser } from './utils/userAccess';
 import { clearAuthSession, getAuthToken } from './utils/authStorage';
+
+const DashboardView = React.lazy(() => import('./views/DashboardView'));
+const ProductsView = React.lazy(() => import('./views/ProductsView'));
+const SalesView = React.lazy(() => import('./views/SalesView'));
+const CustomerView = React.lazy(() => import('./views/CustomerView'));
+const SettingsView = React.lazy(() => import('./views/SettingsView'));
+const CatalogView = React.lazy(() => import('./views/CatalogView'));
+const ReportsView = React.lazy(() => import('./views/ReportsView'));
+const RemindersView = React.lazy(() => import('./views/RemindersView'));
+const HistoryView = React.lazy(() => import('./views/HistoryView'));
+const POSView = React.lazy(() => import('./views/POSView'));
+
+const RouteLoading = () => (
+  <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
+      <Loader2 size={18} className="animate-spin text-slate-500" />
+      <span>Загрузка страницы...</span>
+    </div>
+  </div>
+);
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = getAuthToken();
@@ -61,7 +71,9 @@ const Layout = () => {
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5 xl:p-6">
           <div className="app-page-inner">
-            <Outlet />
+            <React.Suspense fallback={<RouteLoading />}>
+              <Outlet />
+            </React.Suspense>
           </div>
         </main>
       </div>

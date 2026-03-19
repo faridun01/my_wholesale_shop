@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import { DEFAULT_CUSTOMER_NAME } from '../utils/defaultCustomer.js';
 
 const router = Router();
 const safePercentChange = (current: number, previous: number) => {
@@ -55,6 +56,12 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     const customerWhere = {
       active: true,
       city: isAdmin ? undefined : (access.city ?? '__no_city__'),
+      NOT: {
+        name: {
+          equals: DEFAULT_CUSTOMER_NAME,
+          mode: 'insensitive' as const,
+        },
+      },
     };
     const warehouseWhere = isAdmin
       ? { active: true }

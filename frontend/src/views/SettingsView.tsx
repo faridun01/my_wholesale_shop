@@ -17,7 +17,6 @@ import {
   Eye,
   Lock,
   CheckCircle2,
-  XCircle,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -258,20 +257,6 @@ export default function SettingsView() {
     }
   };
 
-  const handleUpdateUserPermission = async (userId: number, field: string, value: boolean) => {
-    if (!isAdmin) {
-      toast.error('Недостаточно прав');
-      return;
-    }
-    try {
-      await client.put(`/auth/users/${userId}`, { [field]: value });
-      toast.success('Права обновлены');
-      fetchData();
-    } catch (err) {
-      toast.error('Ошибка при обновлении прав');
-    }
-  };
-
   const handleUpdateSetting = async (key: string, value: string) => {
     if (!canManageSettings) {
       toast.error('Недостаточно прав');
@@ -502,34 +487,6 @@ export default function SettingsView() {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-3xl bg-slate-50 p-4 sm:flex sm:flex-wrap sm:gap-8 sm:space-y-0 sm:p-6">
-                  <label className="flex items-center space-x-4 cursor-pointer group">
-                    <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${newUser.canCancelInvoices ? 'bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/20' : 'bg-white border-slate-200 group-hover:border-slate-400'}`}>
-                      {newUser.canCancelInvoices && <CheckCircle2 size={20} className="text-white" />}
-                    </div>
-                    <input 
-                      type="checkbox" 
-                      className="hidden" 
-                      checked={newUser.canCancelInvoices}
-                      onChange={e => setNewUser({...newUser, canCancelInvoices: e.target.checked})}
-                    />
-                    <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Отмена накладных</span>
-                  </label>
-                  
-                  <label className="flex items-center space-x-4 cursor-pointer group">
-                    <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${newUser.canDeleteData ? 'bg-rose-600 border-rose-600 shadow-lg shadow-rose-600/30' : 'bg-white border-slate-200 group-hover:border-rose-400'}`}>
-                      {newUser.canDeleteData && <CheckCircle2 size={20} className="text-white" />}
-                    </div>
-                    <input 
-                      type="checkbox" 
-                      className="hidden" 
-                      checked={newUser.canDeleteData}
-                      onChange={e => setNewUser({...newUser, canDeleteData: e.target.checked})}
-                    />
-                    <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Удаление данных</span>
-                  </label>
-                </div>
-
                 <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
                   <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-violet-500 px-10 py-4 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
@@ -714,34 +671,6 @@ export default function SettingsView() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-8 p-6 bg-slate-50 rounded-3xl">
-                    <label className="flex items-center space-x-4 cursor-pointer group">
-                      <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${newUser.canCancelInvoices ? 'bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/20' : 'bg-white border-slate-200 group-hover:border-slate-400'}`}>
-                        {newUser.canCancelInvoices && <CheckCircle2 size={20} className="text-white" />}
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        className="hidden" 
-                        checked={newUser.canCancelInvoices}
-                        onChange={e => setNewUser({...newUser, canCancelInvoices: e.target.checked})}
-                      />
-                      <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Отмена накладных</span>
-                    </label>
-                    
-                    <label className="flex items-center space-x-4 cursor-pointer group">
-                      <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${newUser.canDeleteData ? 'bg-rose-600 border-rose-600 shadow-lg shadow-rose-600/30' : 'bg-white border-slate-200 group-hover:border-rose-400'}`}>
-                        {newUser.canDeleteData && <CheckCircle2 size={20} className="text-white" />}
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        className="hidden" 
-                        checked={newUser.canDeleteData}
-                        onChange={e => setNewUser({...newUser, canDeleteData: e.target.checked})}
-                      />
-                      <span className="font-black text-slate-700 uppercase tracking-widest text-xs">Удаление данных</span>
-                    </label>
-                  </div>
-
                   <div className="flex justify-end space-x-4">
                     <button type="button" onClick={() => setShowAddUser(false)} className="px-10 py-4 rounded-2xl font-black text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
                     <button type="submit" className="px-12 py-4 bg-slate-900 text-white rounded-2xl font-black shadow-xl shadow-slate-900/15 hover:bg-slate-800 transition-all">Создать аккаунт</button>
@@ -795,19 +724,7 @@ export default function SettingsView() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => handleUpdateUserPermission(u.id, 'canCancelInvoices', !u.canCancelInvoices)}
-                    className={`flex-1 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] ${u.canCancelInvoices ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'}`}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    onClick={() => handleUpdateUserPermission(u.id, 'canDeleteData', !u.canDeleteData)}
-                    className={`flex-1 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em] ${u.canDeleteData ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}
-                  >
-                    Удаление
-                  </button>
+                <div className="mt-4 flex justify-end">
                   <button
                     onClick={() => {
                       setSelectedUser(u);
@@ -829,7 +746,6 @@ export default function SettingsView() {
                   <th className="px-10 py-6">Пользователь</th>
                   <th className="px-10 py-6">Роль</th>
                   <th className="px-10 py-6">2FA</th>
-                  <th className="px-10 py-6">Доступ</th>
                   <th className="px-10 py-6 text-right">Действия</th>
                 </tr>
               </thead>
@@ -872,24 +788,6 @@ export default function SettingsView() {
                         )}>
                           {u.twoFactorEnabled ? 'Включена' : 'Выключена'}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center space-x-4">
-                        <button 
-                          onClick={() => handleUpdateUserPermission(u.id, 'canCancelInvoices', !u.canCancelInvoices)}
-                          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.canCancelInvoices ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-slate-50 text-slate-400 border border-transparent opacity-50'}`}
-                        >
-                          {u.canCancelInvoices ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                          <span>Отмена</span>
-                        </button>
-                        <button 
-                          onClick={() => handleUpdateUserPermission(u.id, 'canDeleteData', !u.canDeleteData)}
-                          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.canDeleteData ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-50 text-slate-400 border border-transparent opacity-50'}`}
-                        >
-                          {u.canDeleteData ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                          <span>Удаление</span>
-                        </button>
                       </div>
                     </td>
                     <td className="px-10 py-6 text-right">
