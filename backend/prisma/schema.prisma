@@ -42,6 +42,7 @@ model Warehouse {
   city        String?
   phone       String?
   note        String?
+  isDefault   Boolean  @default(false) @map("is_default")
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")

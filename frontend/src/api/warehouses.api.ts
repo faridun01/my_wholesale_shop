@@ -15,6 +15,11 @@ export const updateWarehouse = async (id: number, data: any) => {
   return response.data;
 };
 
+export const setDefaultWarehouse = async (id: number) => {
+  const response = await client.post(`/warehouses/${id}/set-default`);
+  return response.data;
+};
+
 export const deleteWarehouse = async (id: number) => {
   const response = await client.delete(`/warehouses/${id}`);
   return response.data;

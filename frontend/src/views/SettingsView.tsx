@@ -1,12 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 import client from '../api/client';
-import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from '../api/warehouses.api';
+import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, setDefaultWarehouse } from '../api/warehouses.api';
 import { 
   Warehouse, 
   Users, 
   User,
   Shield, 
   ShieldCheck,
+  Star,
   Plus, 
   Trash2, 
   Edit,
@@ -146,6 +147,16 @@ export default function SettingsView() {
   const resetWarehouseForm = () => {
     setWarehouseForm({ name: '', city: '', address: '', phone: '' });
     setSelectedWarehouse(null);
+  };
+
+  const handleSetDefaultWarehouse = async (warehouseId: number) => {
+    try {
+      await setDefaultWarehouse(warehouseId);
+      toast.success('Основной склад обновлен');
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при выборе основного склада');
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -585,7 +596,15 @@ export default function SettingsView() {
                   </button>
                 </div>
               </div>
-              <h3 className="break-words text-xl font-black text-slate-900">{w.name}</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="break-words text-xl font-black text-slate-900">{w.name}</h3>
+                {w.isDefault && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+                    <Star size={12} />
+                    Основной
+                  </span>
+                )}
+              </div>
               <div className="mt-6 space-y-4">
                 <div className="flex items-start text-slate-500 font-bold">
                   <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 text-slate-400">
@@ -599,6 +618,16 @@ export default function SettingsView() {
                   </div>
                   <span className="break-words">{w.phone || 'Телефон не указан'}</span>
                 </div>
+                {isAdmin && !w.isDefault && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetDefaultWarehouse(w.id)}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 transition-all hover:bg-amber-100"
+                  >
+                    <Star size={16} />
+                    Сделать основным
+                  </button>
+                )}
               </div>
             </div>
           ))}

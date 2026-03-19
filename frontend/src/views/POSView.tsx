@@ -24,6 +24,7 @@ import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUse
 import { formatMoney, toFixedNumber } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
+import { getDefaultWarehouseId } from '../utils/warehouse';
 
 type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -138,7 +139,10 @@ export default function POSView() {
       .then((data) => {
         const filteredWarehouses = filterWarehousesForUser(Array.isArray(data) ? data : [], user);
         setWarehouses(filteredWarehouses);
-        if (!isAdmin && filteredWarehouses[0]) {
+        const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
+        if (isAdmin && !warehouseId && defaultWarehouseId) {
+          setWarehouseId(String(defaultWarehouseId));
+        } else if (!isAdmin && filteredWarehouses[0]) {
           setWarehouseId(String(filteredWarehouses[0].id));
         }
       })

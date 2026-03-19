@@ -29,6 +29,7 @@ import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney, toFixedNumber } from '../utils/format';
 import { formatProductName } from '../utils/productName';
+import { getDefaultWarehouseId } from '../utils/warehouse';
 
 export default function SalesView() {
   const PAYMENT_EPSILON = 0.01;
@@ -92,7 +93,10 @@ export default function SalesView() {
       const res = await client.get('/warehouses');
       const filteredWarehouses = filterWarehousesForUser(Array.isArray(res.data) ? res.data : [], user);
       setWarehouses(filteredWarehouses);
-      if (!isAdmin && filteredWarehouses[0]) {
+      const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
+      if (isAdmin && !selectedWarehouseId && defaultWarehouseId) {
+        setSelectedWarehouseId(String(defaultWarehouseId));
+      } else if (!isAdmin && filteredWarehouses[0]) {
         setSelectedWarehouseId(String(filteredWarehouses[0].id));
       }
     } catch (err) {

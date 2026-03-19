@@ -30,6 +30,7 @@ import { getProductBatches } from '../api/products.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
+import { getDefaultWarehouseId } from '../utils/warehouse';
 
 const normalizeOcrProductName = (name: string) => {
   const trimmed = String(name || '').trim();
@@ -157,7 +158,10 @@ export default function ProductsView() {
       setProducts(Array.isArray(productsData) ? productsData : []);
       const filteredWarehouses = filterWarehousesForUser(Array.isArray(warehousesData) ? warehousesData : [], user);
       setWarehouses(filteredWarehouses);
-      if (!isAdmin && filteredWarehouses[0]) {
+      const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
+      if (isAdmin && !selectedWarehouseId && defaultWarehouseId) {
+        setSelectedWarehouseId(String(defaultWarehouseId));
+      } else if (!isAdmin && filteredWarehouses[0]) {
         setSelectedWarehouseId(String(filteredWarehouses[0].id));
       }
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);

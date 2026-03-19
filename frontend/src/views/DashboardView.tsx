@@ -31,6 +31,7 @@ import { getDashboardSummary } from '../api/dashboard.api';
 import { formatCount, formatMoney, formatPercent } from '../utils/format';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import client from '../api/client';
+import { getDefaultWarehouseId } from '../utils/warehouse';
 
 const statusTone = (status: string) => {
   if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
@@ -83,10 +84,15 @@ export default function DashboardView() {
     client.get('/warehouses')
       .then((res) => {
         const items = Array.isArray(res.data) ? res.data : [];
-        setWarehouses(filterWarehousesForUser(items, user));
+        const filteredWarehouses = filterWarehousesForUser(items, user);
+        setWarehouses(filteredWarehouses);
+        const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
+        if (isAdmin && !selectedWarehouseId && defaultWarehouseId) {
+          setSelectedWarehouseId(String(defaultWarehouseId));
+        }
       })
       .catch(console.error);
-  }, [user]);
+  }, [isAdmin, selectedWarehouseId, user]);
 
   const recentSales = summary?.recentSales || [];
   const overviewSales = summary?.overviewSales || [];
