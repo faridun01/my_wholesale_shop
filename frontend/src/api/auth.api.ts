@@ -5,6 +5,11 @@ export const login = async (data: { username: string; password: string }) => {
   return response.data;
 };
 
+export const loginWithTwoFactor = async (data: { twoFactorToken: string; code: string }) => {
+  const response = await client.post('/auth/2fa/login', data);
+  return response.data;
+};
+
 export const register = async (data: { username: string; password: string; role?: string; warehouseId?: number }) => {
   const response = await client.post('/auth/register', data);
   return response.data;
@@ -17,5 +22,20 @@ export const publicRegister = async (data: { username: string; password: string;
 
 export const changePassword = async (data: { currentPassword: string; newPassword: string }) => {
   const response = await client.post('/auth/change-password', data);
+  return response.data;
+};
+
+export const setupTwoFactor = async () => {
+  const response = await client.post('/auth/2fa/setup');
+  return response.data;
+};
+
+export const verifyTwoFactorSetup = async (data: { setupToken: string; code: string }) => {
+  const response = await client.post('/auth/2fa/verify-setup', data);
+  return response.data;
+};
+
+export const disableTwoFactor = async (data: { currentPassword: string; code: string }) => {
+  const response = await client.post('/auth/2fa/disable', data);
   return response.data;
 };

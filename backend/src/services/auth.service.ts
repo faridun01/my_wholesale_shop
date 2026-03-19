@@ -2,6 +2,14 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../db/prisma.js';
 import { securityConfig } from '../config/security.js';
+import {
+  consumeBackupCode,
+  generateBackupCodes,
+  generateOtpAuthUri,
+  generateTwoFactorSecret,
+  hashBackupCode,
+  verifyTotpToken,
+} from '../utils/two-factor.js';
 
 const JWT_SECRET: string = (() => {
   const secret = process.env.JWT_SECRET;
@@ -20,10 +28,19 @@ type PublicUser = {
   active: boolean;
   canCancelInvoices: boolean;
   canDeleteData: boolean;
+  twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
   warehouse: { id: number; name: string; city: string | null } | null;
 };
+
+type LoginResult =
+  | { requiresTwoFactor: false; user: PublicUser; token: string }
+  | {
+      requiresTwoFactor: true;
+      twoFactorToken: string;
+      user: Pick<PublicUser, 'id' | 'username' | 'twoFactorEnabled'>;
+    };
 
 const toPublicUser = (user: any): PublicUser => ({
   id: user.id,
@@ -34,6 +51,7 @@ const toPublicUser = (user: any): PublicUser => ({
   active: user.active,
   canCancelInvoices: Boolean(user.canCancelInvoices),
   canDeleteData: Boolean(user.canDeleteData),
+  twoFactorEnabled: Boolean(user.twoFactorEnabled),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
   warehouse: user.warehouse
@@ -42,6 +60,8 @@ const toPublicUser = (user: any): PublicUser => ({
 });
 
 const INVALID_CREDENTIALS_ERROR = 'Invalid credentials';
+const BACKUP_CODE_PEPPER = process.env.TWO_FACTOR_BACKUP_PEPPER || JWT_SECRET;
+const TWO_FACTOR_TOKEN_AUDIENCE = `${securityConfig.auth.tokenAudience}:2fa`;
 
 const createHttpError = (message: string, status: number) =>
   Object.assign(new Error(message), { status });
@@ -74,13 +94,80 @@ const ensureUniqueUsername = async (username: string, excludeUserId?: number) =>
   }
 };
 
+const signAccessToken = (user: {
+  id: number;
+  username: string;
+  role: string;
+  warehouseId: number | null;
+  canCancelInvoices: boolean;
+  canDeleteData: boolean;
+}) =>
+  jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      warehouseId: user.warehouseId,
+      canCancelInvoices: user.canCancelInvoices,
+      canDeleteData: user.canDeleteData,
+    },
+    JWT_SECRET,
+    {
+      expiresIn: securityConfig.auth.tokenExpiresIn as SignOptions['expiresIn'],
+      issuer: securityConfig.auth.tokenIssuer,
+      audience: securityConfig.auth.tokenAudience,
+    }
+  );
+
+const signScopedToken = (payload: Record<string, unknown>, expiresIn: string) =>
+  jwt.sign(payload, JWT_SECRET, {
+    expiresIn: expiresIn as SignOptions['expiresIn'],
+    issuer: securityConfig.auth.tokenIssuer,
+    audience: TWO_FACTOR_TOKEN_AUDIENCE,
+  });
+
+const verifyScopedToken = (token: string) =>
+  jwt.verify(token, JWT_SECRET, {
+    issuer: securityConfig.auth.tokenIssuer,
+    audience: TWO_FACTOR_TOKEN_AUDIENCE,
+  }) as jwt.JwtPayload & Record<string, unknown>;
+
+const verifyTwoFactorInput = (options: {
+  secret: string | null;
+  token: string;
+  backupCodeHashes: string[];
+}) => {
+  if (!options.secret) {
+    return null;
+  }
+
+  if (verifyTotpToken(options.secret, options.token)) {
+    return {
+      usedBackupCode: false,
+      remainingBackupCodeHashes: options.backupCodeHashes,
+    };
+  }
+
+  const remainingBackupCodeHashes = consumeBackupCode(
+    options.backupCodeHashes,
+    options.token,
+    BACKUP_CODE_PEPPER
+  );
+
+  if (!remainingBackupCodeHashes) {
+    return null;
+  }
+
+  return {
+    usedBackupCode: true,
+    remainingBackupCodeHashes,
+  };
+};
+
 export class AuthService {
-  /**
-   * Authenticates a user and returns a token.
-   */
-  static async login(username: string, password: string) {
+  static async login(username: string, password: string): Promise<LoginResult> {
     const normalizedUsername = normalizeUsername(username);
-    const user = await prisma.user.findFirst({
+    const user: any = await prisma.user.findFirst({
       where: { username: normalizedUsername, active: true },
       include: { warehouse: true },
     });
@@ -89,30 +176,37 @@ export class AuthService {
       throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        warehouseId: user.warehouseId,
-        canCancelInvoices: user.canCancelInvoices,
-        canDeleteData: user.canDeleteData,
-      },
-      JWT_SECRET,
-      {
-        expiresIn: securityConfig.auth.tokenExpiresIn as SignOptions['expiresIn'],
-        issuer: securityConfig.auth.tokenIssuer,
-        audience: securityConfig.auth.tokenAudience,
-      }
-    );
+    if (user.twoFactorEnabled && user.twoFactorSecret) {
+      return {
+        requiresTwoFactor: true,
+        twoFactorToken: signScopedToken(
+          { type: 'two_factor_login', userId: user.id },
+          securityConfig.auth.twoFactorChallengeExpiresIn
+        ),
+        user: {
+          id: user.id,
+          username: user.username,
+          twoFactorEnabled: true,
+        },
+      };
+    }
 
-    return { user: toPublicUser(user), token };
+    return {
+      requiresTwoFactor: false,
+      user: toPublicUser(user),
+      token: signAccessToken(user),
+    };
   }
 
-  /**
-   * Creates a new user with a hashed password.
-   */
-  static async register(data: { username: string; password: string; phone?: string; role?: string; warehouseId?: number; canCancelInvoices?: boolean; canDeleteData?: boolean }) {
+  static async register(data: {
+    username: string;
+    password: string;
+    phone?: string;
+    role?: string;
+    warehouseId?: number;
+    canCancelInvoices?: boolean;
+    canDeleteData?: boolean;
+  }) {
     const username = normalizeUsername(data.username);
     validatePasswordStrength(data.password);
     await ensureUniqueUsername(username);
@@ -149,7 +243,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: hashedPassword }
+      data: { passwordHash: hashedPassword },
     });
   }
 
@@ -185,7 +279,162 @@ export class AuthService {
   static async deleteUser(id: number) {
     return await prisma.user.update({
       where: { id },
-      data: { active: false }
+      data: { active: false },
     });
+  }
+
+  static async getCurrentUser(userId: number) {
+    const user: any = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { warehouse: true },
+    });
+
+    if (!user || !user.active) {
+      throw createHttpError('User not found', 404);
+    }
+
+    return toPublicUser(user);
+  }
+
+  static async createTwoFactorSetup(userId: number) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, active: true },
+    });
+
+    if (!user || !user.active) {
+      throw createHttpError('User not found', 404);
+    }
+
+    const { secret, formattedSecret } = generateTwoFactorSecret();
+    const backupCodes = generateBackupCodes(securityConfig.auth.backupCodeCount);
+    const backupCodeHashes = backupCodes.map((code) => hashBackupCode(code, BACKUP_CODE_PEPPER));
+    const otpauthUrl = generateOtpAuthUri({
+      secret,
+      accountName: user.username,
+      issuer: securityConfig.auth.twoFactorIssuer,
+    });
+
+    return {
+      secret: formattedSecret,
+      otpauthUrl,
+      backupCodes,
+      setupToken: signScopedToken(
+        {
+          type: 'two_factor_setup',
+          userId,
+          secret,
+          backupCodeHashes,
+        },
+        securityConfig.auth.twoFactorSetupExpiresIn
+      ),
+    };
+  }
+
+  static async verifyTwoFactorSetup(userId: number, setupToken: string, code: string) {
+    const payload = verifyScopedToken(setupToken);
+    if (payload.type !== 'two_factor_setup' || Number(payload.userId) !== Number(userId)) {
+      throw createHttpError('Invalid 2FA setup session', 400);
+    }
+
+    const secret = String(payload.secret || '');
+    const backupCodeHashes = Array.isArray(payload.backupCodeHashes)
+      ? payload.backupCodeHashes.map((entry) => String(entry))
+      : [];
+
+    if (!verifyTotpToken(secret, code)) {
+      throw createHttpError('Invalid two-factor code', 400);
+    }
+
+    const user: any = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorSecret: secret,
+        twoFactorBackupCodes: backupCodeHashes,
+      } as any,
+      include: { warehouse: true },
+    });
+
+    return { user: toPublicUser(user) };
+  }
+
+  static async completeTwoFactorLogin(twoFactorToken: string, code: string) {
+    const payload = verifyScopedToken(twoFactorToken);
+    if (payload.type !== 'two_factor_login') {
+      throw createHttpError('Invalid 2FA session', 400);
+    }
+
+    const user: any = await prisma.user.findUnique({
+      where: { id: Number(payload.userId) },
+      include: { warehouse: true },
+    });
+
+    if (!user || !user.active || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
+    }
+
+    const verification = verifyTwoFactorInput({
+      secret: user.twoFactorSecret,
+      token: code,
+      backupCodeHashes: user.twoFactorBackupCodes,
+    });
+
+    if (!verification) {
+      throw createHttpError('Invalid two-factor code', 400);
+    }
+
+    if (verification.usedBackupCode) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { twoFactorBackupCodes: verification.remainingBackupCodeHashes } as any,
+      });
+    }
+
+    return {
+      user: toPublicUser(user),
+      token: signAccessToken(user),
+    };
+  }
+
+  static async disableTwoFactor(userId: number, currentPassword: string, code: string) {
+    const user: any = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { warehouse: true },
+    });
+
+    if (!user || !user.active) {
+      throw createHttpError('User not found', 404);
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw createHttpError('Two-factor authentication is not enabled', 400);
+    }
+
+    const verification = verifyTwoFactorInput({
+      secret: user.twoFactorSecret,
+      token: code,
+      backupCodeHashes: user.twoFactorBackupCodes,
+    });
+
+    if (!verification) {
+      throw createHttpError('Invalid two-factor code', 400);
+    }
+
+    const updatedUser: any = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorBackupCodes: [],
+      } as any,
+      include: { warehouse: true },
+    });
+
+    return { user: toPublicUser(updatedUser) };
   }
 }

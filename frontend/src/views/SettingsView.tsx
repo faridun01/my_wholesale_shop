@@ -23,6 +23,8 @@ import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { getCurrentUser } from '../utils/userAccess';
+import { updateStoredUser } from '../utils/authStorage';
+import TwoFactorSettingsCard from '../components/settings/TwoFactorSettingsCard';
 
 export default function SettingsView() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -236,7 +238,7 @@ export default function SettingsView() {
       
       // Update local storage if needed, but safer to just let them re-login if they changed sensitive info
       const updatedUser = { ...currentUser, ...res.data };
-      sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      updateStoredUser(updatedUser);
       
       setProfileForm({ ...profileForm, password: '', confirmPassword: '' });
     } catch (err) {
@@ -930,6 +932,7 @@ export default function SettingsView() {
               </div>
             </form>
           </div>
+          <TwoFactorSettingsCard currentUser={currentUser} />
         </div>
       )}
       {activeTab === 'general' && (

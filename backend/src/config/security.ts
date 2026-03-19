@@ -28,6 +28,10 @@ export const securityConfig = {
     tokenAudience: process.env.JWT_AUDIENCE || 'my-wholesale-shop-users',
     tokenExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
     minimumPasswordLength: 8,
+    twoFactorIssuer: process.env.TWO_FACTOR_ISSUER || 'Wholesale CRM',
+    twoFactorSetupExpiresIn: process.env.TWO_FACTOR_SETUP_EXPIRES_IN || '10m',
+    twoFactorChallengeExpiresIn: process.env.TWO_FACTOR_CHALLENGE_EXPIRES_IN || '5m',
+    backupCodeCount: 8,
   },
   rateLimit: {
     loginWindowMs: 15 * 60 * 1000,
@@ -39,6 +43,9 @@ export const securityConfig = {
     uploadWindowMs: 5 * 60 * 1000,
     uploadMaxAttempts: 30,
     uploadBlockMs: 10 * 60 * 1000,
+    twoFactorWindowMs: 10 * 60 * 1000,
+    twoFactorMaxAttempts: 8,
+    twoFactorBlockMs: 15 * 60 * 1000,
   },
   upload: {
     maxImageBytes: 5 * 1024 * 1024,

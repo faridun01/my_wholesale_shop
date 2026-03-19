@@ -5,6 +5,7 @@ export type AppUser = {
   username?: string;
   role?: string;
   warehouseId?: number | string | null;
+  twoFactorEnabled?: boolean;
   warehouse?: {
     id?: number;
     name?: string;

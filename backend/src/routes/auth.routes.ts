@@ -13,6 +13,9 @@ const loginRateLimitKey = (req: any) =>
 const passwordChangeRateLimitKey = (req: AuthRequest) =>
   `${req.ip}:${req.user?.id ?? 'anonymous'}`;
 
+const twoFactorRateLimitKey = (req: any) =>
+  `${req.ip}:${String(req.body?.twoFactorToken || req.body?.setupToken || req.user?.id || 'anonymous')}`;
+
 const loginRateLimit = createRateLimit({
   windowMs: securityConfig.rateLimit.loginWindowMs,
   maxAttempts: securityConfig.rateLimit.loginMaxAttempts,
@@ -29,12 +32,24 @@ const passwordChangeRateLimit = createRateLimit({
   keyGenerator: (req) => passwordChangeRateLimitKey(req as AuthRequest),
 });
 
+const twoFactorRateLimit = createRateLimit({
+  windowMs: securityConfig.rateLimit.twoFactorWindowMs,
+  maxAttempts: securityConfig.rateLimit.twoFactorMaxAttempts,
+  blockMs: securityConfig.rateLimit.twoFactorBlockMs,
+  message: 'Too many two-factor attempts. Please try again later.',
+  keyGenerator: twoFactorRateLimitKey,
+});
+
 router.post('/login', loginRateLimit, async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    const { user, token } = await AuthService.login(username, password);
+    const result = await AuthService.login(username, password);
+    if (result.requiresTwoFactor) {
+      return res.json(result);
+    }
+
     resetRateLimit(loginRateLimitKey(req));
-    res.json({ user, token });
+    res.json({ user: result.user, token: result.token, requiresTwoFactor: false });
   } catch (error) {
     next(error);
   }
@@ -44,6 +59,15 @@ router.get('/users', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, 
   try {
     const users = await AuthService.getAllUsers();
     res.json(users);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/me', authenticate, async (req: AuthRequest, res, next) => {
+  try {
+    const user = await AuthService.getCurrentUser(req.user!.id);
+    res.json(user);
   } catch (error) {
     next(error);
   }
@@ -112,6 +136,60 @@ router.post('/change-password', authenticate, passwordChangeRateLimit, async (re
     await AuthService.changePassword(req.user!.id, currentPassword, newPassword);
     resetRateLimit(passwordChangeRateLimitKey(req));
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/2fa/login', twoFactorRateLimit, async (req, res, next) => {
+  try {
+    const { twoFactorToken, code } = req.body;
+    if (!twoFactorToken || !code) {
+      return res.status(400).json({ error: 'twoFactorToken and code are required' });
+    }
+
+    const result = await AuthService.completeTwoFactorLogin(twoFactorToken, code);
+    resetRateLimit(twoFactorRateLimitKey(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/2fa/setup', authenticate, async (req: AuthRequest, res, next) => {
+  try {
+    const result = await AuthService.createTwoFactorSetup(req.user!.id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/2fa/verify-setup', authenticate, twoFactorRateLimit, async (req: AuthRequest, res, next) => {
+  try {
+    const { setupToken, code } = req.body;
+    if (!setupToken || !code) {
+      return res.status(400).json({ error: 'setupToken and code are required' });
+    }
+
+    const result = await AuthService.verifyTwoFactorSetup(req.user!.id, setupToken, code);
+    resetRateLimit(twoFactorRateLimitKey(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRequest, res, next) => {
+  try {
+    const { currentPassword, code } = req.body;
+    if (!currentPassword || !code) {
+      return res.status(400).json({ error: 'currentPassword and code are required' });
+    }
+
+    const result = await AuthService.disableTwoFactor(req.user!.id, currentPassword, code);
+    resetRateLimit(twoFactorRateLimitKey(req));
+    res.json(result);
   } catch (error) {
     next(error);
   }
