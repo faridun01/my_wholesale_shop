@@ -1,0 +1,1 @@
+-- No-op migration restored to keep Prisma migration history consistent.
