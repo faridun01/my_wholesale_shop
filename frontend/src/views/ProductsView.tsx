@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import client from '../api/client';
-import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory } from '../api/products.api';
+import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct } from '../api/products.api';
 import { 
   Plus, 
   PlusCircle,
@@ -18,6 +18,7 @@ import {
   History,
   DollarSign,
   Layers,
+  GitMerge,
   Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,9 +37,16 @@ const normalizeOcrProductName = (name: string) => {
   return (bracketIndex >= 0 ? trimmed.slice(0, bracketIndex) : trimmed).trim();
 };
 
+const normalizeVolumeSpacing = (value: string) =>
+  value
+    .replace(/(\d)\s*[.,]\s*(\d)/gu, '$1.$2')
+    .replace(/(\d)\s+(\d)(?=\s*(?:гр|г|кг|л|мл)\b)/giu, '$1.$2')
+    .replace(/(\d(?:\.\d+)?)\s*(гр|г|кг|л|мл|шт)\b/giu, '$1 $2');
+
 const normalizeCatalogName = (name: string) =>
-  String(name || '')
+  normalizeVolumeSpacing(String(name || ''))
     .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/[«"“”„‟'][^«"“”„‟']+[»"“”„‟']/gu, ' ')
     .replace(/[«»“”„‟"']/gu, '')
     .replace(/[(),]/gu, ' ')
     .replace(/[ёЁ]/g, 'е')
@@ -46,6 +54,13 @@ const normalizeCatalogName = (name: string) =>
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+
+const normalizeProductFamilyName = (name: string) =>
+  normalizeCatalogName(name)
+    .replace(/\bмассой\s+\d+(?:\.\d+)?\s*(?:гр|г|кг|л|мл|шт)\b/giu, ' ')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:гр|г|кг|л|мл|шт)\b/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const detectCategoryName = (name: string) => {
   const normalized = String(name || '').toLowerCase().replace(/[ё]/g, 'е');
@@ -85,12 +100,14 @@ export default function ProductsView() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showRestockModal, setShowRestockModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showBatchesModal, setShowBatchesModal] = useState(false);
   const [productHistory, setProductHistory] = useState<any[]>([]);
   const [productBatches, setProductBatches] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
   const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', reason: '' });
@@ -345,12 +362,39 @@ export default function ProductsView() {
           lineTotal: number;
         }>;
 
-      if (!preparedResults.length) {
+      const mergedPreparedResults = Array.from(
+        preparedResults.reduce((acc, item) => {
+          const key = normalizeCatalogName(item.name);
+          const existing = acc.get(key);
+
+          if (!existing) {
+            acc.set(key, { ...item });
+            return acc;
+          }
+
+          existing.quantity += Number(item.quantity || 0);
+          existing.price += Number(item.price || 0);
+          existing.lineTotal += Number(item.lineTotal || 0);
+          existing.packageCount += Number(item.packageCount || 0);
+          existing.unitsPerPackage = Math.max(Number(existing.unitsPerPackage || 0), Number(item.unitsPerPackage || 0));
+          existing.costPricePerPieceTJS = existing.quantity > 0 ? (existing.price * rate) / existing.quantity : existing.costPricePerPieceTJS;
+          if (Number(item.sellingPrice || 0) > 0) {
+            existing.sellingPrice = Number(item.sellingPrice);
+          }
+          if (!existing.rawQuantity && item.rawQuantity) {
+            existing.rawQuantity = item.rawQuantity;
+          }
+
+          return acc;
+        }, new Map<string, any>()).values(),
+      );
+
+      if (!mergedPreparedResults.length) {
         toast.error('После сканирования не осталось корректных товаров для добавления');
         return;
       }
       const currentProducts = [...products];
-      for (const item of preparedResults) {
+      for (const item of mergedPreparedResults) {
         const costPriceTJS = item.costPricePerPieceTJS;
         const normalizedItemName = normalizeCatalogName(item.name);
         const categoryId = await ensureCategoryId(item.name);
@@ -510,6 +554,53 @@ export default function ProductsView() {
     }
   };
 
+  const getMergeCandidates = (product: any) => {
+    const sourceFamily = normalizeProductFamilyName(String(product?.name || ''));
+    const sourceWarehouseId = Number(product?.warehouseId || selectedWarehouseId || 0);
+
+    return products.filter((candidate) => {
+      if (!candidate || candidate.id === product?.id) {
+        return false;
+      }
+
+      const candidateWarehouseId = Number(candidate.warehouseId || 0);
+      if (sourceWarehouseId && candidateWarehouseId && candidateWarehouseId !== sourceWarehouseId) {
+        return false;
+      }
+
+      return normalizeProductFamilyName(String(candidate.name || '')) === sourceFamily;
+    });
+  };
+
+  const handleOpenMergeModal = (product: any) => {
+    const candidates = getMergeCandidates(product);
+    if (!candidates.length) {
+      toast.error('Похожих товаров для объединения не найдено');
+      return;
+    }
+
+    setSelectedProduct(product);
+    setMergeTargetId(String(candidates[0].id));
+    setShowMergeModal(true);
+  };
+
+  const handleMergeProduct = async () => {
+    if (!selectedProduct || !mergeTargetId) {
+      return;
+    }
+
+    try {
+      await mergeProduct(selectedProduct.id, Number(mergeTargetId));
+      toast.success('Товары объединены');
+      setShowMergeModal(false);
+      setMergeTargetId('');
+      setSelectedProduct(null);
+      fetchInitialData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при объединении товаров');
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -577,10 +668,11 @@ export default function ProductsView() {
 
   const baseProducts = selectedWarehouseId ? sortedProducts : sortedAggregatedProducts;
   const isAggregateMode = !selectedWarehouseId;
+  const normalizedSearch = normalizeCatalogName(search);
 
   const filteredProducts = baseProducts.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      false;
+    const productSearchValue = normalizeCatalogName(String(p.name || ''));
+    const matchesSearch = !normalizedSearch || productSearchValue.includes(normalizedSearch);
     
     // If a warehouse is selected, we only show products that have stock in that warehouse
     // OR are assigned to that warehouse as their default warehouse.
@@ -1369,6 +1461,76 @@ export default function ProductsView() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showMergeModal && selectedProduct && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-2xl overflow-hidden rounded-[2rem] bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 bg-fuchsia-50/50 p-6">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl bg-fuchsia-600 p-3 text-white">
+                    <GitMerge size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">Объединить дубликаты</h3>
+                    <p className="text-sm text-slate-500">Выберите основной товар, в который нужно перенести остатки и историю.</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowMergeModal(false)} className="text-slate-400 transition-colors hover:text-slate-600">
+                  <X size={22} />
+                </button>
+              </div>
+
+              <div className="space-y-5 p-6">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Объединяемый товар</p>
+                  <p className="mt-2 text-base font-semibold text-slate-900">{formatProductName(selectedProduct.name)}</p>
+                  <p className="mt-1 text-sm text-slate-500">Остаток: {selectedProduct.stock} {selectedProduct.unit}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Основной товар</label>
+                  <select
+                    value={mergeTargetId}
+                    onChange={(e) => setMergeTargetId(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-fuchsia-300 focus:bg-white"
+                  >
+                    {getMergeCandidates(selectedProduct).map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {formatProductName(candidate.name)} • {candidate.stock} {candidate.unit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="text-sm text-slate-500">
+                  Партии, остатки, история движения, цены и позиции продаж будут перенесены в выбранный основной товар.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-6">
+                <button
+                  onClick={() => setShowMergeModal(false)}
+                  className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleMergeProduct}
+                  className="rounded-2xl bg-fuchsia-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-fuchsia-700"
+                >
+                  Объединить
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ConfirmationModal 
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -1691,6 +1853,15 @@ export default function ProductsView() {
                             title="Пополнить"
                           >
                             <PlusCircle size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleOpenMergeModal(product)}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-fuchsia-200 hover:bg-fuchsia-50 hover:text-fuchsia-600"
+                            title="Объединить похожий товар"
+                          >
+                            <GitMerge size={14} />
                           </button>
                         )}
                         <button 

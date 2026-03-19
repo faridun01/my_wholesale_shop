@@ -22,6 +22,11 @@ export const updateProduct = async (id: number, data: any) => {
   return response.data;
 };
 
+export const mergeProduct = async (id: number, targetProductId: number) => {
+  const response = await client.post(`/products/${id}/merge`, { targetProductId });
+  return response.data;
+};
+
 export const deleteProduct = async (id: number) => {
   const response = await client.delete(`/products/${id}`);
   return response.data;

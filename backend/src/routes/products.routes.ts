@@ -6,13 +6,20 @@ import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '.
 
 const router = Router();
 
+const normalizeVolumeSpacing = (value: string) =>
+  value
+    .replace(/(\d)\s*[.,]\s*(\d)/gu, '$1.$2')
+    .replace(/(\d)\s+(\d)(?=\s*(?:гр|г|кг|л|мл)\b)/giu, '$1.$2')
+    .replace(/(\d(?:\.\d+)?)\s*(гр|г|кг|л|мл|шт)\b/giu, '$1 $2');
+
 const normalizeProductName = (value: string | null | undefined) =>
-  String(value || '')
+  normalizeVolumeSpacing(String(value || ''))
     .replace(/\s*\[[^\]]*\]\s*$/u, '')
+    .replace(/[«"“”„‟'][^«"“”„‟']+[»"“”„‟']/gu, ' ')
     .replace(/[«»“”„‟"']/gu, '')
     .replace(/[(),]/gu, ' ')
     .replace(/plasticковых/giu, 'пластиковых')
-    .replace(/Ñ‘/giu, 'Ðµ')
+    .replace(/[ёЁ]/gu, 'е')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -296,6 +303,96 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     }
 
     res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/merge', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
+
+    const sourceProductId = Number(req.params.id);
+    const targetProductId = Number(req.body?.targetProductId);
+
+    if (!Number.isFinite(sourceProductId) || !Number.isFinite(targetProductId) || sourceProductId <= 0 || targetProductId <= 0) {
+      return res.status(400).json({ error: 'Некорректные товары для объединения' });
+    }
+
+    if (sourceProductId === targetProductId) {
+      return res.status(400).json({ error: 'Нельзя объединить товар с самим собой' });
+    }
+
+    const [sourceProduct, targetProduct] = await Promise.all([
+      prisma.product.findUnique({ where: { id: sourceProductId } }),
+      prisma.product.findUnique({ where: { id: targetProductId } }),
+    ]);
+
+    if (!sourceProduct || !targetProduct) {
+      return res.status(404).json({ error: 'Один из товаров не найден' });
+    }
+
+    if (sourceProduct.warehouseId !== targetProduct.warehouseId) {
+      return res.status(400).json({ error: 'Объединять можно только товары из одного склада' });
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.productBatch.updateMany({
+        where: { productId: sourceProductId },
+        data: { productId: targetProductId },
+      });
+
+      await tx.invoiceItem.updateMany({
+        where: { productId: sourceProductId },
+        data: { productId: targetProductId },
+      });
+
+      await tx.inventoryTransaction.updateMany({
+        where: { productId: sourceProductId },
+        data: { productId: targetProductId },
+      });
+
+      await tx.priceHistory.updateMany({
+        where: { productId: sourceProductId },
+        data: { productId: targetProductId },
+      });
+
+      const targetBatches = await tx.productBatch.findMany({
+        where: { productId: targetProductId },
+        select: { quantity: true, remainingQuantity: true },
+      });
+
+      const nextStock = targetBatches.reduce((sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0), 0);
+      const nextIncoming = targetBatches.reduce((sum: number, batch: any) => sum + Number(batch.quantity || 0), 0);
+
+      await tx.product.update({
+        where: { id: targetProductId },
+        data: {
+          stock: nextStock,
+          totalIncoming: nextIncoming,
+          initialStock: Math.max(Number(targetProduct.initialStock || 0), nextIncoming),
+          photoUrl: targetProduct.photoUrl || sourceProduct.photoUrl || null,
+        },
+      });
+
+      await tx.product.update({
+        where: { id: sourceProductId },
+        data: {
+          active: false,
+          stock: 0,
+          totalIncoming: 0,
+          initialStock: 0,
+          name: `${sourceProduct.name} [merged ${sourceProductId}]`,
+          photoUrl: null,
+          sku: null,
+        },
+      });
+    });
+
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
@@ -611,4 +708,3 @@ router.get('/:id/batches', async (req: AuthRequest, res, next) => {
 });
 
 export default router;
-
