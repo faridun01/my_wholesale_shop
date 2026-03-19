@@ -6,6 +6,7 @@ import {
   Users, 
   User,
   Shield, 
+  ShieldCheck,
   Plus, 
   Trash2, 
   Edit,
@@ -759,9 +760,9 @@ export default function SettingsView() {
                     <p className="mt-1 text-sm font-bold text-slate-900">{u.role}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Права</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
-                      {u.canCancelInvoices || u.canDeleteData ? 'Есть доступ' : 'Базовый'}
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">2FA</p>
+                    <p className={`mt-1 text-sm font-bold ${u.twoFactorEnabled ? 'text-emerald-600' : 'text-slate-900'}`}>
+                      {u.twoFactorEnabled ? 'Включена' : 'Выключена'}
                     </p>
                   </div>
                 </div>
@@ -798,6 +799,7 @@ export default function SettingsView() {
                 <tr>
                   <th className="px-10 py-6">Пользователь</th>
                   <th className="px-10 py-6">Роль</th>
+                  <th className="px-10 py-6">2FA</th>
                   <th className="px-10 py-6">Доступ</th>
                   <th className="px-10 py-6 text-right">Действия</th>
                 </tr>
@@ -825,6 +827,22 @@ export default function SettingsView() {
                           <Shield size={18} />
                         </div>
                         <span className="font-black text-slate-600 tracking-tight">{u.role}</span>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex items-center space-x-3">
+                        <div className={clsx(
+                          'p-2 rounded-xl',
+                          u.twoFactorEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'
+                        )}>
+                          <ShieldCheck size={18} />
+                        </div>
+                        <span className={clsx(
+                          'font-black tracking-tight',
+                          u.twoFactorEnabled ? 'text-emerald-600' : 'text-slate-500'
+                        )}>
+                          {u.twoFactorEnabled ? 'Включена' : 'Выключена'}
+                        </span>
                       </div>
                     </td>
                     <td className="px-10 py-6">
