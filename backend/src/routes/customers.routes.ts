@@ -6,6 +6,30 @@ import { DEFAULT_CUSTOMER_NAME, getCanonicalDefaultCustomer, isDefaultCustomerNa
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
+const normalizeCustomerName = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
+
+const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: number) => {
+  const normalizedName = normalizeCustomerName(name);
+  if (!normalizedName) {
+    return null;
+  }
+
+  const customers = await prisma.customer.findMany({
+    where: {
+      name: {
+        equals: String(name || '').trim(),
+        mode: 'insensitive',
+      },
+    },
+    select: { id: true, name: true },
+  });
+
+  return (
+    customers.find((customer: { id: number; name: string }) =>
+      customer.id !== excludeCustomerId && normalizeCustomerName(customer.name) === normalizedName,
+    ) || null
+  );
+};
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
   const balance = Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
@@ -105,14 +129,25 @@ router.get('/', async (req: AuthRequest, res, next) => {
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    const customerName = String(req.body?.name || '').trim();
+    if (!customerName) {
+      return res.status(400).json({ error: 'Название клиента обязательно' });
+    }
+
     if (isDefaultCustomerName(req.body?.name)) {
       const defaultCustomer = await getCanonicalDefaultCustomer(prisma, req.user?.id || null);
       return res.json(defaultCustomer);
     }
 
+    const duplicateCustomer = await findCustomerByNormalizedName(customerName);
+    if (duplicateCustomer) {
+      return res.status(400).json({ error: `Клиент с названием "${customerName}" уже существует` });
+    }
+
     const customer = await prisma.customer.create({
       data: {
         ...req.body,
+        name: customerName,
         city: access.isAdmin ? (req.body.city || null) : (access.city || null),
         createdByUserId: req.user?.id || null,
       },
@@ -128,12 +163,17 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
+    const customerName = String(req.body?.name || '').trim();
     const { customer: current, allowed } = await getCustomerAccess(access, customerId);
     if (!current) {
       return res.status(404).json({ error: 'Клиент не найден' });
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!customerName) {
+      return res.status(400).json({ error: 'Название клиента обязательно' });
     }
 
     if (isDefaultCustomerName(req.body?.name)) {
@@ -143,9 +183,14 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       }
     }
 
+    const duplicateCustomer = await findCustomerByNormalizedName(customerName, customerId);
+    if (duplicateCustomer) {
+      return res.status(400).json({ error: `Клиент с названием "${customerName}" уже существует` });
+    }
+
     const customer = await prisma.customer.update({
       where: { id: customerId },
-      data: access.isAdmin ? req.body : { ...req.body, city: access.city || null },
+      data: access.isAdmin ? { ...req.body, name: customerName } : { ...req.body, name: customerName, city: access.city || null },
     });
     res.json(customer);
   } catch (error) {

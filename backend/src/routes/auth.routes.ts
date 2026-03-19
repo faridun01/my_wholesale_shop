@@ -35,15 +35,7 @@ router.post('/register', authenticate, authorize(['ADMIN']), async (req, res, ne
 
 router.post('/public-register', async (req, res, next) => {
   try {
-    // Public registration defaults to SELLER role and no specific warehouse
-    const user = await AuthService.register({
-      ...req.body,
-      role: 'SELLER',
-      warehouseId: undefined,
-      canCancelInvoices: false,
-      canDeleteData: false
-    });
-    res.json(user);
+    return res.status(403).json({ error: 'Публичная регистрация отключена' });
   } catch (error) {
     next(error);
   }
