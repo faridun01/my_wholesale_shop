@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import LoginView from './views/LoginView';
-import RegisterView from './views/RegisterView';
 import DashboardView from './views/DashboardView';
 import ProductsView from './views/ProductsView';
 import SalesView from './views/SalesView';
@@ -82,7 +81,7 @@ export default function App() {
       <Toaster position="top-right" />
       <Routes>
         <Route path="/login" element={<LoginView />} />
-        <Route path="/register" element={<RegisterView />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route
           element={
             <PrivateRoute>

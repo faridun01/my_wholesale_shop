@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../db/prisma.js';
+import { securityConfig } from '../config/security.js';
 
 const JWT_SECRET: string = (() => {
   const secret = process.env.JWT_SECRET;
@@ -20,7 +22,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -28,8 +30,41 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    req.user = decoded;
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: securityConfig.auth.tokenIssuer,
+      audience: securityConfig.auth.tokenAudience,
+    }) as any;
+    const userId = Number(decoded?.id);
+
+    if (!Number.isFinite(userId)) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        warehouseId: true,
+        active: true,
+        canCancelInvoices: true,
+        canDeleteData: true,
+      },
+    });
+
+    if (!user || !user.active) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    req.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      warehouseId: user.warehouseId ?? undefined,
+      canCancelInvoices: user.canCancelInvoices,
+      canDeleteData: user.canDeleteData,
+    };
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });

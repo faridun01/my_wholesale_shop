@@ -12,8 +12,7 @@
     "build": "npm run build:backend && npm run build:frontend",
     "lint": "tsc -p backend --noEmit && tsc -p frontend --noEmit",
     "prisma:generate": "prisma generate --schema=backend/prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema=backend/prisma/schema.prisma",
-    "prisma:seed": "tsx backend/prisma/seed.ts"
+    "prisma:migrate": "prisma migrate dev --schema=backend/prisma/schema.prisma"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
@@ -59,8 +58,5 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
-  },
-  "prisma": {
-    "seed": "tsx backend/prisma/seed.ts"
   }
 }

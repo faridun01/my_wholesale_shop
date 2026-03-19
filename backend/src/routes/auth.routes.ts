@@ -2,13 +2,38 @@ import { Router } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
+import { securityConfig } from '../config/security.js';
+import { createRateLimit, resetRateLimit } from '../middlewares/rate-limit.middleware.js';
 
 const router = Router();
 
-router.post('/login', async (req, res, next) => {
+const loginRateLimitKey = (req: any) =>
+  `${req.ip}:${String(req.body?.username || '').trim().toLowerCase()}`;
+
+const passwordChangeRateLimitKey = (req: AuthRequest) =>
+  `${req.ip}:${req.user?.id ?? 'anonymous'}`;
+
+const loginRateLimit = createRateLimit({
+  windowMs: securityConfig.rateLimit.loginWindowMs,
+  maxAttempts: securityConfig.rateLimit.loginMaxAttempts,
+  blockMs: securityConfig.rateLimit.loginBlockMs,
+  message: 'Too many login attempts. Please try again later.',
+  keyGenerator: loginRateLimitKey,
+});
+
+const passwordChangeRateLimit = createRateLimit({
+  windowMs: securityConfig.rateLimit.passwordChangeWindowMs,
+  maxAttempts: securityConfig.rateLimit.passwordChangeMaxAttempts,
+  blockMs: securityConfig.rateLimit.passwordChangeBlockMs,
+  message: 'Too many password change attempts. Please try again later.',
+  keyGenerator: (req) => passwordChangeRateLimitKey(req as AuthRequest),
+});
+
+router.post('/login', loginRateLimit, async (req, res, next) => {
   try {
     const { username, password } = req.body;
     const { user, token } = await AuthService.login(username, password);
+    resetRateLimit(loginRateLimitKey(req));
     res.json({ user, token });
   } catch (error) {
     next(error);
@@ -77,7 +102,7 @@ router.delete('/users/:id', authenticate, authorize(['ADMIN']), async (req, res,
   }
 });
 
-router.post('/change-password', authenticate, async (req: AuthRequest, res, next) => {
+router.post('/change-password', authenticate, passwordChangeRateLimit, async (req: AuthRequest, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -85,6 +110,7 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res, next
     }
 
     await AuthService.changePassword(req.user!.id, currentPassword, newPassword);
+    resetRateLimit(passwordChangeRateLimitKey(req));
     res.json({ success: true });
   } catch (error) {
     next(error);

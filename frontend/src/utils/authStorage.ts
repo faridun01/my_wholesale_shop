@@ -1,14 +1,7 @@
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
-export function getAuthToken() {
-  return sessionStorage.getItem(TOKEN_KEY);
-}
-
-export function getTokenPayload() {
-  const token = getAuthToken();
-  if (!token) return null;
-
+function decodeTokenPayload(token: string) {
   try {
     const [, payload = ''] = token.split('.');
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
@@ -18,6 +11,26 @@ export function getTokenPayload() {
   } catch {
     return null;
   }
+}
+
+export function getAuthToken() {
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+
+  const payload = decodeTokenPayload(token);
+  const expiresAt = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
+  if (expiresAt && Date.now() >= expiresAt) {
+    clearAuthSession();
+    return null;
+  }
+
+  return token;
+}
+
+export function getTokenPayload() {
+  const token = getAuthToken();
+  if (!token) return null;
+  return decodeTokenPayload(token);
 }
 
 export function getStoredUser() {

@@ -10,11 +10,7 @@
     "lint": "tsc -p . --noEmit",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
-    "prisma:seed": "tsx prisma/seed.ts",
     "prisma:recategorize": "node prisma/recategorize-products.mjs"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",

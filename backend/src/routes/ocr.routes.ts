@@ -1,14 +1,20 @@
 import { Router } from 'express';
-import multer from 'multer';
 import { OCRService } from '../services/ocr.service.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
-import path from 'path';
 import fs from 'fs';
+import { createRateLimit } from '../middlewares/rate-limit.middleware.js';
+import { securityConfig } from '../config/security.js';
+import { imageUpload, ocrUpload } from '../utils/upload.js';
 
 const router = Router();
-const upload = multer({ dest: 'uploads/' });
 
-router.post('/parse-invoice', authenticate, upload.single('invoice'), async (req, res, next) => {
+const uploadRateLimit = createRateLimit({
+  windowMs: securityConfig.rateLimit.uploadWindowMs,
+  maxAttempts: securityConfig.rateLimit.uploadMaxAttempts,
+  blockMs: securityConfig.rateLimit.uploadBlockMs,
+  message: 'Too many file upload attempts. Please try again later.',
+});
+
+router.post('/parse-invoice', uploadRateLimit, ocrUpload.single('invoice'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -29,7 +35,7 @@ router.post('/parse-invoice', authenticate, upload.single('invoice'), async (req
   }
 });
 
-router.post('/invoice', authenticate, upload.single('image'), async (req, res, next) => {
+router.post('/invoice', uploadRateLimit, ocrUpload.single('image'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -50,7 +56,7 @@ router.post('/invoice', authenticate, upload.single('image'), async (req, res, n
   }
 });
 
-router.post('/upload', authenticate, upload.single('photo'), (req, res) => {
+router.post('/upload', uploadRateLimit, imageUpload.single('photo'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }

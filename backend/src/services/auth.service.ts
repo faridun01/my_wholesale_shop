@@ -1,6 +1,7 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../db/prisma.js';
+import { securityConfig } from '../config/security.js';
 
 const JWT_SECRET: string = (() => {
   const secret = process.env.JWT_SECRET;
@@ -40,23 +41,52 @@ const toPublicUser = (user: any): PublicUser => ({
     : null,
 });
 
+const INVALID_CREDENTIALS_ERROR = 'Invalid credentials';
+
+const createHttpError = (message: string, status: number) =>
+  Object.assign(new Error(message), { status });
+
+const normalizeUsername = (username: string) => username.trim();
+
+const validatePasswordStrength = (password: string) => {
+  if (password.length < securityConfig.auth.minimumPasswordLength) {
+    throw createHttpError(`Password must be at least ${securityConfig.auth.minimumPasswordLength} characters long`, 400);
+  }
+
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+    throw createHttpError('Password must contain uppercase, lowercase letters and at least one number', 400);
+  }
+};
+
+const ensureUniqueUsername = async (username: string, excludeUserId?: number) => {
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      id: excludeUserId ? { not: excludeUserId } : undefined,
+      username: {
+        equals: username,
+        mode: 'insensitive',
+      },
+    },
+  });
+
+  if (existingUser) {
+    throw createHttpError('A user with this username already exists', 409);
+  }
+};
+
 export class AuthService {
   /**
    * Authenticates a user and returns a token.
    */
   static async login(username: string, password: string) {
+    const normalizedUsername = normalizeUsername(username);
     const user = await prisma.user.findFirst({
-      where: { username, active: true },
+      where: { username: normalizedUsername, active: true },
       include: { warehouse: true },
     });
 
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new Error('Invalid password');
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
     }
 
     const token = jwt.sign(
@@ -69,7 +99,11 @@ export class AuthService {
         canDeleteData: user.canDeleteData,
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      {
+        expiresIn: securityConfig.auth.tokenExpiresIn as SignOptions['expiresIn'],
+        issuer: securityConfig.auth.tokenIssuer,
+        audience: securityConfig.auth.tokenAudience,
+      }
     );
 
     return { user: toPublicUser(user), token };
@@ -79,11 +113,14 @@ export class AuthService {
    * Creates a new user with a hashed password.
    */
   static async register(data: { username: string; password: string; phone?: string; role?: string; warehouseId?: number; canCancelInvoices?: boolean; canDeleteData?: boolean }) {
+    const username = normalizeUsername(data.username);
+    validatePasswordStrength(data.password);
+    await ensureUniqueUsername(username);
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const user = await prisma.user.create({
       data: {
-        username: data.username,
+        username,
         passwordHash: hashedPassword,
         phone: data.phone,
         role: data.role || 'SELLER',
@@ -100,14 +137,15 @@ export class AuthService {
   static async changePassword(userId: number, currentPassword: string, newPassword: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.active) {
-      throw new Error('User not found');
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
     }
 
     const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isPasswordValid) {
-      throw new Error('Invalid password');
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
     }
 
+    validatePasswordStrength(newPassword);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return await prisma.user.update({
       where: { id: user.id },
@@ -117,7 +155,12 @@ export class AuthService {
 
   static async updateUser(id: number, data: any) {
     const updateData: any = { ...data };
+    if (typeof data.username === 'string') {
+      updateData.username = normalizeUsername(data.username);
+      await ensureUniqueUsername(updateData.username, id);
+    }
     if (data.password) {
+      validatePasswordStrength(data.password);
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
       delete updateData.password;
     }
