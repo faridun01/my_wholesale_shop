@@ -308,6 +308,11 @@ export class InvoiceService {
    * Fetches full invoice details.
    */
   static async getInvoiceDetails(invoiceId: number) {
+    const companyProfile = await prisma.companyProfile.findFirst({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+
     const invoice = await prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -366,11 +371,13 @@ export class InvoiceService {
       customer_name: invoice.customerNameSnapshot || invoice.customer.name,
       customer_phone: invoice.customerPhoneSnapshot || invoice.customer.phone,
       customer_address: invoice.customerAddressSnapshot || invoice.customer.address,
-      company_name: invoice.companyNameSnapshot,
-      company_country: invoice.companyCountrySnapshot,
-      company_region: invoice.companyRegionSnapshot,
-      company_city: invoice.companyCitySnapshot,
-      company_address: invoice.companyAddressSnapshot,
+      company_name: companyProfile?.name || invoice.companyNameSnapshot,
+      company_country: companyProfile?.country || invoice.companyCountrySnapshot,
+      company_region: companyProfile?.region || invoice.companyRegionSnapshot,
+      company_city: companyProfile?.city || invoice.companyCitySnapshot,
+      company_address: companyProfile?.addressLine || invoice.companyAddressSnapshot,
+      company_phone: companyProfile?.phone || null,
+      company_note: companyProfile?.note || null,
       staff_name: invoice.user.username,
       items: normalizedItems,
       payments: normalizedPayments,
