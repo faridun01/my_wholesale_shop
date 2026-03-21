@@ -175,6 +175,8 @@ export class StockService {
             warehouseId: toWarehouseId,
             quantity: takeFromBatch,
             remainingQuantity: takeFromBatch,
+            purchaseCostPrice: batch.purchaseCostPrice ?? null,
+            expensePercent: Number(batch.expensePercent || 0),
             costPrice: batch.costPrice,
           },
         });
@@ -223,7 +225,9 @@ export class StockService {
     quantity: number,
     costPrice: number,
     userId: number,
-    reason?: string
+    reason?: string,
+    purchaseCostPrice?: number | null,
+    expensePercent?: number | null,
   ) {
     // Create new batch
     const batch = await prisma.productBatch.create({
@@ -232,6 +236,8 @@ export class StockService {
         warehouseId,
         quantity,
         remainingQuantity: quantity,
+        purchaseCostPrice: purchaseCostPrice ?? null,
+        expensePercent: Number(expensePercent || 0),
         costPrice,
       },
     });

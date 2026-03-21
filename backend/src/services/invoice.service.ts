@@ -1,5 +1,6 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
+import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -36,7 +37,21 @@ export class InvoiceService {
     customerId: number;
     userId: number;
     warehouseId: number;
-    items: { productId: number; quantity: number; sellingPrice: number }[];
+    items: {
+      productId: number;
+      quantity: number;
+      sellingPrice: number;
+      totalBaseUnits?: number;
+      packageQuantity?: number;
+      extraUnitQuantity?: number;
+      packagingId?: number | null;
+      packageName?: string | null;
+      baseUnitName?: string | null;
+      unitsPerPackage?: number | null;
+      productName?: string | null;
+      rawName?: string | null;
+      brand?: string | null;
+    }[];
     discount?: number;
     tax?: number;
     paidAmount?: number;
@@ -57,10 +72,29 @@ export class InvoiceService {
 
     // Start Prisma Transaction
     return await prisma.$transaction(async (tx: any) => {
+      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      const companyProfile = await tx.companyProfile.findFirst({ where: { isActive: true }, orderBy: { id: 'asc' } });
+      const products = await tx.product.findMany({
+        where: {
+          id: { in: items.map((item) => item.productId) },
+        },
+        include: {
+          packagings: {
+            where: { active: true },
+          },
+        },
+      }) as any[];
+
+      if (!customer) {
+        throw new Error('Customer not found');
+      }
+
+      const productsById = new Map<number, any>(products.map((product: any) => [product.id, product]));
+
       // 1. Calculate totals
       let totalAmount = 0;
       for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.quantity, 'Item quantity');
+        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
         const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
@@ -85,13 +119,40 @@ export class InvoiceService {
           paidAmount: normalizedPaidAmount,
           status,
           paymentDueDate: paymentDueDate ? new Date(paymentDueDate) : null,
+          companyNameSnapshot: companyProfile?.name || null,
+          companyCountrySnapshot: companyProfile?.country || null,
+          companyRegionSnapshot: companyProfile?.region || null,
+          companyCitySnapshot: companyProfile?.city || null,
+          companyAddressSnapshot: companyProfile?.addressLine || null,
+          customerNameSnapshot: customer.name,
+          customerPhoneSnapshot: customer.phone || null,
+          customerAddressSnapshot: customer.address || null,
         },
       });
 
       // 3. Create Items and Allocate Stock
       for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.quantity, 'Item quantity');
+        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
         const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
+        const product = productsById.get(item.productId);
+
+        if (!product) {
+          throw new Error(`Product ${item.productId} not found`);
+        }
+
+        const packaging = item.packagingId
+          ? product.packagings.find((entry: any) => entry.id === Number(item.packagingId))
+          : product.packagings.find((entry: any) => entry.isDefault) || product.packagings[0] || null;
+
+        const packageQuantity =
+          item.packageQuantity !== undefined && item.packageQuantity !== null
+            ? normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity')
+            : null;
+        const extraUnitQuantity =
+          item.extraUnitQuantity !== undefined && item.extraUnitQuantity !== null
+            ? normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity')
+            : 0;
+        const baseUnitName = normalizeBaseUnitName(item.baseUnitName || packaging?.baseUnitName || product.baseUnitName || product.unit);
 
         // Create item first with placeholder costPrice
         const invoiceItem = await tx.invoiceItem.create({
@@ -99,6 +160,16 @@ export class InvoiceService {
             invoiceId: invoice.id,
             productId: item.productId,
             quantity,
+            totalBaseUnits: quantity,
+            packageQuantity,
+            extraUnitQuantity,
+            packagingId: packaging?.id || null,
+            packageNameSnapshot: item.packageName || packaging?.packageName || null,
+            baseUnitNameSnapshot: baseUnitName,
+            unitsPerPackageSnapshot: item.unitsPerPackage || packaging?.unitsPerPackage || null,
+            productNameSnapshot: item.productName || product.name,
+            rawNameSnapshot: item.rawName || product.rawName || null,
+            brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
             totalPrice: quantity * sellingPrice,
           },
@@ -142,9 +213,28 @@ export class InvoiceService {
         throw new Error('Invoice not found');
       }
 
+      const customer = await tx.customer.findUnique({
+        where: { id: customerId },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          address: true,
+        },
+      });
+
+      if (!customer) {
+        throw new Error('Customer not found');
+      }
+
       await tx.invoice.update({
         where: { id: invoiceId },
-        data: { customerId },
+        data: {
+          customerId,
+          customerNameSnapshot: customer.name,
+          customerPhoneSnapshot: customer.phone || null,
+          customerAddressSnapshot: customer.address || null,
+        },
       });
 
       await tx.payment.updateMany({
@@ -249,8 +339,15 @@ export class InvoiceService {
 
     const normalizedItems = invoiceItems.map((item) => ({
       ...item,
-      product_name: item.product.name,
-      unit: item.product.unit,
+      product_name: item.productNameSnapshot || item.product.name,
+      unit: item.baseUnitNameSnapshot || item.product.baseUnitName || item.product.unit,
+      quantityLabel: formatQuantityForInvoice({
+        packageQuantity: item.packageQuantity,
+        extraUnitQuantity: item.extraUnitQuantity,
+        packageName: item.packageNameSnapshot,
+        baseUnitName: item.baseUnitNameSnapshot || item.product.baseUnitName || item.product.unit,
+        totalBaseUnits: item.totalBaseUnits ?? item.quantity,
+      }),
     }));
 
     const normalizedPayments = invoicePayments.map((payment) => ({
@@ -266,9 +363,14 @@ export class InvoiceService {
 
     return {
       ...invoice,
-      customer_name: invoice.customer.name,
-      customer_phone: invoice.customer.phone,
-      customer_address: invoice.customer.address,
+      customer_name: invoice.customerNameSnapshot || invoice.customer.name,
+      customer_phone: invoice.customerPhoneSnapshot || invoice.customer.phone,
+      customer_address: invoice.customerAddressSnapshot || invoice.customer.address,
+      company_name: invoice.companyNameSnapshot,
+      company_country: invoice.companyCountrySnapshot,
+      company_region: invoice.companyRegionSnapshot,
+      company_city: invoice.companyCitySnapshot,
+      company_address: invoice.companyAddressSnapshot,
       staff_name: invoice.user.username,
       items: normalizedItems,
       payments: normalizedPayments,

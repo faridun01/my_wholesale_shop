@@ -7,7 +7,12 @@ export class OCRService {
   private static readonly OCR_PROMPT = `Extract invoice items from this invoice as separate rows.
 Requirements:
 1. Return one JSON object per invoice line item. Never merge different products into one object.
-2. "name" must contain only the normalized base product name before the first opening parenthesis "(". Remove the brand word "SKIF" and similar quoted brand tokens. If the invoice has extra details inside parentheses, do not include them in "name"; put them into "note" instead.
+2. Ignore non-product text such as company header, signatures, payment data, totals, tax, addresses, banking details, and generic notes.
+3. "rawName" must contain the original full product line text exactly as it appears on the invoice.
+4. "name" must contain only the clean normalized product name for database storage. Remove packaging fragments, remove outer quotes around brands, keep the readable brand in the clean name if it belongs to the product itself.
+5. "brand" should contain the extracted brand if visible, for example "SKIF".
+6. "packageName" should contain the package label such as "мешок", "коробка", "упаковка", "box", "bag".
+7. "baseUnitName" should contain the base unit inside the package such as "шт", "пачка", "флакон", "емкость".
 3. If two lines have similar names, keep them as separate objects unless the line is literally the same repeated line.
 4. "packageCount": Return how many bags, boxes, or packages are listed on the line. If not available, return 0.
 5. "unitsPerPackage": Return how many individual pieces are inside one bag, box, or package. If not available, return 0.
@@ -20,7 +25,7 @@ Requirements:
 12. "lineIndex": Return the visible order number of the line from top to bottom starting with 1.
 13. Do not invent values. If a field is missing, omit it or return an empty string for text fields and 0 for numeric fields.
 14. Keep the product type and mass in the "name" when they are visible, for example "автомат 900гр" or "гель для мытья посуды 1.5л".
-Return only a JSON array of objects with "lineIndex", "name", "packageCount", "unitsPerPackage", "quantity", "price", "rawQuantity", "unit", "lineTotal", and "note".`;
+Return only a JSON array of objects with "lineIndex", "rawName", "name", "brand", "packageName", "baseUnitName", "packageCount", "unitsPerPackage", "quantity", "price", "rawQuantity", "unit", "lineTotal", and "note".`;
 
   static getClient() {
     const apiKey = process.env.OCR_API_KEY?.trim();
@@ -132,7 +137,11 @@ Return only a JSON array of objects with "lineIndex", "name", "packageCount", "u
             type: OCRSchemaType.OBJECT,
             properties: {
               lineIndex: { type: OCRSchemaType.NUMBER },
+              rawName: { type: OCRSchemaType.STRING },
               name: { type: OCRSchemaType.STRING },
+              brand: { type: OCRSchemaType.STRING },
+              packageName: { type: OCRSchemaType.STRING },
+              baseUnitName: { type: OCRSchemaType.STRING },
               packageCount: { type: OCRSchemaType.NUMBER },
               unitsPerPackage: { type: OCRSchemaType.NUMBER },
               quantity: { type: OCRSchemaType.NUMBER },

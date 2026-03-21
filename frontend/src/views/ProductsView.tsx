@@ -119,7 +119,7 @@ export default function ProductsView() {
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
-  const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', reason: '' });
+  const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', reason: '' });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [usdRate, setUsdRate] = useState<string>('10.95'); // Default rate
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
@@ -139,11 +139,26 @@ export default function ProductsView() {
     categoryId: '',
     warehouseId: '',
     costPrice: '',
+    expensePercent: '0',
     sellingPrice: '',
     minStock: '0',
     initialStock: '0',
     photoUrl: ''
   });
+  const effectiveFormCostPrice = (() => {
+    const purchaseCost = Number(formData.costPrice || 0);
+    const expensePercent = Number(formData.expensePercent || 0);
+    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 0;
+    if (!Number.isFinite(expensePercent) || expensePercent < 0) return purchaseCost;
+    return purchaseCost + (purchaseCost * expensePercent / 100);
+  })();
+  const effectiveRestockCostPrice = (() => {
+    const purchaseCost = Number(restockData.costPrice || 0);
+    const expensePercent = Number(restockData.expensePercent || 0);
+    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 0;
+    if (!Number.isFinite(expensePercent) || expensePercent < 0) return purchaseCost;
+    return purchaseCost + (purchaseCost * expensePercent / 100);
+  })();
 
   useEffect(() => {
     fetchInitialData();
@@ -201,11 +216,13 @@ export default function ProductsView() {
         warehouseId: Number(restockData.warehouseId),
         quantity: Number(restockData.quantity),
         costPrice: Number(restockData.costPrice),
+        purchaseCostPrice: Number(restockData.costPrice),
+        expensePercent: Number(restockData.expensePercent || 0),
         reason: restockData.reason
       });
       toast.success('Товар успешно пополнен!');
       setShowRestockModal(false);
-      setRestockData({ warehouseId: '', quantity: '', costPrice: '', reason: '' });
+      setRestockData({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', reason: '' });
       fetchInitialData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при пополнении товара');
@@ -524,6 +541,8 @@ export default function ProductsView() {
         categoryId: Number(formData.categoryId),
         warehouseId: Number(formData.warehouseId),
         costPrice: parseFloat(formData.costPrice),
+        purchaseCostPrice: parseFloat(formData.costPrice),
+        expensePercent: parseFloat(formData.expensePercent || '0'),
         sellingPrice: parseFloat(formData.sellingPrice),
         minStock: parseFloat(formData.minStock),
         initialStock: parseFloat(formData.initialStock)
@@ -546,6 +565,8 @@ export default function ProductsView() {
         categoryId: Number(formData.categoryId),
         warehouseId: Number(formData.warehouseId),
         costPrice: parseFloat(formData.costPrice),
+        purchaseCostPrice: parseFloat(formData.costPrice),
+        expensePercent: parseFloat(formData.expensePercent || '0'),
         sellingPrice: parseFloat(formData.sellingPrice),
         minStock: parseFloat(formData.minStock),
         initialStock: parseFloat(formData.initialStock)
@@ -656,6 +677,7 @@ export default function ProductsView() {
       categoryId: '',
       warehouseId: '',
       costPrice: '',
+      expensePercent: '0',
       sellingPrice: '',
       minStock: '0',
       initialStock: '0',
@@ -885,6 +907,19 @@ export default function ProductsView() {
                       />
                     </div>
                   )}
+                  {isAdmin && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Расходы %</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.expensePercent}
+                        onChange={e => setFormData({...formData, expensePercent: e.target.value})}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Цена продажи (TJS)</label>
                     <input 
@@ -897,6 +932,17 @@ export default function ProductsView() {
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                     />
                   </div>
+                  {isAdmin && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Итог за штуку</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formatPriceInput(effectiveFormCostPrice)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 outline-none transition-all font-bold text-sm"
+                      />
+                    </div>
+                  )}
                   {!showEditModal && (
                     <>
                       <div>
@@ -1105,6 +1151,30 @@ export default function ProductsView() {
                       </div>
                     )}
                   </div>
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Расходы %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={restockData.expensePercent}
+                          onChange={e => setRestockData({ ...restockData, expensePercent: e.target.value })}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Итог за штуку</label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={formatPriceInput(effectiveRestockCostPrice)}
+                          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 font-bold text-emerald-700 outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Причина / Комментарий</label>
                     <input 
@@ -1505,7 +1575,8 @@ export default function ProductsView() {
                         unit: product.unit || '',
                         categoryId: product.categoryId?.toString() || '',
                         warehouseId: product.warehouseId?.toString() || '',
-                        costPrice: formatPriceInput(product.costPrice),
+                        costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                        expensePercent: String(product.expensePercent ?? 0),
                         sellingPrice: formatPriceInput(product.sellingPrice),
                         minStock: product.minStock?.toString() || '0',
                         initialStock: product.initialStock?.toString() || '0',
@@ -1520,7 +1591,12 @@ export default function ProductsView() {
                   <button
                     onClick={() => {
                       setSelectedProduct(product);
-                      setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
+                      setRestockData({
+                        ...restockData,
+                        warehouseId: product.warehouseId?.toString() || '',
+                        costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                        expensePercent: String(product.expensePercent ?? 0),
+                      });
                       setShowRestockModal(true);
                     }}
                     className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-semibold text-emerald-700"
@@ -1695,7 +1771,8 @@ export default function ProductsView() {
                                 unit: product.unit || '',
                                 categoryId: product.categoryId?.toString() || '',
                                 warehouseId: product.warehouseId?.toString() || '',
-                                costPrice: formatPriceInput(product.costPrice),
+                                costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                                expensePercent: String(product.expensePercent ?? 0),
                                 sellingPrice: formatPriceInput(product.sellingPrice),
                                 minStock: product.minStock?.toString() || '0',
                                 initialStock: product.initialStock?.toString() || '0',
@@ -1713,7 +1790,12 @@ export default function ProductsView() {
                           <button 
                             onClick={() => {
                               setSelectedProduct(product);
-                              setRestockData({ ...restockData, warehouseId: product.warehouseId?.toString() || '' });
+                              setRestockData({
+                                ...restockData,
+                                warehouseId: product.warehouseId?.toString() || '',
+                                costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                                expensePercent: String(product.expensePercent ?? 0),
+                              });
                               setShowRestockModal(true);
                             }}
                             className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600" 

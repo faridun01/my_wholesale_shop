@@ -35,6 +35,7 @@ function getLineNetRevenue(invoice: any, item: any) {
 }
 
 function getLineCost(item: any) {
+  const originalQty = Number(item?.quantity || 0);
   const remainingQty = getRemainingQuantity(item);
   if (remainingQty <= 0) return 0;
 
@@ -43,6 +44,9 @@ function getLineCost(item: any) {
     : 0;
 
   if (allocatedCost > MONEY_EPSILON) {
+    if (originalQty > MONEY_EPSILON && remainingQty < originalQty) {
+      return allocatedCost * (remainingQty / originalQty);
+    }
     return allocatedCost;
   }
 
@@ -130,16 +134,15 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req: AuthReques
       warehousePerformance[inv.warehouseId].sales += netAmount;
 
       for (const item of inv.items) {
-        for (const alloc of item.saleAllocations) {
-          const cost = Number(alloc.batch.costPrice) * alloc.quantity;
-          const profit = (Number(item.sellingPrice) - Number(alloc.batch.costPrice)) * alloc.quantity;
+        const lineRevenue = getLineNetRevenue(inv, item);
+        const lineCost = getLineCost(item);
+        const lineProfit = lineRevenue - lineCost;
 
-          totalCost += cost;
-          if (isAdmin) {
-            totalProfit += profit;
-            monthlyData[month].profit += profit;
-            warehousePerformance[inv.warehouseId].profit += profit;
-          }
+        totalCost += lineCost;
+        if (isAdmin) {
+          totalProfit += lineProfit;
+          monthlyData[month].profit += lineProfit;
+          warehousePerformance[inv.warehouseId].profit += lineProfit;
         }
       }
     }

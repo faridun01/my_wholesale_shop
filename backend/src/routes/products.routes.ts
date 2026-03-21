@@ -3,29 +3,19 @@ import prisma from '../db/prisma.js';
 import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import {
+  buildProductNameKey,
+  calculateEffectiveCostPrice,
+  normalizeBaseUnitName,
+  normalizePackageName,
+  normalizeProductName,
+  parsePackagingFromRawName,
+} from '../utils/product-packaging.js';
 
 const router = Router();
 
-const normalizeVolumeSpacing = (value: string) =>
-  value
-    .replace(/(\d)\s*[.,]\s*(\d)/gu, '$1.$2')
-    .replace(/(\d)\s+(\d)(?=\s*(?:гр|г|кг|л|мл)\b)/giu, '$1.$2')
-    .replace(/(\d(?:\.\d+)?)\s*(гр|г|кг|л|мл|шт)\b/giu, '$1 $2');
-
-const normalizeProductName = (value: string | null | undefined) =>
-  normalizeVolumeSpacing(String(value || ''))
-    .replace(/\s*\[[^\]]*\]\s*$/u, '')
-    .replace(/[«"“”„‟'][^«"“”„‟']+[»"“”„‟']/gu, ' ')
-    .replace(/\bskif\b/giu, ' ')
-    .replace(/[«»“”„‟"']/gu, '')
-    .replace(/[(),]/gu, ' ')
-    .replace(/plasticковых/giu, 'пластиковых')
-    .replace(/[ёЁ]/gu, 'е')
-    .replace(/\s+/g, ' ')
-    .trim();
-
 const normalizeProductFamilyName = (value: string | null | undefined) =>
-  normalizeProductName(value)
+  normalizeProductName(String(value || '')).name
     .toLowerCase()
     .replace(/\bмассой\s+\d+(?:[.,]\d+)?\s*(?:гр|г|кг|л|мл|шт)\b/giu, '')
     .replace(/\b\d+(?:[.,]\d+)?\s*(?:гр|г|кг|л|мл|шт)\b/giu, '')
@@ -33,7 +23,7 @@ const normalizeProductFamilyName = (value: string | null | undefined) =>
     .trim();
 
 const extractMassKey = (value: string | null | undefined) => {
-  const match = normalizeProductName(value).toLowerCase().match(/(\d+(?:\.\d+)?)\s*(гр|г|кг|л|мл|шт)\b/u);
+  const match = normalizeProductName(String(value || '')).name.toLowerCase().match(/(\d+(?:\.\d+)?)\s*(гр|г|кг|л|мл|шт)\b/u);
   return match ? `${match[1]} ${match[2]}` : '';
 };
 
@@ -107,6 +97,7 @@ router.get('/', async (req, res, next) => {
   try {
     const access = await getAccessContext(req as AuthRequest);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
+    const sortBy = String(req.query.sortBy || '').toLowerCase();
     const products = await prisma.product.findMany({
       where: {
         active: true,
@@ -115,13 +106,24 @@ router.get('/', async (req, res, next) => {
       include: { 
         category: true, 
         warehouse: true,
+        packagings: {
+          where: { active: true },
+          orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
+        },
         batches: warehouseId ? {
           where: { warehouseId: Number(warehouseId) }
         } : false
       },
     });
 
-    const productsWithResolvedPhoto = applyFamilyPhotoFallback(products as any[]);
+    const productsWithResolvedPhoto = applyFamilyPhotoFallback(products as any[])
+      .sort((a: any, b: any) => {
+        if (sortBy === 'brand') {
+          return String(a.brand || '').localeCompare(String(b.brand || ''), 'ru') || String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+        }
+
+        return 0;
+      });
 
     if (warehouseId) {
       const productsWithWarehouseStock = productsWithResolvedPhoto.map((p: any) => {
@@ -152,7 +154,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     if (!ensureAdminProductAccess(access, res)) {
       return;
     }
-    const { initialStock, warehouseId, costPrice, ...rest } = req.body;
+    const { initialStock, warehouseId, costPrice, purchaseCostPrice, expensePercent, packaging, packagings, ...rest } = req.body;
     const userId = req.user?.id || 1;
     const requestedWarehouseId = warehouseId ? Number(warehouseId) : null;
     const wId = access.isAdmin ? requestedWarehouseId : access.warehouseId;
@@ -160,12 +162,17 @@ router.post('/', async (req: AuthRequest, res, next) => {
     if (!access.isAdmin && !wId) {
       return res.status(400).json({ error: 'Warehouse ID is required' });
     }
-    const normalizedName = normalizeProductName(rest.name);
+    const normalizedName = normalizeProductName(rest.rawName || rest.name);
     const canonicalName =
       Number.isFinite(Number(rest.categoryId))
-        ? await findCanonicalProductName(Number(rest.categoryId), normalizedName)
+        ? await findCanonicalProductName(Number(rest.categoryId), normalizedName.name)
         : null;
-    const finalName = canonicalName || normalizedName;
+    const finalName = canonicalName || normalizedName.name;
+    const parsedPackaging = packaging || parsePackagingFromRawName(rest.rawName || rest.name);
+    const resolvedBaseUnitName = normalizeBaseUnitName(rest.baseUnitName || parsedPackaging?.baseUnitName || rest.unit);
+    const resolvedPurchaseCostPrice = Number(purchaseCostPrice ?? costPrice ?? 0);
+    const resolvedExpensePercent = Number(expensePercent ?? 0);
+    const resolvedEffectiveCostPrice = calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent);
 
     // Check for unique constraints
     const existingProducts = await prisma.product.findMany({
@@ -178,7 +185,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         name: true,
       }
     });
-    const existingProduct = existingProducts.find((product: { id: number; name: string }) => normalizeProductName(product.name) === finalName);
+    const existingProduct = existingProducts.find((product: { id: number; name: string }) => normalizeProductName(product.name).name === finalName);
 
     if (existingProduct) {
       return res.status(400).json({
@@ -193,21 +200,50 @@ router.post('/', async (req: AuthRequest, res, next) => {
       data: {
         ...rest,
         name: finalName,
+        rawName: normalizedName.rawName,
+        brand: normalizedName.brand,
+        nameKey: buildProductNameKey(finalName),
         sku: null,
+        baseUnitName: resolvedBaseUnitName,
+        unit: resolvedBaseUnitName,
+        purchaseCostPrice: resolvedPurchaseCostPrice,
+        expensePercent: resolvedExpensePercent,
         photoUrl: resolvedPhotoUrl,
         initialStock: Number(initialStock || 0),
         totalIncoming: 0,
         stock: 0,
         warehouseId: wId,
-        costPrice: Number(costPrice || 0),
+        costPrice: resolvedEffectiveCostPrice,
       },
     });
+
+    const packagingRows = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
+      .filter(Boolean)
+      .map((entry: any, index: number) => ({
+        productId: product.id,
+        warehouseId: wId,
+        packageName: normalizePackageName(entry.packageName),
+        baseUnitName: normalizeBaseUnitName(entry.baseUnitName || resolvedBaseUnitName),
+        unitsPerPackage: Number(entry.unitsPerPackage || 0),
+        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? Number(entry.packageSellingPrice) : null,
+        barcode: entry.barcode ? String(entry.barcode) : null,
+        isDefault: Boolean(entry.isDefault ?? index === 0),
+        sortOrder: Number(entry.sortOrder || index),
+      }))
+      .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
+
+    if (packagingRows.length > 0) {
+      await prisma.productPackaging.createMany({
+        data: packagingRows,
+        skipDuplicates: true,
+      });
+    }
 
     // Record initial price history
     await prisma.priceHistory.create({
       data: {
         productId: product.id,
-        costPrice: Number(costPrice || 0),
+        costPrice: resolvedEffectiveCostPrice,
         sellingPrice: Number(rest.sellingPrice || 0),
       }
     });
@@ -218,9 +254,11 @@ router.post('/', async (req: AuthRequest, res, next) => {
         product.id,
         Number(wId),
         Number(initialStock),
-        Number(costPrice || 0),
+        resolvedEffectiveCostPrice,
         userId,
-        'Initial Stock'
+        'Initial Stock',
+        resolvedPurchaseCostPrice,
+        resolvedExpensePercent,
       );
     }
 
@@ -236,6 +274,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     if (!ensureAdminProductAccess(access, res)) {
       return;
     }
+    const { packaging, packagings, ...productPayload } = req.body;
     const productId = Number(req.params.id);
     const userId = req.user?.id || 1;
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
@@ -249,13 +288,21 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     }
 
     // Check for unique constraints if name or warehouseId changed
-    const normalizedRequestedName = normalizeProductName(req.body.name || oldProduct.name);
-    const nextCategoryId = req.body.categoryId !== undefined ? Number(req.body.categoryId) : oldProduct.categoryId;
-    const canonicalName = await findCanonicalProductName(nextCategoryId, normalizedRequestedName, productId);
-    const newName = canonicalName || normalizedRequestedName;
+    const normalizedRequestedName = normalizeProductName(productPayload.rawName || productPayload.name || oldProduct.rawName || oldProduct.name);
+    const nextCategoryId = productPayload.categoryId !== undefined ? Number(productPayload.categoryId) : oldProduct.categoryId;
+    const canonicalName = await findCanonicalProductName(nextCategoryId, normalizedRequestedName.name, productId);
+    const newName = canonicalName || normalizedRequestedName.name;
     const newWarehouseId = access.isAdmin
-      ? (req.body.warehouseId !== undefined ? Number(req.body.warehouseId) : oldProduct.warehouseId)
+      ? (productPayload.warehouseId !== undefined ? Number(productPayload.warehouseId) : oldProduct.warehouseId)
       : access.warehouseId;
+    const nextBaseUnitName = normalizeBaseUnitName(productPayload.baseUnitName || oldProduct.baseUnitName || oldProduct.unit);
+    const nextPurchaseCostPrice = productPayload.purchaseCostPrice !== undefined
+      ? Number(productPayload.purchaseCostPrice)
+      : (productPayload.costPrice !== undefined ? Number(productPayload.costPrice) : Number(oldProduct.purchaseCostPrice ?? oldProduct.costPrice));
+    const nextExpensePercent = productPayload.expensePercent !== undefined
+      ? Number(productPayload.expensePercent)
+      : Number(oldProduct.expensePercent || 0);
+    const nextEffectiveCostPrice = calculateEffectiveCostPrice(nextPurchaseCostPrice, nextExpensePercent);
 
     if (newName !== oldProduct.name || newWarehouseId !== oldProduct.warehouseId) {
       const existingProducts = await prisma.product.findMany({
@@ -269,7 +316,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
         }
       });
       const existingProduct = existingProducts.find((product: { id: number; name: string }) => (
-        product.id !== productId && normalizeProductName(product.name) === newName
+        product.id !== productId && normalizeProductName(product.name).name === newName
       ));
 
       if (existingProduct) {
@@ -282,13 +329,21 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
-        ...req.body,
+        ...productPayload,
         name: newName,
+        rawName: normalizedRequestedName.rawName,
+        brand: normalizedRequestedName.brand,
+        nameKey: buildProductNameKey(newName),
+        baseUnitName: nextBaseUnitName,
+        unit: nextBaseUnitName,
+        purchaseCostPrice: nextPurchaseCostPrice,
+        expensePercent: nextExpensePercent,
+        costPrice: nextEffectiveCostPrice,
         sku: null
       }
     });
 
-    if (req.body.photoUrl !== undefined) {
+    if (productPayload.photoUrl !== undefined) {
       const familyName = normalizeProductFamilyName(newName);
       const relatedProducts = await prisma.product.findMany({
         where: {
@@ -310,15 +365,15 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           id: { in: relatedIds },
         },
         data: {
-          photoUrl: req.body.photoUrl || null
+          photoUrl: productPayload.photoUrl || null
         }
       });
     }
 
     // If price changed, record history
-    if (oldProduct && (req.body.costPrice !== undefined || req.body.sellingPrice !== undefined)) {
-      const newCost = req.body.costPrice !== undefined ? Number(req.body.costPrice) : oldProduct.costPrice;
-      const newSelling = req.body.sellingPrice !== undefined ? Number(req.body.sellingPrice) : oldProduct.sellingPrice;
+    if (oldProduct && (productPayload.costPrice !== undefined || productPayload.purchaseCostPrice !== undefined || productPayload.expensePercent !== undefined || productPayload.sellingPrice !== undefined)) {
+      const newCost = nextEffectiveCostPrice;
+      const newSelling = productPayload.sellingPrice !== undefined ? Number(productPayload.sellingPrice) : oldProduct.sellingPrice;
       
       if (newCost !== oldProduct.costPrice || newSelling !== oldProduct.sellingPrice) {
         const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
@@ -346,6 +401,29 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           });
         }
       }
+    }
+
+    const parsedPackaging = packaging || parsePackagingFromRawName(productPayload.rawName || productPayload.name || oldProduct.rawName || oldProduct.name);
+    const nextPackagings = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
+      .filter(Boolean)
+      .map((entry: any, index: number) => ({
+        productId,
+        warehouseId: newWarehouseId,
+        packageName: normalizePackageName(entry.packageName),
+        baseUnitName: normalizeBaseUnitName(entry.baseUnitName || nextBaseUnitName),
+        unitsPerPackage: Number(entry.unitsPerPackage || 0),
+        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? Number(entry.packageSellingPrice) : null,
+        barcode: entry.barcode ? String(entry.barcode) : null,
+        isDefault: Boolean(entry.isDefault ?? index === 0),
+        sortOrder: Number(entry.sortOrder || index),
+      }))
+      .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
+
+    if (nextPackagings.length > 0) {
+      await prisma.productPackaging.createMany({
+        data: nextPackagings,
+        skipDuplicates: true,
+      });
     }
 
     res.json(product);
@@ -402,6 +480,11 @@ router.post('/:id/merge', async (req: AuthRequest, res, next) => {
       });
 
       await tx.priceHistory.updateMany({
+        where: { productId: sourceProductId },
+        data: { productId: targetProductId },
+      });
+
+      await tx.productPackaging.updateMany({
         where: { productId: sourceProductId },
         data: { productId: targetProductId },
       });
@@ -493,19 +576,34 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
     const productId = Number(req.params.id);
     const userId = req.user!.id;
     const warehouseId = access.isAdmin ? Number(req.body.warehouseId) : access.warehouseId;
-    const { quantity, costPrice, reason } = req.body;
+    const { quantity, costPrice, purchaseCostPrice, expensePercent, reason } = req.body;
 
     if (!warehouseId || !ensureWarehouseAccess(access, warehouseId)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    const resolvedPurchaseCostPrice = Number(purchaseCostPrice ?? costPrice ?? 0);
+    const resolvedExpensePercent = Number(expensePercent ?? 0);
+    const resolvedEffectiveCostPrice = calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent);
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        purchaseCostPrice: resolvedPurchaseCostPrice,
+        expensePercent: resolvedExpensePercent,
+        costPrice: resolvedEffectiveCostPrice,
+      },
+    });
+
     const batch = await StockService.addStock(
       productId,
       warehouseId,
       quantity,
-      costPrice,
+      resolvedEffectiveCostPrice,
       userId,
-      reason
+      reason,
+      resolvedPurchaseCostPrice,
+      resolvedExpensePercent,
     );
     res.json(batch);
   } catch (error) {
@@ -748,6 +846,73 @@ router.get('/:id/batches', async (req: AuthRequest, res, next) => {
       orderBy: { createdAt: 'asc' }
     });
     res.json(batches);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/packagings', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const product = await prisma.product.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { id: true, warehouseId: true, baseUnitName: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+    if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const packagings = await prisma.productPackaging.findMany({
+      where: { productId: product.id, active: true },
+      orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
+    });
+
+    res.json(packagings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/packagings', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { id: true, warehouseId: true, baseUnitName: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+
+    const packaging = await prisma.productPackaging.create({
+      data: {
+        productId: product.id,
+        warehouseId: product.warehouseId,
+        packageName: normalizePackageName(req.body.packageName),
+        baseUnitName: normalizeBaseUnitName(req.body.baseUnitName || product.baseUnitName),
+        unitsPerPackage: Number(req.body.unitsPerPackage || 0),
+        packageSellingPrice: req.body.packageSellingPrice !== undefined && req.body.packageSellingPrice !== null ? Number(req.body.packageSellingPrice) : null,
+        barcode: req.body.barcode ? String(req.body.barcode) : null,
+        isDefault: Boolean(req.body.isDefault),
+        sortOrder: Number(req.body.sortOrder || 0),
+      },
+    });
+
+    if (packaging.isDefault) {
+      await prisma.productPackaging.updateMany({
+        where: { productId: product.id, id: { not: packaging.id } },
+        data: { isDefault: false },
+      });
+    }
+
+    res.status(201).json(packaging);
   } catch (error) {
     next(error);
   }
