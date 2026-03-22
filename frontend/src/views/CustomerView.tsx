@@ -248,8 +248,8 @@ export default function CustomerView() {
       if (!result.ok && result.reason === 'blocked') {
         toast.error('Разрешите всплывающие окна для печати накладной');
       }
-    } catch {
-      toast.error('Ошибка при подготовке печати');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || '?????? ??? ?????????? ??????');
     }
   };
 
@@ -787,5 +787,6 @@ export default function CustomerView() {
     </div>
   );
 }
+
 
 

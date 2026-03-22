@@ -369,8 +369,8 @@ export default function SalesView() {
     try {
       const res = await client.get(`/invoices/${invoiceId}`);
       await handlePrintInvoice(res.data);
-    } catch {
-      toast.error('Ошибка при подготовке печати');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || '?????? ??? ?????????? ??????');
     }
   };
 
@@ -1238,3 +1238,4 @@ export default function SalesView() {
     </div>
   );
 }
+
