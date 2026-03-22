@@ -35,6 +35,11 @@ export function printSalesInvoice({
     return { ok: false, reason: 'blocked' as const };
   }
 
+  const customerName = invoice.customer_name || 'Обычный клиент';
+  const customerPhone = invoice.customer_phone || '';
+  const customerAddress = invoice.customer_address || '';
+  const invoiceDate = new Date(invoice.createdAt).toLocaleDateString('ru-RU');
+
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
         .map(
@@ -51,8 +56,6 @@ export function printSalesInvoice({
         .join('')
     : '';
 
-  const customerDetails = [invoice.customer_phone, invoice.customer_address].filter(Boolean).join('<br/>');
-
   const html = `
     <!doctype html>
     <html lang="ru">
@@ -61,20 +64,20 @@ export function printSalesInvoice({
         <title>Накладная #${invoice.id}</title>
         <style>
           * { box-sizing: border-box; }
-          body { margin: 0; padding: 32px; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
-          .sheet { max-width: 900px; margin: 0 auto; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 24px; }
-          .title { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
-          .muted { color: #475569; font-size: 14px; line-height: 1.6; }
-          .company-block { max-width: 420px; }
-          .company-line { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a; line-height: 1.45; }
-          .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
-          .card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc; }
+          body { margin: 0; padding: 30px; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
+          .sheet { max-width: 920px; margin: 0 auto; }
+          .header { display: flex; justify-content: space-between; align-items: stretch; gap: 28px; border-bottom: 2px solid #dbe3ef; padding-bottom: 22px; margin-bottom: 18px; }
+          .company-block { flex: 1; min-width: 0; }
+          .company-line { margin: 0 0 4px; font-size: 14px; font-weight: 700; line-height: 1.45; color: #111827; }
+          .client-block { width: 320px; border: 1px solid #dbe3ef; border-radius: 18px; padding: 16px 18px; background: #f8fafc; }
           .label { margin: 0 0 8px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
-          .value { margin: 0; font-size: 18px; font-weight: 700; }
-          .subvalue { margin: 8px 0 0; color: #475569; font-size: 14px; line-height: 1.5; }
-          .section { margin-top: 24px; }
-          .section h3 { margin: 0 0 12px; font-size: 16px; }
+          .client-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: #0f172a; }
+          .client-line { margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.5; }
+          .meta-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+          .meta-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+          .meta-value { margin-top: 4px; font-size: 14px; font-weight: 700; color: #0f172a; }
+          .section { margin-top: 20px; }
+          .section h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: #334155; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #e2e8f0; padding: 12px; font-size: 14px; text-align: left; vertical-align: top; }
           th { background: #f8fafc; font-weight: 700; }
@@ -94,22 +97,22 @@ export function printSalesInvoice({
               ${invoice.company_address ? `<p class="company-line">${escapeHtml(invoice.company_address)}</p>` : ''}
               ${invoice.company_phone ? `<p class="company-line">${escapeHtml(invoice.company_phone)}</p>` : ''}
             </div>
-            <div style="text-align: right;">
-              <h1 class="title">Накладная #${invoice.id}</h1>
-              <div class="muted">${escapeHtml(new Date(invoice.createdAt).toLocaleDateString('ru-RU'))}</div>
+            <div class="client-block">
+              <p class="label">Клиент</p>
+              <p class="client-name">${escapeHtml(customerName)}</p>
+              ${customerPhone ? `<p class="client-line">Телефон: ${escapeHtml(customerPhone)}</p>` : ''}
+              ${customerAddress ? `<p class="client-line">Адрес: ${escapeHtml(customerAddress)}</p>` : ''}
             </div>
           </div>
 
-          <div class="grid">
-            <div class="card">
-              <p class="label">Клиент</p>
-              <p class="value">${escapeHtml(invoice.customer_name || 'Обычный клиент')}</p>
-              <p class="subvalue">${customerDetails || 'Нет данных клиента'}</p>
+          <div class="meta-row">
+            <div>
+              <div class="meta-label">Документ</div>
+              <div class="meta-value">Накладная #${escapeHtml(invoice.id)}</div>
             </div>
-            <div class="card">
-              <p class="label">Дата</p>
-              <p class="value">${escapeHtml(new Date(invoice.createdAt).toLocaleDateString('ru-RU'))}</p>
-              <p class="subvalue">Накладная #${escapeHtml(invoice.id)}</p>
+            <div style="text-align: right;">
+              <div class="meta-label">Дата</div>
+              <div class="meta-value">${escapeHtml(invoiceDate)}</div>
             </div>
           </div>
 
@@ -120,7 +123,7 @@ export function printSalesInvoice({
                 <tr>
                   <th style="width: 52px;">№</th>
                   <th>Товар</th>
-                  <th style="width: 140px;">Количество</th>
+                  <th style="width: 150px;">Количество</th>
                   <th style="width: 140px;">Цена</th>
                   <th style="width: 140px;">Сумма</th>
                 </tr>

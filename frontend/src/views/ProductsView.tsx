@@ -34,7 +34,18 @@ import { getDefaultWarehouseId } from '../utils/warehouse';
 const normalizeOcrProductName = (name: string) => {
   const trimmed = String(name || '').trim();
   const bracketIndex = trimmed.indexOf('(');
-  return (bracketIndex >= 0 ? trimmed.slice(0, bracketIndex) : trimmed).trim();
+  const slashIndex = trimmed.indexOf('/');
+  const cutIndex =
+    bracketIndex >= 0 && slashIndex >= 0
+      ? Math.min(bracketIndex, slashIndex)
+      : bracketIndex >= 0
+        ? bracketIndex
+        : slashIndex;
+
+  return (cutIndex >= 0 ? trimmed.slice(0, cutIndex) : trimmed)
+    .replace(/[«»“”„‟"]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 const normalizeVolumeSpacing = (value: string) =>
@@ -46,8 +57,6 @@ const normalizeVolumeSpacing = (value: string) =>
 const normalizeCatalogName = (name: string) =>
   normalizeVolumeSpacing(String(name || ''))
     .replace(/\s*\[[^\]]*\]\s*$/u, '')
-    .replace(/[«"“”„‟'][^«"“”„‟']+[»"“”„‟']/gu, ' ')
-    .replace(/\bskif\b/giu, ' ')
     .replace(/[«»“”„‟"']/gu, '')
     .replace(/[(),]/gu, ' ')
     .replace(/[ёЁ]/g, 'е')

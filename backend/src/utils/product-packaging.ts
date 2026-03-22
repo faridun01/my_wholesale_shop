@@ -1,4 +1,5 @@
 const BRAND_PATTERN = /\bskif\b/iu;
+const QUOTED_BRAND_PATTERN = /[«"“”„‟']\s*([^«»"“”„‟'](?:.*?[^«»"“”„‟'])?)\s*[»"“”„‟']/u;
 const PACKAGING_PATTERN =
   /(?:(\d+(?:[.,]\d+)?)\s*)?(меш(?:ок|ка|ков)?|короб(?:ка|ки|ок)?|упаков(?:ка|ки|ок)?|пач(?:ка|ки|ек)?|блок(?:а|ов)?)[\s-]*(\d+)\s*(шт|штук|пач(?:ка|ки|ек)?|флакон(?:а|ов)?|емкост(?:ь|и|ей)|бут(?:ылка|ылки|ылок)?|бан(?:ка|ки|ок)?)/iu;
 const UNIT_ALIASES: Record<string, string> = {
@@ -51,7 +52,13 @@ const normalizeSpacing = (value: string) =>
 const stripQuotes = (value: string) => value.replace(/[«»"“”„‟']/gu, '');
 
 export function extractBrand(raw: string) {
-  const normalized = stripQuotes(String(raw || '')).trim();
+  const source = String(raw || '').trim();
+  const quotedMatch = source.match(QUOTED_BRAND_PATTERN);
+  if (quotedMatch?.[1]) {
+    return normalizeSpacing(quotedMatch[1]);
+  }
+
+  const normalized = stripQuotes(source).trim();
   const match = normalized.match(BRAND_PATTERN);
   return match ? match[0].toUpperCase() : null;
 }
@@ -76,6 +83,7 @@ export function normalizeProductName(raw: string) {
   const withoutQuotes = stripQuotes(source);
   const withoutBracketPackaging = withoutQuotes.replace(/\([^)]*\)/gu, ' ');
   const withoutTrailingPackaging = withoutBracketPackaging
+    .replace(/\/\s*[^/]*$/u, ' ')
     .replace(/\/\s*\d+(?:[.,]\d+)?\s*(шт|штук|пач(?:ка|ки|ек)?|флакон(?:а|ов)?|емкост(?:ь|и|ей))\b/giu, ' ')
     .replace(PACKAGING_PATTERN, ' ')
     .replace(/\s+/g, ' ')

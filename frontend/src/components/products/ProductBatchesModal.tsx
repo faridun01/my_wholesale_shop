@@ -24,11 +24,13 @@ export default function ProductBatchesModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onClick={onClose}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[52rem] overflow-hidden rounded-[2rem] bg-white shadow-2xl"
           >
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-violet-50/50 p-5 sm:p-6">

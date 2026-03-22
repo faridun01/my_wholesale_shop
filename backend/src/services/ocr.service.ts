@@ -9,8 +9,8 @@ Requirements:
 1. Return one JSON object per invoice line item. Never merge different products into one object.
 2. Ignore non-product text such as company header, signatures, payment data, totals, tax, addresses, banking details, and generic notes.
 3. "rawName" must contain the original full product line text exactly as it appears on the invoice.
-4. "name" must contain only the clean normalized product name for database storage. Remove packaging fragments, remove outer quotes around brands, keep the readable brand in the clean name if it belongs to the product itself.
-5. "brand" should contain the extracted brand if visible, for example "SKIF".
+4. "name" must contain only the clean normalized product name for database storage. Remove packaging fragments and any trailing fragment after "/" such as "/160 пачек". Remove only the quote characters around brands, but keep the brand text itself in the clean name.
+5. "brand" should contain the extracted brand if visible, for example "SKIF" or "Мэй Фу".
 6. "packageName" should contain the package label such as "мешок", "коробка", "упаковка", "box", "bag".
 7. "baseUnitName" should contain the base unit inside the package such as "шт", "пачка", "флакон", "емкость".
 3. If two lines have similar names, keep them as separate objects unless the line is literally the same repeated line.
@@ -24,7 +24,7 @@ Requirements:
 11. "note": Return useful details for that exact line only, such as packaging conversion, color, scent, or remarks.
 12. "lineIndex": Return the visible order number of the line from top to bottom starting with 1.
 13. Do not invent values. If a field is missing, omit it or return an empty string for text fields and 0 for numeric fields.
-14. Keep the product type and mass in the "name" when they are visible, for example "автомат 900гр" or "гель для мытья посуды 1.5л".
+14. Keep the product type, brand, and mass in the "name" when they are visible, for example "автомат SKIF 900гр" or "гель Мэй Фу для мытья посуды 1.5л".
 Return only a JSON array of objects with "lineIndex", "rawName", "name", "brand", "packageName", "baseUnitName", "packageCount", "unitsPerPackage", "quantity", "price", "rawQuantity", "unit", "lineTotal", and "note".`;
 
   static getClient() {

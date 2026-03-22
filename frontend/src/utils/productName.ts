@@ -6,8 +6,7 @@ export function formatProductName(value: unknown) {
   }
 
   return normalized
-    .replace(/[«"“”„‟'][^«"“”„‟']+[»"“”„‟']/gu, ' ')
-    .replace(/\bskif\b/giu, ' ')
+    .replace(/[«»“”„‟"]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
