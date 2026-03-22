@@ -8,6 +8,12 @@ const TRANSACTION_OPTIONS = {
   timeout: 120000,
 };
 
+const buildCustomerAddressSnapshot = (customer: any) =>
+  [customer?.country, customer?.region, customer?.city, customer?.address]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(', ') || null;
+
 function getInvoiceStatus(paidAmount: number, netAmount: number) {
   if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
     return 'paid';
@@ -126,7 +132,7 @@ export class InvoiceService {
           companyAddressSnapshot: companyProfile?.addressLine || null,
           customerNameSnapshot: customer.name,
           customerPhoneSnapshot: customer.phone || null,
-          customerAddressSnapshot: customer.address || null,
+          customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
         },
       });
 
@@ -233,7 +239,7 @@ export class InvoiceService {
           customerId,
           customerNameSnapshot: customer.name,
           customerPhoneSnapshot: customer.phone || null,
-          customerAddressSnapshot: customer.address || null,
+          customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
         },
       });
 
@@ -370,7 +376,7 @@ export class InvoiceService {
       ...invoice,
       customer_name: invoice.customerNameSnapshot || invoice.customer.name,
       customer_phone: invoice.customerPhoneSnapshot || invoice.customer.phone,
-      customer_address: invoice.customerAddressSnapshot || invoice.customer.address,
+      customer_address: invoice.customerAddressSnapshot || buildCustomerAddressSnapshot(invoice.customer),
       company_name: companyProfile?.name || invoice.companyNameSnapshot,
       company_country: companyProfile?.country || invoice.companyCountrySnapshot,
       company_region: companyProfile?.region || invoice.companyRegionSnapshot,

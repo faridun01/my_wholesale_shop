@@ -8,6 +8,34 @@ const router = Router();
 const PAYMENT_EPSILON = 0.01;
 const normalizeCustomerName = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
 
+const normalizeOptionalString = (value: unknown) => {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+};
+
+const buildCustomerPayload = (body: any, access: any) => {
+  const customerType = String(body?.customerType || 'individual').trim().toLowerCase() === 'company' ? 'company' : 'individual';
+  const companyName = normalizeOptionalString(body?.companyName);
+  const contactName = normalizeOptionalString(body?.contactName);
+  const fallbackName = normalizeOptionalString(body?.name);
+  const name = customerType === 'company'
+    ? companyName || contactName || fallbackName || ''
+    : contactName || fallbackName || '';
+
+  return {
+    customerType,
+    name,
+    companyName,
+    contactName,
+    phone: normalizeOptionalString(body?.phone),
+    country: normalizeOptionalString(body?.country),
+    region: normalizeOptionalString(body?.region),
+    city: access.isAdmin ? normalizeOptionalString(body?.city) : normalizeOptionalString(access.city),
+    address: normalizeOptionalString(body?.address),
+    notes: normalizeOptionalString(body?.notes),
+  };
+};
+
 const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: number) => {
   const normalizedName = normalizeCustomerName(name);
   if (!normalizedName) {
@@ -130,7 +158,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     await mergeDuplicateCustomers(prisma, req.user?.id || null);
-    const customerName = String(req.body?.name || '').trim();
+    const payload = buildCustomerPayload(req.body, access);
+    const customerName = payload.name;
     if (!customerName) {
       return res.status(400).json({ error: 'Название клиента обязательно' });
     }
@@ -147,9 +176,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
     const customer = await prisma.customer.create({
       data: {
-        ...req.body,
-        name: customerName,
-        city: access.isAdmin ? (req.body.city || null) : (access.city || null),
+        ...payload,
         createdByUserId: req.user?.id || null,
       },
     });
@@ -165,7 +192,8 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     const access = await getAccessContext(req);
     await mergeDuplicateCustomers(prisma, req.user?.id || null);
     const customerId = Number(req.params.id);
-    const customerName = String(req.body?.name || '').trim();
+    const payload = buildCustomerPayload(req.body, access);
+    const customerName = payload.name;
     const { customer: current, allowed } = await getCustomerAccess(access, customerId);
     if (!current) {
       return res.status(404).json({ error: 'Клиент не найден' });
@@ -192,7 +220,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 
     const customer = await prisma.customer.update({
       where: { id: customerId },
-      data: access.isAdmin ? { ...req.body, name: customerName } : { ...req.body, name: customerName, city: access.city || null },
+      data: payload,
     });
     res.json(customer);
   } catch (error) {

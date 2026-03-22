@@ -165,8 +165,13 @@ model ProductBatch {
 
 model Customer {
   id        Int      @id @default(autoincrement())
+  customerType String @default("individual") @map("customer_type")
   name      String
+  companyName String? @map("company_name")
+  contactName String? @map("contact_name")
   phone     String?
+  country   String?
+  region    String?
   address   String?
   city      String?
   notes     String?

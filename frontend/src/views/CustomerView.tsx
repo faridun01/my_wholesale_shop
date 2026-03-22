@@ -9,8 +9,14 @@ import ConfirmationModal from '../components/common/ConfirmationModal';
 
 interface Customer {
   id: number;
+  customerType?: 'individual' | 'company';
   name: string;
+  companyName?: string;
+  contactName?: string;
   phone: string;
+  country?: string;
+  region?: string;
+  city?: string;
   address: string;
   notes: string;
   total_invoiced: number;
@@ -58,7 +64,18 @@ interface StatementInvoice {
   returnEvents: StatementReturn[];
 }
 
-const emptyForm = { name: '', phone: '', address: '', notes: '' };
+const emptyForm = {
+  customerType: 'individual',
+  name: '',
+  companyName: '',
+  contactName: '',
+  phone: '',
+  country: '',
+  region: '',
+  city: '',
+  address: '',
+  notes: '',
+};
 
 export default function CustomerView() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -91,9 +108,21 @@ export default function CustomerView() {
     const payload = {
       ...formData,
       name: formData.name.trim(),
+      companyName: formData.companyName.trim(),
+      contactName: formData.contactName.trim(),
+      phone: formData.phone.trim(),
+      country: formData.country.trim(),
+      region: formData.region.trim(),
+      city: formData.city.trim(),
+      address: formData.address.trim(),
+      notes: formData.notes.trim(),
     };
 
-    if (!payload.name) {
+    const resolvedName = payload.customerType === 'company'
+      ? payload.companyName || payload.contactName || payload.name
+      : payload.contactName || payload.name;
+
+    if (!resolvedName) {
       toast.error('Введите название клиента');
       return;
     }
@@ -301,8 +330,14 @@ export default function CustomerView() {
                         onClick={() => {
                           setSelectedCustomer(customer);
                           setFormData({
+                            customerType: customer.customerType || 'individual',
                             name: customer.name || '',
+                            companyName: customer.companyName || '',
+                            contactName: customer.contactName || '',
                             phone: customer.phone || '',
+                            country: customer.country || '',
+                            region: customer.region || '',
+                            city: customer.city || '',
                             address: customer.address || '',
                             notes: customer.notes || '',
                           });
@@ -401,14 +436,55 @@ export default function CustomerView() {
                 </div>
                 <form onSubmit={handleSave} className="space-y-5 p-5 sm:space-y-6 sm:p-10">
                   <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Имя клиента</label>
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Тип клиента</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, customerType: 'individual', companyName: '' })}
+                        className={`rounded-2xl border px-5 py-4 text-sm font-medium transition-all ${formData.customerType === 'individual' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
+                      >
+                        Частное лицо
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, customerType: 'company' })}
+                        className={`rounded-2xl border px-5 py-4 text-sm font-medium transition-all ${formData.customerType === 'company' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
+                      >
+                        Компания
+                      </button>
+                    </div>
+                  </div>
+
+                  {formData.customerType === 'company' && (
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Название компании</label>
+                      <input
+                        required
+                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                        value={formData.companyName}
+                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value, name: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">
+                      {formData.customerType === 'company' ? 'Контактное лицо' : 'Имя клиента'}
+                    </label>
                     <input
-                      required
+                      required={formData.customerType !== 'company'}
                       className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      value={formData.customerType === 'company' ? formData.contactName : formData.name}
+                      onChange={(e) =>
+                        setFormData(
+                          formData.customerType === 'company'
+                            ? { ...formData, contactName: e.target.value }
+                            : { ...formData, name: e.target.value, contactName: e.target.value },
+                        )
+                      }
                     />
                   </div>
+
                   <div className="space-y-2">
                     <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Телефон</label>
                     <input
@@ -417,6 +493,34 @@ export default function CustomerView() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Страна</label>
+                      <input
+                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                        value={formData.country}
+                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Регион</label>
+                      <input
+                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                        value={formData.region}
+                        onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Город</label>
+                      <input
+                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Адрес</label>
                     <input

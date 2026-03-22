@@ -186,6 +186,7 @@ export default function SettingsView() {
     try {
       await client.delete(`/auth/users/${selectedUser.id}`);
       toast.success('Пользователь удален');
+      setShowDeleteUserConfirm(false);
       setSelectedUser(null);
       fetchData();
     } catch (err) {

@@ -1672,9 +1672,9 @@ export default function ProductsView() {
                     {getDuplicateHintCount(product) > 0 && (
                       <button
                         onClick={() => handleOpenMergeModal(product)}
-                        className="rounded-xl bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700"
+                        className="rounded-xl bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
                       >
-                        Дубликат: {getDuplicateHintCount(product)}
+                        Дубликат
                       </button>
                     )}
                     <span className="rounded-xl bg-slate-50 px-2.5 py-1 text-[11px] text-slate-500">
@@ -1950,15 +1950,6 @@ export default function ProductsView() {
                             title="Пополнить"
                           >
                             <PlusCircle size={14} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleOpenMergeModal(product)}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-fuchsia-200 hover:bg-fuchsia-50 hover:text-fuchsia-600"
-                            title="Объединить похожий товар"
-                          >
-                            <GitMerge size={14} />
                           </button>
                         )}
                         <button 
