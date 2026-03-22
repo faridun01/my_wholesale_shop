@@ -716,11 +716,13 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => setShowDetailsModal(false)}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
               className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl md:rounded-[2.5rem]"
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4 md:p-8">
@@ -986,11 +988,13 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => setShowEditModal(false)}
             className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
               className="w-full max-w-xl overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-8">
@@ -1055,11 +1059,13 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => setShowPaymentModal(false)}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -1134,11 +1140,13 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={() => setShowReturnModal(false)}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
