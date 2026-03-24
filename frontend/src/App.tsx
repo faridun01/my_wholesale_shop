@@ -86,7 +86,7 @@ const Layout = () => {
           </button>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5 xl:p-6">
+        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:py-5 lg:pr-5 lg:pl-0 xl:py-6 xl:pr-6 xl:pl-0">
           <div className="app-page-inner min-h-full">
             <React.Suspense fallback={<RouteLoading />}>
               <Outlet />

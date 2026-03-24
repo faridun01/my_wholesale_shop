@@ -254,7 +254,7 @@ export default function RemindersView() {
 
   return (
     <div className="app-page-shell app-page-pad">
-      <div className="mx-auto max-w-[1380px]">
+      <div className="w-full">
         <div className="overflow-hidden rounded-[28px] border border-[#dfe4ff] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-[#eceffd] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-7">
             <h1 className="text-[34px] font-black tracking-[-0.03em] text-slate-900">Напоминания</h1>

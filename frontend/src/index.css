@@ -15,7 +15,7 @@
 @layer base {
   html {
     overflow-y: scroll;
-    scrollbar-gutter: stable both-edges;
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -45,7 +45,7 @@
 
 @layer components {
   .app-page-shell {
-    @apply mx-auto w-full rounded-[28px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)];
+    @apply w-full rounded-[28px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:rounded-l-none lg:border-l-0;
   }
 
   .app-page-pad {

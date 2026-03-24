@@ -1027,7 +1027,7 @@ export default function POSView() {
                                   : `Штучно: ${item.extraUnitQuantity}`}
                               </span>
                               <span>
-                                Итого: {item.quantity} {item.baseUnitName}
+                                Итого: {item.quantity} шт
                               </span>
                             </div>
                           </div>

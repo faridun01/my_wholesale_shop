@@ -309,7 +309,7 @@ export default function SettingsView() {
 
   return (
     <div className="app-page-shell app-page-pad">
-      <div className="mx-auto max-w-6xl space-y-6 pb-20">
+      <div className="w-full space-y-6 pb-20">
       <section className="app-surface p-5 sm:px-6 sm:py-6">
         <div className="space-y-2">
           <p className="text-sm text-slate-500">Система</p>
