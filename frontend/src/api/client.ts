@@ -15,7 +15,7 @@ const API_URL = (() => {
 
 const client = axios.create({
   baseURL: API_URL,
-  timeout: 30000, // 30 seconds
+  timeout: 180000, // 3 minutes
 });
 
 // Add a request interceptor to include the auth token

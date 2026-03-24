@@ -968,9 +968,14 @@ export default function POSView() {
 
                           <div className="mt-3 space-y-3">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-[13px] font-medium text-slate-900">
-                                {formatMoney(item.sellingPrice * item.quantity)}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="text-[11px] text-slate-500">
+                                  {formatMoney(item.sellingPrice)} x {item.quantity} {item.baseUnitName}
+                                </p>
+                                <p className="text-[13px] font-semibold text-slate-900">
+                                  {formatMoney(item.sellingPrice * item.quantity)}
+                                </p>
+                              </div>
                               <button
                                 onClick={() => removeFromCart(item.id)}
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-500"

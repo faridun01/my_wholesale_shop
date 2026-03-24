@@ -38,7 +38,6 @@ export function printSalesInvoice({
   const customerName = invoice.customer_name || 'Обычный клиент';
   const customerPhone = invoice.customer_phone || '';
   const customerAddress = invoice.customer_address || '';
-  const invoiceDate = new Date(invoice.createdAt).toLocaleDateString('ru-RU');
 
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
@@ -61,21 +60,18 @@ export function printSalesInvoice({
     <html lang="ru">
       <head>
         <meta charset="utf-8" />
-        <title>Накладная #${invoice.id}</title>
+        <title>Накладная</title>
         <style>
           * { box-sizing: border-box; }
           body { margin: 0; padding: 30px; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
           .sheet { max-width: 920px; margin: 0 auto; }
           .header { display: flex; justify-content: space-between; align-items: stretch; gap: 28px; border-bottom: 2px solid #dbe3ef; padding-bottom: 22px; margin-bottom: 18px; }
-          .company-block { flex: 1; min-width: 0; }
-          .company-line { margin: 0 0 4px; font-size: 14px; font-weight: 700; line-height: 1.45; color: #111827; }
-          .client-block { width: 320px; border: 1px solid #dbe3ef; border-radius: 18px; padding: 16px 18px; background: #f8fafc; }
+          .party-block { min-width: 0; border: 1px solid #dbe3ef; border-radius: 18px; padding: 16px 18px; background: #f8fafc; }
+          .seller-block { flex: 1; }
+          .client-block { width: 320px; }
           .label { margin: 0 0 8px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
-          .client-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: #0f172a; }
-          .client-line { margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.5; }
-          .meta-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
-          .meta-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
-          .meta-value { margin-top: 4px; font-size: 14px; font-weight: 700; color: #0f172a; }
+          .party-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: #0f172a; }
+          .party-line { margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.5; }
           .section { margin-top: 20px; }
           .section h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: #334155; }
           table { width: 100%; border-collapse: collapse; }
@@ -90,29 +86,19 @@ export function printSalesInvoice({
       <body>
         <div class="sheet">
           <div class="header">
-            <div class="company-block">
-              ${invoice.company_name ? `<p class="company-line">${escapeHtml(invoice.company_name)}</p>` : ''}
-              ${invoice.company_country ? `<p class="company-line">${escapeHtml(invoice.company_country)}</p>` : ''}
-              ${(invoice.company_region || invoice.company_city) ? `<p class="company-line">${escapeHtml([invoice.company_region, invoice.company_city].filter(Boolean).join(' '))}</p>` : ''}
-              ${invoice.company_address ? `<p class="company-line">${escapeHtml(invoice.company_address)}</p>` : ''}
-              ${invoice.company_phone ? `<p class="company-line">${escapeHtml(invoice.company_phone)}</p>` : ''}
+            <div class="party-block seller-block">
+              <p class="label">Продавец</p>
+              ${invoice.company_name ? `<p class="party-name">${escapeHtml(invoice.company_name)}</p>` : ''}
+              ${invoice.company_country ? `<p class="party-line">${escapeHtml(invoice.company_country)}</p>` : ''}
+              ${(invoice.company_region || invoice.company_city) ? `<p class="party-line">${escapeHtml([invoice.company_region, invoice.company_city].filter(Boolean).join(' '))}</p>` : ''}
+              ${invoice.company_address ? `<p class="party-line">${escapeHtml(invoice.company_address)}</p>` : ''}
+              ${invoice.company_phone ? `<p class="party-line">${escapeHtml(invoice.company_phone)}</p>` : ''}
             </div>
-            <div class="client-block">
+            <div class="party-block client-block">
               <p class="label">Клиент</p>
-              <p class="client-name">${escapeHtml(customerName)}</p>
-              ${customerPhone ? `<p class="client-line">Телефон: ${escapeHtml(customerPhone)}</p>` : ''}
-              ${customerAddress ? `<p class="client-line">Адрес: ${escapeHtml(customerAddress)}</p>` : ''}
-            </div>
-          </div>
-
-          <div class="meta-row">
-            <div>
-              <div class="meta-label">Документ</div>
-              <div class="meta-value">Накладная #${escapeHtml(invoice.id)}</div>
-            </div>
-            <div style="text-align: right;">
-              <div class="meta-label">Дата</div>
-              <div class="meta-value">${escapeHtml(invoiceDate)}</div>
+              <p class="party-name">${escapeHtml(customerName)}</p>
+              ${customerPhone ? `<p class="party-line">Телефон: ${escapeHtml(customerPhone)}</p>` : ''}
+              ${customerAddress ? `<p class="party-line">Адрес: ${escapeHtml(customerAddress)}</p>` : ''}
             </div>
           </div>
 

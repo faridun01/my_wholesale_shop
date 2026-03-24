@@ -432,7 +432,7 @@ export default function SettingsView() {
                     />
                   </div>
                 </div>
-                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
+                <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-4">
                   <button type="button" onClick={() => { setShowAddWarehouse(false); setShowEditWarehouse(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-sky-500 px-10 py-4 font-bold text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95">
                     {showEditWarehouse ? 'Сохранить' : 'Создать'}
@@ -451,6 +451,7 @@ export default function SettingsView() {
             onClick={() => {
               setShowAddUser(false);
               setShowEditUser(false);
+              setSelectedUser(null);
             }}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
@@ -458,21 +459,21 @@ export default function SettingsView() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
+              className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
-                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900 sm:text-2xl">
-                  <div className="rounded-2xl bg-violet-500 p-2.5 text-white shadow-lg shadow-violet-500/20 sm:p-3">
-                    <Users size={24} />
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-6">
+                <h3 className="flex items-center space-x-3 text-lg font-black text-slate-900 sm:text-xl">
+                  <div className="rounded-2xl bg-violet-500 p-2.5 text-white shadow-lg shadow-violet-500/20">
+                    <Users size={20} />
                   </div>
                   <span>{showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}</span>
                 </h3>
-                <button onClick={() => { setShowAddUser(false); setShowEditUser(false); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={() => { setShowAddUser(false); setShowEditUser(false); setSelectedUser(null); }} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
-              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-5 p-5 sm:space-y-6 sm:p-8">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-4 p-5 sm:space-y-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Логин</label>
                     <input 
@@ -534,8 +535,8 @@ export default function SettingsView() {
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
-                  <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" className="rounded-2xl bg-violet-500 px-10 py-4 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
+                  <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); setSelectedUser(null); }} className="rounded-2xl px-6 py-3 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="submit" className="rounded-2xl bg-violet-500 px-8 py-3 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
                     {showEditUser ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
@@ -659,74 +660,6 @@ export default function SettingsView() {
               <span>Добавить пользователя</span>
             </button>
           </div>
-
-          <AnimatePresence>
-            {showAddUser && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="relative mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white p-10 shadow-sm"
-              >
-                <div className="absolute top-0 left-0 h-2 w-full bg-violet-500"></div>
-                <h3 className="text-2xl font-black text-slate-900 mb-8">Новый пользователь</h3>
-                <form onSubmit={handleAddUser} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Логин</label>
-                      <input 
-                        type="text" 
-                        placeholder="username" 
-                        required
-                        value={newUser.username}
-                        onChange={e => setNewUser({...newUser, username: e.target.value})}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Пароль</label>
-                      <input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        required
-                        value={newUser.password}
-                        onChange={e => setNewUser({...newUser, password: e.target.value})}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Роль</label>
-                      <select 
-                        value={newUser.role}
-                        onChange={e => setNewUser({...newUser, role: e.target.value})}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold appearance-none bg-white"
-                      >
-                        <option value="ADMIN">Админ</option>
-                        <option value="MANAGER">Менеджер</option>
-                        <option value="SELLER">Продавец</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Склад</label>
-                      <select 
-                        value={newUser.warehouseId}
-                        onChange={e => setNewUser({...newUser, warehouseId: e.target.value})}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold appearance-none bg-white"
-                      >
-                        <option value="">Все склады</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end space-x-4">
-                    <button type="button" onClick={() => setShowAddUser(false)} className="px-10 py-4 rounded-2xl font-black text-slate-500 hover:bg-slate-50 transition-all">Отмена</button>
-                    <button type="submit" className="px-12 py-4 bg-slate-900 text-white rounded-2xl font-black shadow-xl shadow-slate-900/15 hover:bg-slate-800 transition-all">Создать аккаунт</button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           <div className="space-y-4 md:hidden">
             {users.map(u => (

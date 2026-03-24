@@ -155,6 +155,18 @@ export default function ProductsView() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
 
+  const closeHistoryModal = () => {
+    setShowHistoryModal(false);
+    setProductHistory([]);
+    setSelectedProduct(null);
+  };
+
+  const closeBatchesModal = () => {
+    setShowBatchesModal(false);
+    setProductBatches([]);
+    setSelectedProduct(null);
+  };
+
   const availableTransferStock = selectedProduct && transferData.fromWarehouseId
     ? String(selectedProduct.warehouseId || '') === transferData.fromWarehouseId || selectedWarehouseId === transferData.fromWarehouseId
       ? Number(selectedProduct.stock || 0)
@@ -260,6 +272,7 @@ export default function ProductsView() {
   };
 
   const handleShowHistory = async (product: any) => {
+    setShowBatchesModal(false);
     setSelectedProduct(product);
     try {
       const history = await getProductHistory(product.id);
@@ -271,6 +284,7 @@ export default function ProductsView() {
   };
 
   const handleShowBatches = async (product: any) => {
+    setShowHistoryModal(false);
     setSelectedProduct(product);
     try {
       const batches = await getProductBatches(product.id);
@@ -303,7 +317,7 @@ export default function ProductsView() {
 
     try {
       const res = await client.post('/ocr/parse-invoice', formData, {
-        timeout: 120000,
+        timeout: 300000,
       });
       const rawItems = Array.isArray(res.data)
         ? res.data
@@ -350,7 +364,7 @@ export default function ProductsView() {
 
       toast.error(
         isTimeout
-          ? 'Сканирование заняло слишком много времени. Попробуйте ещё раз или используйте файл поменьше.'
+          ? 'Сканирование заняло слишком много времени. Подождите ещё немного, повторите попытку или используйте файл поменьше.'
           : err.response?.data?.error || 'Ошибка при сканировании накладной'
       );
     } finally {
@@ -462,56 +476,14 @@ export default function ProductsView() {
           note: string;
         }>;
 
-      const mergedPreparedResults = Array.from(
-        preparedResults.reduce((acc, item) => {
-          const key = normalizeCatalogName(item.name);
-          const existing = acc.get(key);
+      const importRows = [...preparedResults].sort((a, b) => a.lineIndex - b.lineIndex);
 
-          if (!existing) {
-            acc.set(key, { ...item });
-            return acc;
-          }
-
-          existing.quantity += Number(item.quantity || 0);
-          existing.price += Number(item.price || 0);
-          existing.lineTotal += Number(item.lineTotal || 0);
-          existing.packageCount += Number(item.packageCount || 0);
-          existing.unitsPerPackage = Math.max(Number(existing.unitsPerPackage || 0), Number(item.unitsPerPackage || 0));
-          existing.costPricePerPieceTJS = existing.quantity > 0
-            ? ((existing.lineTotal > 0 ? existing.lineTotal * rate : existing.price * rate) / existing.quantity)
-            : existing.costPricePerPieceTJS;
-          if (Number(item.sellingPrice || 0) > 0) {
-            existing.sellingPrice = Number(item.sellingPrice);
-          }
-          if (!existing.rawQuantity && item.rawQuantity) {
-            existing.rawQuantity = item.rawQuantity;
-          }
-          if (!existing.rawName && item.rawName) {
-            existing.rawName = item.rawName;
-          }
-          if (!existing.brand && item.brand) {
-            existing.brand = item.brand;
-          }
-          if (!existing.packageName && item.packageName) {
-            existing.packageName = item.packageName;
-          }
-          if (!existing.baseUnitName && item.baseUnitName) {
-            existing.baseUnitName = item.baseUnitName;
-          }
-          if (!existing.note && item.note) {
-            existing.note = item.note;
-          }
-
-          return acc;
-        }, new Map<string, any>()).values(),
-      );
-
-      if (!mergedPreparedResults.length) {
+      if (!importRows.length) {
         toast.error('После сканирования не осталось корректных товаров для добавления');
         return;
       }
       const currentProducts = [...products];
-      for (const item of mergedPreparedResults) {
+      for (const item of importRows) {
         const costPriceTJS = item.costPricePerPieceTJS;
         const normalizedItemName = normalizeCatalogName(item.name);
         const familyKey = normalizeProductFamilyName(item.name);
@@ -626,7 +598,7 @@ export default function ProductsView() {
           }
         }
       }
-      toast.success('Все товары успешно добавлены на склад');
+      toast.success(`Все товары успешно добавлены на склад: ${importRows.length} строк`);
       setOcrResults(null);
       fetchInitialData();
     } catch (err: any) {
@@ -1507,19 +1479,21 @@ export default function ProductsView() {
         )}
       </AnimatePresence>
 
-      <React.Suspense fallback={null}>
-        <ProductHistoryModal
-          isOpen={showHistoryModal}
-          onClose={() => setShowHistoryModal(false)}
-          productName={selectedProduct?.name}
-          productHistory={productHistory}
-        />
-        <ProductBatchesModal
-          isOpen={showBatchesModal}
-          onClose={() => setShowBatchesModal(false)}
-          selectedProduct={selectedProduct}
-          productBatches={productBatches}
-        />
+        <React.Suspense fallback={null}>
+          <ProductHistoryModal
+            key={showHistoryModal ? `history-${selectedProduct?.id || 'empty'}` : 'history-closed'}
+            isOpen={showHistoryModal}
+            onClose={closeHistoryModal}
+            productName={selectedProduct?.name}
+            productHistory={productHistory}
+          />
+          <ProductBatchesModal
+            key={showBatchesModal ? `batches-${selectedProduct?.id || 'empty'}` : 'batches-closed'}
+            isOpen={showBatchesModal}
+            onClose={closeBatchesModal}
+            selectedProduct={selectedProduct}
+            productBatches={productBatches}
+          />
       </React.Suspense>
 
       <AnimatePresence>

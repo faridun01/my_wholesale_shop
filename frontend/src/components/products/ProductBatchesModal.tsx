@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
 import { Layers, X } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
@@ -17,6 +17,19 @@ export default function ProductBatchesModal({
   selectedProduct,
   productBatches,
 }: ProductBatchesModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && selectedProduct && (
@@ -30,6 +43,7 @@ export default function ProductBatchesModal({
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.96, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[52rem] overflow-hidden rounded-[2rem] bg-white shadow-2xl"
           >
@@ -40,14 +54,16 @@ export default function ProductBatchesModal({
                 </div>
                 <span>Партии товара (FIFO): {selectedProduct.name}</span>
               </h3>
-              <button onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
+              <button type="button" onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
+
             <div className="max-h-[56vh] overflow-y-auto p-4 sm:p-6">
               <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-                Система списывает товар из самых старых партий в первую очередь (FIFO).
+                Система списывает товар из самых старых партий в первую очередь по FIFO.
               </div>
+
               <div className="space-y-3 sm:hidden">
                 {productBatches.map((b, i) => (
                   <div key={b.id} className={clsx('rounded-3xl border border-slate-100 p-4', i === 0 ? 'bg-violet-50/60' : 'bg-slate-50')}>
@@ -80,6 +96,7 @@ export default function ProductBatchesModal({
                   <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">Активных партий не найдено</div>
                 )}
               </div>
+
               <table className="hidden w-full text-left sm:table">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -97,7 +114,7 @@ export default function ProductBatchesModal({
                         {new Date(b.createdAt).toLocaleDateString('ru-RU')}
                         {i === 0 && <span className="ml-2 rounded-md bg-violet-500 px-2 py-0.5 text-[8px] uppercase text-white">След. на списание</span>}
                       </td>
-                      <td className="py-3 font-bold text-slate-600">{b.warehouse?.name}</td>
+                      <td className="py-3 font-bold text-slate-600">{b.warehouse?.name || '---'}</td>
                       <td className="py-3 text-right font-bold text-slate-400">{b.quantity} {selectedProduct.unit}</td>
                       <td className="py-3 text-right font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</td>
                       <td className="py-3 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
@@ -111,8 +128,9 @@ export default function ProductBatchesModal({
                 </tbody>
               </table>
             </div>
+
             <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-6">
-              <button onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-8 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50">
+              <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-8 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50">
                 Закрыть
               </button>
             </div>

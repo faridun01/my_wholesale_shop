@@ -720,9 +720,14 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
       }
     };
 
+    const productWarehouseId = product.warehouseId ?? undefined;
+
     const [transactions, priceHistory] = await Promise.all([
       prisma.inventoryTransaction.findMany({
-        where: { productId },
+        where: {
+          productId,
+          ...(productWarehouseId ? { warehouseId: productWarehouseId } : {}),
+        },
         include: { user: true, warehouse: true },
         orderBy: { createdAt: 'desc' }
       }),

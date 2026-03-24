@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
 import { History, X } from 'lucide-react';
 import { formatProductName } from '../../utils/productName';
@@ -17,6 +17,19 @@ export default function ProductHistoryModal({
   productName,
   productHistory,
 }: ProductHistoryModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -30,6 +43,7 @@ export default function ProductHistoryModal({
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.96, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[56rem] overflow-hidden rounded-[2rem] bg-white shadow-2xl"
           >
@@ -40,10 +54,11 @@ export default function ProductHistoryModal({
                 </div>
                 <span>История товара: {formatProductName(productName)}</span>
               </h3>
-              <button onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
+              <button type="button" onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
+
             <div className="max-h-[56vh] overflow-y-auto p-4 sm:p-6">
               <div className="space-y-3 sm:hidden">
                 {productHistory.map((t, i) => (
@@ -91,6 +106,7 @@ export default function ProductHistoryModal({
                   </div>
                 ))}
               </div>
+
               <table className="hidden w-full table-fixed text-left sm:table">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">

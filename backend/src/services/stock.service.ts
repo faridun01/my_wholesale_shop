@@ -1,4 +1,5 @@
 import prisma from '../db/prisma.js';
+import { buildProductNameKey } from '../utils/product-packaging.js';
 
 export class StockService {
   /**
@@ -139,6 +140,75 @@ export class StockService {
     userId: number
   ) {
     return await prisma.$transaction(async (tx: any) => {
+      const sourceProduct = await tx.product.findUnique({
+        where: { id: productId },
+        include: {
+          packagings: {
+            where: { active: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      });
+
+      if (!sourceProduct) {
+        throw new Error('Товар не найден');
+      }
+
+      let destinationProduct = await tx.product.findFirst({
+        where: {
+          warehouseId: toWarehouseId,
+          active: true,
+          OR: [
+            { nameKey: sourceProduct.nameKey || buildProductNameKey(sourceProduct.name) },
+            { name: sourceProduct.name },
+          ],
+        },
+      });
+
+      if (!destinationProduct) {
+        destinationProduct = await tx.product.create({
+          data: {
+            categoryId: sourceProduct.categoryId,
+            sku: null,
+            name: sourceProduct.name,
+            rawName: sourceProduct.rawName,
+            brand: sourceProduct.brand,
+            nameKey: sourceProduct.nameKey || buildProductNameKey(sourceProduct.name),
+            unit: sourceProduct.unit,
+            baseUnitName: sourceProduct.baseUnitName,
+            purchaseCostPrice: sourceProduct.purchaseCostPrice,
+            expensePercent: Number(sourceProduct.expensePercent || 0),
+            costPrice: sourceProduct.costPrice,
+            sellingPrice: sourceProduct.sellingPrice,
+            minStock: sourceProduct.minStock,
+            initialStock: 0,
+            totalIncoming: 0,
+            stock: 0,
+            photoUrl: sourceProduct.photoUrl,
+            active: true,
+            warehouseId: toWarehouseId,
+          },
+        });
+
+        if (Array.isArray(sourceProduct.packagings) && sourceProduct.packagings.length > 0) {
+          await tx.productPackaging.createMany({
+            data: sourceProduct.packagings.map((packaging: any) => ({
+              productId: destinationProduct.id,
+              warehouseId: toWarehouseId,
+              packageName: packaging.packageName,
+              baseUnitName: packaging.baseUnitName,
+              unitsPerPackage: packaging.unitsPerPackage,
+              packageSellingPrice: packaging.packageSellingPrice,
+              barcode: packaging.barcode,
+              active: packaging.active,
+              isDefault: packaging.isDefault,
+              sortOrder: packaging.sortOrder,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
       // 1. Find batches in source warehouse
       const sourceBatches = await tx.productBatch.findMany({
         where: {
@@ -171,7 +241,7 @@ export class StockService {
         // We create a NEW batch in destination to preserve cost price info from the source batch
         await tx.productBatch.create({
           data: {
-            productId,
+            productId: destinationProduct.id,
             warehouseId: toWarehouseId,
             quantity: takeFromBatch,
             remainingQuantity: takeFromBatch,
@@ -200,7 +270,7 @@ export class StockService {
       // Incoming to destination
       await tx.inventoryTransaction.create({
         data: {
-          productId,
+          productId: destinationProduct.id,
           warehouseId: toWarehouseId,
           userId,
           qtyChange: quantity,
@@ -211,8 +281,9 @@ export class StockService {
 
       // 3. Update product cache stock
       await this.updateProductStockCache(productId, tx);
+      await this.updateProductStockCache(destinationProduct.id, tx);
 
-      return { success: true };
+      return { success: true, destinationProductId: destinationProduct.id };
     });
   }
 
