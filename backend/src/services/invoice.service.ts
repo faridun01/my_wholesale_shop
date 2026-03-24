@@ -83,6 +83,8 @@ export class InvoiceService {
       const products = await tx.product.findMany({
         where: {
           id: { in: items.map((item) => item.productId) },
+          warehouseId,
+          active: true,
         },
         include: {
           packagings: {
@@ -96,6 +98,10 @@ export class InvoiceService {
       }
 
       const productsById = new Map<number, any>(products.map((product: any) => [product.id, product]));
+
+      if (products.length !== items.length) {
+        throw new Error('Один или несколько товаров не принадлежат выбранному складу');
+      }
 
       // 1. Calculate totals
       let totalAmount = 0;
@@ -144,6 +150,10 @@ export class InvoiceService {
 
         if (!product) {
           throw new Error(`Product ${item.productId} not found`);
+        }
+
+        if (Number(product.warehouseId) !== Number(warehouseId)) {
+          throw new Error(`Товар ${product.name} не принадлежит выбранному складу`);
         }
 
         const packaging = item.packagingId

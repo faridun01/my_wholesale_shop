@@ -230,8 +230,18 @@ export default function POSView() {
   useEffect(() => {
     const effectiveWarehouseId = warehouseId || (userWarehouseId ? String(userWarehouseId) : '');
 
+    if (!effectiveWarehouseId) {
+      setProducts([]);
+      return;
+    }
+
     getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined)
-      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const normalizedProducts = Array.isArray(data) ? data : [];
+        setProducts(
+          normalizedProducts.filter((product) => Number(product?.warehouseId) === Number(effectiveWarehouseId)),
+        );
+      })
       .catch(console.error);
   }, [warehouseId, userWarehouseId]);
 
@@ -325,6 +335,25 @@ export default function POSView() {
       localStorage.setItem(warehouseStorageKey, warehouseId);
     }
   }, [warehouseId]);
+
+  const resetSaleDraft = (showToast = false) => {
+    setCart([]);
+    setCustomerId(null);
+    setCustomerSearch('');
+    setPaidAmount('');
+    setDiscount(0);
+    setPaymentMethod('cash');
+    sessionStorage.removeItem(cartStorageKey);
+    localStorage.removeItem(cartStorageKey);
+    sessionStorage.removeItem(pendingCartStorageKey);
+    localStorage.removeItem(pendingCartStorageKey);
+
+    if (showToast) {
+      toast('Склад изменён. Черновик продажи сброшен автоматически.', {
+        icon: '↺',
+      });
+    }
+  };
 
   const addToCart = (product: any) => {
     if (productListRef.current) {
@@ -568,6 +597,17 @@ export default function POSView() {
       return;
     }
 
+    const selectedWarehouseId = Number(warehouseId);
+    const invalidCartItem = cart.find((item) => {
+      const currentProduct = products.find((product) => product.id === item.id);
+      return !currentProduct || Number(currentProduct.warehouseId) !== selectedWarehouseId;
+    });
+
+    if (invalidCartItem) {
+      toast.error('В корзине есть товар не из выбранного склада. Очистите корзину или выберите правильный склад.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
 
@@ -609,6 +649,10 @@ export default function POSView() {
   };
 
   const filteredProducts = products.filter((product) => {
+    if (warehouseId && Number(product.warehouseId) !== Number(warehouseId)) {
+      return false;
+    }
+
     if (product.stock <= 0) return false;
 
     const query = deferredProductSearch.trim().toLowerCase();
@@ -689,8 +733,11 @@ export default function POSView() {
                         <select
                           value={warehouseId}
                           onChange={(e) => {
-                            setWarehouseId(e.target.value);
-                            setCart([]);
+                            const nextWarehouseId = e.target.value;
+                            const shouldResetDraft =
+                              cart.length > 0 || customerId !== null || Number(paidAmount || 0) > 0 || discount > 0;
+                            setWarehouseId(nextWarehouseId);
+                            resetSaleDraft(shouldResetDraft);
                           }}
                           disabled={!isAdmin}
                           className="min-w-[170px] appearance-none bg-transparent text-sm text-slate-700 outline-none"
