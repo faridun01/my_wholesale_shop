@@ -1361,11 +1361,21 @@ export default function ProductsView() {
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-8">
                 <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
-                  <p className="mt-2 text-sm font-medium text-slate-600">
-                    Считываем все данные из накладной, автоматически считаем количество в штуках, цену мешка в сомони и закупку за 1 шт.
-                    На склад добавляются только нужные поля: название, артикул, количество в шт, себестоимость за 1 шт и цена продажи.
-                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
+                      <p className="mt-2 text-sm font-medium text-slate-600">
+                        Считываем все данные из накладной, автоматически считаем количество в штуках, цену мешка в сомони и закупку за 1 шт.
+                        На склад добавляются только нужные поля: название, артикул, количество в шт, себестоимость за 1 шт и цена продажи.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Позиции</span>
+                      <span className="rounded-xl bg-sky-500 px-2.5 py-1 text-sm font-black text-white">
+                        {ocrResults.filter((entry) => entry.enabled !== false).length}/{ocrResults.length}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div className="hidden grid-cols-12 gap-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:grid">
                   <div className="col-span-4">Товар</div>
@@ -1380,19 +1390,24 @@ export default function ProductsView() {
                     item.enabled === false ? "bg-slate-100 opacity-65" : "bg-sky-50 hover:bg-sky-100/50"
                   )}>
                     <div className="sm:col-span-4">
-                      <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
-                        <input
-                          type="checkbox"
-                          checked={item.enabled !== false}
-                          onChange={(e) => {
-                            const newResults = [...ocrResults];
-                            newResults[i].enabled = e.target.checked;
-                            setOcrResults(newResults);
-                          }}
-                          className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
-                        />
-                        Добавить строку #{item.lineIndex || i + 1}
-                      </label>
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
+                          <input
+                            type="checkbox"
+                            checked={item.enabled !== false}
+                            onChange={(e) => {
+                              const newResults = [...ocrResults];
+                              newResults[i].enabled = e.target.checked;
+                              setOcrResults(newResults);
+                            }}
+                            className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                          />
+                          Добавить строку #{item.lineIndex || i + 1}
+                        </label>
+                        <span className="shrink-0 rounded-xl bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 ring-1 ring-sky-100">
+                          #{item.lineIndex || i + 1}
+                        </span>
+                      </div>
                       <p className="font-bold text-slate-900 break-words whitespace-normal">{formatProductName(item.name || item.rawName)}</p>
                       {item.rawQuantity && (
                         <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>

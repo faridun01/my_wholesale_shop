@@ -95,6 +95,33 @@ export default function SettingsView() {
     companyProfile.addressLine,
     companyProfile.phone,
   ].filter(Boolean);
+  const activeTabMeta = {
+    warehouses: {
+      title: 'Точки продаж и склады',
+      description: 'Управляйте филиалами, адресами и основным складом системы.',
+      icon: Warehouse,
+      accent: 'text-sky-600 bg-sky-50 border-sky-100',
+    },
+    users: {
+      title: 'Пользователи и роли',
+      description: 'Контролируйте доступ команды, роли сотрудников и двухфакторную защиту.',
+      icon: Users,
+      accent: 'text-violet-600 bg-violet-50 border-violet-100',
+    },
+    profile: {
+      title: 'Профиль и безопасность',
+      description: 'Обновляйте логин, пароль и персональные параметры входа.',
+      icon: User,
+      accent: 'text-emerald-600 bg-emerald-50 border-emerald-100',
+    },
+    general: {
+      title: 'Профиль компании',
+      description: 'Реквизиты компании и системные параметры для печати и каталога.',
+      icon: SettingsIcon,
+      accent: 'text-amber-600 bg-amber-50 border-amber-100',
+    },
+  } as const;
+  const currentTabMeta = activeTabMeta[activeTab];
 
   useEffect(() => {
     fetchData();
@@ -319,55 +346,72 @@ export default function SettingsView() {
 
   return (
     <div className="app-page-shell app-page-pad">
-      <div className="w-full space-y-6 pb-20">
-      <section className="app-surface p-5 sm:px-6 sm:py-6">
-        <div className="space-y-2">
-          <p className="text-sm text-slate-500">Система</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Настройки</h1>
-          <p className="max-w-2xl text-sm leading-6 text-slate-500">Управление складами, пользователями, профилем и общими параметрами системы.</p>
-        </div>
-      </section>
-      <div className="hidden">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900">Настройки</h1>
-        <p className="text-slate-500 mt-1 font-medium">Настройте параметры системы и управляйте доступом.</p>
-      </div>
+      <div className="w-full pb-20">
+        <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[#f8fafc] shadow-[0_18px_60px_-36px_rgba(15,23,42,0.28)]">
+          <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Настройки системы</p>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{currentTabMeta.title}</h1>
+              <p className="max-w-2xl text-sm leading-6 text-slate-500">{currentTabMeta.description}</p>
+            </div>
+            {activeTab === 'general' && canManageSettings ? (
+              <button
+                type="button"
+                onClick={() => (document.getElementById('company-profile-form') as HTMLFormElement | null)?.requestSubmit()}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition-all hover:bg-orange-600"
+              >
+                <CheckCircle2 size={16} />
+                <span>Сохранить изменения</span>
+              </button>
+            ) : null}
+          </div>
 
-      <section className="space-y-4">
-      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm">
-      <div className="grid w-full grid-cols-2 gap-1 sm:flex sm:w-fit sm:flex-wrap">
-        <button 
-          onClick={() => setActiveTab('warehouses')}
-          className={`flex items-center justify-center space-x-2 rounded-[18px] px-4 py-3 text-sm font-semibold transition-all sm:justify-start sm:px-5 sm:py-3 ${activeTab === 'warehouses' ? tabTheme.warehouses : 'text-slate-500 hover:bg-sky-50 hover:text-sky-700'}`}
-        >
-          <Warehouse size={18} />
-          <span>Склады</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center justify-center space-x-2 rounded-[18px] px-4 py-3 text-sm font-semibold transition-all sm:justify-start sm:px-5 sm:py-3 ${activeTab === 'users' ? tabTheme.users : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'}`}
-        >
-          <Users size={18} />
-          <span>Пользователи</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center justify-center space-x-2 rounded-[18px] px-4 py-3 text-sm font-semibold transition-all sm:justify-start sm:px-5 sm:py-3 ${activeTab === 'profile' ? tabTheme.profile : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
-        >
-          <User size={18} />
-          <span>Профиль</span>
-        </button>
-        {canManageSettings && (
-          <button 
-            onClick={() => setActiveTab('general')}
-            className={`flex items-center justify-center space-x-2 rounded-[18px] px-4 py-3 text-sm font-semibold transition-all sm:justify-start sm:px-5 sm:py-3 ${activeTab === 'general' ? tabTheme.general : 'text-slate-500 hover:bg-amber-50 hover:text-amber-700'}`}
-          >
-            <SettingsIcon size={18} />
-            <span>Общие</span>
-          </button>
-        )}
-      </div>
-      </div>
-      </section>
+          <div className="grid gap-6 p-4 xl:grid-cols-[270px_minmax(0,1fr)] xl:p-6">
+            <aside className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="space-y-2">
+                <p className="px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Разделы</p>
+                {canManageSettings && (
+                  <button
+                    onClick={() => setActiveTab('general')}
+                    className={`flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'general' ? tabTheme.general : 'text-slate-500 hover:bg-amber-50 hover:text-amber-700'}`}
+                  >
+                    <SettingsIcon size={18} />
+                    <span>Профиль компании</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveTab('warehouses')}
+                  className={`flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'warehouses' ? tabTheme.warehouses : 'text-slate-500 hover:bg-sky-50 hover:text-sky-700'}`}
+                >
+                  <Warehouse size={18} />
+                  <span>Склады и точки</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className={`flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'users' ? tabTheme.users : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'}`}
+                >
+                  <Users size={18} />
+                  <span>Пользователи и роли</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={`flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'profile' ? tabTheme.profile : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                >
+                  <User size={18} />
+                  <span>Профиль</span>
+                </button>
+              </div>
+
+              <div className="mt-6 rounded-[24px] border border-slate-100 bg-slate-50 p-4">
+                <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${currentTabMeta.accent}`}>
+                  <currentTabMeta.icon size={22} />
+                </div>
+                <p className="mt-4 text-sm font-black text-slate-900">{currentTabMeta.title}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">{currentTabMeta.description}</p>
+              </div>
+            </aside>
+
+            <div className="min-w-0 space-y-8">
 
       <AnimatePresence>
         {(showAddWarehouse || showEditWarehouse) && (
@@ -953,7 +997,7 @@ export default function SettingsView() {
           <TwoFactorSettingsCard currentUser={currentUser} />
         </div>
       )}
-        {activeTab === 'general' && (
+      {activeTab === 'general' && (
           <div className="max-w-5xl space-y-8">
             <div className="overflow-hidden rounded-[28px] border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-slate-50 shadow-[0_16px_40px_-30px_rgba(245,158,11,0.28)]">
               <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-[1.2fr_1fr]">
@@ -992,7 +1036,7 @@ export default function SettingsView() {
                 <p className="text-slate-500 mt-3 font-medium">Эти данные будут подставляться в печатную накладную. После изменения новые данные будут печататься автоматически.</p>
               </div>
 
-              <form onSubmit={handleSaveCompanyProfile} className="space-y-5">
+              <form id="company-profile-form" onSubmit={handleSaveCompanyProfile} className="space-y-5">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Название компании</label>
@@ -1125,6 +1169,9 @@ export default function SettingsView() {
           </div>
         </div>
       )}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

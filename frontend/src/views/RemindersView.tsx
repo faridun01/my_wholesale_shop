@@ -68,13 +68,30 @@ function startOfDay(date: Date) {
   return next;
 }
 
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseReminderDate(value: string) {
+  const normalized = String(value || '').trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+  }
+
+  return new Date(normalized);
+}
+
 function sameDay(left: Date, right: Date) {
   return startOfDay(left).getTime() === startOfDay(right).getTime();
 }
 
 function getReminderBucket(reminder: ReminderItem, now: Date) {
   if (reminder.isCompleted) return 'completed' as const;
-  const dueDate = new Date(reminder.dueDate);
+  const dueDate = parseReminderDate(reminder.dueDate);
   const today = startOfDay(now);
   const dueStart = startOfDay(dueDate);
   if (dueStart.getTime() < today.getTime()) return 'overdue' as const;
@@ -95,14 +112,14 @@ function buildCalendarDays(activeMonth: Date) {
 }
 
 function formatDueLabel(value: string, bucket: 'overdue' | 'today' | 'upcoming' | 'completed') {
-  const date = new Date(value);
+  const date = parseReminderDate(value);
   if (bucket === 'today') {
-    return `Сегодня, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+    return 'Сегодня';
   }
   if (bucket === 'overdue') {
-    return date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   }
-  return date.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
 function getTypeMeta(type?: string | null) {
@@ -146,7 +163,7 @@ export default function RemindersView() {
 
   const openCreateModal = () => {
     setSelectedReminder(null);
-    setReminderForm({ ...EMPTY_FORM, dueDate: new Date().toISOString().slice(0, 10) });
+    setReminderForm({ ...EMPTY_FORM, dueDate: formatDateInputValue(new Date()) });
     setShowModal(true);
   };
 
@@ -211,7 +228,7 @@ export default function RemindersView() {
         const bucket = getReminderBucket(reminder, now);
         return filterTab === 'all' ? true : bucket === filterTab;
       })
-      .sort((a, b) => new Date(a.dueDate || a.createdAt || 0).getTime() - new Date(b.dueDate || b.createdAt || 0).getTime());
+      .sort((a, b) => parseReminderDate(a.dueDate || a.createdAt || '').getTime() - parseReminderDate(b.dueDate || b.createdAt || '').getTime());
   }, [filterTab, now, reminders, searchTerm]);
 
   const groupedReminders = useMemo(() => {
@@ -485,7 +502,7 @@ export default function RemindersView() {
                   {monthDays.map((day) => {
                     const isCurrentMonth = day.getMonth() === activeMonth.getMonth();
                     const isToday = sameDay(day, now);
-                    const hasReminders = reminders.some((reminder) => sameDay(new Date(reminder.dueDate), day));
+                    const hasReminders = reminders.some((reminder) => sameDay(parseReminderDate(reminder.dueDate), day));
 
                     return (
                       <div
