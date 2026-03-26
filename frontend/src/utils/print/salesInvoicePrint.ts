@@ -52,6 +52,8 @@ export function printSalesInvoice({
     return sellingPricePerUnit;
   };
 
+  const getUnitPrice = (item: any) => Number(item.sellingPrice || 0);
+
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
         .map(
@@ -61,6 +63,7 @@ export function printSalesInvoice({
               <td>${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</td>
               <td>${escapeHtml(item.quantityLabel || `${item.quantity} ${item.unit || ''}`)}</td>
               <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
+              <td>${escapeHtml(formatMoney(getUnitPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
             </tr>
           `,
@@ -123,7 +126,8 @@ export function printSalesInvoice({
                   <th style="width: 52px;">№</th>
                   <th>Товар</th>
                   <th style="width: 150px;">Количество</th>
-                  <th style="width: 140px;">Цена</th>
+                  <th style="width: 140px;">Цена за упаковку</th>
+                  <th style="width: 140px;">Цена за штуку</th>
                   <th style="width: 140px;">Сумма</th>
                 </tr>
               </thead>
