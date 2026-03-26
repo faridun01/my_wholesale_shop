@@ -2,7 +2,7 @@ import { GoogleGenAI as OCRProviderClient, Type as OCRSchemaType } from "@google
 import fs from 'fs';
 
 export class OCRService {
-  private static readonly MAX_RETRIES = 3;
+  private static readonly MAX_RETRIES = 5;
 
   private static readonly OCR_PROMPT = `Extract invoice items from this invoice as separate rows.
 Requirements:
@@ -62,7 +62,8 @@ Return only a JSON array of objects with "lineIndex", "rawName", "name", "brand"
           status === 503 ||
           message.includes('503') ||
           message.includes('UNAVAILABLE') ||
-          message.includes('high demand');
+          message.includes('high demand') ||
+          message.toLowerCase().includes('overloaded');
 
         if (!isBusyModel || attempt === OCRService.MAX_RETRIES) {
           if (isBusyModel) {
@@ -74,7 +75,8 @@ Return only a JSON array of objects with "lineIndex", "rawName", "name", "brand"
           throw error;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        const delayMs = Math.min(12000, 1500 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 500);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
