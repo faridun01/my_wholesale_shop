@@ -44,7 +44,7 @@ export default function HistoryView() {
   };
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full space-y-8">
       <div className="flex justify-between items-center">
         <div>

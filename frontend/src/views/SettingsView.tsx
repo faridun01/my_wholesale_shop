@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import { getCurrentUser } from '../utils/userAccess';
 import { updateStoredUser } from '../utils/authStorage';
 import TwoFactorSettingsCard from '../components/settings/TwoFactorSettingsCard';
+import UserTwoFactorModal from '../components/settings/UserTwoFactorModal';
 
 export default function SettingsView() {
   const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
@@ -58,6 +59,7 @@ export default function SettingsView() {
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
+  const [showUserTwoFactorModal, setShowUserTwoFactorModal] = useState(false);
   const [newUser, setNewUser] = useState({ 
     username: '', 
     password: '', 
@@ -259,8 +261,8 @@ export default function SettingsView() {
         canDeleteData: false
       });
       fetchData();
-    } catch (err) {
-      toast.error('Ошибка при создании пользователя');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при создании пользователя');
     }
   };
 
@@ -285,8 +287,8 @@ export default function SettingsView() {
       setShowEditUser(false);
       setSelectedUser(null);
       fetchData();
-    } catch (err) {
-      toast.error('Ошибка при обновлении пользователя');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при обновлении пользователя');
     }
   };
 
@@ -345,7 +347,7 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full pb-20">
         <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[#f8fafc] shadow-[0_18px_60px_-36px_rgba(15,23,42,0.28)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
@@ -553,6 +555,9 @@ export default function SettingsView() {
                       className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-bold" 
                       placeholder="••••••••"
                     />
+                    <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
+                      Минимум 8 символов, обязательно: большая буква, маленькая буква и цифра.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2 uppercase tracking-widest">Повтор нового пароля</label>
@@ -884,8 +889,22 @@ export default function SettingsView() {
                       </div>
                     </td>
                     <td className="px-10 py-6 text-right">
-                      <div className="flex justify-end space-x-2 opacity-0 transition-all duration-300 group-hover:opacity-100">
+                      <div className="flex justify-end space-x-2 opacity-100 transition-all duration-300 sm:opacity-0 sm:group-hover:opacity-100">
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowUserTwoFactorModal(true);
+                            }}
+                            className="text-slate-300 hover:text-violet-600 p-3 hover:bg-violet-50 rounded-xl transition-all"
+                            title="Управлять 2FA"
+                          >
+                            <ShieldCheck size={20} />
+                          </button>
+                        ) : null}
                         <button 
+                          type="button"
                           onClick={() => {
                             setSelectedUser(u);
                             setNewUser({
@@ -904,6 +923,7 @@ export default function SettingsView() {
                           <Edit size={20} />
                         </button>
                         <button 
+                          type="button"
                           onClick={() => {
                             setSelectedUser(u);
                             setShowDeleteUserConfirm(true);
@@ -921,6 +941,18 @@ export default function SettingsView() {
           </div>
         </div>
       )}
+
+      <UserTwoFactorModal
+        isOpen={showUserTwoFactorModal}
+        user={selectedUser}
+        onClose={() => {
+          setShowUserTwoFactorModal(false);
+          setSelectedUser(null);
+        }}
+        onUpdated={() => {
+          fetchData();
+        }}
+      />
 
       {activeTab === 'profile' && (
         <div className="max-w-4xl space-y-8">

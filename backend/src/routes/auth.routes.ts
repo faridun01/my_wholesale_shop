@@ -195,4 +195,37 @@ router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRe
   }
 });
 
+router.post('/users/:id/2fa/setup', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+  try {
+    const result = await AuthService.createTwoFactorSetupForUser(Number(req.params.id));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/users/:id/2fa/verify-setup', authenticate, authorize(['ADMIN']), twoFactorRateLimit, async (req, res, next) => {
+  try {
+    const { setupToken, code } = req.body;
+    if (!setupToken || !code) {
+      return res.status(400).json({ error: 'setupToken and code are required' });
+    }
+
+    const result = await AuthService.verifyTwoFactorSetupForUser(Number(req.params.id), setupToken, code);
+    resetRateLimit(twoFactorRateLimitKey(req));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/users/:id/2fa/disable', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+  try {
+    const result = await AuthService.adminDisableTwoFactor(Number(req.params.id));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

@@ -270,7 +270,7 @@ export default function RemindersView() {
   ] as const;
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full">
         <div className="overflow-hidden rounded-[28px] border border-[#dfe4ff] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-[#eceffd] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-7">
@@ -471,9 +471,9 @@ export default function RemindersView() {
             <div className="space-y-5">
               <div className="rounded-[24px] border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-[28px] font-bold tracking-[-0.03em] text-slate-900">
-                    {activeMonthLabel.charAt(0).toUpperCase() + activeMonthLabel.slice(1)}
-                  </h3>
+                <h3 className="break-words text-[clamp(1.65rem,2.2vw,1.95rem)] font-bold leading-tight tracking-[-0.03em] text-slate-900">
+                  {activeMonthLabel.charAt(0).toUpperCase() + activeMonthLabel.slice(1)}
+                </h3>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -521,7 +521,7 @@ export default function RemindersView() {
                 </div>
               </div>
               <div className="rounded-[24px] border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
-                <h3 className="text-[28px] font-bold tracking-[-0.03em] text-slate-900">Статистика задач</h3>
+                <h3 className="break-words text-[clamp(1.65rem,2.1vw,1.95rem)] font-bold leading-tight tracking-[-0.03em] text-slate-900">Статистика задач</h3>
                 <div className="mt-5 space-y-4">
                   <div>
                     <div className="mb-2 flex items-center justify-between text-sm text-slate-500">
@@ -549,7 +549,7 @@ export default function RemindersView() {
               </div>
 
               <div className="rounded-[24px] border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
-                <h3 className="text-[28px] font-bold tracking-[-0.03em] text-slate-900">Категории</h3>
+                <h3 className="break-words text-[clamp(1.65rem,2.1vw,1.95rem)] font-bold leading-tight tracking-[-0.03em] text-slate-900">Категории</h3>
                 <div className="mt-4 space-y-3">
                   {Object.entries(TYPE_META).map(([key, meta]) => (
                     <div key={key} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3">

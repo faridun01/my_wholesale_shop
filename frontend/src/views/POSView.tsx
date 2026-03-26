@@ -682,7 +682,7 @@ export default function POSView() {
     .map((entry) => entry.customer);
 
   return (
-    <div className="app-page-shell app-page-pad min-h-full">
+    <div className="app-page-shell min-h-full">
       <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

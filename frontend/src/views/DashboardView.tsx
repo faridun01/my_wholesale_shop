@@ -326,7 +326,7 @@ export default function DashboardView() {
   const showSearchDropdown = searchQuery.length > 0;
 
   return (
-    <div className="app-page-shell app-page-pad min-h-full">
+    <div className="app-page-shell min-h-full">
       <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
         <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

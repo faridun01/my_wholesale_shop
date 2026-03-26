@@ -39,3 +39,18 @@ export const disableTwoFactor = async (data: { currentPassword: string; code: st
   const response = await client.post('/auth/2fa/disable', data);
   return response.data;
 };
+
+export const setupUserTwoFactor = async (userId: number) => {
+  const response = await client.post(`/auth/users/${userId}/2fa/setup`);
+  return response.data;
+};
+
+export const verifyUserTwoFactorSetup = async (userId: number, data: { setupToken: string; code: string }) => {
+  const response = await client.post(`/auth/users/${userId}/2fa/verify-setup`, data);
+  return response.data;
+};
+
+export const disableUserTwoFactor = async (userId: number) => {
+  const response = await client.post(`/auth/users/${userId}/2fa/disable`);
+  return response.data;
+};

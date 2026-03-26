@@ -6,7 +6,6 @@ import {
   BookOpen,
   Calendar,
   ChevronLeft,
-  ChevronRight,
   History,
   LayoutDashboard,
   LogOut,
@@ -143,7 +142,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                   ? 'justify-center rounded-full border border-[#223041] bg-[#182331] p-2.5 shadow-[0_8px_20px_rgba(8,15,26,0.28)] hover:bg-[#1d2a3b]'
                   : 'gap-3',
               )}
-              title={isCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              title={isCollapsed ? 'Развернуть меню' : 'Открыть главную'}
             >
               <div
                 className={clsx(
@@ -170,6 +169,16 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
               <ChevronLeft size={18} />
             </button>
 
+            {!isCollapsed && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="ml-auto hidden h-9 w-9 items-center justify-center rounded-xl bg-[#1a2533] text-[#c9d5e3] transition-all hover:bg-[#233243] hover:text-white lg:flex"
+                title="Свернуть меню"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -237,7 +246,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           </div>
         </nav>
 
-        <div className={clsx('mt-auto pb-4 pt-3', isCollapsed ? 'px-3' : 'px-3')}>
+        <div className="mt-auto px-3 pb-4 pt-3">
           <div
             className={clsx(
               'relative rounded-[18px] border border-[#223041] bg-[#182331]',

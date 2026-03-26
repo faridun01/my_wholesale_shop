@@ -152,6 +152,7 @@ export default function ProductsView() {
   const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', reason: '' });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [usdRate, setUsdRate] = useState<string>('10.95'); // Default rate
+  const [scanExpensePercent, setScanExpensePercent] = useState<string>('0');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
 
@@ -371,6 +372,7 @@ export default function ProductsView() {
         setOcrResults([]);
         return;
       }
+      setScanExpensePercent('0');
       setOcrResults(items);
       toast.success('Накладная успешно отсканирована!');
     } catch (err: any) {
@@ -392,6 +394,7 @@ export default function ProductsView() {
   const handleAddOcrToStock = async () => {
     if (!ocrResults || !selectedWarehouseId) return;
     const rate = parseFloat(usdRate) || 1;
+    const sharedExpensePercent = Math.max(0, Number(scanExpensePercent || 0));
     try {
       setIsLoading(true);
       const categoryCache = new Map(
@@ -435,7 +438,7 @@ export default function ProductsView() {
           const price = Number(item.price || 0);
           const lineTotal = Number(item.lineTotal || 0);
           const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0;
-          const expensePercent = Number(item.expensePercent || 0);
+          const expensePercent = sharedExpensePercent;
           const costPricePerPieceTJS =
             lineTotal > 0 && quantity > 0
               ? (lineTotal * rate) / quantity
@@ -889,7 +892,7 @@ export default function ProductsView() {
   });
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="space-y-6">
       <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1357,23 +1360,40 @@ export default function ProductsView() {
               onClick={(e) => e.stopPropagation()}
               className="flex max-h-[96vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4 sm:p-8">
-                <div className="min-w-0">
-                  <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Результаты сканирования</h3>
-                  <p className="text-slate-500 font-bold">Показываем все распознанные детали. На склад добавятся только нужные поля.</p>
-                </div>
-                <div className="ml-3 flex shrink-0 items-center space-x-3 rounded-2xl border border-sky-100 bg-sky-50 p-3 shadow-sm sm:space-x-4 sm:p-4">
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Курс USD ($)</p>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      value={usdRate}
-                      onChange={(e) => setUsdRate(e.target.value)}
-                      className="w-24 text-right font-black text-sky-600 outline-none"
-                    />
+              <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Результаты сканирования</h3>
                   </div>
-                  <DollarSign className="text-sky-300" size={20} />
+                  <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Курс USD ($)</p>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={usdRate}
+                          onChange={(e) => setUsdRate(e.target.value)}
+                          className="w-24 bg-transparent text-left font-black text-sky-600 outline-none"
+                        />
+                        <DollarSign className="text-sky-300" size={18} />
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-violet-100 bg-white px-4 py-3 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Общие расходы %</p>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={scanExpensePercent}
+                          onChange={(e) => setScanExpensePercent(e.target.value)}
+                          className="w-20 bg-transparent text-left font-black text-violet-600 outline-none"
+                        />
+                        <span className="text-sm font-black text-slate-300">%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-8">
@@ -1382,8 +1402,7 @@ export default function ProductsView() {
                     <div>
                       <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
                       <p className="mt-2 text-sm font-medium text-slate-600">
-                        Считываем все данные из накладной, автоматически считаем количество в штуках, цену мешка в сомони и закупку за 1 шт.
-                        На склад добавляются только нужные поля: название, артикул, количество в шт, себестоимость за 1 шт и цена продажи.
+                        Количество и закупка пересчитываются автоматически. Измените только то, что нужно перед добавлением на склад.
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
@@ -1403,7 +1422,7 @@ export default function ProductsView() {
                 </div>
                 {ocrResults.map((item, i) => (
                   <div key={i} className={clsx(
-                    "grid grid-cols-1 gap-4 rounded-2xl p-4 transition-colors sm:grid-cols-12 sm:items-center",
+                    "grid grid-cols-1 gap-4 rounded-[28px] border p-4 transition-colors sm:grid-cols-12 sm:items-center sm:p-5",
                     item.enabled === false ? "bg-slate-100 opacity-65" : "bg-sky-50 hover:bg-sky-100/50"
                   )}>
                     <div className="sm:col-span-4">
@@ -1482,10 +1501,10 @@ export default function ProductsView() {
                         }}
                         className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-right text-sm font-black text-slate-900 outline-none focus:border-sky-500"
                       />
-                      <p className="text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))} / мешок</p>
+                      <p className="mt-1 text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))} / упаковка</p>
                     </div>
                     <div className="sm:col-span-2 sm:text-right">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">За 1 шт</p>
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Наша закупка</p>
                       {(() => {
                         const quantity =
                           item.packageCount > 0 && item.unitsPerPackage > 0
@@ -1499,7 +1518,7 @@ export default function ProductsView() {
                               : quantity > 0
                                 ? (item.price * parseFloat(usdRate || '0')) / quantity
                                 : 0;
-                        const expensePercent = Number(item.expensePercent || 0);
+                        const expensePercent = Math.max(0, Number(scanExpensePercent || 0));
                         const effectiveCostPerPiece = baseCostPerPiece + (baseCostPerPiece * Math.max(0, expensePercent) / 100);
 
                         return (
@@ -1510,22 +1529,9 @@ export default function ProductsView() {
                             <p className="mt-1 text-[10px] font-bold text-slate-400">
                               база: {formatMoney(baseCostPerPiece)}
                             </p>
-                            <div className="mt-2 flex items-center justify-end gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Расходы</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.expensePercent ?? 0}
-                                onChange={(e) => {
-                                  const newResults = [...ocrResults];
-                                  newResults[i].expensePercent = Number(e.target.value || 0);
-                                  setOcrResults(newResults);
-                                }}
-                                className="w-20 rounded-xl border border-sky-200 bg-white px-2.5 py-1.5 text-right text-xs font-black text-slate-900 outline-none focus:border-sky-500"
-                              />
-                              <span className="text-xs font-black text-slate-400">%</span>
-                            </div>
+                            <p className="mt-2 text-[10px] font-bold text-slate-400">
+                              расходы: {toFixedNumber(expensePercent)}%
+                            </p>
                           </>
                         );
                       })()}

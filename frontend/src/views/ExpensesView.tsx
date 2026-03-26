@@ -153,7 +153,7 @@ export default function ExpensesView() {
   };
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full space-y-6">
         <div className="overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">

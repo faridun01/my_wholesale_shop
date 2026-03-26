@@ -332,7 +332,7 @@ export default function CustomerView() {
   };
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full space-y-6">
         <div className="app-surface app-surface-header">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

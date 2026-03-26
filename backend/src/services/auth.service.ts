@@ -297,6 +297,10 @@ export class AuthService {
   }
 
   static async createTwoFactorSetup(userId: number) {
+    return this.createTwoFactorSetupForUser(userId);
+  }
+
+  static async createTwoFactorSetupForUser(userId: number) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, username: true, active: true },
@@ -332,6 +336,10 @@ export class AuthService {
   }
 
   static async verifyTwoFactorSetup(userId: number, setupToken: string, code: string) {
+    return this.verifyTwoFactorSetupForUser(userId, setupToken, code);
+  }
+
+  static async verifyTwoFactorSetupForUser(userId: number, setupToken: string, code: string) {
     const payload = verifyScopedToken(setupToken);
     if (payload.type !== 'two_factor_setup' || Number(payload.userId) !== Number(userId)) {
       throw createHttpError('Invalid 2FA setup session', 400);
@@ -423,6 +431,29 @@ export class AuthService {
 
     if (!verification) {
       throw createHttpError('Invalid two-factor code', 400);
+    }
+
+    const updatedUser: any = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorBackupCodes: [],
+      } as any,
+      include: { warehouse: true },
+    });
+
+    return { user: toPublicUser(updatedUser) };
+  }
+
+  static async adminDisableTwoFactor(userId: number) {
+    const user: any = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { warehouse: true },
+    });
+
+    if (!user || !user.active) {
+      throw createHttpError('User not found', 404);
     }
 
     const updatedUser: any = await prisma.user.update({

@@ -497,7 +497,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   };
 
   return (
-    <div className="app-page-shell app-page-pad">
+    <div className="app-page-shell">
       <div className="w-full space-y-6">
       <section className={`app-surface p-5 ${currentMeta.border}`}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
