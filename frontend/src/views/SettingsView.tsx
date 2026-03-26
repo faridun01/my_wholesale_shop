@@ -29,6 +29,15 @@ import UserTwoFactorModal from '../components/settings/UserTwoFactorModal';
 
 export default function SettingsView() {
   const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
+  const emptyUserForm = {
+    username: '',
+    password: '',
+    confirmPassword: '',
+    role: 'SELLER',
+    warehouseId: '',
+    canCancelInvoices: false,
+    canDeleteData: false,
+  };
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
@@ -60,15 +69,7 @@ export default function SettingsView() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
   const [showUserTwoFactorModal, setShowUserTwoFactorModal] = useState(false);
-  const [newUser, setNewUser] = useState({ 
-    username: '', 
-    password: '', 
-    confirmPassword: '',
-    role: 'SELLER', 
-    warehouseId: '',
-    canCancelInvoices: false,
-    canDeleteData: false
-  });
+  const [newUser, setNewUser] = useState(emptyUserForm);
 
   const [profileForm, setProfileForm] = useState({
     username: '',
@@ -125,6 +126,24 @@ export default function SettingsView() {
   } as const;
   const currentTabMeta = activeTabMeta[activeTab];
 
+  const closeWarehouseModal = () => {
+    setShowAddWarehouse(false);
+    setShowEditWarehouse(false);
+    resetWarehouseForm();
+  };
+
+  const closeUserModal = () => {
+    setShowAddUser(false);
+    setShowEditUser(false);
+    setSelectedUser(null);
+    setNewUser(emptyUserForm);
+  };
+
+  const closeUserTwoFactor = () => {
+    setShowUserTwoFactorModal(false);
+    setSelectedUser(null);
+  };
+
   useEffect(() => {
     fetchData();
     setProfileForm({
@@ -133,6 +152,53 @@ export default function SettingsView() {
       confirmPassword: ''
     });
   }, []);
+
+  useEffect(() => {
+    if (
+      !showAddWarehouse &&
+      !showEditWarehouse &&
+      !showAddUser &&
+      !showEditUser &&
+      !showDeleteWarehouseConfirm &&
+      !showDeleteUserConfirm &&
+      !showUserTwoFactorModal
+    ) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (showDeleteWarehouseConfirm) {
+        setShowDeleteWarehouseConfirm(false);
+        setSelectedWarehouse(null);
+        return;
+      }
+
+      if (showDeleteUserConfirm) {
+        setShowDeleteUserConfirm(false);
+        setSelectedUser(null);
+        return;
+      }
+
+      if (showUserTwoFactorModal) return closeUserTwoFactor();
+      if (showAddUser || showEditUser) return closeUserModal();
+      if (showAddWarehouse || showEditWarehouse) return closeWarehouseModal();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    showAddUser,
+    showAddWarehouse,
+    showDeleteUserConfirm,
+    showDeleteWarehouseConfirm,
+    showEditUser,
+    showEditWarehouse,
+    showUserTwoFactorModal,
+  ]);
 
   const fetchData = async () => {
     try {
@@ -250,16 +316,7 @@ export default function SettingsView() {
         warehouseId: payload.warehouseId ? Number(payload.warehouseId) : undefined
       });
       toast.success('Пользователь создан');
-      setShowAddUser(false);
-      setNewUser({ 
-        username: '', 
-        password: '', 
-        confirmPassword: '',
-        role: 'SELLER', 
-        warehouseId: '',
-        canCancelInvoices: false,
-        canDeleteData: false
-      });
+      closeUserModal();
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при создании пользователя');
@@ -284,8 +341,7 @@ export default function SettingsView() {
         warehouseId: payload.warehouseId ? Number(payload.warehouseId) : null
       });
       toast.success('Пользователь обновлен');
-      setShowEditUser(false);
-      setSelectedUser(null);
+      closeUserModal();
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при обновлении пользователя');
@@ -421,10 +477,7 @@ export default function SettingsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowAddWarehouse(false);
-              setShowEditWarehouse(false);
-            }}
+            onClick={closeWarehouseModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -440,7 +493,7 @@ export default function SettingsView() {
                   </div>
                   <span>{showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}</span>
                 </h3>
-                <button onClick={() => { setShowAddWarehouse(false); setShowEditWarehouse(false); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closeWarehouseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -491,7 +544,7 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-4">
-                  <button type="button" onClick={() => { setShowAddWarehouse(false); setShowEditWarehouse(false); }} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="button" onClick={closeWarehouseModal} className="rounded-2xl px-8 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-sky-500 px-10 py-4 font-bold text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95">
                     {showEditWarehouse ? 'Сохранить' : 'Создать'}
                   </button>
@@ -506,11 +559,7 @@ export default function SettingsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowAddUser(false);
-              setShowEditUser(false);
-              setSelectedUser(null);
-            }}
+            onClick={closeUserModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -526,7 +575,7 @@ export default function SettingsView() {
                   </div>
                   <span>{showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}</span>
                 </h3>
-                <button onClick={() => { setShowAddUser(false); setShowEditUser(false); setSelectedUser(null); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closeUserModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -596,7 +645,7 @@ export default function SettingsView() {
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
-                  <button type="button" onClick={() => { setShowAddUser(false); setShowEditUser(false); setSelectedUser(null); }} className="rounded-2xl px-6 py-3 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="button" onClick={closeUserModal} className="rounded-2xl px-6 py-3 font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-violet-500 px-8 py-3 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
                     {showEditUser ? 'Сохранить' : 'Создать'}
                   </button>
@@ -610,7 +659,10 @@ export default function SettingsView() {
       <React.Suspense fallback={null}>
         <ConfirmationModal 
           isOpen={showDeleteWarehouseConfirm}
-          onClose={() => setShowDeleteWarehouseConfirm(false)}
+          onClose={() => {
+            setShowDeleteWarehouseConfirm(false);
+            setSelectedWarehouse(null);
+          }}
           onConfirm={handleDeleteWarehouse}
           title="Удалить склад?"
           message={`Вы уверены, что хотите удалить склад "${selectedWarehouse?.name}"? Это действие нельзя отменить.`}
@@ -946,8 +998,7 @@ export default function SettingsView() {
         isOpen={showUserTwoFactorModal}
         user={selectedUser}
         onClose={() => {
-          setShowUserTwoFactorModal(false);
-          setSelectedUser(null);
+          closeUserTwoFactor();
         }}
         onUpdated={() => {
           fetchData();

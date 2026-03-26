@@ -96,9 +96,53 @@ export default function CustomerView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const PAYMENT_EPSILON = 0.01;
 
+  const closeCustomerModal = () => {
+    setIsModalOpen(false);
+    setSelectedCustomer(null);
+    setFormData(emptyForm);
+  };
+
+  const closeStatementModal = () => {
+    setIsStatementOpen(false);
+    setIsInvoiceDetailsOpen(false);
+    setSelectedInvoice(null);
+    setStatementData([]);
+    setSelectedCustomer(null);
+  };
+
+  const closeInvoiceDetailsModal = () => {
+    setIsInvoiceDetailsOpen(false);
+    setSelectedInvoice(null);
+  };
+
   useEffect(() => {
     fetchCustomers();
   }, []);
+
+  useEffect(() => {
+    if (!isModalOpen && !isStatementOpen && !isInvoiceDetailsOpen && !showDeleteConfirm) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (showDeleteConfirm) {
+        setShowDeleteConfirm(false);
+        setSelectedCustomer(null);
+        return;
+      }
+
+      if (isInvoiceDetailsOpen) return closeInvoiceDetailsModal();
+      if (isStatementOpen) return closeStatementModal();
+      if (isModalOpen) return closeCustomerModal();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isInvoiceDetailsOpen, isModalOpen, isStatementOpen, showDeleteConfirm]);
 
   const fetchCustomers = async () => {
     try {
@@ -142,9 +186,7 @@ export default function CustomerView() {
         toast.success('Клиент добавлен');
       }
 
-      setIsModalOpen(false);
-      setSelectedCustomer(null);
-      setFormData(emptyForm);
+      closeCustomerModal();
       fetchCustomers();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при сохранении');
@@ -505,7 +547,7 @@ export default function CustomerView() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeCustomerModal}
                 className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               />
               <motion.div
@@ -518,7 +560,7 @@ export default function CustomerView() {
                   <h2 className="text-2xl font-medium tracking-tight text-slate-900">
                     {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
                   </h2>
-                  <button onClick={() => setIsModalOpen(false)} className="rounded-xl p-2 transition-colors hover:bg-white">
+                  <button onClick={closeCustomerModal} className="rounded-xl p-2 transition-colors hover:bg-white">
                     <X />
                   </button>
                 </div>
@@ -641,7 +683,7 @@ export default function CustomerView() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsStatementOpen(false)}
+                onClick={closeStatementModal}
                 className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               />
               <motion.div
@@ -656,7 +698,7 @@ export default function CustomerView() {
                       <h2 className="text-3xl font-medium tracking-tight text-slate-900">{selectedCustomer.name}</h2>
                       <p className="mt-1 text-slate-500">История и баланс строятся только по накладным.</p>
                     </div>
-                    <button onClick={() => setIsStatementOpen(false)} className="rounded-2xl p-3 shadow-sm transition-colors hover:bg-white">
+                    <button onClick={closeStatementModal} className="rounded-2xl p-3 shadow-sm transition-colors hover:bg-white">
                       <X />
                     </button>
                   </div>
@@ -745,7 +787,7 @@ export default function CustomerView() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsInvoiceDetailsOpen(false)}
+                onClick={closeInvoiceDetailsModal}
                 className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               />
               <motion.div
@@ -756,7 +798,7 @@ export default function CustomerView() {
               >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
                   <h3 className="text-2xl font-medium text-slate-900">Накладная #{selectedInvoice.id}</h3>
-                  <button onClick={() => setIsInvoiceDetailsOpen(false)} className="rounded-xl p-2 transition-colors hover:bg-white">
+                  <button onClick={closeInvoiceDetailsModal} className="rounded-xl p-2 transition-colors hover:bg-white">
                     <X />
                   </button>
                 </div>
@@ -861,7 +903,7 @@ export default function CustomerView() {
                     <span>Печать</span>
                   </button>
                   <button
-                    onClick={() => setIsInvoiceDetailsOpen(false)}
+                    onClick={closeInvoiceDetailsModal}
                     className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                   >
                     Закрыть

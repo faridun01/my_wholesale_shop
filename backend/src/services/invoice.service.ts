@@ -1,6 +1,7 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
+import { roundMoney } from '../utils/money.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -65,9 +66,9 @@ export class InvoiceService {
     paymentDueDate?: string;
   }) {
     const { customerId, userId, warehouseId, items, discount = 0, tax = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
-    const normalizedDiscount = normalizeNonNegativeNumber(discount, 'Discount');
-    const normalizedTax = normalizeNonNegativeNumber(tax, 'Tax');
-    const normalizedPaidAmount = normalizeNonNegativeNumber(paidAmount, 'Paid amount');
+    const normalizedDiscount = roundMoney(normalizeNonNegativeNumber(discount, 'Discount'));
+    const normalizedTax = roundMoney(normalizeNonNegativeNumber(tax, 'Tax'));
+    const normalizedPaidAmount = roundMoney(normalizeNonNegativeNumber(paidAmount, 'Paid amount'));
 
     if (normalizedDiscount > 100) {
       throw new Error('Discount cannot exceed 100%');
@@ -107,15 +108,16 @@ export class InvoiceService {
       let totalAmount = 0;
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
-        const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
+        const sellingPrice = roundMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'));
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
 
-        totalAmount += quantity * sellingPrice;
+        totalAmount += roundMoney(quantity * sellingPrice);
       }
 
-      const netAmount = totalAmount - (totalAmount * normalizedDiscount / 100) + normalizedTax;
+      totalAmount = roundMoney(totalAmount);
+      const netAmount = roundMoney(totalAmount - (totalAmount * normalizedDiscount / 100) + normalizedTax);
       const status = getInvoiceStatus(normalizedPaidAmount, Number(netAmount));
 
       // 2. Create Invoice
@@ -145,7 +147,7 @@ export class InvoiceService {
       // 3. Create Items and Allocate Stock
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
-        const sellingPrice = normalizeNonNegativeNumber(item.sellingPrice, 'Item price');
+        const sellingPrice = roundMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'));
         const product = productsById.get(item.productId);
 
         if (!product) {
@@ -187,7 +189,7 @@ export class InvoiceService {
             rawNameSnapshot: item.rawName || product.rawName || null,
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
-            totalPrice: quantity * sellingPrice,
+            totalPrice: roundMoney(quantity * sellingPrice),
           },
         });
 
@@ -208,7 +210,7 @@ export class InvoiceService {
             customerId,
             invoiceId: invoice.id,
             userId,
-            amount: normalizedPaidAmount,
+            amount: roundMoney(normalizedPaidAmount),
             method: paymentMethod,
           },
         });
@@ -451,7 +453,7 @@ export class InvoiceService {
         });
 
         // 4. Calculate refund value
-        totalRefundValue += Number(originalItem.sellingPrice) * returnItem.quantity;
+        totalRefundValue += roundMoney(Number(originalItem.sellingPrice) * returnItem.quantity);
       }
 
       for (const productId of affectedProductIds) {
@@ -471,8 +473,9 @@ export class InvoiceService {
 
       // 6. Update invoice returned amount and net amount
       // We subtract the return from the net amount to reduce debt
-      const newReturnedAmount = Number(invoice.returnedAmount) + totalRefundValue;
-      const newNetAmount = Number(invoice.netAmount) - totalRefundValue;
+      totalRefundValue = roundMoney(totalRefundValue);
+      const newReturnedAmount = roundMoney(Number(invoice.returnedAmount) + totalRefundValue);
+      const newNetAmount = roundMoney(Number(invoice.netAmount) - totalRefundValue);
       
       // Update status based on new net amount
       const status = getInvoiceStatus(Number(invoice.paidAmount), Number(newNetAmount));
@@ -486,7 +489,7 @@ export class InvoiceService {
         }
       });
 
-      return { success: true, refundAmount: totalRefundValue };
+      return { success: true, refundAmount: roundMoney(totalRefundValue) };
     }, TRANSACTION_OPTIONS);
   }
 }

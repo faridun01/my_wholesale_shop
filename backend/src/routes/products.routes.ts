@@ -11,6 +11,7 @@ import {
   normalizeProductName,
   parsePackagingFromRawName,
 } from '../utils/product-packaging.js';
+import { roundMoney } from '../utils/money.js';
 
 const router = Router();
 
@@ -170,9 +171,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const finalName = canonicalName || normalizedName.name;
     const parsedPackaging = packaging || parsePackagingFromRawName(rest.rawName || rest.name);
     const resolvedBaseUnitName = normalizeBaseUnitName(rest.baseUnitName || parsedPackaging?.baseUnitName || rest.unit);
-    const resolvedPurchaseCostPrice = Number(purchaseCostPrice ?? costPrice ?? 0);
+    const resolvedPurchaseCostPrice = roundMoney(purchaseCostPrice ?? costPrice ?? 0);
     const resolvedExpensePercent = Number(expensePercent ?? 0);
-    const resolvedEffectiveCostPrice = calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent);
+    const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
     // Check for unique constraints
     const existingProducts = await prisma.product.findMany({
@@ -214,6 +215,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         stock: 0,
         warehouseId: wId,
         costPrice: resolvedEffectiveCostPrice,
+        sellingPrice: roundMoney(rest.sellingPrice || 0),
       },
     });
 
@@ -225,7 +227,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         packageName: normalizePackageName(entry.packageName),
         baseUnitName: normalizeBaseUnitName(entry.baseUnitName || resolvedBaseUnitName),
         unitsPerPackage: Number(entry.unitsPerPackage || 0),
-        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? Number(entry.packageSellingPrice) : null,
+        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
         barcode: entry.barcode ? String(entry.barcode) : null,
         isDefault: Boolean(entry.isDefault ?? index === 0),
         sortOrder: Number(entry.sortOrder || index),
@@ -244,7 +246,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       data: {
         productId: product.id,
         costPrice: resolvedEffectiveCostPrice,
-        sellingPrice: Number(rest.sellingPrice || 0),
+        sellingPrice: roundMoney(rest.sellingPrice || 0),
       }
     });
 
@@ -297,12 +299,12 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       : access.warehouseId;
     const nextBaseUnitName = normalizeBaseUnitName(productPayload.baseUnitName || oldProduct.baseUnitName || oldProduct.unit);
     const nextPurchaseCostPrice = productPayload.purchaseCostPrice !== undefined
-      ? Number(productPayload.purchaseCostPrice)
-      : (productPayload.costPrice !== undefined ? Number(productPayload.costPrice) : Number(oldProduct.purchaseCostPrice ?? oldProduct.costPrice));
+      ? roundMoney(productPayload.purchaseCostPrice)
+      : (productPayload.costPrice !== undefined ? roundMoney(productPayload.costPrice) : roundMoney(oldProduct.purchaseCostPrice ?? oldProduct.costPrice));
     const nextExpensePercent = productPayload.expensePercent !== undefined
       ? Number(productPayload.expensePercent)
       : Number(oldProduct.expensePercent || 0);
-    const nextEffectiveCostPrice = calculateEffectiveCostPrice(nextPurchaseCostPrice, nextExpensePercent);
+    const nextEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(nextPurchaseCostPrice, nextExpensePercent));
 
     if (newName !== oldProduct.name || newWarehouseId !== oldProduct.warehouseId) {
       const existingProducts = await prisma.product.findMany({
@@ -339,6 +341,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
         purchaseCostPrice: nextPurchaseCostPrice,
         expensePercent: nextExpensePercent,
         costPrice: nextEffectiveCostPrice,
+        sellingPrice: productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : oldProduct.sellingPrice,
         sku: null
       }
     });
@@ -373,7 +376,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     // If price changed, record history
     if (oldProduct && (productPayload.costPrice !== undefined || productPayload.purchaseCostPrice !== undefined || productPayload.expensePercent !== undefined || productPayload.sellingPrice !== undefined)) {
       const newCost = nextEffectiveCostPrice;
-      const newSelling = productPayload.sellingPrice !== undefined ? Number(productPayload.sellingPrice) : oldProduct.sellingPrice;
+      const newSelling = productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : roundMoney(oldProduct.sellingPrice);
       
       if (newCost !== oldProduct.costPrice || newSelling !== oldProduct.sellingPrice) {
         const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
@@ -412,7 +415,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
         packageName: normalizePackageName(entry.packageName),
         baseUnitName: normalizeBaseUnitName(entry.baseUnitName || nextBaseUnitName),
         unitsPerPackage: Number(entry.unitsPerPackage || 0),
-        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? Number(entry.packageSellingPrice) : null,
+        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
         barcode: entry.barcode ? String(entry.barcode) : null,
         isDefault: Boolean(entry.isDefault ?? index === 0),
         sortOrder: Number(entry.sortOrder || index),
@@ -626,9 +629,9 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const resolvedPurchaseCostPrice = Number(purchaseCostPrice ?? costPrice ?? 0);
+    const resolvedPurchaseCostPrice = roundMoney(purchaseCostPrice ?? costPrice ?? 0);
     const resolvedExpensePercent = Number(expensePercent ?? 0);
-    const resolvedEffectiveCostPrice = calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent);
+    const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
     await prisma.product.update({
       where: { id: productId },
@@ -1060,7 +1063,7 @@ router.post('/:id/packagings', async (req: AuthRequest, res, next) => {
         packageName: normalizePackageName(req.body.packageName),
         baseUnitName: normalizeBaseUnitName(req.body.baseUnitName || product.baseUnitName),
         unitsPerPackage: Number(req.body.unitsPerPackage || 0),
-        packageSellingPrice: req.body.packageSellingPrice !== undefined && req.body.packageSellingPrice !== null ? Number(req.body.packageSellingPrice) : null,
+        packageSellingPrice: req.body.packageSellingPrice !== undefined && req.body.packageSellingPrice !== null ? roundMoney(req.body.packageSellingPrice) : null,
         barcode: req.body.barcode ? String(req.body.barcode) : null,
         isDefault: Boolean(req.body.isDefault),
         sortOrder: Number(req.body.sortOrder || 0),

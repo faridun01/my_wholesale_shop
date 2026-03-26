@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { formatMoney, toFixedNumber } from '../utils/format';
+import { formatDollar, formatMoney, roundMoney, toFixedNumber } from '../utils/format';
 import { getProductBatches } from '../api/products.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
@@ -153,13 +153,15 @@ export default function ProductsView() {
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
-  const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', reason: '' });
+  const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', finalCostPrice: '', reason: '' });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [usdRate, setUsdRate] = useState<string>('10.95'); // Default rate
   const [scanExpensePercent, setScanExpensePercent] = useState<string>('0');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const emptyTransferData = { fromWarehouseId: '', toWarehouseId: '', quantity: '' };
+  const emptyRestockData = { warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', finalCostPrice: '', reason: '' };
 
   const closeHistoryModal = () => {
     setShowHistoryModal(false);
@@ -171,6 +173,39 @@ export default function ProductsView() {
     setShowBatchesModal(false);
     setProductBatches([]);
     setSelectedProduct(null);
+  };
+
+  const closeDeleteConfirm = () => {
+    setShowDeleteConfirm(false);
+    setSelectedProduct(null);
+  };
+
+  const closeProductFormModal = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    resetForm();
+  };
+
+  const closeTransferModal = () => {
+    setShowTransferModal(false);
+    setTransferData(emptyTransferData);
+    setSelectedProduct(null);
+  };
+
+  const closeRestockModal = () => {
+    setShowRestockModal(false);
+    setRestockData(emptyRestockData);
+    setSelectedProduct(null);
+  };
+
+  const closeMergeModal = () => {
+    setShowMergeModal(false);
+    setMergeTargetId('');
+    setSelectedProduct(null);
+  };
+
+  const closeOcrResultsModal = () => {
+    setOcrResults(null);
   };
 
   const availableTransferStock = selectedProduct && transferData.fromWarehouseId
@@ -201,6 +236,8 @@ export default function ProductsView() {
     return purchaseCost + (purchaseCost * expensePercent / 100);
   })();
   const effectiveRestockCostPrice = (() => {
+    const manualFinalCost = Number(restockData.finalCostPrice || 0);
+    if (restockData.finalCostPrice !== '' && Number.isFinite(manualFinalCost) && manualFinalCost >= 0) return manualFinalCost;
     const purchaseCost = Number(restockData.costPrice || 0);
     const expensePercent = Number(restockData.expensePercent || 0);
     if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 0;
@@ -234,6 +271,76 @@ export default function ProductsView() {
       };
     });
   }, [categories, formData.name, isCategoryManual, showAddModal, showEditModal]);
+
+  useEffect(() => {
+    if (!showRestockModal || restockData.finalCostPrice !== '') {
+      return;
+    }
+
+    const purchaseCost = Number(restockData.costPrice || 0);
+    const expensePercent = Number(restockData.expensePercent || 0);
+    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) {
+      return;
+    }
+
+    const calculated =
+      !Number.isFinite(expensePercent) || expensePercent < 0
+        ? purchaseCost
+        : purchaseCost + (purchaseCost * expensePercent / 100);
+
+    setRestockData((prev) => ({
+      ...prev,
+      finalCostPrice: formatPriceInput(calculated),
+    }));
+  }, [restockData.costPrice, restockData.expensePercent, restockData.finalCostPrice, showRestockModal]);
+
+  useEffect(() => {
+    const hasOpenModal =
+      showAddModal ||
+      showEditModal ||
+      showTransferModal ||
+      showRestockModal ||
+      showMergeModal ||
+      showDeleteConfirm ||
+      Boolean(batchActionConfirm) ||
+      showHistoryModal ||
+      showBatchesModal ||
+      Boolean(ocrResults);
+
+    if (!hasOpenModal) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (showDeleteConfirm) return closeDeleteConfirm();
+      if (batchActionConfirm) return setBatchActionConfirm(null);
+      if (showHistoryModal) return closeHistoryModal();
+      if (showBatchesModal) return closeBatchesModal();
+      if (showMergeModal) return closeMergeModal();
+      if (showTransferModal) return closeTransferModal();
+      if (showRestockModal) return closeRestockModal();
+      if (showAddModal || showEditModal) return closeProductFormModal();
+      if (ocrResults) return closeOcrResultsModal();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    batchActionConfirm,
+    ocrResults,
+    showAddModal,
+    showBatchesModal,
+    showDeleteConfirm,
+    showEditModal,
+    showHistoryModal,
+    showMergeModal,
+    showRestockModal,
+    showTransferModal,
+  ]);
 
   const fetchInitialData = async (warehouseIdOverride?: string) => {
     setIsLoading(true);
@@ -273,9 +380,7 @@ export default function ProductsView() {
         quantity: Number(transferData.quantity)
       });
 
-      setShowTransferModal(false);
-      setTransferData({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
-      setSelectedProduct(null);
+      closeTransferModal();
 
       if (targetWarehouseId) {
         setSelectedWarehouseId(String(targetWarehouseId));
@@ -301,14 +406,13 @@ export default function ProductsView() {
       await restockProduct(selectedProduct.id, {
         warehouseId: Number(restockData.warehouseId),
         quantity: Number(restockData.quantity),
-        costPrice: Number(restockData.costPrice),
-        purchaseCostPrice: Number(restockData.costPrice),
+        costPrice: roundMoney(effectiveRestockCostPrice),
+        purchaseCostPrice: roundMoney(restockData.costPrice),
         expensePercent: Number(restockData.expensePercent || 0),
         reason: restockData.reason
       });
       toast.success('Товар успешно пополнен!');
-      setShowRestockModal(false);
-      setRestockData({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', reason: '' });
+      closeRestockModal();
       fetchInitialData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при пополнении товара');
@@ -348,37 +452,33 @@ export default function ProductsView() {
     setProductBatches(batches);
   };
 
-  const handleZeroBatch = async (batchId: number) => {
-    try {
-      await zeroProductBatch(batchId);
-      await Promise.all([refreshSelectedProductBatches(), fetchInitialData()]);
-      toast.success('Партия убрана');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Ошибка при обнулении партии');
-    }
-  };
-
-  const handleDeleteBatch = async (batchId: number) => {
-    try {
-      await deleteProductBatch(batchId);
-      await Promise.all([refreshSelectedProductBatches(), fetchInitialData()]);
-      toast.success('Партия удалена');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Ошибка при удалении партии');
-    }
-  };
-
   const confirmBatchAction = async () => {
     if (!batchActionConfirm) {
       return;
     }
 
-    if (batchActionConfirm.type === 'zero') {
-      await handleZeroBatch(batchActionConfirm.batchId);
-      return;
-    }
+    const currentAction = batchActionConfirm;
 
-    await handleDeleteBatch(batchActionConfirm.batchId);
+    try {
+      if (currentAction.type === 'zero') {
+        await zeroProductBatch(currentAction.batchId);
+        setBatchActionConfirm(null);
+        await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
+        toast.success('Партия убрана');
+        return;
+      }
+
+      await deleteProductBatch(currentAction.batchId);
+      setBatchActionConfirm(null);
+      await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
+      toast.success('Партия удалена');
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.error ||
+          (currentAction.type === 'zero' ? 'Ошибка при удалении партии' : 'Ошибка при удалении партии')
+      );
+      throw err;
+    }
   };
 
   const handleScanInvoice = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -572,10 +672,10 @@ export default function ProductsView() {
             baseUnitName: item.baseUnitName,
             unitsPerPackage: item.unitsPerPackage,
             quantity: Number(item.quantity),
-            purchaseCostPrice: Number(item.costPricePerPieceTJS),
-            effectiveCostPricePerPieceTJS: Number(item.effectiveCostPricePerPieceTJS),
+            purchaseCostPrice: roundMoney(item.costPricePerPieceTJS),
+            effectiveCostPricePerPieceTJS: roundMoney(item.effectiveCostPricePerPieceTJS),
             expensePercent: Number(item.expensePercent || 0),
-            sellingPrice: Number(item.sellingPrice || 0),
+            sellingPrice: roundMoney(item.sellingPrice || 0),
           })),
         },
         { timeout: 300000 }
@@ -628,10 +728,10 @@ export default function ProductsView() {
         ...formData,
         categoryId: Number(formData.categoryId),
         warehouseId: Number(formData.warehouseId),
-        costPrice: parseFloat(formData.costPrice),
-        purchaseCostPrice: parseFloat(formData.costPrice),
+        costPrice: roundMoney(formData.costPrice),
+        purchaseCostPrice: roundMoney(formData.costPrice),
         expensePercent: parseFloat(formData.expensePercent || '0'),
-        sellingPrice: parseFloat(formData.sellingPrice),
+        sellingPrice: roundMoney(formData.sellingPrice),
         minStock: parseFloat(formData.minStock),
         initialStock: parseFloat(formData.initialStock)
       });
@@ -652,10 +752,10 @@ export default function ProductsView() {
         ...formData,
         categoryId: Number(formData.categoryId),
         warehouseId: Number(formData.warehouseId),
-        costPrice: parseFloat(formData.costPrice),
-        purchaseCostPrice: parseFloat(formData.costPrice),
+        costPrice: roundMoney(formData.costPrice),
+        purchaseCostPrice: roundMoney(formData.costPrice),
         expensePercent: parseFloat(formData.expensePercent || '0'),
-        sellingPrice: parseFloat(formData.sellingPrice),
+        sellingPrice: roundMoney(formData.sellingPrice),
         minStock: parseFloat(formData.minStock),
         initialStock: parseFloat(formData.initialStock)
       });
@@ -675,9 +775,10 @@ export default function ProductsView() {
       toast.success('Товар успешно удалён!');
       setShowDeleteConfirm(false);
       setSelectedProduct(null);
-      fetchInitialData();
+      await fetchInitialData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при удалении товара');
+      throw err;
     }
   };
 
@@ -978,10 +1079,7 @@ export default function ProductsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowAddModal(false);
-              setShowEditModal(false);
-            }}
+            onClick={closeProductFormModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -997,7 +1095,7 @@ export default function ProductsView() {
                   </div>
                   <span>{showEditModal ? 'Редактировать товар' : 'Новый товар'}</span>
                 </h3>
-                <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closeProductFormModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -1097,7 +1195,7 @@ export default function ProductsView() {
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                     />
                   </div>
-                  {isAdmin && (
+                  {isAdmin && !showEditModal && (
                     <div>
                       <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Итог за штуку</label>
                       <input
@@ -1170,7 +1268,7 @@ export default function ProductsView() {
                   </div>
                 </div>
                 <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
-                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
+                  <button type="button" onClick={closeProductFormModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
                   <button type="submit" className="px-8 py-2 bg-violet-500 text-white rounded-xl font-bold shadow-xl shadow-violet-500/20 hover:bg-violet-600 transition-all active:scale-95 text-sm">
                     {showEditModal ? 'Сохранить' : 'Создать'}
                   </button>
@@ -1187,7 +1285,7 @@ export default function ProductsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowTransferModal(false)}
+            onClick={closeTransferModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -1248,7 +1346,7 @@ export default function ProductsView() {
                   </div>
                 </div>
                 <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
-                  <button type="button" onClick={() => setShowTransferModal(false)} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
+                  <button type="button" onClick={closeTransferModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
                   <button type="submit" className="px-8 py-2 bg-amber-600 text-white rounded-xl font-bold shadow-xl shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 text-sm">Перенести</button>
                 </div>
               </form>
@@ -1263,7 +1361,7 @@ export default function ProductsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowRestockModal(false)}
+            onClick={closeRestockModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -1336,11 +1434,17 @@ export default function ProductsView() {
                       <div>
                         <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Итог за штуку</label>
                         <input
-                          type="text"
-                          readOnly
-                          value={formatPriceInput(effectiveRestockCostPrice)}
-                          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 font-bold text-emerald-700 outline-none"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={restockData.finalCostPrice}
+                          onChange={e => setRestockData({ ...restockData, finalCostPrice: e.target.value })}
+                          onBlur={e => setRestockData({ ...restockData, finalCostPrice: formatPriceInput(e.target.value) })}
+                          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 font-bold text-emerald-700 outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
+                        <p className="mt-2 text-xs font-medium text-slate-400">
+                          Можно изменить вручную. База закупки сохранится отдельно.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1356,7 +1460,7 @@ export default function ProductsView() {
                   </div>
                 </div>
                 <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0">
-                  <button type="button" onClick={() => setShowRestockModal(false)} className="rounded-2xl px-6 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="button" onClick={closeRestockModal} className="rounded-2xl px-6 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
                   <button type="submit" className="rounded-2xl bg-emerald-600 px-8 py-3 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-95">Пополнить</button>
                 </div>
               </form>
@@ -1470,7 +1574,7 @@ export default function ProductsView() {
                       )}
                       {item.lineTotal > 0 && (
                         <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          Сумма строки: {item.lineTotal} $ / ≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}
+                          Сумма строки: {formatDollar(item.lineTotal)} / ≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}
                         </p>
                       )}
                       {item.note && <p className="mt-1 text-[10px] text-slate-500">{item.note}</p>}
@@ -1574,7 +1678,7 @@ export default function ProductsView() {
                 ))}
               </div>
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-sky-50/60 p-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:p-8">
-                <button onClick={() => setOcrResults(null)} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
+                <button onClick={closeOcrResultsModal} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
                 <button 
                   onClick={handleAddOcrToStock}
                   disabled={isLoading}
@@ -1613,7 +1717,7 @@ export default function ProductsView() {
       <AnimatePresence>
         {showMergeModal && selectedProduct && (
           <motion.div
-            onClick={() => setShowMergeModal(false)}
+            onClick={closeMergeModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div
@@ -1633,7 +1737,7 @@ export default function ProductsView() {
                     <p className="text-sm text-slate-500">Выберите основной товар, в который нужно перенести остатки и историю.</p>
                   </div>
                 </div>
-                <button onClick={() => setShowMergeModal(false)} className="text-slate-400 transition-colors hover:text-slate-600">
+                <button onClick={closeMergeModal} className="text-slate-400 transition-colors hover:text-slate-600">
                   <X size={22} />
                 </button>
               </div>
@@ -1667,7 +1771,7 @@ export default function ProductsView() {
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end sm:p-6">
                 <button
-                  onClick={() => setShowMergeModal(false)}
+                  onClick={closeMergeModal}
                   className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                 >
                   Отмена
@@ -1687,10 +1791,10 @@ export default function ProductsView() {
         <React.Suspense fallback={null}>
           <ConfirmationModal 
             isOpen={showDeleteConfirm}
-          onClose={() => setShowDeleteConfirm(false)}
-          onConfirm={handleDeleteProduct}
-          title="Удалить товар навсегда?"
-            message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
+            onClose={closeDeleteConfirm}
+            onConfirm={handleDeleteProduct}
+            title="Удалить товар навсегда?"
+              message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
           />
           <ConfirmationModal
             isOpen={Boolean(batchActionConfirm)}
@@ -1803,14 +1907,14 @@ export default function ProductsView() {
                   <div className="rounded-2xl bg-slate-50 px-3 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
                     <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                      {isAggregateMode ? '-' : `${toFixedNumber(product.costPrice)} TJS`}
+                      {isAggregateMode ? '-' : formatMoney(product.costPrice)}
                     </p>
                   </div>
                 )}
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
                   <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                    {isAggregateMode ? '-' : `${toFixedNumber(product.sellingPrice)} TJS`}
+                    {isAggregateMode ? '-' : formatMoney(product.sellingPrice)}
                   </p>
                 </div>
               </div>
@@ -1846,6 +1950,7 @@ export default function ProductsView() {
                         warehouseId: product.warehouseId?.toString() || '',
                         costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
                         expensePercent: String(product.expensePercent ?? 0),
+                        finalCostPrice: formatPriceInput(product.costPrice),
                       });
                       setShowRestockModal(true);
                     }}
@@ -1974,7 +2079,7 @@ export default function ProductsView() {
                   {isAdmin && (
                     <td className="px-5 py-3">
                       {selectedWarehouseId ? (
-                        <p className="text-xs font-medium text-slate-500">{toFixedNumber(product.costPrice)} <span className="text-[10px] uppercase">TJS</span></p>
+                        <p className="text-xs font-medium text-slate-500">{formatMoney(product.costPrice)}</p>
                       ) : (
                         <span className="text-xs text-slate-300">-</span>
                       )}
@@ -1982,7 +2087,7 @@ export default function ProductsView() {
                   )}
                   <td className="px-5 py-3">
                     {selectedWarehouseId ? (
-                      <p className="text-sm font-semibold text-slate-900">{toFixedNumber(product.sellingPrice)} <span className="text-[10px] font-medium uppercase text-slate-400">TJS</span></p>
+                      <p className="text-sm font-semibold text-slate-900">{formatMoney(product.sellingPrice)}</p>
                     ) : (
                       <span className="text-xs text-slate-300">-</span>
                     )}
@@ -2041,6 +2146,7 @@ export default function ProductsView() {
                                 warehouseId: product.warehouseId?.toString() || '',
                                 costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
                                 expensePercent: String(product.expensePercent ?? 0),
+                                finalCostPrice: formatPriceInput(product.costPrice),
                               });
                               setShowRestockModal(true);
                             }}

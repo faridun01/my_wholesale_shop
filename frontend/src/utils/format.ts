@@ -3,6 +3,15 @@ export function toFixedNumber(value: unknown, digits = 2) {
   return numeric.toFixed(digits);
 }
 
+export function roundMoney(value: unknown, digits = 2) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  return Number(numeric.toFixed(digits));
+}
+
 export function formatMoney(value: unknown, currency = 'TJS') {
   return `${toFixedNumber(value)} ${currency}`;
 }

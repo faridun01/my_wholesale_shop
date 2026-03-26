@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext } from '../utils/access.js';
+import { roundMoney } from '../utils/money.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -9,7 +10,7 @@ const PAYMENT_EPSILON = 0.01;
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const { customer_id, invoice_id, amount, method, note } = req.body;
-    const normalizedAmount = Number(amount);
+    const normalizedAmount = roundMoney(amount);
     if (!Number.isFinite(normalizedAmount) || normalizedAmount < 0) {
       return res.status(400).json({ error: 'Amount must be a non-negative number' });
     }
@@ -42,7 +43,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           customerId: invoice?.customerId ?? Number(customer_id),
           invoiceId,
           userId,
-          amount: normalizedAmount,
+          amount: roundMoney(normalizedAmount),
           method: method || 'cash',
         },
       });
@@ -53,7 +54,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         });
 
         if (currentInvoice) {
-          const newPaidAmount = Number(currentInvoice.paidAmount) + normalizedAmount;
+          const newPaidAmount = roundMoney(Number(currentInvoice.paidAmount) + normalizedAmount);
           const netAmount = Number(currentInvoice.netAmount);
           const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
           

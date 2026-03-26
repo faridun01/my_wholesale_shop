@@ -16,6 +16,7 @@ import {
   normalizeProductName,
   parsePackagingFromRawName,
 } from '../utils/product-packaging.js';
+import { roundMoney } from '../utils/money.js';
 
 const router = Router();
 
@@ -156,12 +157,12 @@ router.post('/import-items', async (req: AuthRequest, res, next) => {
       const normalized = normalizeProductName(rawName || String(item?.name || ''));
       const productName = normalized.name;
       const quantity = Number(item?.quantity || item?.totalBaseUnits || 0);
-      const purchaseCostPrice = Number(item?.purchaseCostPrice ?? item?.costPricePerPieceTJS ?? item?.costPrice ?? 0);
+      const purchaseCostPrice = roundMoney(item?.purchaseCostPrice ?? item?.costPricePerPieceTJS ?? item?.costPrice ?? 0);
       const expensePercent = Number(item?.expensePercent || 0);
-      const effectiveCostPrice = Number(
+      const effectiveCostPrice = roundMoney(
         item?.effectiveCostPricePerPieceTJS ?? calculateEffectiveCostPrice(purchaseCostPrice, expensePercent)
       );
-      const sellingPrice = Number(item?.sellingPrice || 0);
+      const sellingPrice = roundMoney(item?.sellingPrice || 0);
       const brand = String(item?.brand || normalized.brand || '').trim();
       const packageName = normalizePackageName(item?.packageName || '');
       const baseUnitName = normalizeBaseUnitName(item?.baseUnitName || item?.unit || 'шт');
@@ -197,7 +198,7 @@ router.post('/import-items', async (req: AuthRequest, res, next) => {
             purchaseCostPrice,
             expensePercent,
             costPrice: effectiveCostPrice,
-            sellingPrice: sellingPrice > 0 ? sellingPrice : effectiveCostPrice * 1.2,
+            sellingPrice: sellingPrice > 0 ? sellingPrice : roundMoney(effectiveCostPrice * 1.2),
             minStock: 0,
             initialStock: 0,
             totalIncoming: 0,
@@ -352,12 +353,12 @@ router.post('/import-purchase-document', uploadRateLimit, ocrUpload.single('invo
       const packageQuantity = Number(item.packageCount || 0);
       const totalBaseUnits = Number(item.quantity || (packageQuantity > 0 && unitsPerPackage > 0 ? packageQuantity * unitsPerPackage : 0));
       const extraUnitQuantity = Math.max(0, totalBaseUnits - (packageQuantity > 0 && unitsPerPackage > 0 ? packageQuantity * unitsPerPackage : 0));
-      const linePrice = Number(item.price || 0);
+      const linePrice = roundMoney(item.price || 0);
       const costPricePerBaseUnit =
         unitsPerPackage > 0 && packageQuantity > 0
           ? linePrice / unitsPerPackage
           : linePrice;
-      const effectiveCostPricePerBaseUnit = calculateEffectiveCostPrice(costPricePerBaseUnit, defaultExpensePercent);
+      const effectiveCostPricePerBaseUnit = roundMoney(calculateEffectiveCostPrice(costPricePerBaseUnit, defaultExpensePercent));
 
       const normalizedNameKey = buildProductNameKey(normalized.name);
       let product = isReliableNameKey(normalizedNameKey)
@@ -380,9 +381,9 @@ router.post('/import-purchase-document', uploadRateLimit, ocrUpload.single('invo
             nameKey: normalizedNameKey,
             unit: baseUnitName,
             baseUnitName,
-            purchaseCostPrice: costPricePerBaseUnit > 0 ? costPricePerBaseUnit : 0,
+            purchaseCostPrice: costPricePerBaseUnit > 0 ? roundMoney(costPricePerBaseUnit) : 0,
             expensePercent: defaultExpensePercent,
-            costPrice: effectiveCostPricePerBaseUnit > 0 ? effectiveCostPricePerBaseUnit : 0,
+            costPrice: effectiveCostPricePerBaseUnit > 0 ? roundMoney(effectiveCostPricePerBaseUnit) : 0,
             sellingPrice: 0,
             minStock: 0,
             initialStock: 0,
@@ -400,9 +401,9 @@ router.post('/import-purchase-document', uploadRateLimit, ocrUpload.single('invo
             nameKey: normalizedNameKey,
             baseUnitName,
             unit: baseUnitName,
-            purchaseCostPrice: costPricePerBaseUnit > 0 ? costPricePerBaseUnit : product.purchaseCostPrice,
+            purchaseCostPrice: costPricePerBaseUnit > 0 ? roundMoney(costPricePerBaseUnit) : roundMoney(product.purchaseCostPrice),
             expensePercent: defaultExpensePercent,
-            costPrice: effectiveCostPricePerBaseUnit > 0 ? effectiveCostPricePerBaseUnit : product.costPrice,
+            costPrice: effectiveCostPricePerBaseUnit > 0 ? roundMoney(effectiveCostPricePerBaseUnit) : roundMoney(product.costPrice),
           },
         });
       }

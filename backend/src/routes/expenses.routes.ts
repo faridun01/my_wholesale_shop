@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import { roundMoney } from '../utils/money.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ const normalizePositiveAmount = (value: unknown) => {
     throw Object.assign(new Error('Сумма расхода должна быть больше нуля'), { status: 400 });
   }
 
-  return amount;
+  return roundMoney(amount);
 };
 
 router.get('/', async (req: AuthRequest, res, next) => {

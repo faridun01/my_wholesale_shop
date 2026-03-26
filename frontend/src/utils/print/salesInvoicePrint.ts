@@ -38,6 +38,8 @@ export function printSalesInvoice({
   const customerName = invoice.customer_name || 'Обычный клиент';
   const customerPhone = invoice.customer_phone || '';
   const customerAddress = invoice.customer_address || '';
+  const sellerRegionLine = [invoice.company_country, invoice.company_region].filter(Boolean).join(', ');
+  const sellerCityLine = [invoice.company_city, invoice.company_address].filter(Boolean).join(', ');
 
   const getDisplayPrice = (item: any) => {
     const sellingPricePerUnit = Number(item.sellingPrice || 0);
@@ -60,7 +62,7 @@ export function printSalesInvoice({
           (item: any, index: number) => `
             <tr>
               <td>${index + 1}</td>
-              <td>${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</td>
+              <td class="product-cell"><span class="product-name">${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</span></td>
               <td>${escapeHtml(item.quantityLabel || `${item.quantity} ${item.unit || ''}`)}</td>
               <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(getUnitPrice(item)))}</td>
@@ -90,9 +92,11 @@ export function printSalesInvoice({
           .party-line { margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.5; }
           .section { margin-top: 20px; }
           .section h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: #334155; }
-          table { width: 100%; border-collapse: collapse; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; }
           th, td { border: 1px solid #e2e8f0; padding: 12px; font-size: 14px; text-align: left; vertical-align: top; }
           th { background: #f8fafc; font-weight: 700; }
+          .product-cell { width: 300px; }
+          .product-name { display: block; line-height: 1.35; max-height: 2.7em; overflow: hidden; word-break: break-word; }
           .summary { margin-left: auto; margin-top: 24px; width: 320px; }
           .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
           .summary-row.total { font-size: 20px; font-weight: 700; border-top: 2px solid #cbd5e1; margin-top: 8px; padding-top: 12px; }
@@ -103,11 +107,10 @@ export function printSalesInvoice({
         <div class="sheet">
           <div class="header">
             <div class="party-block seller-block">
-              <p class="label">Продавец</p>
+              <p class="label">ПРОДАВЕЦ</p>
               ${invoice.company_name ? `<p class="party-name">${escapeHtml(invoice.company_name)}</p>` : ''}
-              ${invoice.company_country ? `<p class="party-line">${escapeHtml(invoice.company_country)}</p>` : ''}
-              ${(invoice.company_region || invoice.company_city) ? `<p class="party-line">${escapeHtml([invoice.company_region, invoice.company_city].filter(Boolean).join(' '))}</p>` : ''}
-              ${invoice.company_address ? `<p class="party-line">${escapeHtml(invoice.company_address)}</p>` : ''}
+              ${sellerRegionLine ? `<p class="party-line">${escapeHtml(sellerRegionLine)}</p>` : ''}
+              ${sellerCityLine ? `<p class="party-line">${escapeHtml(sellerCityLine)}</p>` : ''}
               ${invoice.company_phone ? `<p class="party-line">${escapeHtml(invoice.company_phone)}</p>` : ''}
             </div>
             <div class="party-block client-block">
@@ -124,11 +127,11 @@ export function printSalesInvoice({
               <thead>
                 <tr>
                   <th style="width: 52px;">№</th>
-                  <th>Товар</th>
-                  <th style="width: 150px;">Количество</th>
-                  <th style="width: 140px;">Цена за упаковку</th>
-                  <th style="width: 140px;">Цена за штуку</th>
-                  <th style="width: 140px;">Сумма</th>
+                  <th style="width: 300px;">Товар</th>
+                  <th style="width: 120px;">Количество</th>
+                  <th style="width: 115px;">Цена за упаковку</th>
+                  <th style="width: 115px;">Цена за штуку</th>
+                  <th style="width: 110px;">Сумма</th>
                 </tr>
               </thead>
               <tbody>${itemsRows}</tbody>

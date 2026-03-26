@@ -155,6 +155,21 @@ export default function RemindersView() {
     fetchReminders();
   }, []);
 
+  useEffect(() => {
+    if (!showModal) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   const closeModal = () => {
     setShowModal(false);
     setSelectedReminder(null);

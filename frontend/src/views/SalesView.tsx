@@ -60,6 +60,26 @@ export default function SalesView() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const navigate = useNavigate();
 
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditCustomerId('');
+  };
+
+  const closePaymentModal = () => {
+    setShowPaymentModal(false);
+    setPaymentAmount('');
+  };
+
+  const closeReturnModal = () => {
+    setShowReturnModal(false);
+    setReturnReason('');
+    setReturnItems([]);
+  };
+
   const escapeHtml = (value: unknown) =>
     String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -73,6 +93,26 @@ export default function SalesView() {
     fetchWarehouses();
     fetchCustomers();
   }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+
+  useEffect(() => {
+    if (!showDetailsModal && !showPaymentModal && !showReturnModal && !showEditModal) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (showPaymentModal) return closePaymentModal();
+      if (showReturnModal) return closeReturnModal();
+      if (showEditModal) return closeEditModal();
+      if (showDetailsModal) return closeDetailsModal();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDetailsModal, showEditModal, showPaymentModal, showReturnModal]);
 
   const fetchInvoices = async () => {
     setIsLoading(true);
@@ -141,8 +181,7 @@ export default function SalesView() {
         method: 'cash'
       });
       toast.success('Оплата принята');
-      setShowPaymentModal(false);
-      setPaymentAmount('');
+      closePaymentModal();
       await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
     } catch (err) {
       toast.error('Ошибка при приеме оплаты');
@@ -173,9 +212,7 @@ export default function SalesView() {
         reason: returnReason
       });
       toast.success('Возврат оформлен');
-      setShowReturnModal(false);
-      setReturnReason('');
-      setReturnItems([]);
+      closeReturnModal();
       fetchInvoices();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при оформлении возврата');
@@ -716,7 +753,7 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowDetailsModal(false)}
+            onClick={closeDetailsModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -735,7 +772,7 @@ export default function SalesView() {
                     <p className="text-slate-500 font-bold">{new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</p>
                   </div>
                 </div>
-                <button onClick={() => setShowDetailsModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closeDetailsModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -842,12 +879,12 @@ export default function SalesView() {
                     )}
                     <div className="flex items-center justify-between text-sm text-slate-500">
                       <span className="font-bold">Скидка ({selectedInvoice.discount}%):</span>
-                      <span className="font-black">-{toFixedNumber(getInvoiceDiscountAmount(selectedInvoice))} TJS</span>
+                      <span className="font-black">-{formatMoney(getInvoiceDiscountAmount(selectedInvoice))}</span>
                     </div>
                     {selectedInvoice.returnedAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-rose-500">
                         <span className="font-bold">Возвращено:</span>
-                        <span className="font-black">-{toFixedNumber(selectedInvoice.returnedAmount || 0)} TJS</span>
+                        <span className="font-black">-{formatMoney(selectedInvoice.returnedAmount || 0)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xl font-black text-slate-900 md:text-2xl">
@@ -908,7 +945,7 @@ export default function SalesView() {
                           {selectedInvoice.returns.map((r: any) => (
                             <tr key={r.id}>
                               <td className="px-6 py-4 font-bold text-slate-500">{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
-                              <td className="px-6 py-4 font-black text-rose-600">-{toFixedNumber(r.totalValue)} TJS</td>
+                              <td className="px-6 py-4 font-black text-rose-600">-{formatMoney(r.totalValue)}</td>
                               <td className="px-6 py-4 text-slate-500 italic">{r.reason}</td>
                               <td className="px-6 py-4 text-slate-500">{r.staff_name}</td>
                             </tr>
@@ -971,7 +1008,7 @@ export default function SalesView() {
                   <span>Печать</span>
                 </button>
                 <button 
-                  onClick={() => setShowDetailsModal(false)}
+                  onClick={closeDetailsModal}
                   className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 md:px-10 md:py-4"
                 >
                   Закрыть
@@ -988,7 +1025,7 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowEditModal(false)}
+            onClick={closeEditModal}
             className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div
@@ -1007,7 +1044,7 @@ export default function SalesView() {
                     <p className="text-sm font-bold text-slate-500">Накладная #{selectedInvoice.id}</p>
                   </div>
                 </div>
-                <button onClick={() => setShowEditModal(false)} className="text-slate-400 transition-colors hover:text-slate-600">
+                <button onClick={closeEditModal} className="text-slate-400 transition-colors hover:text-slate-600">
                   <X size={24} />
                 </button>
               </div>
@@ -1035,7 +1072,7 @@ export default function SalesView() {
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-8">
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={closeEditModal}
                   className="flex-1 rounded-2xl border border-slate-200 bg-white py-4 font-bold text-slate-700 transition-all hover:bg-slate-50"
                 >
                   Отмена
@@ -1059,7 +1096,7 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowPaymentModal(false)}
+            onClick={closePaymentModal}
             className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -1075,7 +1112,7 @@ export default function SalesView() {
                   </div>
                   <h3 className="text-2xl font-black text-slate-900">Принять оплату</h3>
                 </div>
-                <button onClick={() => setShowPaymentModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closePaymentModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -1116,7 +1153,7 @@ export default function SalesView() {
               
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-8">
                 <button 
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={closePaymentModal}
                   className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
                 >
                   Отмена
@@ -1140,7 +1177,7 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowReturnModal(false)}
+            onClick={closeReturnModal}
             className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
             <motion.div 
@@ -1156,7 +1193,7 @@ export default function SalesView() {
                   </div>
                   <h3 className="text-2xl font-black text-slate-900">Оформить возврат</h3>
                 </div>
-                <button onClick={() => setShowReturnModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={closeReturnModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -1217,7 +1254,7 @@ export default function SalesView() {
               
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-8">
                 <button 
-                  onClick={() => setShowReturnModal(false)}
+                  onClick={closeReturnModal}
                   className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
                 >
                   Отмена

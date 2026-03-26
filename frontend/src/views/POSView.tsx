@@ -1144,7 +1144,7 @@ export default function POSView() {
                     </div>
                     <div className="flex items-center justify-between text-slate-500">
                       <span>{'Скидка'}</span>
-                      <span className="text-slate-900">-{toFixedNumber(discountAmount)} TJS</span>
+                      <span className="text-slate-900">-{formatMoney(discountAmount)}</span>
                     </div>
                     {paidAmount && (
                       <div className="flex items-center justify-between text-slate-500">
