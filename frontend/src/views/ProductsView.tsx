@@ -352,7 +352,7 @@ export default function ProductsView() {
     try {
       await zeroProductBatch(batchId);
       await Promise.all([refreshSelectedProductBatches(), fetchInitialData()]);
-      toast.success('Остаток партии обнулён');
+      toast.success('Партия убрана');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при обнулении партии');
     }
@@ -1696,13 +1696,13 @@ export default function ProductsView() {
             isOpen={Boolean(batchActionConfirm)}
             onClose={() => setBatchActionConfirm(null)}
             onConfirm={confirmBatchAction}
-            title={batchActionConfirm?.type === 'zero' ? 'Обнулить остаток партии?' : 'Удалить партию?'}
+            title={batchActionConfirm?.type === 'zero' ? 'Убрать партию?' : 'Удалить партию?'}
             message={
               batchActionConfirm?.type === 'zero'
-                ? 'Остаток выбранной партии станет равным нулю. История сохранится, но эта партия больше не будет участвовать в остатках.'
+                ? 'Если партия ещё нетронутая, она исчезнет полностью. Если уже использовалась, система безопасно уберёт только её текущий остаток.'
                 : 'Партия будет удалена полностью. Это доступно только для нетронутой партии, которая ещё не участвовала в списании.'
             }
-            confirmText={batchActionConfirm?.type === 'zero' ? 'Обнулить остаток' : 'Удалить партию'}
+            confirmText={batchActionConfirm?.type === 'zero' ? 'Убрать партию' : 'Удалить партию'}
             cancelText="Отмена"
             type={batchActionConfirm?.type === 'zero' ? 'warning' : 'danger'}
           />

@@ -71,7 +71,7 @@ export default function ProductBatchesModal({
               </div>
 
               <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
-                Обнуление оставляет партию в истории, но убирает её текущий остаток. Удаление доступно только для нетронутой партии, которая ещё не участвовала в списании.
+                Убрать партию можно в двух режимах: безопасно убрать остаток у уже использованной партии или полностью удалить нетронутую партию.
               </div>
 
               <div className="space-y-3 sm:hidden">
@@ -112,7 +112,7 @@ export default function ProductBatchesModal({
                           className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Ban size={14} />
-                          <span>Обнулить остаток</span>
+                          <span>Убрать партию</span>
                         </button>
                         <button
                           type="button"
@@ -165,7 +165,7 @@ export default function ProductBatchesModal({
                               className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Ban size={12} />
-                              <span>Обнулить</span>
+                              <span>Убрать</span>
                             </button>
                             <button
                               type="button"

@@ -39,15 +39,28 @@ export function printSalesInvoice({
   const customerPhone = invoice.customer_phone || '';
   const customerAddress = invoice.customer_address || '';
 
+  const getDisplayPrice = (item: any) => {
+    const sellingPricePerUnit = Number(item.sellingPrice || 0);
+    const packageQuantity = Number(item.packageQuantity || 0);
+    const extraUnitQuantity = Number(item.extraUnitQuantity || 0);
+    const unitsPerPackage = Number(item.unitsPerPackageSnapshot || item.unitsPerPackage || 0);
+
+    if (packageQuantity > 0 && extraUnitQuantity === 0 && unitsPerPackage > 0) {
+      return sellingPricePerUnit * unitsPerPackage;
+    }
+
+    return sellingPricePerUnit;
+  };
+
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
         .map(
           (item: any, index: number) => `
             <tr>
               <td>${index + 1}</td>
-              <td>${escapeHtml(formatProductName(item.product_name))}</td>
+              <td>${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</td>
               <td>${escapeHtml(item.quantityLabel || `${item.quantity} ${item.unit || ''}`)}</td>
-              <td>${escapeHtml(formatMoney(item.sellingPrice))}</td>
+              <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
             </tr>
           `,

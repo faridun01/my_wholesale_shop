@@ -494,6 +494,11 @@ export class StockService {
     return prisma.$transaction(async (tx: any) => {
       const batch = await tx.productBatch.findUnique({
         where: { id: batchId },
+        include: {
+          saleAllocations: {
+            select: { id: true },
+          },
+        },
       });
 
       if (!batch) {
@@ -505,12 +510,27 @@ export class StockService {
         throw new Error('У этой партии уже нет остатка');
       }
 
-      await tx.productBatch.update({
-        where: { id: batchId },
-        data: {
-          remainingQuantity: 0,
-        },
-      });
+      if ((batch.saleAllocations?.length || 0) === 0 && Number(batch.quantity || 0) === remainingQuantity) {
+        await tx.inventoryTransaction.deleteMany({
+          where: {
+            productId: batch.productId,
+            warehouseId: batch.warehouseId,
+            type: 'incoming',
+            referenceId: batch.id,
+          },
+        });
+
+        await tx.productBatch.delete({
+          where: { id: batchId },
+        });
+      } else {
+        await tx.productBatch.update({
+          where: { id: batchId },
+          data: {
+            remainingQuantity: 0,
+          },
+        });
+      }
 
       await tx.inventoryTransaction.create({
         data: {
