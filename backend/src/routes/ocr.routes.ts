@@ -36,6 +36,14 @@ router.post('/parse-invoice', uploadRateLimit, ocrUpload.single('invoice'), asyn
 
     res.json(items);
   } catch (error: any) {
+    console.error('OCR parse-invoice failed:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+      details: error?.details,
+      mimeType: req.file?.mimetype,
+      filename: req.file?.originalname,
+    });
     if (Number(error?.status) === 503) {
       return res.status(503).json({ error: error.message });
     }
@@ -57,6 +65,14 @@ router.post('/invoice', uploadRateLimit, ocrUpload.single('image'), async (req, 
 
     res.json({ items });
   } catch (error: any) {
+    console.error('OCR invoice failed:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+      details: error?.details,
+      mimeType: req.file?.mimetype,
+      filename: req.file?.originalname,
+    });
     if (Number(error?.status) === 503) {
       return res.status(503).json({ error: error.message });
     }

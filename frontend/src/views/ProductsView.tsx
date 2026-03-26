@@ -383,7 +383,7 @@ export default function ProductsView() {
       toast.error(
         isTimeout
           ? 'Сканирование заняло слишком много времени. Подождите ещё немного, повторите попытку или используйте файл поменьше.'
-          : err.response?.data?.error || 'Ошибка при сканировании накладной'
+          : err.response?.data?.error || err.message || 'Ошибка при сканировании накладной'
       );
     } finally {
       setIsScanning(false);
