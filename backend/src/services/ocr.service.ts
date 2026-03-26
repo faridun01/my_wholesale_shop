@@ -58,12 +58,31 @@ Return only a JSON array of objects with "lineIndex", "rawName", "name", "brand"
       } catch (error: any) {
         const status = Number(error?.status || error?.code || error?.response?.status || 0);
         const message = String(error?.message || '');
+        const retryDelay =
+          error?.details?.find?.((entry: any) => String(entry?.['@type'] || '').includes('RetryInfo'))?.retryDelay
+          || error?.retryDelay;
         const isBusyModel =
           status === 503 ||
           message.includes('503') ||
           message.includes('UNAVAILABLE') ||
           message.includes('high demand') ||
           message.toLowerCase().includes('overloaded');
+        const isQuotaExceeded =
+          status === 429 ||
+          message.includes('429') ||
+          message.includes('RESOURCE_EXHAUSTED') ||
+          message.toLowerCase().includes('quota exceeded') ||
+          message.toLowerCase().includes('rate limit');
+
+        if (isQuotaExceeded) {
+          const quotaError = new Error(
+            retryDelay
+              ? `Лимит OCR временно исчерпан. Попробуйте снова через ${String(retryDelay).replace(/s$/i, ' сек')}.`
+              : 'Лимит OCR временно исчерпан. Попробуйте позже или смените API ключ.'
+          );
+          (quotaError as any).status = 429;
+          throw quotaError;
+        }
 
         if (!isBusyModel || attempt === OCRService.MAX_RETRIES) {
           if (isBusyModel) {
