@@ -34,6 +34,7 @@ services:
       OCR_MODEL: ${OCR_MODEL:-gemini-3-flash-preview}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     volumes:
       - backend_uploads:/app/uploads
     expose:
