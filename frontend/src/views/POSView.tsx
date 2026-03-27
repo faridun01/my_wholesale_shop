@@ -108,7 +108,8 @@ export default function POSView() {
   const pendingCartStorageKey = 'pending_cart';
   const warehouseStorageKey = 'pos_warehouse_session';
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const hasLoadedReferenceDataRef = useRef(false);
+  const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
   const [products, setProducts] = useState<any[]>([]);
@@ -293,6 +294,11 @@ export default function POSView() {
   }, [products]);
 
   useEffect(() => {
+    if (hasLoadedReferenceDataRef.current) {
+      return;
+    }
+
+    hasLoadedReferenceDataRef.current = true;
     getCustomers()
       .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -307,7 +313,10 @@ export default function POSView() {
           setWarehouseId(String(filteredWarehouses[0].id));
         }
       })
-      .catch(console.error);
+      .catch((error) => {
+        hasLoadedReferenceDataRef.current = false;
+        console.error(error);
+      });
   }, [isAdmin, user]);
 
   useEffect(() => {

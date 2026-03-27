@@ -26,6 +26,7 @@ import { getCurrentUser } from '../utils/userAccess';
 import { updateStoredUser } from '../utils/authStorage';
 import TwoFactorSettingsCard from '../components/settings/TwoFactorSettingsCard';
 import UserTwoFactorModal from '../components/settings/UserTwoFactorModal';
+import { invalidateSettingsReferenceCache } from '../api/settings-reference.api';
 
 export default function SettingsView() {
   const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
@@ -379,6 +380,7 @@ export default function SettingsView() {
     }
     try {
       await client.post('/settings', { key, value });
+      invalidateSettingsReferenceCache();
       setSettings({ ...settings, [key]: value });
       toast.success('Настройки сохранены');
     } catch (err) {
@@ -395,6 +397,7 @@ export default function SettingsView() {
 
     try {
       await client.post('/settings/company-profile', companyProfile);
+      invalidateSettingsReferenceCache();
       toast.success('Данные компании сохранены');
       fetchData();
     } catch (err: any) {

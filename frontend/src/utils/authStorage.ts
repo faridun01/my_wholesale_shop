@@ -1,57 +1,34 @@
-const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
-function decodeTokenPayload(token: string) {
-  try {
-    const [, payload = ''] = token.split('.');
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const decoded = atob(padded);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
-
 export function getAuthToken() {
-  const token = sessionStorage.getItem(TOKEN_KEY);
-  if (!token) return null;
-
-  const payload = decodeTokenPayload(token);
-  const expiresAt = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
-  if (expiresAt && Date.now() >= expiresAt) {
-    clearAuthSession();
-    return null;
-  }
-
-  return token;
+  return null;
 }
 
 export function getTokenPayload() {
-  const token = getAuthToken();
-  if (!token) return null;
-  return decodeTokenPayload(token);
+  return null;
 }
 
 export function getStoredUser() {
-  return sessionStorage.getItem(USER_KEY);
+  return sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
 }
 
-export function setAuthSession(token: string, user: unknown) {
-  sessionStorage.setItem(TOKEN_KEY, token);
+export function hasStoredSession() {
+  return Boolean(getStoredUser());
+}
+
+export function setAuthSession(_token: string | null, user: unknown) {
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.removeItem('token');
 }
 
 export function updateStoredUser(user: unknown) {
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-  localStorage.removeItem(USER_KEY);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearAuthSession() {
-  sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('token');
   localStorage.removeItem(USER_KEY);
 }

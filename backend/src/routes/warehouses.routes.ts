@@ -37,7 +37,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post('/', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.post('/', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const payload = normalizeWarehousePayload(req.body || {});
@@ -66,7 +66,7 @@ router.post('/', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, 
   }
 });
 
-router.put('/:id', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.put('/:id', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = Number(req.params.id);
@@ -117,7 +117,7 @@ router.post('/:id/set-default', authorize(['ADMIN']), async (req: AuthRequest, r
   }
 });
 
-router.delete('/:id', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.delete('/:id', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = Number(req.params.id);

@@ -2,6 +2,7 @@
 import { FileSpreadsheet, Warehouse } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../api/client';
+import { getWarehouses } from '../api/warehouses.api';
 import { formatCount, formatMoney, toFixedNumber } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getCurrentUser } from '../utils/userAccess';
@@ -152,15 +153,15 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const [dateRange, setDateRange] = useState(() => getMonthRange(today.getFullYear(), today.getMonth()));
   const [reportData, setReportData] = useState<ReportRow[]>([]);
 
-  const user = getCurrentUser();
+  const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
   const currentMeta = reportMeta[reportType];
 
   useEffect(() => {
     const fetchWarehouses = async () => {
       try {
-        const res = await client.get('/warehouses');
-        setWarehouses(Array.isArray(res.data) ? res.data : []);
+        const data = await getWarehouses();
+        setWarehouses(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
       }

@@ -30,13 +30,17 @@ import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUse
 import { formatMoney, toFixedNumber } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
+import { getCustomers } from '../api/customers.api';
+import { getWarehouses } from '../api/warehouses.api';
 
 export default function SalesView() {
   const PAYMENT_EPSILON = 0.01;
   const [invoices, setInvoices] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const user = getCurrentUser();
+  const hasLoadedCustomersRef = React.useRef(false);
+  const hasLoadedWarehousesRef = React.useRef(false);
+  const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
@@ -90,9 +94,25 @@ export default function SalesView() {
 
   useEffect(() => {
     fetchInvoices();
-    fetchWarehouses();
-    fetchCustomers();
   }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+
+  useEffect(() => {
+    if (hasLoadedWarehousesRef.current) {
+      return;
+    }
+
+    hasLoadedWarehousesRef.current = true;
+    fetchWarehouses();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (hasLoadedCustomersRef.current) {
+      return;
+    }
+
+    hasLoadedCustomersRef.current = true;
+    fetchCustomers();
+  }, []);
 
   useEffect(() => {
     if (!showDetailsModal && !showPaymentModal && !showReturnModal && !showEditModal) {
@@ -130,8 +150,8 @@ export default function SalesView() {
 
   const fetchWarehouses = async () => {
     try {
-      const res = await client.get('/warehouses');
-      const filteredWarehouses = filterWarehousesForUser(Array.isArray(res.data) ? res.data : [], user);
+      const data = await getWarehouses();
+      const filteredWarehouses = filterWarehousesForUser(Array.isArray(data) ? data : [], user);
       setWarehouses(filteredWarehouses);
       const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
       if (isAdmin && !selectedWarehouseId && defaultWarehouseId) {
@@ -140,6 +160,7 @@ export default function SalesView() {
         setSelectedWarehouseId(String(filteredWarehouses[0].id));
       }
     } catch (err) {
+      hasLoadedWarehousesRef.current = false;
       console.error(err);
     }
   };
@@ -305,8 +326,8 @@ export default function SalesView() {
 
   const fetchCustomers = async () => {
     try {
-      const res = await client.get('/customers');
-      setCustomers(Array.isArray(res.data) ? res.data : []);
+      const data = await getCustomers();
+      setCustomers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }

@@ -15,6 +15,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { getDashboardSummary } from '../api/dashboard.api';
+import { getWarehouses } from '../api/warehouses.api';
 import { formatCount, formatMoney, formatPercent } from '../utils/format';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import client from '../api/client';
@@ -61,28 +62,43 @@ export default function DashboardView() {
   const [search, setSearch] = useState('');
   const [overviewPeriod, setOverviewPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('week');
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const user = getCurrentUser();
+  const lastSummaryWarehouseIdRef = React.useRef<string | null>(null);
+  const hasLoadedWarehousesRef = React.useRef(false);
+  const user = useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const defaultWarehouseId = getUserWarehouseId(user);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(defaultWarehouseId ? String(defaultWarehouseId) : '');
 
   useEffect(() => {
+    if (lastSummaryWarehouseIdRef.current === selectedWarehouseId) {
+      return;
+    }
+
+    lastSummaryWarehouseIdRef.current = selectedWarehouseId;
     getDashboardSummary(selectedWarehouseId ? Number(selectedWarehouseId) : null).then(setSummary).catch(console.error);
   }, [selectedWarehouseId]);
 
   useEffect(() => {
-    client.get('/warehouses')
-      .then((res) => {
-        const items = Array.isArray(res.data) ? res.data : [];
+    if (hasLoadedWarehousesRef.current) {
+      return;
+    }
+
+    hasLoadedWarehousesRef.current = true;
+    getWarehouses()
+      .then((data) => {
+        const items = Array.isArray(data) ? data : [];
         const filteredWarehouses = filterWarehousesForUser(items, user);
         setWarehouses(filteredWarehouses);
         const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
-        if (isAdmin && !selectedWarehouseId && defaultWarehouseId) {
-          setSelectedWarehouseId(String(defaultWarehouseId));
+        if (isAdmin && defaultWarehouseId) {
+          setSelectedWarehouseId((currentValue) => currentValue || String(defaultWarehouseId));
         }
       })
-      .catch(console.error);
-  }, [isAdmin, selectedWarehouseId, user]);
+      .catch((error) => {
+        hasLoadedWarehousesRef.current = false;
+        console.error(error);
+      });
+  }, [isAdmin, user]);
 
   const recentSales = summary?.recentSales || [];
   const overviewSales = summary?.overviewSales || [];

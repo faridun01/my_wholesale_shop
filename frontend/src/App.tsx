@@ -5,7 +5,8 @@ import Sidebar from './components/layout/Sidebar';
 import { Toaster } from 'react-hot-toast';
 import { Loader2, Menu, X, Warehouse } from 'lucide-react';
 import { getCurrentUser, isAdminUser } from './utils/userAccess';
-import { clearAuthSession, getAuthToken } from './utils/authStorage';
+import { clearAuthSession, getStoredUser, hasStoredSession, setAuthSession } from './utils/authStorage';
+import { getSessionUser } from './api/auth.api';
 
 const DashboardView = React.lazy(() => import('./views/DashboardView'));
 const ProductsView = React.lazy(() => import('./views/ProductsView'));
@@ -29,8 +30,7 @@ const RouteLoading = () => (
 );
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = getAuthToken();
-  return token ? <>{children}</> : <Navigate to="/login" />;
+  return hasStoredSession() ? <>{children}</> : <Navigate to="/login" />;
 };
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -99,11 +99,58 @@ const Layout = () => {
 };
 
 export default function App() {
+  const [isBootstrappingSession, setIsBootstrappingSession] = React.useState(() => Boolean(getStoredUser()));
+
   React.useEffect(() => {
-    if (localStorage.getItem('token') || localStorage.getItem('user')) {
-      clearAuthSession();
+    if (localStorage.getItem('token')) {
+      localStorage.removeItem('token');
     }
   }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapSession = async () => {
+      if (!getStoredUser()) {
+        if (isMounted) {
+          setIsBootstrappingSession(false);
+        }
+        return;
+      }
+
+      try {
+        const user = await getSessionUser();
+        if (isMounted) {
+          setAuthSession(null, user);
+        }
+      } catch {
+        if (isMounted) {
+          clearAuthSession();
+        }
+      } finally {
+        if (isMounted) {
+          setIsBootstrappingSession(false);
+        }
+      }
+    };
+
+    bootstrapSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (isBootstrappingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-shopify-bg">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
+          <Loader2 size={18} className="animate-spin text-slate-500" />
+          <span>Проверяем сессию...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>

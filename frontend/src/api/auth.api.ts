@@ -10,6 +10,16 @@ export const loginWithTwoFactor = async (data: { twoFactorToken: string; code: s
   return response.data;
 };
 
+export const getSessionUser = async () => {
+  const response = await client.get('/auth/me');
+  return response.data;
+};
+
+export const logout = async () => {
+  const response = await client.post('/auth/logout');
+  return response.data;
+};
+
 export const register = async (data: { username: string; password: string; role?: string; warehouseId?: number }) => {
   const response = await client.post('/auth/register', data);
   return response.data;

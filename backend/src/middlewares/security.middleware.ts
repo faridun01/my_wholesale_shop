@@ -22,7 +22,7 @@ export const corsMiddleware = cors({
   origin: buildCorsOriginCheck(),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type'],
-  credentials: false,
+  credentials: true,
   maxAge: 86400,
 });
 

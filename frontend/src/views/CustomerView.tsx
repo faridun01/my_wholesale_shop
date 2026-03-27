@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
+import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
 import { formatCount, formatMoney } from '../utils/format';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 
@@ -146,8 +147,8 @@ export default function CustomerView() {
 
   const fetchCustomers = async () => {
     try {
-      const res = await client.get('/customers');
-      setCustomers(Array.isArray(res.data) ? res.data : []);
+      const data = await getCustomers();
+      setCustomers(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Ошибка при загрузке клиентов');
     }
@@ -179,10 +180,10 @@ export default function CustomerView() {
 
     try {
       if (selectedCustomer) {
-        await client.put(`/customers/${selectedCustomer.id}`, payload);
+        await updateCustomer(selectedCustomer.id, payload);
         toast.success('Клиент обновлен');
       } else {
-        await client.post('/customers', payload);
+        await createCustomer(payload);
         toast.success('Клиент добавлен');
       }
 
@@ -197,7 +198,7 @@ export default function CustomerView() {
     if (!window.confirm('Вы уверены?')) return;
 
     try {
-      await client.delete(`/customers/${id}`);
+      await deleteCustomer(id);
       toast.success('Клиент удален');
       fetchCustomers();
     } catch {
@@ -209,7 +210,7 @@ export default function CustomerView() {
     if (!selectedCustomer) return;
 
     try {
-      await client.delete(`/customers/${selectedCustomer.id}`);
+      await deleteCustomer(selectedCustomer.id);
       toast.success('Клиент удален');
       setShowDeleteConfirm(false);
       setSelectedCustomer(null);

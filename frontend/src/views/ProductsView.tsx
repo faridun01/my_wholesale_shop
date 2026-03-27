@@ -32,6 +32,8 @@ import {
   calculateUnitCostFromPackage,
 } from '../utils/money';
 import { getProductBatches } from '../api/products.api';
+import { getWarehouses } from '../api/warehouses.api';
+import { getSettingsCategories } from '../api/settings-reference.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
@@ -274,7 +276,8 @@ export default function ProductsView() {
   const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
   const ProductHistoryModal = React.lazy(() => import('../components/products/ProductHistoryModal'));
   const ProductBatchesModal = React.lazy(() => import('../components/products/ProductBatchesModal'));
-  const user = getCurrentUser();
+  const hasLoadedReferenceDataRef = React.useRef(false);
+  const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
   const [products, setProducts] = useState<any[]>([]);
@@ -446,7 +449,7 @@ export default function ProductsView() {
 
   useEffect(() => {
     fetchInitialData();
-  }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+  }, [selectedWarehouseId]);
 
   useEffect(() => {
     if (!showAddModal || showEditModal || isCategoryManual) {
@@ -520,21 +523,8 @@ export default function ProductsView() {
     setIsLoading(true);
     try {
       const effectiveWarehouseId = warehouseIdOverride !== undefined ? warehouseIdOverride : selectedWarehouseId;
-      const [productsData, warehousesData, categoriesData] = await Promise.all([
-        getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined),
-        client.get('/warehouses').then(res => res.data),
-        client.get('/settings/categories').then(res => res.data)
-      ]);
+      const productsData = await getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined);
       setProducts(Array.isArray(productsData) ? productsData : []);
-      const filteredWarehouses = filterWarehousesForUser(Array.isArray(warehousesData) ? warehousesData : [], user);
-      setWarehouses(filteredWarehouses);
-      const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
-      if (isAdmin && !effectiveWarehouseId && defaultWarehouseId) {
-        setSelectedWarehouseId(String(defaultWarehouseId));
-      } else if (!isAdmin && filteredWarehouses[0]) {
-        setSelectedWarehouseId(String(filteredWarehouses[0].id));
-      }
-      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
     } catch (err) {
       console.error(err);
       toast.error('Ошибка при загрузке данных');
@@ -572,6 +562,35 @@ export default function ProductsView() {
       toast.error(err.response?.data?.error || 'Ошибка при переносе товара');
     }
   };
+
+  useEffect(() => {
+    if (hasLoadedReferenceDataRef.current) {
+      return;
+    }
+
+    hasLoadedReferenceDataRef.current = true;
+
+    Promise.all([
+      getWarehouses(),
+      getSettingsCategories(),
+    ])
+      .then(([warehousesData, categoriesData]) => {
+        const filteredWarehouses = filterWarehousesForUser(Array.isArray(warehousesData) ? warehousesData : [], user);
+        setWarehouses(filteredWarehouses);
+        const defaultWarehouseId = getDefaultWarehouseId(filteredWarehouses);
+        if (isAdmin && defaultWarehouseId) {
+          setSelectedWarehouseId((currentValue) => currentValue || String(defaultWarehouseId));
+        } else if (!isAdmin && filteredWarehouses[0]) {
+          setSelectedWarehouseId(String(filteredWarehouses[0].id));
+        }
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      })
+      .catch((error) => {
+        hasLoadedReferenceDataRef.current = false;
+        console.error(error);
+        toast.error('Ошибка при загрузке данных');
+      });
+  }, [isAdmin, user]);
 
   const handleRestock = async (e: React.FormEvent) => {
     e.preventDefault();

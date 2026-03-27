@@ -21,7 +21,8 @@ import { clsx } from 'clsx';
 import { motion } from 'motion/react';
 import client from '../../api/client';
 import { getCurrentUser, isAdminUser } from '../../utils/userAccess';
-import { clearAuthSession, getAuthToken } from '../../utils/authStorage';
+import { clearAuthSession, hasStoredSession } from '../../utils/authStorage';
+import { logout } from '../../api/auth.api';
 
 type NavItem = {
   to: string;
@@ -58,8 +59,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
   const [remindersCount, setRemindersCount] = useState(0);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (!token) return;
+    if (!hasStoredSession()) return;
 
     const refreshRemindersCount = () => {
       client
@@ -83,7 +83,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Clear client session even if the server cookie is already gone.
+    }
     clearAuthSession();
     navigate('/login');
   };

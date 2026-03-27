@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearAuthSession, getAuthToken } from '../utils/authStorage';
+import { clearAuthSession } from '../utils/authStorage';
 
 const API_URL = (() => {
   if (import.meta.env.VITE_API_URL) {
@@ -16,16 +16,11 @@ const API_URL = (() => {
 const client = axios.create({
   baseURL: API_URL,
   timeout: 180000, // 3 minutes
+  withCredentials: true,
 });
 
-// Add a request interceptor to include the auth token
 client.interceptors.request.use(
   (config) => {
-    const token = getAuthToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     } else if (!config.headers['Content-Type']) {

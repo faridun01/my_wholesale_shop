@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getProducts } from '../api/products.api';
+import { getWarehouses } from '../api/warehouses.api';
+import { getPublicSettings } from '../api/settings-reference.api';
 import { useNavigate } from 'react-router-dom';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney } from '../utils/format';
@@ -34,7 +36,8 @@ function getStoredWarehouseId() {
 
 export default function CatalogView() {
   const warehouseStorageKey = 'pos_warehouse_session';
-  const user = getCurrentUser();
+  const hasLoadedReferenceDataRef = React.useRef(false);
+  const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
   const [products, setProducts] = useState<any[]>([]);
@@ -55,13 +58,25 @@ export default function CatalogView() {
   useEffect(() => {
     setLoading(true);
 
-    Promise.all([
-      getProducts(selectedWarehouseId ? Number(selectedWarehouseId) : undefined),
-      client.get('/warehouses').then((res) => res.data),
-      client.get('/settings/public').then((res) => res.data),
-    ])
-      .then(([productsData, warehousesData, settingsData]) => {
+    getProducts(selectedWarehouseId ? Number(selectedWarehouseId) : undefined)
+      .then((productsData) => {
         setProducts(Array.isArray(productsData) ? productsData : []);
+      })
+      .finally(() => setLoading(false));
+  }, [selectedWarehouseId]);
+
+  useEffect(() => {
+    if (hasLoadedReferenceDataRef.current) {
+      return;
+    }
+
+    hasLoadedReferenceDataRef.current = true;
+
+    Promise.all([
+      getWarehouses(),
+      getPublicSettings(),
+    ])
+      .then(([warehousesData, settingsData]) => {
         const filteredWarehouses = filterWarehousesForUser(Array.isArray(warehousesData) ? warehousesData : [], user);
         setWarehouses(filteredWarehouses);
         if (!isAdmin && filteredWarehouses[0]) {
@@ -69,8 +84,11 @@ export default function CatalogView() {
         }
         setSettings(settingsData || {});
       })
-      .finally(() => setLoading(false));
-  }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+      .catch((error) => {
+        hasLoadedReferenceDataRef.current = false;
+        console.error(error);
+      });
+  }, [isAdmin, user]);
 
   useEffect(() => {
     if (selectedWarehouseId) {

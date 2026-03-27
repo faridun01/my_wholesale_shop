@@ -1,4 +1,4 @@
-import { getStoredUser, getTokenPayload } from './authStorage';
+import { getStoredUser } from './authStorage';
 
 export type AppUser = {
   id?: number;
@@ -15,18 +15,9 @@ export type AppUser = {
 
 export function getCurrentUser(): AppUser {
   try {
-    const storedUser = JSON.parse(getStoredUser() || '{}');
-    const tokenPayload = getTokenPayload() || {};
-
-    return {
-      ...tokenPayload,
-      ...storedUser,
-      role: storedUser.role || tokenPayload.role,
-      warehouseId: storedUser.warehouseId ?? tokenPayload.warehouseId,
-    };
+    return JSON.parse(getStoredUser() || '{}');
   } catch {
-    const tokenPayload = getTokenPayload();
-    return tokenPayload && typeof tokenPayload === 'object' ? tokenPayload : {};
+    return {};
   }
 }
 

@@ -38,12 +38,42 @@ const buildAuthUser = (user: {
   canDeleteData: user.canDeleteData,
 });
 
+const parseCookies = (cookieHeader?: string) => {
+  const entries = String(cookieHeader || '')
+    .split(';')
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const separatorIndex = chunk.indexOf('=');
+      if (separatorIndex === -1) {
+        return [chunk, ''] as const;
+      }
+
+      return [
+        decodeURIComponent(chunk.slice(0, separatorIndex).trim()),
+        decodeURIComponent(chunk.slice(separatorIndex + 1).trim()),
+      ] as const;
+    });
+
+  return Object.fromEntries(entries);
+};
+
 const getBearerToken = (authHeader?: string) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
 
   return authHeader.split(' ')[1];
+};
+
+const getRequestToken = (req: Request) => {
+  const bearerToken = getBearerToken(req.headers.authorization);
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies.auth_token || null;
 };
 
 const resolveUserFromToken = async (token: string) => {
@@ -78,7 +108,7 @@ const resolveUserFromToken = async (token: string) => {
 };
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const token = getBearerToken(req.headers.authorization);
+  const token = getRequestToken(req);
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -93,7 +123,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 export const authenticateUploadAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
-  const token = getBearerToken(req.headers.authorization) || queryToken;
+  const token = getRequestToken(req) || queryToken;
 
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });

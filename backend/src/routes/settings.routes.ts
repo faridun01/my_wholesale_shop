@@ -16,7 +16,7 @@ router.get('/public', async (req, res, next) => {
   }
 });
 
-router.get('/', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
     const settings = await SettingsService.getSettings();
     res.json(settings);
@@ -25,7 +25,7 @@ router.get('/', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, 
   }
 });
 
-router.post('/', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.post('/', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
     const { key, value } = req.body;
     const setting = await SettingsService.updateSetting(key, value);
@@ -44,7 +44,7 @@ router.get('/categories', authenticate, async (req, res, next) => {
   }
 });
 
-router.post('/categories', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.post('/categories', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
     const category = await SettingsService.ensureCategory(req.body?.name);
     res.status(201).json(category);
@@ -65,7 +65,7 @@ router.get('/company-profile', authenticate, async (req, res, next) => {
   }
 });
 
-router.post('/company-profile', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.post('/company-profile', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
     const payload = {
       name: String(req.body?.name || '').trim(),

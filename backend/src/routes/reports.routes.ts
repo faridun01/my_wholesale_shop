@@ -60,7 +60,7 @@ function getLineCost(item: any) {
 
 router.use(authenticate);
 
-router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const isAdmin = access.isAdmin;
@@ -173,7 +173,7 @@ router.get('/analytics', authorize(['ADMIN', 'MANAGER']), async (req: AuthReques
   }
 });
 
-router.get('/sales', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.get('/sales', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
@@ -314,7 +314,7 @@ router.get('/profit', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.get('/returns', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.get('/returns', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);

@@ -56,6 +56,54 @@ export function printSalesInvoice({
 
   const getUnitPrice = (item: any) => Number(item.sellingPrice || 0);
 
+  const detectInnerUnitLabel = (item: any) => {
+    const explicitBaseUnit = String(item.baseUnitNameSnapshot || item.baseUnitName || item.unit || '').trim().toLowerCase();
+    if (explicitBaseUnit && explicitBaseUnit !== 'шт') {
+      return explicitBaseUnit;
+    }
+
+    const source = String(
+      item.rawNameSnapshot ||
+        item.raw_name_snapshot ||
+        item.product_name ||
+        item.productNameSnapshot ||
+        ''
+    ).toLowerCase();
+
+    if (/пач(?:ка|ки|ек)/u.test(source)) return 'пачка';
+    if (/флакон(?:а|ов)?/u.test(source)) return 'флакон';
+    if (/бут(?:ылка|ылки|ылок)/u.test(source)) return 'бутылка';
+    if (/бан(?:ка|ки|ок)/u.test(source)) return 'банка';
+    if (/ёмкост(?:ь|и|ей)|емкост(?:ь|и|ей)/u.test(source)) return 'ёмкость';
+
+    return explicitBaseUnit || 'шт';
+  };
+
+  const getQuantityLabel = (item: any) => {
+    const packageQuantity = Number(item.packageQuantity || 0);
+    const extraUnitQuantity = Number(item.extraUnitQuantity || 0);
+    const unitsPerPackage = Number(item.unitsPerPackageSnapshot || item.unitsPerPackage || 0);
+    const packageName = String(item.packageNameSnapshot || item.packageName || '').trim();
+    const baseUnitName = 'шт';
+    const quantity = Number(item.quantity || 0);
+
+    if (packageQuantity > 0 && packageName) {
+      const lines = [`${packageQuantity} ${packageName}`];
+
+      if (unitsPerPackage > 0) {
+        lines.push(`${unitsPerPackage} ${baseUnitName} в ${packageName}`);
+      }
+
+      if (extraUnitQuantity > 0) {
+        lines.push(`${extraUnitQuantity} ${baseUnitName}`);
+      }
+
+      return lines;
+    }
+
+    return [`${quantity} ${baseUnitName}`];
+  };
+
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
         .map(
@@ -63,7 +111,9 @@ export function printSalesInvoice({
             <tr>
               <td>${index + 1}</td>
               <td class="product-cell"><span class="product-name">${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</span></td>
-              <td>${escapeHtml(item.quantityLabel || `${item.quantity} ${item.unit || ''}`)}</td>
+              <td class="quantity-cell">${getQuantityLabel(item)
+                .map((line) => `<span class="quantity-line">${escapeHtml(line)}</span>`)
+                .join('')}</td>
               <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(getUnitPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
@@ -112,6 +162,9 @@ export function printSalesInvoice({
             overflow: hidden;
             word-break: break-word;
           }
+          .quantity-cell { line-height: 1.2; }
+          .quantity-line { display: block; }
+          .quantity-line + .quantity-line { margin-top: 2px; font-size: 11px; color: #475569; }
           .summary { margin-left: auto; margin-top: 10px; width: 260px; }
           .summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
           .summary-row.total { font-size: 16px; font-weight: 700; border-top: 1px solid #cbd5e1; margin-top: 4px; padding-top: 8px; }

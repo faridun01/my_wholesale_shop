@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Response } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -6,6 +7,29 @@ import { securityConfig } from '../config/security.js';
 import { createRateLimit, resetRateLimit } from '../middlewares/rate-limit.middleware.js';
 
 const router = Router();
+
+const isSecureCookie = () =>
+  process.env.NODE_ENV === 'production' &&
+  String(process.env.COOKIE_SECURE || 'true').toLowerCase() !== 'false';
+
+const setAuthCookie = (res: Response, token: string) => {
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: isSecureCookie(),
+    sameSite: 'lax',
+    maxAge: 8 * 60 * 60 * 1000,
+    path: '/',
+  });
+};
+
+const clearAuthCookie = (res: Response) => {
+  res.clearCookie('auth_token', {
+    httpOnly: true,
+    secure: isSecureCookie(),
+    sameSite: 'lax',
+    path: '/',
+  });
+};
 
 const loginRateLimitKey = (req: any) =>
   `${req.ip}:${String(req.body?.username || '').trim().toLowerCase()}`;
@@ -49,13 +73,14 @@ router.post('/login', loginRateLimit, async (req, res, next) => {
     }
 
     await resetRateLimit(loginRateLimitKey(req));
-    res.json({ user: result.user, token: result.token, requiresTwoFactor: false });
+    setAuthCookie(res, result.token);
+    res.json({ user: result.user, requiresTwoFactor: false });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/users', authenticate, authorize(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/users', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
     const users = await AuthService.getAllUsers();
     res.json(users);
@@ -71,6 +96,11 @@ router.get('/me', authenticate, async (req: AuthRequest, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+router.post('/logout', (_req, res) => {
+  clearAuthCookie(res);
+  res.json({ success: true });
 });
 
 router.post('/register', authenticate, authorize(['ADMIN']), async (req, res, next) => {
@@ -150,7 +180,8 @@ router.post('/2fa/login', twoFactorRateLimit, async (req, res, next) => {
 
     const result = await AuthService.completeTwoFactorLogin(twoFactorToken, code);
     await resetRateLimit(twoFactorRateLimitKey(req));
-    res.json(result);
+    setAuthCookie(res, result.token);
+    res.json({ user: result.user });
   } catch (error) {
     next(error);
   }
