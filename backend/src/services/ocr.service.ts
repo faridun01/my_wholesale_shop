@@ -7,6 +7,8 @@ export class OCRService {
   private static readonly OCR_PROMPT = `Extract invoice items from this invoice as separate rows.
 Requirements:
 1. Return one JSON object per invoice line item. Never merge different products into one object.
+1a. Do not skip visible product rows even if some values are unclear. If a row is visible but partially unclear, still return a separate object with the available fields and keep the full original text in "rawName".
+1b. Preserve the exact number of visible product rows from the invoice table. It is better to return an incomplete row than to omit a row.
 2. Ignore non-product text such as company header, signatures, payment data, totals, tax, addresses, banking details, and generic notes.
 3. "rawName" must contain the original full product line text exactly as it appears on the invoice.
 4. "name" must contain only the clean normalized product name for database storage. Remove packaging fragments and any trailing fragment after "/" such as "/160 пачек". Remove only the quote characters around brands, but keep the brand text itself in the clean name.

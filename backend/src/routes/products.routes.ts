@@ -378,7 +378,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       const newCost = nextEffectiveCostPrice;
       const newSelling = productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : roundMoney(oldProduct.sellingPrice);
       
-      if (newCost !== oldProduct.costPrice || newSelling !== oldProduct.sellingPrice) {
+      if (newCost !== Number(oldProduct.costPrice) || newSelling !== Number(oldProduct.sellingPrice)) {
         const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
 
         await prisma.priceHistory.create({
@@ -623,7 +623,7 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
     const productId = Number(req.params.id);
     const userId = req.user!.id;
     const warehouseId = access.isAdmin ? Number(req.body.warehouseId) : access.warehouseId;
-    const { quantity, costPrice, purchaseCostPrice, expensePercent, reason } = req.body;
+    const { quantity, costPrice, purchaseCostPrice, sellingPrice, expensePercent, reason } = req.body;
 
     if (!warehouseId || !ensureWarehouseAccess(access, warehouseId)) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -633,14 +633,42 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
     const resolvedExpensePercent = Number(expensePercent ?? 0);
     const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
+    const existingProduct = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { costPrice: true, sellingPrice: true, warehouseId: true },
+    });
+
+    if (!existingProduct) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+
+    const resolvedSellingPrice =
+      sellingPrice !== undefined && sellingPrice !== null && sellingPrice !== ''
+        ? roundMoney(sellingPrice)
+        : roundMoney(existingProduct.sellingPrice);
+
     await prisma.product.update({
       where: { id: productId },
       data: {
         purchaseCostPrice: resolvedPurchaseCostPrice,
         expensePercent: resolvedExpensePercent,
         costPrice: resolvedEffectiveCostPrice,
+        sellingPrice: resolvedSellingPrice,
       },
     });
+
+    if (
+      resolvedEffectiveCostPrice !== Number(existingProduct.costPrice) ||
+      resolvedSellingPrice !== Number(existingProduct.sellingPrice)
+    ) {
+      await prisma.priceHistory.create({
+        data: {
+          productId,
+          costPrice: resolvedEffectiveCostPrice,
+          sellingPrice: resolvedSellingPrice,
+        },
+      });
+    }
 
     const batch = await StockService.addStock(
       productId,

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
-import { Ban, Layers, Trash2, X } from 'lucide-react';
+import { Layers, Trash2, X } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
 
 interface ProductBatchesModalProps {
@@ -10,9 +10,82 @@ interface ProductBatchesModalProps {
   selectedProduct: any;
   productBatches: any[];
   canManage?: boolean;
-  onZeroBatch?: (batchId: number) => void;
   onDeleteBatch?: (batchId: number) => void;
 }
+
+const normalizePackageName = (value: string) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'упаковка';
+  if (['мешок', 'мешка', 'мешков', 'bag'].includes(normalized)) return 'мешок';
+  if (['коробка', 'коробки', 'коробок', 'box'].includes(normalized)) return 'коробка';
+  if (['упаковка', 'упаковки', 'упаковок', 'pack'].includes(normalized)) return 'упаковка';
+  if (['пачка', 'пачки', 'пачек'].includes(normalized)) return 'пачка';
+  return normalized;
+};
+
+const pluralizeRu = (count: number, forms: [string, string, string]) => {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+
+  if (abs > 10 && abs < 20) return forms[2];
+  if (last > 1 && last < 5) return forms[1];
+  if (last === 1) return forms[0];
+  return forms[2];
+};
+
+const formatCountWithUnit = (count: number, unit: string) => {
+  const normalized = String(unit || '').trim().toLowerCase();
+  const formsMap: Record<string, [string, string, string]> = {
+    'шт': ['шт', 'шт', 'шт'],
+    'штука': ['штука', 'штуки', 'штук'],
+    'пачка': ['пачка', 'пачки', 'пачек'],
+    'мешок': ['мешок', 'мешка', 'мешков'],
+    'коробка': ['коробка', 'коробки', 'коробок'],
+    'упаковка': ['упаковка', 'упаковки', 'упаковок'],
+    'флакон': ['флакон', 'флакона', 'флаконов'],
+    'ёмкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'емкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'бутылка': ['бутылка', 'бутылки', 'бутылок'],
+  };
+
+  const forms = formsMap[normalized] || [unit, unit, unit];
+  return `${count} ${pluralizeRu(count, forms)}`;
+};
+
+const getPreferredPackaging = (product: any) => {
+  const packagings = Array.isArray(product?.packagings) ? product.packagings : [];
+  return (
+    packagings.find((packaging: any) => packaging?.isDefault && Number(packaging?.unitsPerPackage || 0) > 1) ||
+    packagings.find((packaging: any) => Number(packaging?.unitsPerPackage || 0) > 1) ||
+    null
+  );
+};
+
+const getQuantityBreakdown = (quantityValue: unknown, product: any) => {
+  const totalUnits = Number(quantityValue || 0);
+  const preferredPackaging = getPreferredPackaging(product);
+  const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 0);
+  const packageName = normalizePackageName(preferredPackaging?.packageName || preferredPackaging?.name || 'упаковка');
+  const baseUnitName = product?.unit || 'шт';
+
+  if (!preferredPackaging || unitsPerPackage <= 1 || !Number.isFinite(totalUnits)) {
+    return {
+      primary: formatCountWithUnit(totalUnits, baseUnitName),
+      secondary: null,
+    };
+  }
+
+  const packageCount = Math.floor(totalUnits / unitsPerPackage);
+  const remainderUnits = totalUnits % unitsPerPackage;
+
+  return {
+    primary:
+      remainderUnits > 0
+        ? `${formatCountWithUnit(packageCount, packageName)}\n${formatCountWithUnit(remainderUnits, baseUnitName)}`
+        : formatCountWithUnit(packageCount, packageName),
+    secondary: `${formatCountWithUnit(totalUnits, baseUnitName)} всего`,
+  };
+};
 
 export default function ProductBatchesModal({
   isOpen,
@@ -20,7 +93,6 @@ export default function ProductBatchesModal({
   selectedProduct,
   productBatches,
   canManage = false,
-  onZeroBatch,
   onDeleteBatch,
 }: ProductBatchesModalProps) {
   useEffect(() => {
@@ -70,63 +142,61 @@ export default function ProductBatchesModal({
                 Система списывает товар из самых старых партий в первую очередь по FIFO.
               </div>
 
-              <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
-                Убрать партию можно в двух режимах: безопасно убрать остаток у уже использованной партии или полностью удалить нетронутую партию.
-              </div>
-
               <div className="space-y-3 sm:hidden">
-                {productBatches.map((b, i) => (
-                  <div key={b.id} className={clsx('rounded-3xl border border-slate-100 p-4', i === 0 ? 'bg-violet-50/60' : 'bg-slate-50')}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{new Date(b.createdAt).toLocaleDateString('ru-RU')}</p>
-                        <p className="mt-1 text-sm text-slate-500">{b.warehouse?.name || '---'}</p>
+                {productBatches.map((b, i) => {
+                  const quantityInfo = getQuantityBreakdown(b.quantity, selectedProduct);
+                  const remainingInfo = getQuantityBreakdown(b.remainingQuantity, selectedProduct);
+
+                  return (
+                    <div key={b.id} className={clsx('rounded-3xl border border-slate-100 p-4', i === 0 ? 'bg-violet-50/60' : 'bg-slate-50')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{new Date(b.createdAt).toLocaleDateString('ru-RU')}</p>
+                          <p className="mt-1 text-sm text-slate-500">{b.warehouse?.name || '---'}</p>
+                        </div>
+                        {i === 0 && (
+                          <span className="rounded-md bg-violet-500 px-2 py-1 text-[8px] uppercase text-white">След. на списание</span>
+                        )}
                       </div>
-                      {i === 0 && (
-                        <span className="rounded-md bg-violet-500 px-2 py-1 text-[8px] uppercase text-white">След. на списание</span>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl bg-white px-3 py-3">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Нач. кол-во</p>
+                          <p className="mt-1 whitespace-pre-line text-sm font-semibold text-slate-900">{quantityInfo.primary}</p>
+                          {quantityInfo.secondary && (
+                            <p className="mt-1 text-[11px] font-medium text-slate-500">{quantityInfo.secondary}</p>
+                          )}
+                        </div>
+                        <div className="rounded-2xl bg-white px-3 py-3">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
+                          <p className="mt-1 whitespace-pre-line text-sm font-black text-slate-900">{remainingInfo.primary}</p>
+                          {remainingInfo.secondary && (
+                            <p className="mt-1 text-[11px] font-medium text-slate-500">{remainingInfo.secondary}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-2xl bg-white px-3 py-3">
+                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Цена закупки</p>
+                        <p className="mt-1 text-sm font-black text-emerald-600">{formatMoney(b.costPrice)}</p>
+                      </div>
+
+                      {canManage && (
+                        <div className="mt-3 flex flex-col gap-2">
+                          <button
+                            type="button"
+                            disabled={!b.canDelete}
+                            onClick={() => onDeleteBatch?.(b.id)}
+                            className="flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            <span>Удалить партию</span>
+                          </button>
+                        </div>
                       )}
                     </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl bg-white px-3 py-3">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Нач. кол-во</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">{b.quantity} {selectedProduct.unit}</p>
-                      </div>
-                      <div className="rounded-2xl bg-white px-3 py-3">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                        <p className="mt-1 text-sm font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 rounded-2xl bg-white px-3 py-3">
-                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Цена закупки</p>
-                      <p className="mt-1 text-sm font-black text-emerald-600">{formatMoney(b.costPrice)}</p>
-                    </div>
-
-                    {canManage && (
-                      <div className="mt-3 flex flex-col gap-2">
-                        <button
-                          type="button"
-                          disabled={!b.canZeroRemaining}
-                          onClick={() => onZeroBatch?.(b.id)}
-                          className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Ban size={14} />
-                          <span>Убрать партию</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!b.canDelete}
-                          onClick={() => onDeleteBatch?.(b.id)}
-                          className="flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Trash2 size={14} />
-                          <span>Удалить партию</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
 
                 {productBatches.length === 0 && (
                   <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm font-bold text-slate-400">Партий не найдено</div>
@@ -145,42 +215,48 @@ export default function ProductBatchesModal({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {productBatches.map((b, i) => (
-                    <tr key={b.id} className={clsx('text-[13px]', i === 0 && 'bg-violet-50/40')}>
-                      <td className="py-3 font-bold text-slate-500">
-                        {new Date(b.createdAt).toLocaleDateString('ru-RU')}
-                        {i === 0 && <span className="ml-2 rounded-md bg-violet-500 px-2 py-0.5 text-[8px] uppercase text-white">След. на списание</span>}
-                      </td>
-                      <td className="py-3 font-bold text-slate-600">{b.warehouse?.name || '---'}</td>
-                      <td className="py-3 text-right font-bold text-slate-400">{b.quantity} {selectedProduct.unit}</td>
-                      <td className="py-3 text-right font-black text-slate-900">{b.remainingQuantity} {selectedProduct.unit}</td>
-                      <td className="py-3 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
-                      {canManage && (
-                        <td className="py-3">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={!b.canZeroRemaining}
-                              onClick={() => onZeroBatch?.(b.id)}
-                              className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Ban size={12} />
-                              <span>Убрать</span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!b.canDelete}
-                              onClick={() => onDeleteBatch?.(b.id)}
-                              className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Trash2 size={12} />
-                              <span>Удалить</span>
-                            </button>
-                          </div>
+                  {productBatches.map((b, i) => {
+                    const quantityInfo = getQuantityBreakdown(b.quantity, selectedProduct);
+                    const remainingInfo = getQuantityBreakdown(b.remainingQuantity, selectedProduct);
+
+                    return (
+                      <tr key={b.id} className={clsx('text-[13px]', i === 0 && 'bg-violet-50/40')}>
+                        <td className="py-3 font-bold text-slate-500">
+                          {new Date(b.createdAt).toLocaleDateString('ru-RU')}
+                          {i === 0 && <span className="ml-2 rounded-md bg-violet-500 px-2 py-0.5 text-[8px] uppercase text-white">След. на списание</span>}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="py-3 font-bold text-slate-600">{b.warehouse?.name || '---'}</td>
+                        <td className="py-3 text-right font-bold text-slate-400">
+                          <div className="whitespace-pre-line">{quantityInfo.primary}</div>
+                          {quantityInfo.secondary && (
+                            <div className="mt-1 text-[11px] font-medium text-slate-400">{quantityInfo.secondary}</div>
+                          )}
+                        </td>
+                        <td className="py-3 text-right font-black text-slate-900">
+                          <div className="whitespace-pre-line">{remainingInfo.primary}</div>
+                          {remainingInfo.secondary && (
+                            <div className="mt-1 text-[11px] font-medium text-slate-400">{remainingInfo.secondary}</div>
+                          )}
+                        </td>
+                        <td className="py-3 text-right font-black text-emerald-600">{formatMoney(b.costPrice)}</td>
+                        {canManage && (
+                          <td className="py-3">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={!b.canDelete}
+                                onClick={() => onDeleteBatch?.(b.id)}
+                                className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Trash2 size={12} />
+                                <span>Удалить</span>
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
 
                   {productBatches.length === 0 && (
                     <tr>

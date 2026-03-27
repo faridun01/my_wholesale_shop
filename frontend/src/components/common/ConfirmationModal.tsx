@@ -11,6 +11,7 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
+  closeOnConfirmStart?: boolean;
 }
 
 export default function ConfirmationModal({
@@ -22,6 +23,7 @@ export default function ConfirmationModal({
   confirmText = 'Удалить',
   cancelText = 'Отмена',
   type = 'danger',
+  closeOnConfirmStart = false,
 }: ConfirmationModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +44,19 @@ export default function ConfirmationModal({
   }, [isOpen, isSubmitting, onClose]);
 
   const handleConfirm = async () => {
+    if (closeOnConfirmStart) {
+      setIsSubmitting(true);
+      onClose();
+
+      try {
+        await Promise.resolve(onConfirm());
+      } finally {
+        setIsSubmitting(false);
+      }
+
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await Promise.resolve(onConfirm());
@@ -120,7 +135,7 @@ export default function ConfirmationModal({
                       : 'bg-indigo-600 shadow-indigo-600/20 hover:bg-indigo-700'
                 }`}
               >
-                {isSubmitting ? 'Подождите...' : confirmText}
+                {isSubmitting && !closeOnConfirmStart ? 'Подождите...' : confirmText}
               </button>
             </div>
           </motion.div>

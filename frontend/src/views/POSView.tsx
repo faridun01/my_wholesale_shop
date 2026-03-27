@@ -19,6 +19,7 @@ import { getProducts } from '../api/products.api';
 import { createInvoice } from '../api/invoices.api';
 import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { formatMoney, toFixedNumber } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
@@ -127,6 +128,7 @@ export default function POSView() {
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
   const [productSearch, setProductSearch] = useState('');
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
+  const [pendingWarehouseId, setPendingWarehouseId] = useState<string | null>(null);
   const productListRef = useRef<HTMLDivElement | null>(null);
   const lastProductScrollRef = useRef(0);
   const deferredProductSearch = useDeferredValue(productSearch);
@@ -333,7 +335,11 @@ export default function POSView() {
     if (warehouseId) {
       sessionStorage.setItem(warehouseStorageKey, warehouseId);
       localStorage.setItem(warehouseStorageKey, warehouseId);
+      return;
     }
+
+    sessionStorage.removeItem(warehouseStorageKey);
+    localStorage.removeItem(warehouseStorageKey);
   }, [warehouseId]);
 
   const resetSaleDraft = (showToast = false) => {
@@ -353,6 +359,38 @@ export default function POSView() {
         icon: '↺',
       });
     }
+  };
+
+  const hasSaleDraft =
+    cart.length > 0 || customerId !== null || Number(paidAmount || 0) > 0 || discount > 0;
+
+  const handleWarehouseChange = (nextWarehouseId: string) => {
+    if (nextWarehouseId === warehouseId) {
+      return;
+    }
+
+    if (hasSaleDraft) {
+      setPendingWarehouseId(nextWarehouseId);
+      return;
+    }
+
+    setWarehouseId(nextWarehouseId);
+    resetSaleDraft(false);
+  };
+
+  const closeWarehouseConfirm = () => {
+    setPendingWarehouseId(null);
+  };
+
+  const confirmWarehouseChange = async () => {
+    if (!pendingWarehouseId) {
+      return;
+    }
+
+    const nextWarehouseId = pendingWarehouseId;
+    setPendingWarehouseId(null);
+    setWarehouseId(nextWarehouseId);
+    resetSaleDraft(true);
   };
 
   const addToCart = (product: any) => {
@@ -683,6 +721,17 @@ export default function POSView() {
 
   return (
     <div className="app-page-shell min-h-full">
+        <ConfirmationModal
+          isOpen={Boolean(pendingWarehouseId)}
+          onClose={closeWarehouseConfirm}
+          onConfirm={confirmWarehouseChange}
+          title="Сменить склад?"
+          message="При смене склада корзина, клиент и черновик продажи будут очищены. Подтвердите смену, если хотите начать продажу с другого склада."
+          confirmText="Сменить склад"
+          cancelText="Остаться здесь"
+          type="warning"
+        />
+
       <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -732,13 +781,7 @@ export default function POSView() {
                         <Warehouse size={16} className="text-sky-500" />
                         <select
                           value={warehouseId}
-                          onChange={(e) => {
-                            const nextWarehouseId = e.target.value;
-                            const shouldResetDraft =
-                              cart.length > 0 || customerId !== null || Number(paidAmount || 0) > 0 || discount > 0;
-                            setWarehouseId(nextWarehouseId);
-                            resetSaleDraft(shouldResetDraft);
-                          }}
+                          onChange={(e) => handleWarehouseChange(e.target.value)}
                           disabled={!isAdmin}
                           className="min-w-[170px] appearance-none bg-transparent text-sm text-slate-700 outline-none"
                         >

@@ -1,7 +1,7 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
-import { roundMoney } from '../utils/money.js';
+import { normalizeMoney, roundMoney } from '../utils/money.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -66,9 +66,9 @@ export class InvoiceService {
     paymentDueDate?: string;
   }) {
     const { customerId, userId, warehouseId, items, discount = 0, tax = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
-    const normalizedDiscount = roundMoney(normalizeNonNegativeNumber(discount, 'Discount'));
-    const normalizedTax = roundMoney(normalizeNonNegativeNumber(tax, 'Tax'));
-    const normalizedPaidAmount = roundMoney(normalizeNonNegativeNumber(paidAmount, 'Paid amount'));
+    const normalizedDiscount = normalizeMoney(normalizeNonNegativeNumber(discount, 'Discount'), 'Discount');
+    const normalizedTax = normalizeMoney(normalizeNonNegativeNumber(tax, 'Tax'), 'Tax');
+    const normalizedPaidAmount = normalizeMoney(normalizeNonNegativeNumber(paidAmount, 'Paid amount'), 'Paid amount');
 
     if (normalizedDiscount > 100) {
       throw new Error('Discount cannot exceed 100%');
@@ -108,7 +108,7 @@ export class InvoiceService {
       let totalAmount = 0;
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
-        const sellingPrice = roundMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'));
+        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
@@ -147,7 +147,7 @@ export class InvoiceService {
       // 3. Create Items and Allocate Stock
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
-        const sellingPrice = roundMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'));
+        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const product = productsById.get(item.productId);
 
         if (!product) {

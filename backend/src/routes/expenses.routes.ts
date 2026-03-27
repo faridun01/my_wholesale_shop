@@ -2,7 +2,7 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
-import { roundMoney } from '../utils/money.js';
+import { normalizeMoney } from '../utils/money.js';
 
 const router = Router();
 
@@ -12,12 +12,12 @@ const normalizeOptionalString = (value: unknown) => {
 };
 
 const normalizePositiveAmount = (value: unknown) => {
-  const amount = Number(value);
+  const amount = normalizeMoney(value, 'Expense amount', { allowZero: false });
   if (!Number.isFinite(amount) || amount <= 0) {
     throw Object.assign(new Error('Сумма расхода должна быть больше нуля'), { status: 400 });
   }
 
-  return roundMoney(amount);
+  return amount;
 };
 
 router.get('/', async (req: AuthRequest, res, next) => {

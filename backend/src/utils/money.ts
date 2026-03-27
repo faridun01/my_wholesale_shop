@@ -7,3 +7,13 @@ export const roundMoney = (value: unknown, digits = 2) => {
   return Number(numeric.toFixed(digits));
 };
 
+export const normalizeMoney = (value: unknown, fieldName: string, options?: { allowZero?: boolean }) => {
+  const normalized = roundMoney(value);
+  const allowZero = options?.allowZero ?? true;
+
+  if (!Number.isFinite(normalized) || normalized < 0 || (!allowZero && normalized === 0)) {
+    throw Object.assign(new Error(`${fieldName} must be a valid monetary amount`), { status: 400 });
+  }
+
+  return normalized;
+};

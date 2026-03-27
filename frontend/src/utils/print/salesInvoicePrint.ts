@@ -80,27 +80,45 @@ export function printSalesInvoice({
         <meta charset="utf-8" />
         <title>Накладная</title>
         <style>
+          @page { size: A4 portrait; margin: 10mm; }
           * { box-sizing: border-box; }
-          body { margin: 0; padding: 30px; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
+          body { margin: 0; padding: 12px; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
           .sheet { max-width: 920px; margin: 0 auto; }
-          .header { display: flex; justify-content: space-between; align-items: stretch; gap: 28px; border-bottom: 2px solid #dbe3ef; padding-bottom: 22px; margin-bottom: 18px; }
-          .party-block { min-width: 0; border: 1px solid #dbe3ef; border-radius: 18px; padding: 16px 18px; background: #f8fafc; }
+          .header { display: flex; justify-content: space-between; align-items: stretch; gap: 14px; border-bottom: 1px solid #dbe3ef; padding-bottom: 10px; margin-bottom: 10px; }
+          .party-block { min-width: 0; border: 1px solid #dbe3ef; border-radius: 12px; padding: 10px 12px; background: #f8fafc; }
           .seller-block { flex: 1; }
-          .client-block { width: 320px; }
-          .label { margin: 0 0 8px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
-          .party-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: #0f172a; }
-          .party-line { margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.5; }
-          .section { margin-top: 20px; }
-          .section h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: #334155; }
+          .client-block { width: 280px; }
+          .label { margin: 0 0 6px; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+          .party-name { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: #0f172a; }
+          .party-line { margin: 4px 0 0; color: #334155; font-size: 12px; line-height: 1.35; }
+          .section { margin-top: 10px; }
+          .section h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #334155; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-          th, td { border: 1px solid #e2e8f0; padding: 12px; font-size: 14px; text-align: left; vertical-align: top; }
-          th { background: #f8fafc; font-weight: 700; }
-          .product-cell { width: 300px; }
-          .product-name { display: block; line-height: 1.35; max-height: 2.7em; overflow: hidden; word-break: break-word; }
-          .summary { margin-left: auto; margin-top: 24px; width: 320px; }
-          .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-          .summary-row.total { font-size: 20px; font-weight: 700; border-top: 2px solid #cbd5e1; margin-top: 8px; padding-top: 12px; }
-          @media print { body { padding: 0; } .sheet { max-width: none; } }
+          th, td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 12px; text-align: left; vertical-align: top; line-height: 1.25; }
+          th { background: #f8fafc; font-weight: 700; font-size: 11px; }
+          .col-number { width: 42px; }
+          .col-product { width: 265px; }
+          .col-quantity { width: 112px; }
+          .col-package-price { width: 108px; }
+          .col-unit-price { width: 102px; }
+          .col-total { width: 96px; }
+          .product-cell { width: 265px; }
+          .product-name {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.22;
+            max-height: 2.44em;
+            overflow: hidden;
+            word-break: break-word;
+          }
+          .summary { margin-left: auto; margin-top: 10px; width: 260px; }
+          .summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+          .summary-row.total { font-size: 16px; font-weight: 700; border-top: 1px solid #cbd5e1; margin-top: 4px; padding-top: 8px; }
+          @media print {
+            body { padding: 0; }
+            .sheet { max-width: none; }
+          }
         </style>
       </head>
       <body>
@@ -126,12 +144,12 @@ export function printSalesInvoice({
             <table>
               <thead>
                 <tr>
-                  <th style="width: 52px;">№</th>
-                  <th style="width: 300px;">Товар</th>
-                  <th style="width: 120px;">Количество</th>
-                  <th style="width: 115px;">Цена за упаковку</th>
-                  <th style="width: 115px;">Цена за штуку</th>
-                  <th style="width: 110px;">Сумма</th>
+                  <th class="col-number">№</th>
+                  <th class="col-product">Товар</th>
+                  <th class="col-quantity">Количество</th>
+                  <th class="col-package-price">Цена за упаковку</th>
+                  <th class="col-unit-price">Цена за штуку</th>
+                  <th class="col-total">Сумма</th>
                 </tr>
               </thead>
               <tbody>${itemsRows}</tbody>

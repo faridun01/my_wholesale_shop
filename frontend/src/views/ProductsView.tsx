@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import client from '../api/client';
-import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, zeroProductBatch, deleteProductBatch } from '../api/products.api';
+import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, deleteProductBatch } from '../api/products.api';
 import { 
   Plus, 
   PlusCircle,
@@ -25,6 +25,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { formatDollar, formatMoney, roundMoney, toFixedNumber } from '../utils/format';
+import {
+  calculateEffectiveCost,
+  calculateLineTotal,
+  calculateUnitCostFromLineTotal,
+  calculateUnitCostFromPackage,
+} from '../utils/money';
 import { getProductBatches } from '../api/products.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
@@ -122,6 +128,148 @@ const formatPriceInput = (value: unknown) => {
   return Number.isFinite(numeric) ? toFixedNumber(numeric) : '';
 };
 
+type PackagingOption = {
+  id: number;
+  packageName: string;
+  baseUnitName: string;
+  unitsPerPackage: number;
+  isDefault?: boolean;
+};
+
+const normalizePackagings = (product: any): PackagingOption[] =>
+  Array.isArray(product?.packagings)
+    ? product.packagings
+        .map((entry: any) => ({
+          id: Number(entry.id),
+          packageName: String(entry.packageName || '').trim(),
+          baseUnitName: String(entry.baseUnitName || product?.unit || 'шт').trim() || 'шт',
+          unitsPerPackage: Number(entry.unitsPerPackage || 0),
+          isDefault: Boolean(entry.isDefault),
+        }))
+        .filter((entry: PackagingOption) => entry.id > 0 && entry.packageName && entry.unitsPerPackage > 0)
+    : [];
+
+const getDefaultPackaging = (packagings: PackagingOption[]) =>
+  packagings.find((entry) => entry.isDefault) || packagings[0] || null;
+
+const getPreferredPackaging = (product: any) => {
+  const packagings = Array.isArray(product?.packagings) ? product.packagings : [];
+  return (
+    packagings.find((packaging: any) => packaging?.isDefault && Number(packaging?.unitsPerPackage || 0) > 1) ||
+    packagings.find((packaging: any) => Number(packaging?.unitsPerPackage || 0) > 1) ||
+    null
+  );
+};
+
+const pluralizeRu = (count: number, forms: [string, string, string]) => {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+
+  if (abs > 10 && abs < 20) return forms[2];
+  if (last > 1 && last < 5) return forms[1];
+  if (last === 1) return forms[0];
+  return forms[2];
+};
+
+const formatCountWithUnit = (count: number, unit: string) => {
+  const normalized = String(unit || '').trim().toLowerCase();
+  const formsMap: Record<string, [string, string, string]> = {
+    'шт': ['шт', 'шт', 'шт'],
+    'штука': ['штука', 'штуки', 'штук'],
+    'пачка': ['пачка', 'пачки', 'пачек'],
+    'мешок': ['мешок', 'мешка', 'мешков'],
+    'коробка': ['коробка', 'коробки', 'коробок'],
+    'упаковка': ['упаковка', 'упаковки', 'упаковок'],
+    'флакон': ['флакон', 'флакона', 'флаконов'],
+    'ёмкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'емкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'бутылка': ['бутылка', 'бутылки', 'бутылок'],
+  };
+
+  const forms = formsMap[normalized] || [unit, unit, unit];
+  return `${count} ${pluralizeRu(count, forms)}`;
+};
+
+const getStockBreakdown = (product: any) => {
+  const totalUnits = Number(product?.stock || 0);
+  const preferredPackaging = getPreferredPackaging(product);
+  const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 0);
+  const packageName = preferredPackaging?.packageName || preferredPackaging?.name || '';
+
+  if (!preferredPackaging || unitsPerPackage <= 1 || totalUnits <= 0) {
+    return {
+      primary: formatCountWithUnit(totalUnits, product?.unit || 'шт'),
+      secondary: null,
+    };
+  }
+
+  const packageCount = Math.floor(totalUnits / unitsPerPackage);
+  const remainderUnits = totalUnits % unitsPerPackage;
+  const piecesLabel = product?.unit || 'шт';
+  const normalizedPackageName = normalizeOcrPackageName(packageName || 'упаковка');
+
+  return {
+    primary:
+      remainderUnits > 0
+        ? `${formatCountWithUnit(packageCount, normalizedPackageName)}\n${formatCountWithUnit(remainderUnits, piecesLabel)}`
+        : formatCountWithUnit(packageCount, normalizedPackageName),
+    secondary: `${formatCountWithUnit(totalUnits, piecesLabel)} всего`,
+  };
+};
+
+const getOcrResolvedQuantity = (item: any) => {
+  const packageCount = Number(item?.packageCount || 0);
+  const unitsPerPackage = Number(item?.unitsPerPackage || 0);
+  const fallbackQuantity = Number(item?.quantity || 0);
+
+  if (packageCount > 0 && unitsPerPackage > 0) {
+    return packageCount * unitsPerPackage;
+  }
+
+  return fallbackQuantity;
+};
+
+const getOcrValidationReason = (item: any, rateValue: unknown, expensePercentValue: unknown) => {
+  const rate = Number(rateValue || 0);
+  const expensePercent = Math.max(0, Number(expensePercentValue || 0));
+  const normalizedName = normalizeOcrProductName(item?.name || '');
+  const quantity = getOcrResolvedQuantity(item);
+  const price = Number(item?.price || 0);
+  const lineTotal = Number(item?.lineTotal || 0);
+  const unitsPerPackage = Number(item?.unitsPerPackage || 0);
+
+  if (!normalizedName) {
+    return 'Укажите или исправьте название товара';
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return 'Проверьте количество';
+  }
+
+  if (!Number.isFinite(price) || price < 0) {
+    return 'Проверьте цену закупки';
+  }
+
+  const baseCostPerPiece =
+    lineTotal > 0 && quantity > 0
+      ? calculateUnitCostFromLineTotal(lineTotal * rate, quantity)
+      : unitsPerPackage > 0
+        ? calculateUnitCostFromPackage(price * rate, unitsPerPackage)
+        : calculateUnitCostFromLineTotal(price * rate, quantity);
+
+  if (!Number.isFinite(baseCostPerPiece) || baseCostPerPiece < 0) {
+    return 'Не удалось посчитать закупку за 1 шт';
+  }
+
+  const effectiveCostPerPiece = calculateEffectiveCost(baseCostPerPiece, expensePercent);
+
+  if (!Number.isFinite(effectiveCostPerPiece) || effectiveCostPerPiece < 0) {
+    return 'Не удалось посчитать итоговую закупку';
+  }
+
+  return null;
+};
+
 export default function ProductsView() {
   const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
   const ProductHistoryModal = React.lazy(() => import('../components/products/ProductHistoryModal'));
@@ -141,10 +289,6 @@ export default function ProductsView() {
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [batchActionConfirm, setBatchActionConfirm] = useState<null | {
-    type: 'zero' | 'delete';
-    batchId: number;
-  }>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showBatchesModal, setShowBatchesModal] = useState(false);
   const [productHistory, setProductHistory] = useState<any[]>([]);
@@ -153,15 +297,36 @@ export default function ProductsView() {
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
-  const [restockData, setRestockData] = useState({ warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', finalCostPrice: '', reason: '' });
+  const [restockData, setRestockData] = useState({
+    warehouseId: '',
+    quantity: '',
+    selectedPackagingId: '',
+    packageQuantityInput: '',
+    costPrice: '',
+    sellingPrice: '',
+    reason: '',
+  });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
+  const [ocrOriginalCount, setOcrOriginalCount] = useState(0);
+  const [ocrImportedCount, setOcrImportedCount] = useState(0);
   const [usdRate, setUsdRate] = useState<string>('10.95'); // Default rate
   const [scanExpensePercent, setScanExpensePercent] = useState<string>('0');
+  const [showOnlyProblematicOcrRows, setShowOnlyProblematicOcrRows] = useState(false);
+  const [highlightedOcrLine, setHighlightedOcrLine] = useState<number | null>(null);
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const ocrRowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
   const emptyTransferData = { fromWarehouseId: '', toWarehouseId: '', quantity: '' };
-  const emptyRestockData = { warehouseId: '', quantity: '', costPrice: '', expensePercent: '0', finalCostPrice: '', reason: '' };
+  const emptyRestockData = {
+    warehouseId: '',
+    quantity: '',
+    selectedPackagingId: '',
+    packageQuantityInput: '',
+    costPrice: '',
+    sellingPrice: '',
+    reason: '',
+  };
 
   const closeHistoryModal = () => {
     setShowHistoryModal(false);
@@ -206,6 +371,10 @@ export default function ProductsView() {
 
   const closeOcrResultsModal = () => {
     setOcrResults(null);
+    setOcrOriginalCount(0);
+    setOcrImportedCount(0);
+    setShowOnlyProblematicOcrRows(false);
+    setHighlightedOcrLine(null);
   };
 
   const availableTransferStock = selectedProduct && transferData.fromWarehouseId
@@ -228,22 +397,52 @@ export default function ProductsView() {
     initialStock: '0',
     photoUrl: ''
   });
+  const numericSortKeys = new Set(['costPrice', 'sellingPrice', 'stock', 'totalIncoming', 'minStock', 'initialStock']);
   const effectiveFormCostPrice = (() => {
-    const purchaseCost = Number(formData.costPrice || 0);
-    const expensePercent = Number(formData.expensePercent || 0);
-    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 0;
-    if (!Number.isFinite(expensePercent) || expensePercent < 0) return purchaseCost;
-    return purchaseCost + (purchaseCost * expensePercent / 100);
+    return calculateEffectiveCost(formData.costPrice, formData.expensePercent);
   })();
-  const effectiveRestockCostPrice = (() => {
-    const manualFinalCost = Number(restockData.finalCostPrice || 0);
-    if (restockData.finalCostPrice !== '' && Number.isFinite(manualFinalCost) && manualFinalCost >= 0) return manualFinalCost;
-    const purchaseCost = Number(restockData.costPrice || 0);
-    const expensePercent = Number(restockData.expensePercent || 0);
-    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 0;
-    if (!Number.isFinite(expensePercent) || expensePercent < 0) return purchaseCost;
-    return purchaseCost + (purchaseCost * expensePercent / 100);
-  })();
+  const restockPackagings = normalizePackagings(selectedProduct);
+  const selectedRestockPackaging =
+    restockPackagings.find((entry) => String(entry.id) === String(restockData.selectedPackagingId || '')) || null;
+  const restockPackageQuantity = Math.max(0, Math.floor(Number(restockData.packageQuantityInput || 0) || 0));
+  const totalRestockUnits =
+    selectedRestockPackaging && selectedRestockPackaging.unitsPerPackage > 0
+      ? restockPackageQuantity * selectedRestockPackaging.unitsPerPackage
+      : Number(restockData.quantity || 0);
+  const invalidOcrRowsCount = Array.isArray(ocrResults)
+    ? ocrResults.filter((item) => item.enabled !== false && getOcrValidationReason(item, usdRate, scanExpensePercent)).length
+    : 0;
+  const visibleOcrResults = Array.isArray(ocrResults)
+    ? ocrResults.filter((item) =>
+        showOnlyProblematicOcrRows
+          ? item.enabled !== false && Boolean(getOcrValidationReason(item, usdRate, scanExpensePercent))
+          : true
+      )
+    : [];
+  const problematicOcrRows = Array.isArray(ocrResults)
+    ? ocrResults
+        .filter((item) => item.enabled !== false)
+        .map((item) => ({
+          lineIndex: Number(item.lineIndex || 0),
+          reason: getOcrValidationReason(item, usdRate, scanExpensePercent),
+        }))
+        .filter((item): item is { lineIndex: number; reason: string } => Boolean(item.reason))
+        .sort((a, b) => a.lineIndex - b.lineIndex)
+    : [];
+
+  const jumpToOcrLine = (lineIndex: number) => {
+    setShowOnlyProblematicOcrRows(true);
+    setHighlightedOcrLine(lineIndex);
+
+    window.setTimeout(() => {
+      const target = ocrRowRefs.current[lineIndex];
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+
+    window.setTimeout(() => {
+      setHighlightedOcrLine((current) => (current === lineIndex ? null : current));
+    }, 2200);
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -273,28 +472,6 @@ export default function ProductsView() {
   }, [categories, formData.name, isCategoryManual, showAddModal, showEditModal]);
 
   useEffect(() => {
-    if (!showRestockModal || restockData.finalCostPrice !== '') {
-      return;
-    }
-
-    const purchaseCost = Number(restockData.costPrice || 0);
-    const expensePercent = Number(restockData.expensePercent || 0);
-    if (!Number.isFinite(purchaseCost) || purchaseCost < 0) {
-      return;
-    }
-
-    const calculated =
-      !Number.isFinite(expensePercent) || expensePercent < 0
-        ? purchaseCost
-        : purchaseCost + (purchaseCost * expensePercent / 100);
-
-    setRestockData((prev) => ({
-      ...prev,
-      finalCostPrice: formatPriceInput(calculated),
-    }));
-  }, [restockData.costPrice, restockData.expensePercent, restockData.finalCostPrice, showRestockModal]);
-
-  useEffect(() => {
     const hasOpenModal =
       showAddModal ||
       showEditModal ||
@@ -302,7 +479,6 @@ export default function ProductsView() {
       showRestockModal ||
       showMergeModal ||
       showDeleteConfirm ||
-      Boolean(batchActionConfirm) ||
       showHistoryModal ||
       showBatchesModal ||
       Boolean(ocrResults);
@@ -317,7 +493,6 @@ export default function ProductsView() {
       }
 
       if (showDeleteConfirm) return closeDeleteConfirm();
-      if (batchActionConfirm) return setBatchActionConfirm(null);
       if (showHistoryModal) return closeHistoryModal();
       if (showBatchesModal) return closeBatchesModal();
       if (showMergeModal) return closeMergeModal();
@@ -330,7 +505,6 @@ export default function ProductsView() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    batchActionConfirm,
     ocrResults,
     showAddModal,
     showBatchesModal,
@@ -405,10 +579,11 @@ export default function ProductsView() {
     try {
       await restockProduct(selectedProduct.id, {
         warehouseId: Number(restockData.warehouseId),
-        quantity: Number(restockData.quantity),
-        costPrice: roundMoney(effectiveRestockCostPrice),
+        quantity: selectedRestockPackaging ? totalRestockUnits : Number(restockData.quantity),
+        costPrice: roundMoney(restockData.costPrice),
         purchaseCostPrice: roundMoney(restockData.costPrice),
-        expensePercent: Number(restockData.expensePercent || 0),
+        sellingPrice: roundMoney(restockData.sellingPrice || 0),
+        expensePercent: 0,
         reason: restockData.reason
       });
       toast.success('Товар успешно пополнен!');
@@ -452,32 +627,21 @@ export default function ProductsView() {
     setProductBatches(batches);
   };
 
-  const confirmBatchAction = async () => {
-    if (!batchActionConfirm) {
+  const handleDeleteBatch = async (batchId: number) => {
+    const confirmed = window.confirm('Удалить эту партию? Это действие нельзя отменить.');
+    if (!confirmed) {
       return;
     }
 
-    const currentAction = batchActionConfirm;
+    setProductBatches((prev) => prev.filter((batch) => batch.id !== batchId));
 
     try {
-      if (currentAction.type === 'zero') {
-        await zeroProductBatch(currentAction.batchId);
-        setBatchActionConfirm(null);
-        await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
-        toast.success('Партия убрана');
-        return;
-      }
-
-      await deleteProductBatch(currentAction.batchId);
-      setBatchActionConfirm(null);
+      await deleteProductBatch(batchId);
       await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
       toast.success('Партия удалена');
     } catch (err: any) {
-      toast.error(
-        err.response?.data?.error ||
-          (currentAction.type === 'zero' ? 'Ошибка при удалении партии' : 'Ошибка при удалении партии')
-      );
-      throw err;
+      await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
+      toast.error(err.response?.data?.error || 'Ошибка при удалении партии');
     }
   };
 
@@ -539,10 +703,16 @@ export default function ProductsView() {
         .sort((a: any, b: any) => a.lineIndex - b.lineIndex);
       if (!items.length) {
         toast.error('Сканирование завершено, но товары не были распознаны');
+        setOcrOriginalCount(0);
+        setOcrImportedCount(0);
         setOcrResults([]);
         return;
       }
+      setOcrOriginalCount(items.length);
+      setOcrImportedCount(0);
       setScanExpensePercent('0');
+      setShowOnlyProblematicOcrRows(false);
+      setHighlightedOcrLine(null);
       setOcrResults(items);
       toast.success('Накладная успешно отсканирована!');
     } catch (err: any) {
@@ -567,11 +737,17 @@ export default function ProductsView() {
     const sharedExpensePercent = Math.max(0, Number(scanExpensePercent || 0));
     try {
       setIsLoading(true);
+      const invalidRows: Array<{ lineIndex: number; reason: string }> = [];
+      const enabledRowsCount = ocrResults.filter((item) => item.enabled !== false).length;
+
       const preparedResults = ocrResults
         .map((item) => {
           if (item.enabled === false) {
             return null;
           }
+
+          const lineIndex = Number(item.lineIndex || 0);
+          const validationReason = getOcrValidationReason(item, rate, sharedExpensePercent);
           const normalizedName = normalizeOcrProductName(item.name || '');
           const rawName = String(item.rawName || item.name || '').trim();
           const brand = String(item.brand || '').trim();
@@ -590,31 +766,22 @@ export default function ProductsView() {
           const expensePercent = sharedExpensePercent;
           const costPricePerPieceTJS =
             lineTotal > 0 && quantity > 0
-              ? (lineTotal * rate) / quantity
+              ? calculateUnitCostFromLineTotal(lineTotal * rate, quantity)
               : unitsPerPackage > 0
-              ? (price * rate) / unitsPerPackage
-              : quantity > 0
-                ? (price * rate) / quantity
-                : 0;
-          const effectiveCostPricePerPieceTJS =
-            costPricePerPieceTJS + (costPricePerPieceTJS * Math.max(0, expensePercent) / 100);
+                ? calculateUnitCostFromPackage(price * rate, unitsPerPackage)
+              : calculateUnitCostFromLineTotal(price * rate, quantity);
+          const effectiveCostPricePerPieceTJS = calculateEffectiveCost(costPricePerPieceTJS, expensePercent);
 
-          if (
-            !normalizedName ||
-            !Number.isFinite(quantity) ||
-            quantity <= 0 ||
-            !Number.isFinite(price) ||
-            price < 0 ||
-            !Number.isFinite(costPricePerPieceTJS) ||
-            costPricePerPieceTJS < 0 ||
-            !Number.isFinite(effectiveCostPricePerPieceTJS) ||
-            effectiveCostPricePerPieceTJS < 0
-          ) {
+          if (validationReason) {
+            invalidRows.push({
+              lineIndex,
+              reason: validationReason,
+            });
             return null;
           }
 
           return {
-            lineIndex: Number(item.lineIndex || 0),
+            lineIndex,
             name: normalizedName,
             rawName,
             brand,
@@ -654,12 +821,31 @@ export default function ProductsView() {
         }>;
 
       const importRows = [...preparedResults].sort((a, b) => a.lineIndex - b.lineIndex);
+      const importLineIndexes = new Set(importRows.map((item) => item.lineIndex));
+
+      if (invalidRows.length > 0) {
+        const invalidRowsText = invalidRows
+          .sort((a, b) => a.lineIndex - b.lineIndex)
+          .slice(0, 6)
+          .map((row) => `#${row.lineIndex}: ${row.reason}`)
+          .join(', ');
+
+        setShowOnlyProblematicOcrRows(true);
+        if (invalidRows[0]?.lineIndex) {
+          jumpToOcrLine(invalidRows[0].lineIndex);
+        }
+        toast.error(
+          `Не все товары готовы к добавлению. Проверьте ${invalidRows.length} строк: ${invalidRowsText}${invalidRows.length > 6 ? '...' : ''}`
+        );
+        return;
+      }
 
       if (!importRows.length) {
         toast.error('После сканирования не осталось корректных товаров для добавления');
         return;
       }
-      await client.post(
+
+      const response = await client.post(
         '/ocr/import-items',
         {
           warehouseId: Number(selectedWarehouseId),
@@ -681,9 +867,36 @@ export default function ProductsView() {
         { timeout: 300000 }
       );
 
-      toast.success(`Все товары успешно добавлены на склад: ${importRows.length} строк`);
-      setOcrResults(null);
-      fetchInitialData();
+      const importedCount = Number(response.data?.importedCount || 0);
+
+      if (importedCount !== importRows.length || importedCount !== enabledRowsCount) {
+        toast.error(
+          `Добавление выполнено не полностью: ожидалось ${enabledRowsCount}, добавлено ${importedCount}. Проверьте строки накладной перед повтором.`
+        );
+        await fetchInitialData();
+        return;
+      }
+
+      const remainingRows = ocrResults.filter((item) => {
+        if (item.enabled === false) {
+          return true;
+        }
+
+        return !importLineIndexes.has(Number(item.lineIndex || 0));
+      });
+
+      setOcrImportedCount((prev) => prev + importedCount);
+
+      if (remainingRows.length > 0) {
+        setOcrResults(remainingRows);
+        setShowOnlyProblematicOcrRows(false);
+        setHighlightedOcrLine(null);
+        toast.success(`Добавлено ${ocrImportedCount + importedCount} из ${ocrOriginalCount}. Осталось ${remainingRows.length} строк.`);
+      } else {
+        toast.success(`Все товары успешно добавлены на склад: ${ocrImportedCount + importedCount} из ${ocrOriginalCount} строк`);
+        closeOcrResultsModal();
+      }
+      await fetchInitialData();
     } catch (err: any) {
       toast.error('Ошибка при добавлении товаров: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -768,18 +981,30 @@ export default function ProductsView() {
     }
   };
 
-  const handleDeleteProduct = async () => {
-    if (!selectedProduct) return;
+  const handleDeleteProduct = async (productId: number) => {
     try {
-      await deleteProduct(selectedProduct.id, { force: true });
+      await deleteProduct(productId, { force: true });
       toast.success('Товар успешно удалён!');
-      setShowDeleteConfirm(false);
-      setSelectedProduct(null);
       await fetchInitialData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при удалении товара');
       throw err;
     }
+  };
+
+  const handleConfirmDeleteProduct = () => {
+    if (!selectedProduct?.id) {
+      return Promise.resolve();
+    }
+
+    const productId = selectedProduct.id;
+    closeDeleteConfirm();
+
+    return new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        void handleDeleteProduct(productId).then(resolve).catch(reject);
+      }, 0);
+    });
   };
 
   const handleReverseIncoming = async (transactionId: number) => {
@@ -909,8 +1134,8 @@ export default function ProductsView() {
 
   const sortedProducts = [...products].sort((a, b) => {
     if (!sortConfig.direction) return 0;
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
+    const aValue = numericSortKeys.has(sortConfig.key) ? Number(a[sortConfig.key] || 0) : a[sortConfig.key];
+    const bValue = numericSortKeys.has(sortConfig.key) ? Number(b[sortConfig.key] || 0) : b[sortConfig.key];
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
@@ -925,6 +1150,7 @@ export default function ProductsView() {
           name: String(product.name || '').replace(/\s*\[[^\]]*\]\s*$/u, '').trim(),
           stock: Number(product.stock || 0),
           totalIncoming: Number(product.totalIncoming || 0),
+          packagings: Array.isArray(product.packagings) ? product.packagings : [],
           isAggregateRow: true,
         };
       } else {
@@ -933,6 +1159,9 @@ export default function ProductsView() {
         if (!acc[key].photoUrl && product.photoUrl) {
           acc[key].photoUrl = product.photoUrl;
         }
+        if ((!Array.isArray(acc[key].packagings) || acc[key].packagings.length === 0) && Array.isArray(product.packagings)) {
+          acc[key].packagings = product.packagings;
+        }
       }
       return acc;
     }, {} as Record<string, any>)
@@ -940,8 +1169,8 @@ export default function ProductsView() {
 
   const sortedAggregatedProducts = [...aggregatedProducts].sort((a, b) => {
     if (!sortConfig.direction) return 0;
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
+    const aValue = numericSortKeys.has(sortConfig.key) ? Number(a[sortConfig.key] || 0) : a[sortConfig.key];
+    const bValue = numericSortKeys.has(sortConfig.key) ? Number(b[sortConfig.key] || 0) : b[sortConfig.key];
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
@@ -1002,47 +1231,6 @@ export default function ProductsView() {
             <Plus size={18} />
             <span>Добавить</span>
           </button>}
-        </div>
-      </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1.35fr_0.95fr]">
-        <div className="rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4 shadow-sm sm:p-5">
-          <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-sky-500 p-2.5 text-white shadow-lg shadow-sky-500/20">
-              <Camera size={18} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-900">Как работать проще всего</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Сначала выберите склад, потом загрузите накладную или добавьте товар вручную. Система сама посчитает закупку и подберёт категорию.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-100 bg-white/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-600">Шаг 1</p>
-              <p className="mt-1 text-sm font-bold text-slate-900">Выберите склад</p>
-              <p className="mt-1 text-xs text-slate-500">Все товары сразу попадут в нужный склад.</p>
-            </div>
-            <div className="rounded-2xl border border-slate-100 bg-white/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-600">Шаг 2</p>
-              <p className="mt-1 text-sm font-bold text-slate-900">Загрузите документ</p>
-              <p className="mt-1 text-xs text-slate-500">Лучше всего одно чёткое фото или одна страница PDF.</p>
-            </div>
-            <div className="rounded-2xl border border-slate-100 bg-white/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-600">Шаг 3</p>
-              <p className="mt-1 text-sm font-bold text-slate-900">Проверьте и сохраните</p>
-              <p className="mt-1 text-xs text-slate-500">Обычно достаточно проверить цену продажи и нажать одну кнопку.</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[28px] border border-amber-100 bg-amber-50/80 p-4 shadow-sm sm:p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-600">Подсказка</p>
-          <p className="mt-2 text-sm font-bold text-slate-900">Что лучше загружать</p>
-          <div className="mt-3 space-y-2 text-sm text-slate-600">
-            <p><span className="font-bold text-slate-900">Лучше всего:</span> одно чёткое фото или PNG страницы с товарами.</p>
-            <p><span className="font-bold text-slate-900">Тоже хорошо:</span> PDF на 1 страницу.</p>
-            <p><span className="font-bold text-slate-900">Хуже читается:</span> большой PDF с лишним текстом и несколькими страницами.</p>
-          </div>
         </div>
       </div>
       </div>
@@ -1168,9 +1356,14 @@ export default function ProductsView() {
                         onBlur={e => setFormData({...formData, costPrice: formatPriceInput(e.target.value)})}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                       />
+                      {!showEditModal && (
+                        <p className="mt-2 text-xs font-medium text-slate-400">
+                          Введите себестоимость вручную.
+                        </p>
+                      )}
                     </div>
                   )}
-                  {isAdmin && (
+                  {isAdmin && showEditModal && (
                     <div>
                       <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Расходы %</label>
                       <input
@@ -1195,17 +1388,6 @@ export default function ProductsView() {
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
                     />
                   </div>
-                  {isAdmin && !showEditModal && (
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Итог за штуку</label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatPriceInput(effectiveFormCostPrice)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 outline-none transition-all font-bold text-sm"
-                      />
-                    </div>
-                  )}
                   {!showEditModal && (
                     <>
                       <div>
@@ -1394,16 +1576,70 @@ export default function ProductsView() {
                     </select>
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Количество</label>
-                      <input 
-                        type="number" 
-                        required
-                        value={restockData.quantity}
-                        onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
-                      />
-                    </div>
+                    {selectedRestockPackaging ? (
+                      <>
+                        <div>
+                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
+                          <select
+                            value={restockData.selectedPackagingId}
+                            onChange={e =>
+                              setRestockData((prev) => ({
+                                ...prev,
+                                selectedPackagingId: e.target.value,
+                                packageQuantityInput: '',
+                                quantity: '',
+                              }))
+                            }
+                            className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          >
+                            {restockPackagings.map((packaging) => (
+                              <option key={packaging.id} value={packaging.id}>
+                                {packaging.packageName} x {packaging.unitsPerPackage}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">
+                            Количество {selectedRestockPackaging.packageName}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            required
+                            value={restockData.packageQuantityInput}
+                          onChange={e =>
+                            setRestockData((prev) => ({
+                              ...prev,
+                              packageQuantityInput: e.target.value,
+                              quantity: String(
+                                Math.max(0, Math.floor(Number(e.target.value || 0) || 0)) *
+                                  (selectedRestockPackaging.unitsPerPackage || 0)
+                              ),
+                            }))
+                          }
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                          <p className="mt-2 text-xs font-medium text-slate-400">
+                            1 {formatCountWithUnit(1, selectedRestockPackaging.packageName).replace(/^1\s+/, '')} = {selectedRestockPackaging.unitsPerPackage} {selectedProduct?.unit || 'шт'}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-slate-400">
+                            Итого: {totalRestockUnits} {selectedProduct?.unit || 'шт'}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Количество</label>
+                        <input 
+                          type="number" 
+                          required
+                          value={restockData.quantity}
+                          onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
+                        />
+                      </div>
+                    )}
                     {isAdmin && (
                       <div>
                         <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена закупки</label>
@@ -1412,42 +1648,30 @@ export default function ProductsView() {
                           step="0.01"
                           required
                           value={restockData.costPrice}
-                          onChange={e => setRestockData({ ...restockData, costPrice: e.target.value })}
+                          onChange={e => setRestockData((prev) => ({ ...prev, costPrice: e.target.value }))}
                           className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                         />
-                      </div>
-                    )}
-                  </div>
-                  {isAdmin && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Расходы %</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={restockData.expensePercent}
-                          onChange={e => setRestockData({ ...restockData, expensePercent: e.target.value })}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Итог за штуку</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={restockData.finalCostPrice}
-                          onChange={e => setRestockData({ ...restockData, finalCostPrice: e.target.value })}
-                          onBlur={e => setRestockData({ ...restockData, finalCostPrice: formatPriceInput(e.target.value) })}
-                          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 font-bold text-emerald-700 outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        />
                         <p className="mt-2 text-xs font-medium text-slate-400">
-                          Можно изменить вручную. База закупки сохранится отдельно.
+                          Закупка за 1 шт без расходов.
                         </p>
                       </div>
+                    )}
+                    <div>
+                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена продажи</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={restockData.sellingPrice}
+                        onChange={e => setRestockData({ ...restockData, sellingPrice: e.target.value })}
+                        onBlur={e => setRestockData({ ...restockData, sellingPrice: formatPriceInput(e.target.value) })}
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                      <p className="mt-2 text-xs font-medium text-slate-400">
+                        Новая цена продажи для этой поставки.
+                      </p>
                     </div>
-                  )}
+                  </div>
                   <div>
                     <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Причина / Комментарий</label>
                     <input 
@@ -1528,12 +1752,61 @@ export default function ProductsView() {
                       <p className="mt-2 text-sm font-medium text-slate-600">
                         Количество и закупка пересчитываются автоматически. Измените только то, что нужно перед добавлением на склад.
                       </p>
+                      {invalidOcrRowsCount > 0 && (
+                        <p className="mt-3 text-sm font-bold text-rose-600">
+                          Проверьте проблемные строки: {invalidOcrRowsCount}. Они подсвечены красным и не дадут завершить импорт.
+                        </p>
+                      )}
+                      {problematicOcrRows.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {problematicOcrRows.map((row) => (
+                            <button
+                              key={`problem-row-${row.lineIndex}`}
+                              type="button"
+                              onClick={() => jumpToOcrLine(row.lineIndex)}
+                              className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 ring-1 ring-rose-200"
+                              title={row.reason}
+                            >
+                              Строка {row.lineIndex}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
                       <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Позиции</span>
                       <span className="rounded-xl bg-sky-500 px-2.5 py-1 text-sm font-black text-white">
-                        {ocrResults.filter((entry) => entry.enabled !== false).length}/{ocrResults.length}
+                        {ocrImportedCount + ocrResults.filter((entry) => entry.enabled !== false).length}/{ocrOriginalCount || ocrResults.length}
                       </span>
+                      {ocrImportedCount > 0 && (
+                        <span className="rounded-xl bg-emerald-500 px-2.5 py-1 text-sm font-black text-white">
+                          Добавлено: {ocrImportedCount}
+                        </span>
+                      )}
+                      {ocrResults.filter((entry) => entry.enabled !== false).length > 0 && (
+                        <span className="rounded-xl bg-slate-500 px-2.5 py-1 text-sm font-black text-white">
+                          Осталось: {ocrResults.filter((entry) => entry.enabled !== false).length}
+                        </span>
+                      )}
+                      {invalidOcrRowsCount > 0 && (
+                        <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-sm font-black text-white">
+                          Ошибки: {invalidOcrRowsCount}
+                        </span>
+                      )}
+                      {invalidOcrRowsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowOnlyProblematicOcrRows((prev) => !prev)}
+                          className={clsx(
+                            'rounded-xl px-3 py-1.5 text-xs font-black transition-all',
+                            showOnlyProblematicOcrRows
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
+                          )}
+                        >
+                          {showOnlyProblematicOcrRows ? 'Показать все строки' : 'Только проблемные'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1544,11 +1817,27 @@ export default function ProductsView() {
                   <div className="col-span-2 text-right">Наша закупка</div>
                   <div className="col-span-2 text-right">Цена продажи</div>
                 </div>
-                {ocrResults.map((item, i) => (
-                  <div key={i} className={clsx(
+                {visibleOcrResults.map((item, i) => {
+                  const validationReason = getOcrValidationReason(item, usdRate, scanExpensePercent);
+                  const sourceIndex = ocrResults.findIndex((entry) => entry === item);
+
+                  return (
+                  <div
+                    key={`${item.lineIndex || sourceIndex || i}-${sourceIndex}`}
+                    ref={(node) => {
+                      ocrRowRefs.current[Number(item.lineIndex || sourceIndex || i)] = node;
+                    }}
+                    className={clsx(
                     "grid grid-cols-1 gap-4 rounded-[28px] border p-4 transition-colors sm:grid-cols-12 sm:items-center sm:p-5",
-                    item.enabled === false ? "bg-slate-100 opacity-65" : "bg-sky-50 hover:bg-sky-100/50"
-                  )}>
+                    item.enabled === false
+                      ? "bg-slate-100 opacity-65"
+                      : highlightedOcrLine === Number(item.lineIndex || sourceIndex || i)
+                        ? "border-rose-400 bg-rose-100 shadow-lg shadow-rose-200/60 ring-2 ring-rose-300"
+                      : validationReason
+                        ? "border-rose-200 bg-rose-50 hover:bg-rose-100/60"
+                        : "bg-sky-50 hover:bg-sky-100/50"
+                  )}
+                  >
                     <div className="sm:col-span-4">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
@@ -1557,18 +1846,32 @@ export default function ProductsView() {
                             checked={item.enabled !== false}
                             onChange={(e) => {
                               const newResults = [...ocrResults];
-                              newResults[i].enabled = e.target.checked;
+                              if (sourceIndex >= 0) {
+                                newResults[sourceIndex].enabled = e.target.checked;
+                              }
                               setOcrResults(newResults);
                             }}
                             className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
                           />
                           Добавить строку #{item.lineIndex || i + 1}
                         </label>
-                        <span className="shrink-0 rounded-xl bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 ring-1 ring-sky-100">
-                          #{item.lineIndex || i + 1}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {validationReason && item.enabled !== false && (
+                            <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                              Проблема
+                            </span>
+                          )}
+                          <span className="shrink-0 rounded-xl bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 ring-1 ring-sky-100">
+                            Строка {item.lineIndex || i + 1}
+                          </span>
+                        </div>
                       </div>
                       <p className="font-bold text-slate-900 break-words whitespace-normal">{formatProductName(item.name || item.rawName)}</p>
+                      {validationReason && item.enabled !== false && (
+                        <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200">
+                          Нужно проверить: {validationReason}
+                        </p>
+                      )}
                       {item.rawQuantity && (
                         <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>
                       )}
@@ -1588,7 +1891,9 @@ export default function ProductsView() {
                           value={item.packageCount || ''}
                           onChange={(e) => {
                             const newResults = [...ocrResults];
-                            newResults[i].packageCount = Number(e.target.value || 0);
+                            if (sourceIndex >= 0) {
+                              newResults[sourceIndex].packageCount = Number(e.target.value || 0);
+                            }
                             setOcrResults(newResults);
                           }}
                           className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
@@ -1600,16 +1905,23 @@ export default function ProductsView() {
                           value={item.unitsPerPackage || ''}
                           onChange={(e) => {
                             const newResults = [...ocrResults];
-                            newResults[i].unitsPerPackage = Number(e.target.value || 0);
+                            if (sourceIndex >= 0) {
+                              newResults[sourceIndex].unitsPerPackage = Number(e.target.value || 0);
+                            }
                             setOcrResults(newResults);
                           }}
                           className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
                         />
                       </div>
                       <p className="text-[10px] font-bold text-slate-500">
-                        = {item.packageCount > 0 && item.unitsPerPackage > 0 ? item.packageCount * item.unitsPerPackage : item.quantity} шт
+                        = {getOcrResolvedQuantity(item)} шт
                       </p>
                       <p className="text-[10px] font-bold text-slate-400">итог для склада</p>
+                      {item.price > 0 && item.packageCount > 0 && (
+                        <p className="mt-1 text-[10px] font-bold text-slate-400">
+                          {formatDollar(item.price)} x {item.packageCount} = {formatDollar(calculateLineTotal(item.packageCount, item.price))}
+                        </p>
+                      )}
                     </div>
                     <div className="sm:col-span-2 sm:text-right">
                       <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Закупка</p>
@@ -1620,7 +1932,9 @@ export default function ProductsView() {
                         value={item.price || ''}
                         onChange={(e) => {
                           const newResults = [...ocrResults];
-                          newResults[i].price = Number(e.target.value || 0);
+                          if (sourceIndex >= 0) {
+                            newResults[sourceIndex].price = Number(e.target.value || 0);
+                          }
                           setOcrResults(newResults);
                         }}
                         className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-right text-sm font-black text-slate-900 outline-none focus:border-sky-500"
@@ -1630,20 +1944,15 @@ export default function ProductsView() {
                     <div className="sm:col-span-2 sm:text-right">
                       <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Наша закупка</p>
                       {(() => {
-                        const quantity =
-                          item.packageCount > 0 && item.unitsPerPackage > 0
-                            ? item.packageCount * item.unitsPerPackage
-                            : Number(item.quantity || 0);
+                        const quantity = getOcrResolvedQuantity(item);
                         const baseCostPerPiece =
                           item.lineTotal > 0 && quantity > 0
-                            ? (item.lineTotal * parseFloat(usdRate || '0')) / quantity
+                            ? calculateUnitCostFromLineTotal(item.lineTotal * parseFloat(usdRate || '0'), quantity)
                             : item.unitsPerPackage > 0
-                              ? (item.price * parseFloat(usdRate || '0')) / item.unitsPerPackage
-                              : quantity > 0
-                                ? (item.price * parseFloat(usdRate || '0')) / quantity
-                                : 0;
+                              ? calculateUnitCostFromPackage(item.price * parseFloat(usdRate || '0'), item.unitsPerPackage)
+                              : calculateUnitCostFromLineTotal(item.price * parseFloat(usdRate || '0'), quantity);
                         const expensePercent = Math.max(0, Number(scanExpensePercent || 0));
-                        const effectiveCostPerPiece = baseCostPerPiece + (baseCostPerPiece * Math.max(0, expensePercent) / 100);
+                        const effectiveCostPerPiece = calculateEffectiveCost(baseCostPerPiece, expensePercent);
 
                         return (
                           <>
@@ -1668,14 +1977,21 @@ export default function ProductsView() {
                         value={item.sellingPrice}
                         onChange={(e) => {
                           const newResults = [...ocrResults];
-                          newResults[i].sellingPrice = e.target.value;
+                          if (sourceIndex >= 0) {
+                            newResults[sourceIndex].sellingPrice = e.target.value;
+                          }
                           setOcrResults(newResults);
                         }}
                         className="w-full text-right bg-white px-4 py-2 rounded-xl border border-sky-200 focus:border-sky-500 outline-none font-black text-emerald-600"
                       />
                     </div>
                   </div>
-                ))}
+                )})}
+                {showOnlyProblematicOcrRows && visibleOcrResults.length === 0 && (
+                  <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 text-center text-sm font-bold text-emerald-700">
+                    Проблемных строк не осталось. Можно добавить все товары на склад.
+                  </div>
+                )}
               </div>
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-sky-50/60 p-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:p-8">
                 <button onClick={closeOcrResultsModal} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
@@ -1699,6 +2015,7 @@ export default function ProductsView() {
             isOpen={showHistoryModal}
             onClose={closeHistoryModal}
             productName={selectedProduct?.name}
+            product={selectedProduct}
             productHistory={productHistory}
             onReverseIncoming={handleReverseIncoming}
           />
@@ -1709,8 +2026,7 @@ export default function ProductsView() {
             selectedProduct={selectedProduct}
             productBatches={productBatches}
             canManage={isAdmin}
-            onZeroBatch={(batchId) => setBatchActionConfirm({ type: 'zero', batchId })}
-            onDeleteBatch={(batchId) => setBatchActionConfirm({ type: 'delete', batchId })}
+            onDeleteBatch={handleDeleteBatch}
           />
       </React.Suspense>
 
@@ -1792,23 +2108,9 @@ export default function ProductsView() {
           <ConfirmationModal 
             isOpen={showDeleteConfirm}
             onClose={closeDeleteConfirm}
-            onConfirm={handleDeleteProduct}
+            onConfirm={handleConfirmDeleteProduct}
             title="Удалить товар навсегда?"
               message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
-          />
-          <ConfirmationModal
-            isOpen={Boolean(batchActionConfirm)}
-            onClose={() => setBatchActionConfirm(null)}
-            onConfirm={confirmBatchAction}
-            title={batchActionConfirm?.type === 'zero' ? 'Убрать партию?' : 'Удалить партию?'}
-            message={
-              batchActionConfirm?.type === 'zero'
-                ? 'Если партия ещё нетронутая, она исчезнет полностью. Если уже использовалась, система безопасно уберёт только её текущий остаток.'
-                : 'Партия будет удалена полностью. Это доступно только для нетронутой партии, которая ещё не участвовала в списании.'
-            }
-            confirmText={batchActionConfirm?.type === 'zero' ? 'Убрать партию' : 'Удалить партию'}
-            cancelText="Отмена"
-            type={batchActionConfirm?.type === 'zero' ? 'warning' : 'danger'}
           />
         </React.Suspense>
 
@@ -1893,9 +2195,14 @@ export default function ProductsView() {
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                  <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                    {product.stock} <span className="text-[10px] uppercase text-slate-400">{product.unit}</span>
+                  <p className="mt-1 whitespace-pre-line break-words text-sm font-semibold text-slate-900">
+                    {getStockBreakdown(product).primary}
                   </p>
+                  {getStockBreakdown(product).secondary && (
+                    <p className="mt-1 break-words text-[11px] font-medium text-slate-500">
+                      {getStockBreakdown(product).secondary}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Приход</p>
@@ -1944,13 +2251,17 @@ export default function ProductsView() {
                   </button>
                   <button
                     onClick={() => {
+                      const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
                       setSelectedProduct(product);
                       setRestockData({
                         ...restockData,
                         warehouseId: product.warehouseId?.toString() || '',
+                        quantity: '',
+                        selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                        packageQuantityInput: '',
                         costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                        expensePercent: String(product.expensePercent ?? 0),
-                        finalCostPrice: formatPriceInput(product.costPrice),
+                        sellingPrice: formatPriceInput(product.sellingPrice),
+                        reason: '',
                       });
                       setShowRestockModal(true);
                     }}
@@ -2098,12 +2409,19 @@ export default function ProductsView() {
                         "w-1.5 h-1.5 rounded-full",
                         product.stock <= product.minStock ? "bg-rose-600 animate-pulse" : "bg-emerald-500"
                       )} />
-                      <span className={clsx(
-                        "text-sm font-semibold",
+                      <div className={clsx(
+                        "min-w-0",
                         product.stock <= product.minStock ? "text-rose-600" : "text-slate-900"
                       )}>
-                        {product.stock} <span className="text-[10px] font-medium uppercase text-slate-400">{product.unit}</span>
-                      </span>
+                        <p className="whitespace-pre-line text-sm font-semibold">
+                          {getStockBreakdown(product).primary}
+                        </p>
+                        {getStockBreakdown(product).secondary && (
+                          <p className="text-[11px] font-medium text-slate-400">
+                            {getStockBreakdown(product).secondary}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-3">
@@ -2140,13 +2458,17 @@ export default function ProductsView() {
                         {isAdmin && (
                           <button 
                             onClick={() => {
+                              const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
                               setSelectedProduct(product);
                               setRestockData({
                                 ...restockData,
                                 warehouseId: product.warehouseId?.toString() || '',
+                                quantity: '',
+                                selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                                packageQuantityInput: '',
                                 costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                                expensePercent: String(product.expensePercent ?? 0),
-                                finalCostPrice: formatPriceInput(product.costPrice),
+                                sellingPrice: formatPriceInput(product.sellingPrice),
+                                reason: '',
                               });
                               setShowRestockModal(true);
                             }}

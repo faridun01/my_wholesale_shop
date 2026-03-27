@@ -82,10 +82,10 @@ model Product {
   nameKey        String   @default("") @map("name_key")
   unit           String
   baseUnitName   String   @default("шт") @map("base_unit_name")
-  purchaseCostPrice Float? @map("purchase_cost_price")
+  purchaseCostPrice Decimal? @db.Decimal(12, 2) @map("purchase_cost_price")
   expensePercent Float   @default(0) @map("expense_percent")
-  costPrice      Float    @map("cost_price")
-  sellingPrice   Float    @map("selling_price")
+  costPrice      Decimal  @db.Decimal(12, 2) @map("cost_price")
+  sellingPrice   Decimal  @db.Decimal(12, 2) @map("selling_price")
   minStock       Float    @default(0) @map("min_stock")
   initialStock   Float    @default(0) @map("initial_stock")
   totalIncoming  Float    @default(0) @map("total_incoming")
@@ -118,7 +118,7 @@ model ProductPackaging {
   packageName         String   @map("package_name")
   baseUnitName        String   @map("base_unit_name")
   unitsPerPackage     Int      @map("units_per_package")
-  packageSellingPrice Float?   @map("package_selling_price")
+  packageSellingPrice Decimal? @db.Decimal(12, 2) @map("package_selling_price")
   barcode             String?
   active              Boolean  @default(true)
   isDefault           Boolean  @default(false) @map("is_default")
@@ -137,8 +137,8 @@ model ProductPackaging {
 model PriceHistory {
   id           Int      @id @default(autoincrement())
   productId    Int      @map("product_id")
-  costPrice    Float    @map("cost_price")
-  sellingPrice Float    @map("selling_price")
+  costPrice    Decimal  @db.Decimal(12, 2) @map("cost_price")
+  sellingPrice Decimal  @db.Decimal(12, 2) @map("selling_price")
   createdAt    DateTime @default(now()) @map("created_at")
 
   product Product @relation(fields: [productId], references: [id])
@@ -152,9 +152,9 @@ model ProductBatch {
   warehouseId       Int      @map("warehouse_id")
   quantity          Float
   remainingQuantity Float    @map("remaining_quantity")
-  purchaseCostPrice Float?   @map("purchase_cost_price")
+  purchaseCostPrice Decimal? @db.Decimal(12, 2) @map("purchase_cost_price")
   expensePercent    Float    @default(0) @map("expense_percent")
-  costPrice         Float    @map("cost_price")
+  costPrice         Decimal  @db.Decimal(12, 2) @map("cost_price")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -257,8 +257,8 @@ model PurchaseDocumentItem {
   extraUnitQuantity    Float    @default(0) @map("extra_unit_quantity")
   totalBaseUnits       Float    @map("total_base_units")
   expensePercent       Float    @default(0) @map("expense_percent")
-  costPricePerBaseUnit Float?   @map("cost_price_per_base_unit")
-  effectiveCostPricePerBaseUnit Float? @map("effective_cost_price_per_base_unit")
+  costPricePerBaseUnit Decimal? @db.Decimal(12, 2) @map("cost_price_per_base_unit")
+  effectiveCostPricePerBaseUnit Decimal? @db.Decimal(12, 2) @map("effective_cost_price_per_base_unit")
   createdAt            DateTime @default(now()) @map("created_at")
 
   purchaseDocument PurchaseDocument @relation(fields: [purchaseDocumentId], references: [id])
@@ -272,12 +272,12 @@ model Invoice {
   customerId  Int      @map("customer_id")
   userId      Int      @map("user_id")
   warehouseId Int      @map("warehouse_id")
-  totalAmount Float    @map("total_amount")
+  totalAmount Decimal  @db.Decimal(12, 2) @map("total_amount")
   discount    Float    @default(0)
-  tax         Float    @default(0)
-  netAmount   Float    @map("net_amount")
-  paidAmount  Float    @default(0) @map("paid_amount")
-  returnedAmount Float   @default(0) @map("returned_amount")
+  tax         Decimal  @default(0) @db.Decimal(12, 2)
+  netAmount   Decimal  @db.Decimal(12, 2) @map("net_amount")
+  paidAmount  Decimal  @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  returnedAmount Decimal @default(0) @db.Decimal(12, 2) @map("returned_amount")
   status      String   @default("unpaid") // 'paid' | 'partial' | 'unpaid'
   cancelled   Boolean  @default(false)
   paymentDueDate DateTime? @map("payment_due_date")
@@ -317,9 +317,9 @@ model InvoiceItem {
   productNameSnapshot String? @map("product_name_snapshot")
   rawNameSnapshot String? @map("raw_name_snapshot")
   brandSnapshot String? @map("brand_snapshot")
-  sellingPrice Float    @map("selling_price")
-  costPrice    Float    @default(0) @map("cost_price")
-  totalPrice   Float    @map("total_price")
+  sellingPrice Decimal  @db.Decimal(12, 2) @map("selling_price")
+  costPrice    Decimal  @default(0) @db.Decimal(12, 2) @map("cost_price")
+  totalPrice   Decimal  @db.Decimal(12, 2) @map("total_price")
   returnedQty  Float    @default(0) @map("returned_qty")
 
   invoice         Invoice          @relation(fields: [invoiceId], references: [id])
@@ -346,7 +346,7 @@ model Payment {
   customerId Int      @map("customer_id")
   invoiceId  Int?     @map("invoice_id")
   userId     Int      @map("user_id")
-  amount     Float
+  amount     Decimal  @db.Decimal(12, 2)
   method     String   @default("cash") // 'cash' | 'card' | 'transfer'
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -363,7 +363,7 @@ model Expense {
   userId      Int      @map("user_id")
   category    String
   title       String
-  amount      Float
+  amount      Decimal  @db.Decimal(12, 2)
   expenseDate DateTime @map("expense_date")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -381,7 +381,7 @@ model Return {
   customerId Int      @map("customer_id")
   userId     Int      @map("user_id")
   reason     String?
-  totalValue Float    @map("total_value")
+  totalValue Decimal  @db.Decimal(12, 2) @map("total_value")
   createdAt  DateTime @default(now()) @map("created_at")
 
   invoice  Invoice  @relation(fields: [invoiceId], references: [id])
@@ -400,8 +400,8 @@ model InventoryTransaction {
   type         String   // 'incoming' | 'outgoing' | 'return' | 'adjustment' | 'transfer'
   reason       String?
   referenceId  Int?     @map("reference_id") // ID of Invoice, Return, etc.
-  costAtTime   Float?   @map("cost_at_time")
-  sellingAtTime Float?  @map("selling_at_time")
+  costAtTime   Decimal? @db.Decimal(12, 2) @map("cost_at_time")
+  sellingAtTime Decimal? @db.Decimal(12, 2) @map("selling_at_time")
   createdAt    DateTime @default(now()) @map("created_at")
 
   product   Product   @relation(fields: [productId], references: [id])

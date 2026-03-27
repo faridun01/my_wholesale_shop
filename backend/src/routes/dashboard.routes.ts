@@ -18,7 +18,11 @@ const getInvoiceDebt = (netAmount: number, paidAmount: number) => {
   return balance > PAYMENT_EPSILON ? balance : 0;
 };
 
-const getPeriodRevenue = (invoices: Array<{ createdAt: Date; netAmount: number }>, start: Date, end: Date) =>
+const getPeriodRevenue = (
+  invoices: Array<{ createdAt: Date; netAmount: number | string | { toString(): string } }>,
+  start: Date,
+  end: Date,
+) =>
   invoices.reduce((sum, invoice) => {
     const createdAt = new Date(invoice.createdAt);
     if (createdAt >= start && createdAt < end) {

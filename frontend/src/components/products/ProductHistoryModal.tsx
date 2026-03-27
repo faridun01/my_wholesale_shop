@@ -8,6 +8,7 @@ interface ProductHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   productName?: string | null;
+  product?: any;
   productHistory: any[];
   onReverseIncoming?: (transactionId: number) => void | Promise<void>;
 }
@@ -28,13 +29,85 @@ const getTypeClassName = (type: string) =>
         ? 'bg-rose-50 text-rose-600'
         : type === 'price_change' || type === 'adjustment'
           ? 'bg-sky-50 text-sky-600'
-          : 'bg-amber-50 text-amber-600'
+          : 'bg-amber-50 text-amber-600',
   );
+
+const normalizePackageName = (value: string) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'упаковка';
+  if (['мешок', 'мешка', 'мешков', 'bag'].includes(normalized)) return 'мешок';
+  if (['коробка', 'коробки', 'коробок', 'box'].includes(normalized)) return 'коробка';
+  if (['упаковка', 'упаковки', 'упаковок', 'pack'].includes(normalized)) return 'упаковка';
+  if (['пачка', 'пачки', 'пачек'].includes(normalized)) return 'пачка';
+  return normalized;
+};
+
+const pluralizeRu = (count: number, forms: [string, string, string]) => {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+
+  if (abs > 10 && abs < 20) return forms[2];
+  if (last > 1 && last < 5) return forms[1];
+  if (last === 1) return forms[0];
+  return forms[2];
+};
+
+const formatCountWithUnit = (count: number, unit: string) => {
+  const normalized = String(unit || '').trim().toLowerCase();
+  const formsMap: Record<string, [string, string, string]> = {
+    'шт': ['шт', 'шт', 'шт'],
+    'штука': ['штука', 'штуки', 'штук'],
+    'пачка': ['пачка', 'пачки', 'пачек'],
+    'мешок': ['мешок', 'мешка', 'мешков'],
+    'коробка': ['коробка', 'коробки', 'коробок'],
+    'упаковка': ['упаковка', 'упаковки', 'упаковок'],
+    'флакон': ['флакон', 'флакона', 'флаконов'],
+    'ёмкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'емкость': ['ёмкость', 'ёмкости', 'ёмкостей'],
+    'бутылка': ['бутылка', 'бутылки', 'бутылок'],
+  };
+
+  const forms = formsMap[normalized] || [unit, unit, unit];
+  return `${count} ${pluralizeRu(count, forms)}`;
+};
+
+const getPreferredPackaging = (product: any) => {
+  const packagings = Array.isArray(product?.packagings) ? product.packagings : [];
+  return (
+    packagings.find((packaging: any) => packaging?.isDefault && Number(packaging?.unitsPerPackage || 0) > 1) ||
+    packagings.find((packaging: any) => Number(packaging?.unitsPerPackage || 0) > 1) ||
+    null
+  );
+};
+
+const getQuantityBreakdown = (quantityValue: unknown, product: any) => {
+  const rawQuantity = Number(quantityValue || 0);
+  const absoluteQuantity = Math.abs(rawQuantity);
+  const sign = rawQuantity > 0 ? '+' : rawQuantity < 0 ? '-' : '';
+  const preferredPackaging = getPreferredPackaging(product);
+  const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 0);
+  const packageName = normalizePackageName(preferredPackaging?.packageName || preferredPackaging?.name || 'упаковка');
+  const baseUnitName = product?.unit || 'шт';
+
+  if (!preferredPackaging || unitsPerPackage <= 1 || !Number.isFinite(rawQuantity)) {
+    return `${sign}${formatCountWithUnit(absoluteQuantity, baseUnitName)}`;
+  }
+
+  const packageCount = Math.floor(absoluteQuantity / unitsPerPackage);
+  const remainderUnits = absoluteQuantity % unitsPerPackage;
+
+  if (remainderUnits > 0) {
+    return `${sign}${formatCountWithUnit(packageCount, packageName)}\n${formatCountWithUnit(remainderUnits, baseUnitName)}`;
+  }
+
+  return `${sign}${formatCountWithUnit(packageCount, packageName)}`;
+};
 
 export default function ProductHistoryModal({
   isOpen,
   onClose,
   productName,
+  product,
   productHistory,
   onReverseIncoming,
 }: ProductHistoryModalProps) {
@@ -89,15 +162,13 @@ export default function ProductHistoryModal({
                         <p className="text-sm font-semibold text-slate-900">{new Date(t.createdAt).toLocaleString('ru-RU')}</p>
                         <p className="mt-1 text-xs text-slate-500">{t.warehouseName || t.warehouse?.name || '---'}</p>
                       </div>
-                      <span className={getTypeClassName(t.type)}>
-                        {getTypeLabel(t.type)}
-                      </span>
+                      <span className={getTypeClassName(t.type)}>{getTypeLabel(t.type)}</span>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <div className="rounded-2xl bg-white px-3 py-3">
                         <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Кол-во</p>
-                        <p className="mt-1 text-sm font-black text-slate-900">
-                          {Number(t.qtyChange || 0) > 0 ? `+${t.qtyChange}` : (t.qtyChange ?? 0)}
+                        <p className="mt-1 whitespace-pre-line text-sm font-black text-slate-900">
+                          {getQuantityBreakdown(t.qtyChange ?? 0, product)}
                         </p>
                       </div>
                       <div className="rounded-2xl bg-white px-3 py-3">
@@ -128,9 +199,9 @@ export default function ProductHistoryModal({
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <th className="w-[17%] pb-4">Дата</th>
                     <th className="w-[10%] pb-4">Тип</th>
-                    <th className="w-[9%] pb-4">Кол-во</th>
+                    <th className="w-[14%] pb-4">Кол-во</th>
                     <th className="w-[13%] pb-4">Склад</th>
-                    <th className="w-[29%] pb-4">Причина</th>
+                    <th className="w-[24%] pb-4">Причина</th>
                     <th className="w-[12%] pb-4">Пользователь</th>
                     <th className="w-[10%] pb-4 text-right">Действие</th>
                   </tr>
@@ -140,16 +211,14 @@ export default function ProductHistoryModal({
                     <tr key={i} className="text-[13px]">
                       <td className="py-3 pr-3 align-top text-slate-500">{new Date(t.createdAt).toLocaleString('ru-RU')}</td>
                       <td className="py-3 pr-3 align-top">
-                        <span className={getTypeClassName(t.type)}>
-                          {getTypeLabel(t.type)}
-                        </span>
+                        <span className={getTypeClassName(t.type)}>{getTypeLabel(t.type)}</span>
                       </td>
                       <td className="py-3 pr-3 align-top font-black">
-                        {Number(t.qtyChange || 0) > 0 ? `+${t.qtyChange}` : (t.qtyChange ?? 0)}
+                        <div className="whitespace-pre-line">{getQuantityBreakdown(t.qtyChange ?? 0, product)}</div>
                       </td>
                       <td className="py-3 pr-3 align-top break-words text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
                       <td className="py-3 pr-3 align-top break-words italic text-slate-500">{t.reason || '---'}</td>
-                      <td className="py-3 pr-3 align-top break-words text-slate-500">{t.username}</td>
+                      <td className="py-3 pr-3 align-top break-words text-slate-500">{t.username || '---'}</td>
                       <td className="py-3 align-top text-right">
                         {t.canReverseIncoming && onReverseIncoming ? (
                           <button

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext } from '../utils/access.js';
-import { roundMoney } from '../utils/money.js';
+import { normalizeMoney, roundMoney } from '../utils/money.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -10,12 +10,9 @@ const PAYMENT_EPSILON = 0.01;
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const { customer_id, invoice_id, amount, method, note } = req.body;
-    const normalizedAmount = roundMoney(amount);
+    const normalizedAmount = normalizeMoney(amount, 'Amount', { allowZero: false });
     if (!Number.isFinite(normalizedAmount) || normalizedAmount < 0) {
       return res.status(400).json({ error: 'Amount must be a non-negative number' });
-    }
-    if (normalizedAmount === 0) {
-      return res.status(400).json({ error: 'Amount must be greater than zero' });
     }
 
     const userId = req.user!.id;
@@ -43,7 +40,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           customerId: invoice?.customerId ?? Number(customer_id),
           invoiceId,
           userId,
-          amount: roundMoney(normalizedAmount),
+          amount: normalizedAmount,
           method: method || 'cash',
         },
       });
