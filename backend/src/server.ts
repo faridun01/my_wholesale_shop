@@ -18,6 +18,8 @@ for (const envPath of envCandidates) {
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 
+const { initRateLimitStorage } = await import('./middlewares/rate-limit.middleware.js');
+await initRateLimitStorage();
 const { default: app } = await import('./app.js');
 
 const server = app.listen(PORT, HOST, () => {

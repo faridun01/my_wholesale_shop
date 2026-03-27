@@ -1,4 +1,5 @@
 import type React from 'react';
+import { getAuthToken } from './authStorage';
 
 const getApiOrigin = () => {
   if (import.meta.env.VITE_API_URL) {
@@ -24,11 +25,31 @@ export const resolveMediaUrl = (url: string | null | undefined, fallbackSeed: st
     return url;
   }
 
-  if (url.startsWith('/')) {
-    return `${getApiOrigin()}${url}`;
+  const token = getAuthToken();
+  const appendToken = (value: string) => {
+    if (!token || /^https?:\/\//i.test(value)) {
+      return value;
+    }
+
+    const separator = value.includes('?') ? '&' : '?';
+    return `${value}${separator}token=${encodeURIComponent(token)}`;
+  };
+
+  const normalizeProtectedUploadUrl = (value: string) => {
+    if (value.startsWith('/uploads/')) {
+      return `/api${value}`;
+    }
+
+    return value;
+  };
+
+  const normalizedUrl = normalizeProtectedUploadUrl(url);
+
+  if (normalizedUrl.startsWith('/')) {
+    return appendToken(`${getApiOrigin()}${normalizedUrl}`);
   }
 
-  return `${getApiOrigin()}/${url}`;
+  return appendToken(`${getApiOrigin()}/${normalizedUrl}`);
 };
 
 export const handleBrokenImage = (event: React.SyntheticEvent<HTMLImageElement>, fallbackSeed: string | number) => {

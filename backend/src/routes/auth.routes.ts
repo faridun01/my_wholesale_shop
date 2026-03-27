@@ -48,7 +48,7 @@ router.post('/login', loginRateLimit, async (req, res, next) => {
       return res.json(result);
     }
 
-    resetRateLimit(loginRateLimitKey(req));
+    await resetRateLimit(loginRateLimitKey(req));
     res.json({ user: result.user, token: result.token, requiresTwoFactor: false });
   } catch (error) {
     next(error);
@@ -134,7 +134,7 @@ router.post('/change-password', authenticate, passwordChangeRateLimit, async (re
     }
 
     await AuthService.changePassword(req.user!.id, currentPassword, newPassword);
-    resetRateLimit(passwordChangeRateLimitKey(req));
+    await resetRateLimit(passwordChangeRateLimitKey(req));
     res.json({ success: true });
   } catch (error) {
     next(error);
@@ -149,7 +149,7 @@ router.post('/2fa/login', twoFactorRateLimit, async (req, res, next) => {
     }
 
     const result = await AuthService.completeTwoFactorLogin(twoFactorToken, code);
-    resetRateLimit(twoFactorRateLimitKey(req));
+    await resetRateLimit(twoFactorRateLimitKey(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -173,7 +173,7 @@ router.post('/2fa/verify-setup', authenticate, twoFactorRateLimit, async (req: A
     }
 
     const result = await AuthService.verifyTwoFactorSetup(req.user!.id, setupToken, code);
-    resetRateLimit(twoFactorRateLimitKey(req));
+    await resetRateLimit(twoFactorRateLimitKey(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -188,7 +188,7 @@ router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRe
     }
 
     const result = await AuthService.disableTwoFactor(req.user!.id, currentPassword, code);
-    resetRateLimit(twoFactorRateLimitKey(req));
+    await resetRateLimit(twoFactorRateLimitKey(req));
     res.json(result);
   } catch (error) {
     next(error);
@@ -212,7 +212,7 @@ router.post('/users/:id/2fa/verify-setup', authenticate, authorize(['ADMIN']), t
     }
 
     const result = await AuthService.verifyTwoFactorSetupForUser(Number(req.params.id), setupToken, code);
-    resetRateLimit(twoFactorRateLimitKey(req));
+    await resetRateLimit(twoFactorRateLimitKey(req));
     res.json(result);
   } catch (error) {
     next(error);

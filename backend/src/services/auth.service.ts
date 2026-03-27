@@ -168,7 +168,13 @@ export class AuthService {
   static async login(username: string, password: string): Promise<LoginResult> {
     const normalizedUsername = normalizeUsername(username);
     const user: any = await prisma.user.findFirst({
-      where: { username: normalizedUsername, active: true },
+      where: {
+        username: {
+          equals: normalizedUsername,
+          mode: 'insensitive',
+        },
+        active: true,
+      },
       include: { warehouse: true },
     });
 

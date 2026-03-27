@@ -3,7 +3,7 @@ import { OCRService } from '../services/ocr.service.js';
 import fs from 'fs';
 import { createRateLimit } from '../middlewares/rate-limit.middleware.js';
 import { securityConfig } from '../config/security.js';
-import { imageUpload, ocrUpload } from '../utils/upload.js';
+import { allowedImageMimeTypes, allowedOcrMimeTypes, assertFileSignature, imageUpload, ocrUpload } from '../utils/upload.js';
 import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext } from '../utils/access.js';
@@ -58,7 +58,8 @@ router.post('/parse-invoice', uploadRateLimit, ocrUpload.single('invoice'), asyn
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const items = await OCRService.parseInvoice(req.file.path, req.file.mimetype);
+    const detectedMimeType = await assertFileSignature(req.file.path, allowedOcrMimeTypes);
+    const items = await OCRService.parseInvoice(req.file.path, detectedMimeType);
 
     res.json(items);
   } catch (error: any) {
@@ -87,7 +88,8 @@ router.post('/invoice', uploadRateLimit, ocrUpload.single('image'), async (req, 
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const items = await OCRService.parseInvoice(req.file.path, req.file.mimetype);
+    const detectedMimeType = await assertFileSignature(req.file.path, allowedOcrMimeTypes);
+    const items = await OCRService.parseInvoice(req.file.path, detectedMimeType);
 
     res.json({ items });
   } catch (error: any) {
@@ -295,7 +297,8 @@ router.post('/import-purchase-document', uploadRateLimit, ocrUpload.single('invo
       return res.status(400).json({ error: 'Warehouse ID is required' });
     }
 
-    const parsedItems = await OCRService.parseInvoice(req.file.path, req.file.mimetype);
+    const detectedMimeType = await assertFileSignature(req.file.path, allowedOcrMimeTypes);
+    const parsedItems = await OCRService.parseInvoice(req.file.path, detectedMimeType);
     if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
       return res.status(400).json({ error: 'No product lines found in the document' });
     }
@@ -498,12 +501,21 @@ router.post('/import-purchase-document', uploadRateLimit, ocrUpload.single('invo
   }
 });
 
-router.post('/upload', uploadRateLimit, imageUpload.single('photo'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+router.post('/upload', uploadRateLimit, imageUpload.single('photo'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    await assertFileSignature(req.file.path, allowedImageMimeTypes);
+    const photoUrl = `/api/uploads/${req.file.filename}`;
+    res.json({ photoUrl });
+  } catch (error) {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    next(error);
   }
-  const photoUrl = `/uploads/${req.file.filename}`;
-  res.json({ photoUrl });
 });
 
 export default router;
