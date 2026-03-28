@@ -102,7 +102,7 @@ export class InvoiceService {
       const productsById = new Map<number, any>(products.map((product: any) => [product.id, product]));
 
       if (products.length !== productIds.length) {
-        throw new Error('ÐžÐ´Ð¸Ð½ Ð¸Ð»Ð¸ Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ Ñ‚Ð¾Ð²Ð°Ñ€Ð¾Ð² Ð½Ðµ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð°Ñ‚ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð¾Ð¼Ñƒ ÑÐºÐ»Ð°Ð´Ñƒ');
+        throw new Error('Один или несколько товаров не принадлежат выбранному складу');
       }
 
       // 1. Calculate totals
@@ -156,7 +156,7 @@ export class InvoiceService {
         }
 
         if (Number(product.warehouseId) !== Number(warehouseId)) {
-          throw new Error(`Ð¢Ð¾Ð²Ð°Ñ€ ${product.name} Ð½Ðµ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð¾Ð¼Ñƒ ÑÐºÐ»Ð°Ð´Ñƒ`);
+          throw new Error(`Товар ${product.name} не принадлежит выбранному складу`);
         }
 
         const packaging = item.packagingId
@@ -327,7 +327,7 @@ export class InvoiceService {
         Number(invoice.paidAmount || 0) > PAYMENT_EPSILON ||
         Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
       ) {
-        throw new Error('ÐÐµÐ»ÑŒÐ·Ñ Ð¼ÐµÐ½ÑÑ‚ÑŒ Ñ‚Ð¾Ð²Ð°Ñ€Ñ‹ Ð² Ð½Ð°ÐºÐ»Ð°Ð´Ð½Ð¾Ð¹ Ð¿Ð¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð¸Ð»Ð¸ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚Ð°');
+        throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
       }
 
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
@@ -352,7 +352,7 @@ export class InvoiceService {
       const productsById = new Map<number, any>(products.map((product: any) => [product.id, product]));
 
       if (products.length !== productIds.length) {
-        throw new Error('ÐžÐ´Ð¸Ð½ Ð¸Ð»Ð¸ Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ Ñ‚Ð¾Ð²Ð°Ñ€Ð¾Ð² Ð½Ðµ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð°Ñ‚ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð¾Ð¼Ñƒ ÑÐºÐ»Ð°Ð´Ñƒ');
+        throw new Error('Один или несколько товаров не принадлежат выбранному складу');
       }
 
       let totalAmount = 0;
@@ -478,11 +478,11 @@ export class InvoiceService {
       }
 
       if ((invoice.payments?.length || 0) > 0 || Number(invoice.paidAmount || 0) > PAYMENT_EPSILON) {
-        throw new Error('ÐÐµÐ»ÑŒÐ·Ñ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ»Ð°Ð´Ð½ÑƒÑŽ, Ð¿Ð¾ ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ð¹ ÑƒÐ¶Ðµ ÐµÑÑ‚ÑŒ Ð¾Ð¿Ð»Ð°Ñ‚Ð°');
+        throw new Error('Нельзя удалить накладную, по которой уже есть оплата');
       }
 
       if ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
-        throw new Error('ÐÐµÐ»ÑŒÐ·Ñ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Ð½Ð°ÐºÐ»Ð°Ð´Ð½ÑƒÑŽ, Ð¿Ð¾ ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ð¹ ÑƒÐ¶Ðµ ÐµÑÑ‚ÑŒ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚');
+        throw new Error('Нельзя удалить накладную, по которой уже есть возврат');
       }
 
       // 1. Return stock for each item
@@ -635,7 +635,7 @@ export class InvoiceService {
             userId,
             qtyChange: returnItem.quantity,
             type: 'return',
-            reason: `${reason} (ÐÐ°ÐºÐ»Ð°Ð´Ð½Ð°Ñ #${invoiceId})`,
+            reason: `${reason} (Накладная #${invoiceId})`,
             referenceId: invoiceId
           }
         });

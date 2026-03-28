@@ -60,6 +60,39 @@ const findCanonicalProductName = async (categoryId: number, name: string, exclud
   return candidate?.name || null;
 };
 
+const isDuplicateProductCandidate = (
+  candidateName: string | null | undefined,
+  nextName: string | null | undefined,
+) => {
+  const normalizedCandidate = normalizeProductName(String(candidateName || '')).name;
+  const normalizedNext = normalizeProductName(String(nextName || '')).name;
+
+  if (!normalizedCandidate || !normalizedNext) {
+    return false;
+  }
+
+  if (normalizedCandidate === normalizedNext) {
+    return true;
+  }
+
+  const candidateFamily = normalizeProductFamilyName(normalizedCandidate);
+  const nextFamily = normalizeProductFamilyName(normalizedNext);
+  const candidateMass = extractMassKey(normalizedCandidate);
+  const nextMass = extractMassKey(normalizedNext);
+
+  return Boolean(candidateFamily && nextFamily && candidateMass && nextMass && candidateFamily === nextFamily && candidateMass === nextMass);
+};
+
+const findWarehouseDuplicateProduct = (
+  products: Array<{ id: number; name: string }>,
+  nextName: string,
+  excludeProductId?: number,
+) =>
+  products.find((product) => (
+    (!excludeProductId || product.id !== excludeProductId) &&
+    isDuplicateProductCandidate(product.name, nextName)
+  )) || null;
+
 const formatMoneyValue = (value: unknown) => Number(value || 0).toFixed(2);
 
 const ensureAdminProductAccess = (access: Awaited<ReturnType<typeof getAccessContext>>, res: any) => {
@@ -186,7 +219,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         name: true,
       }
     });
-    const existingProduct = existingProducts.find((product: { id: number; name: string }) => normalizeProductName(product.name).name === finalName);
+    const existingProduct = findWarehouseDuplicateProduct(existingProducts as Array<{ id: number; name: string }>, finalName);
 
     if (existingProduct) {
       return res.status(400).json({
@@ -282,7 +315,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     const oldProduct = await prisma.product.findUnique({ where: { id: productId } });
     
     if (!oldProduct) {
-      return res.status(404).json({ error: 'Ð¢Ð¾Ð²Ð°Ñ€ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
+      return res.status(404).json({ error: 'Товар не найден' });
     }
 
     if (!access.isAdmin && !ensureWarehouseAccess(access, oldProduct.warehouseId)) {
@@ -317,9 +350,11 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           name: true,
         }
       });
-      const existingProduct = existingProducts.find((product: { id: number; name: string }) => (
-        product.id !== productId && normalizeProductName(product.name).name === newName
-      ));
+      const existingProduct = findWarehouseDuplicateProduct(
+        existingProducts as Array<{ id: number; name: string }>,
+        newName,
+        productId,
+      );
 
       if (existingProduct) {
         return res.status(400).json({

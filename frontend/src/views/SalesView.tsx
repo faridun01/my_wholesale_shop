@@ -23,7 +23,7 @@ import {
   Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
@@ -52,6 +52,7 @@ type EditInvoiceItem = {
   selectedPackagingId: number | '';
   packageQuantityInput: string;
   extraUnitQuantityInput: string;
+  isNew?: boolean;
 };
 
 type EditProductOption = {
@@ -127,6 +128,7 @@ export default function SalesView() {
   const [isReturning, setIsReturning] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const closeDetailsModal = () => {
     setShowDetailsModal(false);
@@ -163,6 +165,19 @@ export default function SalesView() {
   useEffect(() => {
     fetchInvoices();
   }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+
+  useEffect(() => {
+    const incomingWarehouseId = location.state && typeof location.state === 'object'
+      ? String((location.state as { warehouseId?: string | number | null }).warehouseId || '')
+      : '';
+
+    if (!incomingWarehouseId) {
+      return;
+    }
+
+    setSelectedWarehouseId(incomingWarehouseId);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (hasLoadedWarehousesRef.current) {
@@ -457,10 +472,13 @@ export default function SalesView() {
     const product = productMeta || item?.product || null;
     const packagings = normalizePackagings(product);
     const defaultPackaging = getDefaultPackaging(packagings);
+    const isEmpty = !item && !product;
     const totalUnits =
       item?.quantity !== undefined && item?.quantity !== null
         ? Math.max(0, Number(item.quantity) || 0)
-        : defaultPackaging
+        : isEmpty
+          ? 0
+          : defaultPackaging
           ? Number(defaultPackaging.unitsPerPackage || 0)
           : 1;
     const usePackaging = Boolean(defaultPackaging && Number(defaultPackaging.unitsPerPackage || 0) > 1);
@@ -479,13 +497,16 @@ export default function SalesView() {
       sellingPrice:
         item?.sellingPrice !== undefined && item?.sellingPrice !== null
           ? toFixedNumber(Number(item.sellingPrice))
-          : toFixedNumber(Number(product?.sellingPrice || 0)),
+          : isEmpty
+            ? ''
+            : toFixedNumber(Number(product?.sellingPrice || 0)),
       unit: baseUnitName,
       baseUnitName,
       packagings,
       selectedPackagingId: usePackaging ? Number(defaultPackaging?.id || '') : '',
-      packageQuantityInput: String(packageQuantity),
-      extraUnitQuantityInput: String(extraUnitQuantity),
+      packageQuantityInput: isEmpty ? '' : String(packageQuantity),
+      extraUnitQuantityInput: isEmpty ? '' : String(extraUnitQuantity),
+      isNew: isEmpty,
     };
   };
 
@@ -557,25 +578,14 @@ export default function SalesView() {
       selectedPackagingId: usePackaging ? Number(defaultPackaging?.id || '') : '',
       packageQuantityInput: usePackaging ? '1' : '0',
       extraUnitQuantityInput: usePackaging ? '0' : '1',
+      isNew: false,
     });
   };
 
   const addEditInvoiceItem = () => {
-    const firstProduct = editProducts[0];
     setEditInvoiceItems((current) => [
+      createEditInvoiceItem(),
       ...current,
-      createEditInvoiceItem(
-        firstProduct
-          ? {
-              productId: firstProduct.id,
-              product_name: firstProduct.name,
-              quantity: 1,
-              sellingPrice: Number(firstProduct.sellingPrice || 0),
-              unit: normalizeDisplayBaseUnit(firstProduct.baseUnitName || firstProduct.unit || 'шт'),
-            }
-          : undefined,
-        firstProduct,
-      ),
     ]);
   };
 
@@ -1483,9 +1493,23 @@ export default function SalesView() {
                       const selectedProduct = getEditProductMeta(item.productId);
 
                       return (
-                        <div key={item.key} className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                        <div
+                          key={item.key}
+                          className={`rounded-3xl border p-3.5 shadow-sm transition-all ${
+                            item.isNew
+                              ? 'border-violet-200 bg-violet-50/60 shadow-violet-100'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
                           <div className="mb-2.5 flex items-center justify-between gap-3">
-                            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Строка #{index + 1}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Строка #{index + 1}</p>
+                              {item.isNew ? (
+                                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-violet-700">
+                                  Новая
+                                </span>
+                              ) : null}
+                            </div>
                             <button
                               type="button"
                               onClick={() => removeEditInvoiceItem(item.key)}
@@ -1509,7 +1533,7 @@ export default function SalesView() {
                                   className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-900 transition-all hover:border-violet-200 focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                                 >
                                   <span className="truncate">
-                                    {selectedProduct ? formatProductName(selectedProduct.name) : 'Выберите товар'}
+                                    {selectedProduct ? formatProductName(selectedProduct.name) : 'Выберите товар из списка'}
                                   </span>
                                   <ChevronDown size={18} className="shrink-0 text-slate-400" />
                                 </button>
@@ -1544,8 +1568,8 @@ export default function SalesView() {
                             </div>
 
                             <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                              <p className="break-words text-sm font-semibold leading-6 text-slate-900">
-                                {selectedProduct ? formatProductName(selectedProduct.name) : 'Название товара появится после выбора'}
+                              <p className={`break-words text-sm font-semibold leading-6 ${selectedProduct ? 'text-slate-900' : 'text-violet-700'}`}>
+                                {selectedProduct ? formatProductName(selectedProduct.name) : 'Сначала выберите товар, потом укажите тип продажи и количество'}
                               </p>
                             </div>
 
@@ -1564,6 +1588,7 @@ export default function SalesView() {
                                         extraUnitQuantityInput: isBulk ? item.extraUnitQuantityInput || '0' : item.quantity || '1',
                                       });
                                     }}
+                                    disabled={!selectedProduct}
                                     className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                                   >
                                     <option value="piece">Розница</option>
@@ -1572,7 +1597,9 @@ export default function SalesView() {
                                     ) : null}
                                   </select>
                                   <div className="flex items-center rounded-2xl bg-white px-4 py-3 text-xs font-semibold leading-5 text-slate-500">
-                                    {item.selectedPackagingId && getEditItemPackaging(item)
+                                    {!selectedProduct
+                                      ? 'Выберите товар, чтобы появился режим продажи'
+                                      : item.selectedPackagingId && getEditItemPackaging(item)
                                       ? `По умолчанию: ${getEditItemPackaging(item)?.packageName} x ${getEditItemPackaging(item)?.unitsPerPackage}`
                                       : 'Продажа в розницу'}
                                   </div>
@@ -1587,6 +1614,7 @@ export default function SalesView() {
                                       value={item.packageQuantityInput}
                                       onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { packageQuantityInput: e.target.value })}
                                       placeholder="Кол-во упаковок"
+                                      disabled={!selectedProduct}
                                       className="rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                                     />
                                     <input
@@ -1596,6 +1624,7 @@ export default function SalesView() {
                                       value={item.extraUnitQuantityInput}
                                       onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { extraUnitQuantityInput: e.target.value })}
                                       placeholder="+ шт"
+                                      disabled={!selectedProduct}
                                       className="rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                                     />
                                   </>
@@ -1607,6 +1636,7 @@ export default function SalesView() {
                                     value={item.extraUnitQuantityInput}
                                     onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { extraUnitQuantityInput: e.target.value })}
                                     placeholder="Кол-во, шт"
+                                    disabled={!selectedProduct}
                                     className="sm:col-span-2 rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                                   />
                                 )}
@@ -1645,6 +1675,7 @@ export default function SalesView() {
                                 value={item.sellingPrice}
                                 onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { sellingPrice: e.target.value })}
                                 placeholder="Цена продажи"
+                                disabled={!selectedProduct}
                                 className="mt-1 w-full rounded-xl border border-white bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                               />
                             </div>
@@ -1741,7 +1772,7 @@ export default function SalesView() {
                   <div className="p-3 bg-emerald-600 text-white rounded-2xl">
                     <Banknote size={24} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900">ÐŸÑ€Ð¸Ð½ÑÑ‚ÑŒ Ð¾Ð¿Ð»Ð°Ñ‚Ñƒ</h3>
+                  <h3 className="text-2xl font-black text-slate-900">Принять оплату</h3>
                 </div>
                 <button onClick={closePaymentModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
@@ -1750,23 +1781,23 @@ export default function SalesView() {
               
               <div className="space-y-5 p-4 sm:space-y-6 sm:p-8">
                 <div>
-                  <p className="text-sm font-bold text-slate-500 mb-1">ÐÐ°ÐºÐ»Ð°Ð´Ð½Ð°Ñ #{selectedInvoice.id}</p>
+                    <p className="text-sm font-bold text-slate-500 mb-1">Накладная #{selectedInvoice.id}</p>
                   <p className="text-lg font-black text-slate-900">{selectedInvoice.customer_name}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="p-4 bg-slate-50 rounded-2xl">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ð˜Ñ‚Ð¾Ð³Ð¾</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Итого</p>
                     <p className="text-lg font-black text-slate-900">{formatMoney(getInvoiceNetAmount(selectedInvoice))}</p>
                   </div>
                   <div className="p-4 bg-rose-50 rounded-2xl">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ð”Ð¾Ð»Ð³</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Долг</p>
                     <p className="text-lg font-black text-rose-600">{formatMoney(getInvoiceBalance(selectedInvoice))}</p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ð¡ÑƒÐ¼Ð¼Ð° Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Сумма оплаты</label>
                   <input 
                     type="number" 
                     min={0}
@@ -1787,14 +1818,14 @@ export default function SalesView() {
                   onClick={closePaymentModal}
                   className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
                 >
-                  ÐžÑ‚Ð¼ÐµÐ½Ð°
+                  Отмена
                 </button>
                 <button 
                   onClick={handlePayment}
                   disabled={isPaying || !paymentAmount}
                   className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isPaying ? 'Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ...' : 'Ð’Ð½ÐµÑÑ‚Ð¸'}
+                  {isPaying ? 'Сохранение...' : 'Внести'}
                 </button>
               </div>
             </motion.div>
@@ -1822,7 +1853,7 @@ export default function SalesView() {
                   <div className="p-3 bg-amber-600 text-white rounded-2xl">
                     <RotateCcw size={24} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900">ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚</h3>
+                  <h3 className="text-2xl font-black text-slate-900">Оформить возврат</h3>
                 </div>
                 <button onClick={closeReturnModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X size={24} />
@@ -1831,19 +1862,19 @@ export default function SalesView() {
               
               <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:space-y-6 sm:p-8">
                 <div>
-                  <p className="text-sm font-bold text-slate-500 mb-1">ÐÐ°ÐºÐ»Ð°Ð´Ð½Ð°Ñ #{selectedInvoice.id}</p>
+                    <p className="text-sm font-bold text-slate-500 mb-1">Накладная #{selectedInvoice.id}</p>
                   <p className="text-lg font-black text-slate-900">{selectedInvoice.customer_name}</p>
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ñ‚Ð¾Ð²Ð°Ñ€Ñ‹ Ð´Ð»Ñ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚Ð°</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Выберите товары для возврата</h4>
                   <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                          <th className="px-6 py-4">Ð¢Ð¾Ð²Ð°Ñ€</th>
-                          <th className="px-6 py-4">ÐŸÑ€Ð¾Ð´Ð°Ð½Ð¾</th>
-                          <th className="px-6 py-4">Ð’Ð¾Ð·Ð²Ñ€Ð°Ñ‚</th>
+                          <th className="px-6 py-4">Товар</th>
+                          <th className="px-6 py-4">Продано</th>
+                          <th className="px-6 py-4">Возврат</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -1873,12 +1904,12 @@ export default function SalesView() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ÐŸÑ€Ð¸Ñ‡Ð¸Ð½Ð° Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚Ð°</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Причина возврата</label>
                   <textarea 
                     value={returnReason}
                     onChange={(e) => setReturnReason(e.target.value)}
                     className="w-full mt-1 px-5 py-4 rounded-2xl border border-slate-200 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500 outline-none transition-all font-bold text-slate-900 shadow-sm min-h-[100px]"
-                    placeholder="Ð£ÐºÐ°Ð¶Ð¸Ñ‚Ðµ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚Ð°..."
+                    placeholder="Укажите причину возврата..."
                   />
                 </div>
               </div>
@@ -1888,14 +1919,14 @@ export default function SalesView() {
                   onClick={closeReturnModal}
                   className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all"
                 >
-                  ÐžÑ‚Ð¼ÐµÐ½Ð°
+                  Отмена
                 </button>
                 <button 
                   onClick={handleReturn}
                   disabled={isReturning || returnItems.every(item => !item.returnQty || parseFloat(item.returnQty) === 0)}
                   className="flex-1 py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isReturning ? 'ÐžÑ„Ð¾Ñ€Ð¼Ð»ÐµÐ½Ð¸Ðµ...' : 'ÐžÑ„Ð¾Ñ€Ð¼Ð¸Ñ‚ÑŒ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‚'}
+                  {isReturning ? 'Оформление...' : 'Оформить возврат'}
                 </button>
               </div>
             </motion.div>

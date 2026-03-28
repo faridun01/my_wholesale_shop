@@ -38,6 +38,7 @@ import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUse
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 
 const normalizeOcrProductName = (name: string) => {
   const trimmed = String(name || '').trim();
@@ -292,7 +293,6 @@ const getOcrProblemReason = (item: any, rateValue: unknown, expensePercentValue:
 };
 
 export default function ProductsView() {
-  const ConfirmationModal = React.lazy(() => import('../components/common/ConfirmationModal'));
   const ProductHistoryModal = React.lazy(() => import('../components/products/ProductHistoryModal'));
   const ProductBatchesModal = React.lazy(() => import('../components/products/ProductBatchesModal'));
   const hasLoadedReferenceDataRef = React.useRef(false);
@@ -319,7 +319,13 @@ export default function ProductsView() {
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [isMergingDuplicates, setIsMergingDuplicates] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
-  const [transferData, setTransferData] = useState({ fromWarehouseId: '', toWarehouseId: '', quantity: '' });
+  const [transferData, setTransferData] = useState({
+    fromWarehouseId: '',
+    toWarehouseId: '',
+    quantity: '',
+    selectedPackagingId: '',
+    packageQuantityInput: '',
+  });
   const [restockData, setRestockData] = useState({
     warehouseId: '',
     quantity: '',
@@ -340,7 +346,13 @@ export default function ProductsView() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const ocrRowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
-  const emptyTransferData = { fromWarehouseId: '', toWarehouseId: '', quantity: '' };
+  const emptyTransferData = {
+    fromWarehouseId: '',
+    toWarehouseId: '',
+    quantity: '',
+    selectedPackagingId: '',
+    packageQuantityInput: '',
+  };
   const emptyRestockData = {
     warehouseId: '',
     quantity: '',
@@ -407,6 +419,24 @@ export default function ProductsView() {
     : selectedProduct
       ? Number(selectedProduct.stock || 0)
       : null;
+  const transferPackagings = normalizePackagings(selectedProduct);
+  const selectedTransferPackaging =
+    transferPackagings.find((entry) => String(entry.id) === String(transferData.selectedPackagingId || '')) ||
+    getDefaultPackaging(transferPackagings);
+  const transferPackageQuantity = Math.max(0, Math.floor(Number(transferData.packageQuantityInput || 0) || 0));
+  const transferUnitsPerPackage = Number(selectedTransferPackaging?.unitsPerPackage || 0);
+  const transferAvailableFullPackages =
+    selectedTransferPackaging && transferUnitsPerPackage > 0 && Number.isFinite(Number(availableTransferStock))
+      ? Math.floor(Number(availableTransferStock || 0) / transferUnitsPerPackage)
+      : 0;
+  const transferRemainderUnits =
+    selectedTransferPackaging && transferUnitsPerPackage > 0 && Number.isFinite(Number(availableTransferStock))
+      ? Number(availableTransferStock || 0) % transferUnitsPerPackage
+      : 0;
+  const totalTransferUnits =
+    selectedTransferPackaging && transferUnitsPerPackage > 0
+      ? transferPackageQuantity * transferUnitsPerPackage
+      : Number(transferData.quantity || 0);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -561,7 +591,7 @@ export default function ProductsView() {
       const response = await client.post(`/products/${selectedProduct.id}/transfer`, {
         fromWarehouseId: Number(transferData.fromWarehouseId),
         toWarehouseId: targetWarehouseId,
-        quantity: Number(transferData.quantity)
+        quantity: totalTransferUnits
       });
 
       closeTransferModal();
@@ -1161,11 +1191,17 @@ export default function ProductsView() {
     }
   };
 
-  const getExactDuplicateKey = (product: any) => {
+  const getRobustDuplicateKey = (product: any) => {
     const warehouseId = Number(product?.warehouseId || selectedWarehouseId || 0);
-    const categoryId = Number(product?.categoryId || 0);
-    const normalizedName = normalizeCatalogName(String(product?.name || ''));
-    return `${warehouseId}::${categoryId}::${normalizedName}`;
+    const familyKey = normalizeProductFamilyName(String(product?.name || ''));
+    const massKey = extractMassKey(String(product?.name || ''));
+    const fallbackName = normalizeCatalogName(String(product?.name || ''));
+
+    if (familyKey && massKey) {
+      return `${warehouseId}::${familyKey}::${massKey}`;
+    }
+
+    return `${warehouseId}::${fallbackName}`;
   };
 
   const resetForm = () => {
@@ -1254,18 +1290,17 @@ export default function ProductsView() {
     return matchesSearch && matchesWarehouse;
   });
 
-  const exactDuplicateGroups = React.useMemo(() => {
+  const groupedProducts = React.useMemo(() => {
     const groups = new Map<string, any[]>();
 
     filteredProducts.forEach((product) => {
-      const key = getExactDuplicateKey(product);
+      const key = getRobustDuplicateKey(product);
       const current = groups.get(key) || [];
       current.push(product);
       groups.set(key, current);
     });
 
     return Array.from(groups.values())
-      .filter((group) => group.length > 1)
       .map((group) =>
         [...group].sort(
           (a, b) =>
@@ -1276,13 +1311,37 @@ export default function ProductsView() {
       );
   }, [filteredProducts, selectedWarehouseId]);
 
+  const displayProducts = React.useMemo(
+    () =>
+      groupedProducts.map((group) => {
+        const [primary, ...rest] = group;
+        if (!rest.length) {
+          return primary;
+        }
+
+        return {
+          ...primary,
+          stock: group.reduce((sum, product) => sum + Number(product?.stock || 0), 0),
+          totalIncoming: group.reduce((sum, product) => sum + Number(product?.totalIncoming || 0), 0),
+          duplicateCount: group.length - 1,
+          mergedProductIds: group.map((product) => Number(product.id)).filter((id) => Number.isFinite(id)),
+        };
+      }),
+    [groupedProducts],
+  );
+
+  const duplicateGroups = React.useMemo(
+    () => groupedProducts.filter((group) => group.length > 1),
+    [groupedProducts],
+  );
+
   const duplicateProductsCount = React.useMemo(
-    () => exactDuplicateGroups.reduce((sum, group) => sum + group.length - 1, 0),
-    [exactDuplicateGroups],
+    () => duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0),
+    [duplicateGroups],
   );
 
   const handleMergeExactDuplicates = async () => {
-    if (!exactDuplicateGroups.length || isMergingDuplicates) {
+    if (!duplicateGroups.length || isMergingDuplicates) {
       return;
     }
 
@@ -1290,7 +1349,7 @@ export default function ProductsView() {
     try {
       let mergedCount = 0;
 
-      for (const group of exactDuplicateGroups) {
+      for (const group of duplicateGroups) {
         const [target, ...sources] = group;
         for (const source of sources) {
           await mergeProduct(Number(source.id), Number(target.id));
@@ -1627,27 +1686,90 @@ export default function ProductsView() {
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Количество</label>
-                    {availableTransferStock !== null && (
-                      <p className="mb-2 text-xs font-bold text-slate-500">Доступно: {availableTransferStock} {selectedProduct?.unit || 'шт'}</p>
-                    )}
-                    <input 
-                      type="number" 
-                      required
-                      min="1"
-                      placeholder="Введите количество"
-                      value={transferData.quantity}
-                      onChange={e => setTransferData({ ...transferData, quantity: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm" 
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Количество</label>
+                      {selectedTransferPackaging && transferUnitsPerPackage > 0 ? (
+                        <div className="space-y-3">
+                          {availableTransferStock !== null && (
+                            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2.5">
+                              <p className="text-xs font-bold text-amber-900">
+                                Доступно: {formatCountWithUnit(transferAvailableFullPackages, selectedTransferPackaging.packageName)}
+                              </p>
+                              {transferRemainderUnits > 0 && (
+                                <p className="mt-1 text-xs font-medium text-amber-700">
+                                  Остаток: {formatCountWithUnit(transferRemainderUnits, normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт'))}
+                                </p>
+                              )}
+                              <p className="mt-1 text-[11px] font-medium text-amber-700">
+                                По умолчанию: {formatCountWithUnit(1, selectedTransferPackaging.packageName)} = {transferUnitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                              </p>
+                            </div>
+                          )}
+                          {transferAvailableFullPackages > 0 ? (
+                            <>
+                              <input
+                                type="number"
+                                required
+                                min="1"
+                                max={transferAvailableFullPackages || undefined}
+                                placeholder={`Введите количество (${selectedTransferPackaging.packageName})`}
+                                value={transferData.packageQuantityInput}
+                                onChange={e =>
+                                  setTransferData((prev) => ({
+                                    ...prev,
+                                    packageQuantityInput: e.target.value,
+                                    quantity: String(
+                                      Math.max(0, Math.floor(Number(e.target.value || 0) || 0)) * transferUnitsPerPackage
+                                    ),
+                                  }))
+                                }
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm"
+                              />
+                              <p className="text-xs font-medium text-slate-500">
+                                Перенос: {formatCountWithUnit(transferPackageQuantity, selectedTransferPackaging.packageName)}
+                                {transferPackageQuantity > 0 && ` = ${totalTransferUnits} ${normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}`}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500">
+                              Для оптового переноса нужна хотя бы одна полная {selectedTransferPackaging.packageName}.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {availableTransferStock !== null && (
+                            <p className="mb-2 text-xs font-bold text-slate-500">
+                              Доступно: {formatCountWithUnit(Number(availableTransferStock || 0), normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт'))}
+                            </p>
+                          )}
+                          <input 
+                            type="number" 
+                            required
+                            min="1"
+                            placeholder="Введите количество"
+                            value={transferData.quantity}
+                            onChange={e => setTransferData({ ...transferData, quantity: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm" 
+                          />
+                        </>
+                      )}
+                    </div>
                 </div>
                 <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
                   <button type="button" onClick={closeTransferModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
-                  <button type="submit" className="px-8 py-2 bg-amber-600 text-white rounded-xl font-bold shadow-xl shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 text-sm">Перенести</button>
-                </div>
-              </form>
+                    <button
+                      type="submit"
+                      disabled={
+                        (selectedTransferPackaging && transferUnitsPerPackage > 0 && transferAvailableFullPackages <= 0) ||
+                        totalTransferUnits <= 0
+                      }
+                      className="px-8 py-2 bg-amber-600 text-white rounded-xl font-bold shadow-xl shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Перенести
+                    </button>
+                  </div>
+                </form>
             </motion.div>
           </motion.div>
         )}
@@ -2284,7 +2406,7 @@ export default function ProductsView() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
-              Товаров: {filteredProducts.length}
+              Товаров: {displayProducts.length}
             </div>
             {duplicateProductsCount > 0 ? (
               <>
@@ -2305,7 +2427,7 @@ export default function ProductsView() {
         </div>
 
         <div className="space-y-3 p-3 md:hidden">
-          {filteredProducts.map((product, index) => (
+          {displayProducts.map((product, index) => (
             <div key={`mobile-${product.id ?? product.name}-${index}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
@@ -2436,12 +2558,17 @@ export default function ProductsView() {
                   >
                     Партии
                   </button>
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
-                      setShowTransferModal(true);
-                    }}
+                    <button
+                      onClick={() => {
+                        const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                        setSelectedProduct(product);
+                        setTransferData({
+                          ...emptyTransferData,
+                          fromWarehouseId: product.warehouseId?.toString() || '',
+                          selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                        });
+                        setShowTransferModal(true);
+                      }}
                     className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold text-amber-700"
                   >
                     Перенос
@@ -2459,7 +2586,7 @@ export default function ProductsView() {
               )}
             </div>
           ))}
-          {filteredProducts.length === 0 && !isLoading && (
+          {displayProducts.length === 0 && !isLoading && (
             <div className="rounded-[22px] border border-slate-200 bg-white px-5 py-12 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                 <Package size={28} />
@@ -2506,7 +2633,7 @@ export default function ProductsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((product, index) => (
+                {displayProducts.map((product, index) => (
                 <tr key={product.id} className="group transition-all duration-300 hover:bg-slate-50/70">
                   <td className="px-5 py-4 text-xs font-medium text-slate-400">{index + 1}</td>
                   <td className="px-5 py-3">
@@ -2650,12 +2777,17 @@ export default function ProductsView() {
                           <History size={14} />
                         </button>
                         {isAdmin && (
-                          <button 
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setTransferData({ ...transferData, fromWarehouseId: product.warehouseId?.toString() || '' });
-                              setShowTransferModal(true);
-                            }}
+                            <button 
+                              onClick={() => {
+                                const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                                setSelectedProduct(product);
+                                setTransferData({
+                                  ...emptyTransferData,
+                                  fromWarehouseId: product.warehouseId?.toString() || '',
+                                  selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                                });
+                                setShowTransferModal(true);
+                              }}
                             className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600" 
                             title="Перенос"
                           >
@@ -2682,7 +2814,7 @@ export default function ProductsView() {
                   </td>}
                 </tr>
               ))}
-              {filteredProducts.length === 0 && !isLoading && (
+               {displayProducts.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={isAdmin ? 7 : 5} className="px-5 py-20 text-center">
                     <div className="flex flex-col items-center justify-center space-y-4">

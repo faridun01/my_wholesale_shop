@@ -300,7 +300,7 @@ router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
     const customerId = Number(req.params.id);
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
-      return res.status(404).json({ error: 'ÐšÐ»Ð¸ÐµÐ½Ñ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
+      return res.status(404).json({ error: 'Клиент не найден' });
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -339,7 +339,7 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
     const customerId = Number(req.params.id);
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
-      return res.status(404).json({ error: 'ÐšÐ»Ð¸ÐµÐ½Ñ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
+      return res.status(404).json({ error: 'Клиент не найден' });
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -372,7 +372,7 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
     const customerId = Number(req.params.id);
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
-      return res.status(404).json({ error: 'ÐšÐ»Ð¸ÐµÐ½Ñ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
+      return res.status(404).json({ error: 'Клиент не найден' });
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -405,7 +405,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     const customerId = Number(req.params.id);
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
-      return res.status(404).json({ error: 'ÐšÐ»Ð¸ÐµÐ½Ñ‚ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½' });
+      return res.status(404).json({ error: 'Клиент не найден' });
     }
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });

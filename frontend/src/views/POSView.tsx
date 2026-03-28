@@ -695,7 +695,7 @@ export default function POSView() {
       setPaidAmount('');
       setCustomerId(null);
       setDiscount(0);
-      navigate('/sales');
+        navigate('/sales', { state: { warehouseId: String(warehouseId) } });
     } catch (err: any) {
       const message = err.response?.data?.error || err.message || 'Ошибка при создании продажи';
       toast.error(message === 'Network Error' ? 'Ошибка сети. Проверьте подключение.' : message);
