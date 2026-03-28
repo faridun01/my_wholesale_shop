@@ -122,6 +122,7 @@ export default function SalesView() {
   const [editProducts, setEditProducts] = useState<any[]>([]);
   const [editInvoiceSearch, setEditInvoiceSearch] = useState('');
   const [openEditProductMenuKey, setOpenEditProductMenuKey] = useState<string | null>(null);
+  const [editProductMenuSearch, setEditProductMenuSearch] = useState('');
   const [returnReason, setReturnReason] = useState('');
   const [returnItems, setReturnItems] = useState<any[]>([]);
   const [isPaying, setIsPaying] = useState(false);
@@ -141,6 +142,7 @@ export default function SalesView() {
     setEditProducts([]);
     setEditInvoiceSearch('');
     setOpenEditProductMenuKey(null);
+    setEditProductMenuSearch('');
   };
 
   const closePaymentModal = () => {
@@ -1525,13 +1527,17 @@ export default function SalesView() {
                             <div className="space-y-2">
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Товар</p>
                               <div className="relative">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setOpenEditProductMenuKey((current) => (current === item.key ? null : item.key))
-                                  }
-                                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-900 transition-all hover:border-violet-200 focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
-                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenEditProductMenuKey((current) => {
+                                        const nextKey = current === item.key ? null : item.key;
+                                        setEditProductMenuSearch('');
+                                        return nextKey;
+                                      });
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-900 transition-all hover:border-violet-200 focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
+                                  >
                                   <span className="truncate">
                                     {selectedProduct ? formatProductName(selectedProduct.name) : 'Выберите товар из списка'}
                                   </span>
@@ -1540,14 +1546,33 @@ export default function SalesView() {
 
                                 {openEditProductMenuKey === item.key ? (
                                   <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
+                                    <div className="border-b border-slate-100 p-3">
+                                      <div className="relative">
+                                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                          type="text"
+                                          value={editProductMenuSearch}
+                                          onChange={(e) => setEditProductMenuSearch(e.target.value)}
+                                          placeholder="Поиск товара..."
+                                          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white"
+                                        />
+                                      </div>
+                                    </div>
                                     <div className="max-h-64 overflow-y-auto py-2">
-                                      {editProducts.map((product) => (
+                                      {editProducts
+                                        .filter((product) => {
+                                          const query = editProductMenuSearch.trim().toLowerCase();
+                                          if (!query) return true;
+                                          return formatProductName(product.name).toLowerCase().includes(query);
+                                        })
+                                        .map((product) => (
                                         <button
                                           key={product.id}
                                           type="button"
                                           onClick={() => {
                                             selectEditProductForItem(item.key, product);
                                             setOpenEditProductMenuKey(null);
+                                            setEditProductMenuSearch('');
                                           }}
                                           className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-all hover:bg-slate-50"
                                         >
@@ -1558,9 +1583,18 @@ export default function SalesView() {
                                             <p className="mt-1 text-xs text-slate-500">
                                               {Number(product.stock || 0)} шт
                                             </p>
-                                          </div>
-                                        </button>
+                                            </div>
+                                          </button>
                                       ))}
+                                      {!editProducts.filter((product) => {
+                                        const query = editProductMenuSearch.trim().toLowerCase();
+                                        if (!query) return true;
+                                        return formatProductName(product.name).toLowerCase().includes(query);
+                                      }).length ? (
+                                        <div className="px-4 py-6 text-center text-sm font-medium text-slate-400">
+                                          Ничего не найдено
+                                        </div>
+                                      ) : null}
                                     </div>
                                   </div>
                                 ) : null}
