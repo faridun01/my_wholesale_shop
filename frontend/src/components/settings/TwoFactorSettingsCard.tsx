@@ -142,12 +142,12 @@ export default function TwoFactorSettingsCard({ currentUser }: Props) {
     <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h3 className="flex items-center space-x-3 text-2xl font-black text-slate-900">
-            <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600 shadow-inner ring-4 ring-emerald-50">
-              <ShieldCheck size={28} />
-            </div>
-            <span>Двухфакторная защита</span>
-          </h3>
+<h3 className="flex items-center space-x-3 text-2xl font-medium text-slate-900">
+  <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600 shadow-inner ring-4 ring-emerald-50">
+    <ShieldCheck size={28} />
+  </div>
+  <span>Двухфакторная защита</span>
+</h3>
           <p className="mt-3 text-sm font-medium text-slate-500">
             Вход будет подтверждаться кодом из Google Authenticator или Microsoft Authenticator.
           </p>
