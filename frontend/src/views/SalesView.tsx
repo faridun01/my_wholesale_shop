@@ -33,6 +33,7 @@ import { getDefaultWarehouseId } from '../utils/warehouse';
 import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import { getProducts } from '../api/products.api';
+import PaginationControls from '../components/common/PaginationControls';
 
 type EditInvoiceItem = {
   key: string;
@@ -96,6 +97,7 @@ const getDefaultPackaging = (
 
 export default function SalesView() {
   const PAYMENT_EPSILON = 0.01;
+  const pageSize = 8;
   const [invoices, setInvoices] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -106,6 +108,10 @@ export default function SalesView() {
   const userWarehouseId = getUserWarehouseId(user);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
+  const [staffFilter, setStaffFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: 'createdAt',
     direction: 'desc',
@@ -116,6 +122,7 @@ export default function SalesView() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [editCustomerId, setEditCustomerId] = useState<number | ''>('');
   const [editInvoiceItems, setEditInvoiceItems] = useState<EditInvoiceItem[]>([]);
@@ -343,12 +350,26 @@ export default function SalesView() {
       inv.id.toString().includes(search) ||
       inv.customer_name.toLowerCase().includes(search.toLowerCase());
 
+    const effectiveStatus = getEffectiveStatus(inv);
+    const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
+    const matchesStaff = staffFilter === 'all' || String(inv.staff_name || '') === staffFilter;
+    const invoiceDate = String(inv.createdAt || '').slice(0, 10);
+    const matchesDateFrom = !dateFrom || invoiceDate >= dateFrom;
+    const matchesDateTo = !dateTo || invoiceDate <= dateTo;
+
     if (isAdmin || !userWarehouseId) {
-      return matchesSearch;
+      return matchesSearch && matchesStatus && matchesStaff && matchesDateFrom && matchesDateTo;
     }
 
     const invoiceWarehouseId = inv.warehouseId || inv.warehouse?.id;
-    return matchesSearch && Number(invoiceWarehouseId) === userWarehouseId;
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesStaff &&
+      matchesDateFrom &&
+      matchesDateTo &&
+      Number(invoiceWarehouseId) === userWarehouseId
+    );
   });
 
   const handleSort = (key: string) => {
@@ -367,18 +388,19 @@ export default function SalesView() {
     }
   };
 
-  const getInvoiceSubtotal = (invoice: any) =>
-    Array.isArray(invoice?.items)
+  function getInvoiceSubtotal(invoice: any) {
+    return Array.isArray(invoice?.items)
       ? invoice.items.reduce((sum: number, item: any) => sum + Number(item.totalPrice || 0), 0)
       : Number(invoice?.totalAmount || 0);
+  }
 
-  const getInvoiceDiscountAmount = (invoice: any) => {
+  function getInvoiceDiscountAmount(invoice: any) {
     const subtotal = getInvoiceSubtotal(invoice);
     const discount = Number(invoice?.discount || 0);
     return subtotal * (discount / 100);
-  };
+  }
 
-  const getInvoiceNetAmount = (invoice: any) => {
+  function getInvoiceNetAmount(invoice: any) {
     const subtotal = getInvoiceSubtotal(invoice);
     const discountAmount = getInvoiceDiscountAmount(invoice);
     const returnedAmount = Number(invoice?.returnedAmount || 0);
@@ -390,9 +412,9 @@ export default function SalesView() {
     }
 
     return Math.max(0, calculatedNet);
-  };
+  }
 
-  const getEffectiveStatus = (invoice: any) => {
+  function getEffectiveStatus(invoice: any) {
     if (invoice?.cancelled) {
       return 'cancelled';
     }
@@ -409,16 +431,16 @@ export default function SalesView() {
     }
 
     return 'unpaid';
-  };
+  }
 
-  const getInvoiceBalance = (invoice: any) => {
+  function getInvoiceBalance(invoice: any) {
     const balance = getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.paidAmount || 0));
     if (balance <= PAYMENT_EPSILON) {
       return 0;
     }
 
     return balance;
-  };
+  }
 
   const canEditInvoice = (invoice: any) => {
     if (!invoice || invoice.cancelled) {
@@ -474,19 +496,47 @@ export default function SalesView() {
     const product = productMeta || item?.product || null;
     const packagings = normalizePackagings(product);
     const defaultPackaging = getDefaultPackaging(packagings);
+    const existingPackaging =
+      item?.packagingId
+        ? packagings.find((entry: any) => Number(entry.id) === Number(item.packagingId)) ||
+          (item?.packageNameSnapshot && Number(item?.unitsPerPackageSnapshot || 0) > 0
+            ? {
+                id: Number(item.packagingId),
+                packageName: String(item.packageNameSnapshot),
+                baseUnitName: normalizeDisplayBaseUnit(
+                  item?.baseUnitNameSnapshot || product?.baseUnitName || product?.unit || 'шт',
+                ),
+                unitsPerPackage: Number(item.unitsPerPackageSnapshot || 0),
+                isDefault: false,
+              }
+            : null)
+        : null;
     const isEmpty = !item && !product;
     const totalUnits =
-      item?.quantity !== undefined && item?.quantity !== null
+      item?.totalBaseUnits !== undefined && item?.totalBaseUnits !== null
+        ? Math.max(0, Number(item.totalBaseUnits) || 0)
+        : item?.quantity !== undefined && item?.quantity !== null
         ? Math.max(0, Number(item.quantity) || 0)
         : isEmpty
           ? 0
           : defaultPackaging
           ? Number(defaultPackaging.unitsPerPackage || 0)
           : 1;
-    const usePackaging = Boolean(defaultPackaging && Number(defaultPackaging.unitsPerPackage || 0) > 1);
-    const unitsPerPackage = usePackaging ? Number(defaultPackaging?.unitsPerPackage || 0) : 0;
-    const packageQuantity = usePackaging && unitsPerPackage > 0 ? Math.floor(totalUnits / unitsPerPackage) : 0;
-    const extraUnitQuantity = usePackaging && unitsPerPackage > 0 ? totalUnits % unitsPerPackage : totalUnits;
+    const selectedPackaging = existingPackaging || defaultPackaging;
+    const usePackaging = Boolean(selectedPackaging && Number(selectedPackaging.unitsPerPackage || 0) > 1);
+    const unitsPerPackage = usePackaging ? Number(selectedPackaging?.unitsPerPackage || 0) : 0;
+    const packageQuantity =
+      item?.packageQuantity !== undefined && item?.packageQuantity !== null
+        ? Math.max(0, Number(item.packageQuantity) || 0)
+        : usePackaging && unitsPerPackage > 0
+        ? Math.floor(totalUnits / unitsPerPackage)
+        : 0;
+    const extraUnitQuantity =
+      item?.extraUnitQuantity !== undefined && item?.extraUnitQuantity !== null
+        ? Math.max(0, Number(item.extraUnitQuantity) || 0)
+        : usePackaging && unitsPerPackage > 0
+        ? totalUnits % unitsPerPackage
+        : totalUnits;
     const baseUnitName = normalizeDisplayBaseUnit(
       item?.unit || item?.baseUnitNameSnapshot || product?.baseUnitName || product?.unit || 'шт',
     );
@@ -504,8 +554,10 @@ export default function SalesView() {
             : toFixedNumber(Number(product?.sellingPrice || 0)),
       unit: baseUnitName,
       baseUnitName,
-      packagings,
-      selectedPackagingId: usePackaging ? Number(defaultPackaging?.id || '') : '',
+      packagings: existingPackaging && !packagings.some((entry: any) => Number(entry.id) === Number(existingPackaging.id))
+        ? [existingPackaging, ...packagings]
+        : packagings,
+      selectedPackagingId: usePackaging ? Number(selectedPackaging?.id || '') : '',
       packageQuantityInput: isEmpty ? '' : String(packageQuantity),
       extraUnitQuantityInput: isEmpty ? '' : String(extraUnitQuantity),
       isNew: isEmpty,
@@ -688,6 +740,11 @@ export default function SalesView() {
           quantity,
           totalBaseUnits: quantity,
           sellingPrice,
+          packagingId: normalizedItem.selectedPackagingId ? Number(normalizedItem.selectedPackagingId) : null,
+          packageQuantity: normalizedItem.selectedPackagingId ? Math.max(0, Number(normalizedItem.packageQuantityInput || 0) || 0) : null,
+          extraUnitQuantity: Math.max(0, Number(normalizedItem.extraUnitQuantityInput || 0) || 0),
+          packageName: normalizedItem.selectedPackagingId ? getEditItemPackaging(normalizedItem)?.packageName || null : null,
+          unitsPerPackage: normalizedItem.selectedPackagingId ? Number(getEditItemPackaging(normalizedItem)?.unitsPerPackage || 0) || null : null,
           baseUnitName: normalizeDisplayBaseUnit(product.baseUnitName || product.unit || normalizedItem.baseUnitName || normalizedItem.unit || 'шт'),
           productName: product.name,
           rawName: product.rawName || null,
@@ -825,6 +882,28 @@ export default function SalesView() {
     }
   });
 
+  const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize));
+  const paginatedInvoices = sortedInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const staffOptions = Array.from(new Set(invoices.map((invoice) => String(invoice.staff_name || '').trim()).filter(Boolean)));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedWarehouseId, sortConfig.key, sortConfig.direction, statusFilter, staffFilter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const clearInvoiceFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setStaffFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   const renderSortLabel = (label: string, key: string) => (
     <button
       type="button"
@@ -841,8 +920,8 @@ export default function SalesView() {
   );
 
   return (
-    <div className="app-page-shell lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
-      <div className="space-y-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+    <div className="app-page-shell">
+      <div className="space-y-4">
         <div className="rounded-[28px] border border-slate-100 bg-white/95 px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -880,7 +959,7 @@ export default function SalesView() {
       </div>
         </div>
 
-      <div className="mt-1 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+      <div className="mt-1 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)]">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-[#fbfcfe] p-4 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-2xl font-semibold text-slate-900">Накладные</h2>
           <div className="relative flex-1 max-w-xl">
@@ -895,8 +974,62 @@ export default function SalesView() {
           </div>
         </div>
 
+        <div className="grid gap-3 border-b border-slate-100 bg-white px-4 py-4 md:grid-cols-2 xl:grid-cols-5">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+          >
+            <option value="all">Все статусы</option>
+            <option value="paid">Оплачено</option>
+            <option value="partial">Частично</option>
+            <option value="unpaid">Не оплачено</option>
+          </select>
+
+          <select
+            value={staffFilter}
+            onChange={(e) => setStaffFilter(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+          >
+            <option value="all">Все сотрудники</option>
+            {staffOptions.map((staffName) => (
+              <option key={staffName} value={staffName}>
+                {staffName}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-[#f7f8fc] px-3 py-3">
+            <Calendar size={16} className="text-slate-400" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-[#f7f8fc] px-3 py-3">
+            <Calendar size={16} className="text-slate-400" />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={clearInvoiceFilters}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50"
+          >
+            Сбросить фильтры
+          </button>
+        </div>
+
         <div className="space-y-3 p-3 md:hidden">
-          {sortedInvoices.map((inv) => {
+          {paginatedInvoices.map((inv) => {
             const paymentDisabled = isPaymentActionDisabled(inv);
             const returnDisabled = isReturnActionDisabled(inv);
 
@@ -1004,7 +1137,16 @@ export default function SalesView() {
           )})}
         </div>
 
-        <div className="hidden overflow-auto md:block lg:min-h-0 lg:flex-1">
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={sortedInvoices.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          className="border-t-0 pt-0 md:hidden"
+        />
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-collapse text-left [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3 [&_th]:text-[10px] [&_th]:tracking-[0.14em]">
             <thead>
               <tr className="bg-[#fafbfe] text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
@@ -1020,7 +1162,7 @@ export default function SalesView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedInvoices.map((inv) => {
+              {paginatedInvoices.map((inv) => {
                 const paymentDisabled = isPaymentActionDisabled(inv);
                 const returnDisabled = isReturnActionDisabled(inv);
 
@@ -1148,6 +1290,17 @@ export default function SalesView() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="hidden md:block">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={sortedInvoices.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            className="border-t-0"
+          />
         </div>
       </div>
 

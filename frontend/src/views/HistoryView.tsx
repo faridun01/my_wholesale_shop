@@ -3,6 +3,7 @@ import { History, Search, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw } from
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
 import toast from 'react-hot-toast';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface Transaction {
   id: number;
@@ -15,8 +16,10 @@ interface Transaction {
 }
 
 export default function HistoryView() {
+  const pageSize = 15;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchHistory();
@@ -26,6 +29,7 @@ export default function HistoryView() {
     try {
       const res = await client.get('/reports/transactions');
       setTransactions(res.data);
+      setCurrentPage(1);
     } catch (err) {
       toast.error('Ошибка при загрузке истории');
     } finally {
@@ -42,6 +46,15 @@ export default function HistoryView() {
       default: return <Badge variant="default">{type}</Badge>;
     }
   };
+
+  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
+  const paginatedTransactions = transactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="app-page-shell">
@@ -73,7 +86,7 @@ export default function HistoryView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {transactions.map((t) => (
+              {paginatedTransactions.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/30 transition-colors group">
                   <td className="px-8 py-4 text-slate-500 font-bold">
                     {new Date(t.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -95,6 +108,13 @@ export default function HistoryView() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={transactions.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </Card>
       </div>
     </div>

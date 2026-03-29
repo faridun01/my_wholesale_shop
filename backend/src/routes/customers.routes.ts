@@ -124,7 +124,11 @@ const mapCustomerWithTotals = (customer: any) => {
   };
 };
 
-const getCustomerAccess = async (access: Awaited<ReturnType<typeof getAccessContext>>, customerId: number) => {
+const getCustomerAccess = async (
+  access: Awaited<ReturnType<typeof getAccessContext>>,
+  customerId: number,
+  options?: { requireOwnership?: boolean },
+) => {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     select: { id: true, createdByUserId: true },
@@ -135,6 +139,10 @@ const getCustomerAccess = async (access: Awaited<ReturnType<typeof getAccessCont
   }
 
   if (access.isAdmin) {
+    return { customer, allowed: true };
+  }
+
+  if (!options?.requireOwnership) {
     return { customer, allowed: true };
   }
 
@@ -159,19 +167,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
       ],
     };
 
-    const where: any = access.isAdmin
-      ? baseWhere
-      : {
-          AND: [
-            baseWhere,
-            {
-              createdByUserId: access.userId ?? -1,
-            },
-          ],
-        };
-
     const customers = await prisma.customer.findMany({
-      where,
+      where: baseWhere,
       include: {
         invoices: {
           where: { cancelled: false },
@@ -238,7 +235,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
     const customerId = Number(req.params.id);
     const payload = buildCustomerPayload(req.body, access);
     const customerName = payload.name;
-    const { customer: current, allowed } = await getCustomerAccess(access, customerId);
+    const { customer: current, allowed } = await getCustomerAccess(access, customerId, { requireOwnership: true });
     if (!current) {
       return res.status(404).json({ error: 'Клиент не найден' });
     }
@@ -276,7 +273,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
-    const { customer: current, allowed } = await getCustomerAccess(access, customerId);
+    const { customer: current, allowed } = await getCustomerAccess(access, customerId, { requireOwnership: true });
     if (!current) {
       return res.status(404).json({ error: 'Клиент не найден' });
     }

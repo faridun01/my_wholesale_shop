@@ -16,6 +16,11 @@ export const createExpense = async (data: any) => {
   return response.data;
 };
 
+export const addExpensePayment = async (id: number, amount: number) => {
+  const response = await client.post(`/expenses/${id}/payments`, { amount });
+  return response.data;
+};
+
 export const deleteExpense = async (id: number) => {
   const response = await client.delete(`/expenses/${id}`);
   return response.data;

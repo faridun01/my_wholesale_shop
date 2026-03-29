@@ -7,6 +7,7 @@ import { formatCount, formatMoney, toFixedNumber } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getCurrentUser } from '../utils/userAccess';
 import ChartSkeleton from '../components/charts/ChartSkeleton';
+import PaginationControls from '../components/common/PaginationControls';
 
 const ReportsCharts = React.lazy(() => import('../components/charts/ReportsCharts'));
 
@@ -190,16 +191,20 @@ function Panel({
 }
 
 export default function ReportsView({ warehouseId: initialWarehouseId = null }: ReportsViewProps) {
+  const detailPageSize = 15;
   const today = new Date();
   const [reportType, setReportType] = useState<ReportType>('sales');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initialWarehouseId?.toString() || '');
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState(() => getMonthRange(today.getFullYear(), today.getMonth()));
   const [reportData, setReportData] = useState<ReportRow[]>([]);
+  const [detailPage, setDetailPage] = useState(1);
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
   const currentMeta = reportMeta[reportType];
+  const detailTotalPages = Math.max(1, Math.ceil(reportData.length / detailPageSize));
+  const paginatedDetailRows = reportData.slice((detailPage - 1) * detailPageSize, detailPage * detailPageSize);
 
   useEffect(() => {
     const fetchWarehouses = async () => {
@@ -236,6 +241,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
     fetchReport();
   }, [dateRange, isAdmin, reportType, selectedWarehouseId]);
+
+  useEffect(() => {
+    setDetailPage(1);
+  }, [dateRange, reportType, selectedWarehouseId]);
+
+  useEffect(() => {
+    if (detailPage > detailTotalPages) {
+      setDetailPage(detailTotalPages);
+    }
+  }, [detailPage, detailTotalPages]);
 
   const handleMonthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const [year, month] = event.target.value.split('-');
@@ -821,7 +836,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {reportData.map((row, index) => (
+              {paginatedDetailRows.map((row, index) => (
                 <tr key={`${row.date}-${row.product_name}-${index}`} className="text-sm text-slate-700">
                   <td className="px-5 py-4">{new Date(row.date).toLocaleDateString('ru-RU')}</td>
                   <td className="px-5 py-4 text-slate-900">{formatProductName(row.product_name)}</td>
@@ -856,6 +871,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             </tbody>
           </table>
         </div>
+        {reportData.length > detailPageSize && (
+          <PaginationControls
+            currentPage={detailPage}
+            totalPages={detailTotalPages}
+            totalItems={reportData.length}
+            pageSize={detailPageSize}
+            onPageChange={setDetailPage}
+            className="border-t-0"
+          />
+        )}
       </Panel>
       </div>
     </div>

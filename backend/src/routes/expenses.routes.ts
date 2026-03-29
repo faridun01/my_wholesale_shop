@@ -20,6 +20,19 @@ const normalizePositiveAmount = (value: unknown) => {
   return amount;
 };
 
+const normalizePaidAmount = (value: unknown, totalAmount: number) => {
+  const amount = normalizeMoney(value ?? 0, 'Expense paid amount');
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw Object.assign(new Error('Сумма оплаты не может быть отрицательной'), { status: 400 });
+  }
+
+  if (amount > totalAmount) {
+    throw Object.assign(new Error('Сумма оплаты не может быть больше суммы расхода'), { status: 400 });
+  }
+
+  return amount;
+};
+
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
@@ -75,6 +88,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
     const category = String(req.body?.category || 'Прочее').trim() || 'Прочее';
     const amount = normalizePositiveAmount(req.body?.amount);
+    const paidAmount = normalizePaidAmount(req.body?.paidAmount, amount);
     const expenseDate = req.body?.expenseDate ? new Date(req.body.expenseDate) : new Date();
 
     const created = await prisma.expense.create({
@@ -84,6 +98,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         category,
         title,
         amount,
+        paidAmount,
         expenseDate,
         note: normalizeOptionalString(req.body?.note),
       },
@@ -98,6 +113,52 @@ router.post('/', async (req: AuthRequest, res, next) => {
     });
 
     res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/payments', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const expenseId = Number(req.params.id);
+    const expense = await prisma.expense.findUnique({
+      where: { id: expenseId },
+      select: {
+        id: true,
+        warehouseId: true,
+        amount: true,
+        paidAmount: true,
+      },
+    });
+
+    if (!expense) {
+      return res.status(404).json({ error: 'Расход не найден' });
+    }
+
+    if (!ensureWarehouseAccess(access, expense.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const amount = normalizePositiveAmount(req.body?.amount);
+    const nextPaidAmount = normalizePaidAmount(Number(expense.paidAmount || 0) + amount, Number(expense.amount || 0));
+
+    const updated = await prisma.expense.update({
+      where: { id: expenseId },
+      data: {
+        paidAmount: nextPaidAmount,
+      },
+      include: {
+        warehouse: {
+          select: { id: true, name: true },
+        },
+        user: {
+          select: { id: true, username: true },
+        },
+      },
+    });
+
+    res.json(updated);
   } catch (error) {
     next(error);
   }

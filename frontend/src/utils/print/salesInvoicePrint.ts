@@ -138,14 +138,14 @@ export function printSalesInvoice({
           .party-block { min-width: 0; border: 1px solid #d9e3ef; border-radius: 8px; padding: 6px 8px; background: #ffffff; }
           .seller-block { flex: 1; }
           .client-block { width: 235px; }
-          .label { margin: 0 0 4px; color: #64748b; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
-          .party-name { margin: 0; font-size: 12px; font-weight: 700; line-height: 1.15; color: #0f172a; }
-          .party-line { margin: 2px 0 0; color: #334155; font-size: 9.5px; line-height: 1.2; }
+          .label { margin: 0 0 3px; color: #64748b; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+          .party-name { margin: 0; font-size: 11px; font-weight: 700; line-height: 1.1; color: #0f172a; }
+          .party-line { margin: 1px 0 0; color: #334155; font-size: 8.5px; line-height: 1.1; }
           .section { margin-top: 6px; }
-          .section h3 { margin: 0 0 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #1e3a8a; }
+          .section h3 { margin: 0 0 3px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: #1e3a8a; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-          th, td { border: 1px solid #dbe5f1; padding: 4px 5px; font-size: 9.5px; text-align: left; vertical-align: top; line-height: 1.1; }
-          th { background: #ffffff; font-weight: 700; font-size: 9px; color: #111827; }
+          th, td { border: 1px solid #dbe5f1; padding: 3px 4px; font-size: 8.5px; text-align: left; vertical-align: top; line-height: 1.05; }
+          th { background: #ffffff; font-weight: 700; font-size: 8px; color: #111827; }
           .col-number { width: 28px; }
           .col-product { width: 292px; }
           .col-quantity { width: 78px; }
@@ -161,14 +161,14 @@ export function printSalesInvoice({
             max-height: 2.16em;
             overflow: hidden;
             word-break: break-word;
-            font-size: 9.2px;
+            font-size: 8.4px;
           }
           .quantity-cell { line-height: 1.1; }
           .quantity-line { display: block; }
-          .quantity-line + .quantity-line { margin-top: 1px; font-size: 8.2px; color: #475569; }
+          .quantity-line + .quantity-line { margin-top: 1px; font-size: 7.4px; color: #475569; }
           .summary { margin-left: auto; margin-top: 6px; width: 220px; }
-          .summary-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid #dbe5f1; font-size: 10px; }
-          .summary-row.total { font-size: 12px; font-weight: 700; border-top: 1px solid #cbd5e1; margin-top: 3px; padding-top: 5px; }
+          .summary-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px solid #dbe5f1; font-size: 9px; }
+          .summary-row.total { font-size: 10.5px; font-weight: 700; border-top: 1px solid #cbd5e1; margin-top: 2px; padding-top: 4px; }
           @media print {
             body { padding: 0; }
             .sheet { max-width: none; }

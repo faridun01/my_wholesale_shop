@@ -39,6 +39,7 @@ import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import PaginationControls from '../components/common/PaginationControls';
 
 const normalizeOcrProductName = (name: string) => {
   const trimmed = String(name || '').trim();
@@ -293,9 +294,11 @@ const getOcrProblemReason = (item: any, rateValue: unknown, expensePercentValue:
 };
 
 export default function ProductsView() {
+  const pageSize = 12;
   const ProductHistoryModal = React.lazy(() => import('../components/products/ProductHistoryModal'));
   const ProductBatchesModal = React.lazy(() => import('../components/products/ProductBatchesModal'));
   const hasLoadedReferenceDataRef = React.useRef(false);
+  const latestProductsRequestRef = React.useRef(0);
   const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
@@ -345,6 +348,8 @@ export default function ProductsView() {
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isReferenceDataReady, setIsReferenceDataReady] = useState(false);
   const ocrRowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
   const emptyTransferData = {
     fromWarehouseId: '',
@@ -498,8 +503,12 @@ export default function ProductsView() {
   };
 
   useEffect(() => {
+    if (!isReferenceDataReady) {
+      return;
+    }
+
     fetchInitialData();
-  }, [selectedWarehouseId]);
+  }, [isReferenceDataReady, selectedWarehouseId]);
 
   useEffect(() => {
     if (!showAddModal || showEditModal || isCategoryManual) {
@@ -570,16 +579,26 @@ export default function ProductsView() {
   ]);
 
   const fetchInitialData = async (warehouseIdOverride?: string) => {
+    const requestId = latestProductsRequestRef.current + 1;
+    latestProductsRequestRef.current = requestId;
     setIsLoading(true);
     try {
       const effectiveWarehouseId = warehouseIdOverride !== undefined ? warehouseIdOverride : selectedWarehouseId;
       const productsData = await getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined);
+      if (latestProductsRequestRef.current !== requestId) {
+        return;
+      }
       setProducts(Array.isArray(productsData) ? productsData : []);
     } catch (err) {
+      if (latestProductsRequestRef.current !== requestId) {
+        return;
+      }
       console.error(err);
       toast.error('Ошибка при загрузке данных');
     } finally {
-      setIsLoading(false);
+      if (latestProductsRequestRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -634,9 +653,11 @@ export default function ProductsView() {
           setSelectedWarehouseId(String(filteredWarehouses[0].id));
         }
         setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        setIsReferenceDataReady(true);
       })
       .catch((error) => {
         hasLoadedReferenceDataRef.current = false;
+        setIsReferenceDataReady(true);
         console.error(error);
         toast.error('Ошибка при загрузке данных');
       });
@@ -1192,15 +1213,8 @@ export default function ProductsView() {
   };
 
   const getRobustDuplicateKey = (product: any) => {
-    const warehouseId = Number(product?.warehouseId || selectedWarehouseId || 0);
-    const familyKey = normalizeProductFamilyName(String(product?.name || ''));
-    const massKey = extractMassKey(String(product?.name || ''));
+    const warehouseId = selectedWarehouseId ? Number(product?.warehouseId || selectedWarehouseId || 0) : 0;
     const fallbackName = normalizeCatalogName(String(product?.name || ''));
-
-    if (familyKey && massKey) {
-      return `${warehouseId}::${familyKey}::${massKey}`;
-    }
-
     return `${warehouseId}::${fallbackName}`;
   };
 
@@ -1339,6 +1353,21 @@ export default function ProductsView() {
     () => duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0),
     [duplicateGroups],
   );
+  const totalPages = Math.max(1, Math.ceil(displayProducts.length / pageSize));
+  const paginatedProducts = React.useMemo(
+    () => displayProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [currentPage, displayProducts],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedWarehouseId, sortConfig.key, sortConfig.direction]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleMergeExactDuplicates = async () => {
     if (!duplicateGroups.length || isMergingDuplicates) {
@@ -2427,7 +2456,7 @@ export default function ProductsView() {
         </div>
 
         <div className="space-y-3 p-3 md:hidden">
-          {displayProducts.map((product, index) => (
+          {paginatedProducts.map((product, index) => (
             <div key={`mobile-${product.id ?? product.name}-${index}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
@@ -2447,7 +2476,7 @@ export default function ProductsView() {
                   <div className="flex items-start justify-between gap-3">
                     <p className="min-w-0 break-words text-[15px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
                     <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                      #{index + 1}
+                      #{(currentPage - 1) * pageSize + index + 1}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -2597,6 +2626,15 @@ export default function ProductsView() {
           )}
         </div>
 
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={displayProducts.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          className="border-t-0 pt-0 md:hidden"
+        />
+
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -2633,9 +2671,9 @@ export default function ProductsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-                {displayProducts.map((product, index) => (
+                {paginatedProducts.map((product, index) => (
                 <tr key={product.id} className="group transition-all duration-300 hover:bg-slate-50/70">
-                  <td className="px-5 py-4 text-xs font-medium text-slate-400">{index + 1}</td>
+                  <td className="px-5 py-4 text-xs font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center space-x-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-transform duration-500 group-hover:scale-105">
@@ -2837,6 +2875,17 @@ export default function ProductsView() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="hidden md:block">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={displayProducts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            className="border-t-0"
+          />
         </div>
       </div>
     </div>

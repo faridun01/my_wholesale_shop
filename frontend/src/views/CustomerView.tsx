@@ -7,6 +7,8 @@ import client from '../api/client';
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
 import { formatCount, formatMoney } from '../utils/format';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import PaginationControls from '../components/common/PaginationControls';
+import { useMemo } from 'react';
 
 interface Customer {
   id: number;
@@ -75,7 +77,7 @@ const emptyForm = {
   companyName: '',
   contactName: '',
   phone: '',
-  country: '',
+  country: 'Таджикистан',
   region: '',
   city: '',
   address: '',
@@ -83,6 +85,7 @@ const emptyForm = {
 };
 
 export default function CustomerView() {
+  const pageSize = 6;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [segmentFilter, setSegmentFilter] = useState('all');
@@ -95,6 +98,7 @@ export default function CustomerView() {
   const [statementData, setStatementData] = useState<StatementInvoice[]>([]);
   const [formData, setFormData] = useState(emptyForm);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const PAYMENT_EPSILON = 0.01;
 
   const closeCustomerModal = () => {
@@ -162,7 +166,7 @@ export default function CustomerView() {
       companyName: formData.companyName.trim(),
       contactName: formData.contactName.trim(),
       phone: formData.phone.trim(),
-      country: formData.country.trim(),
+      country: formData.country.trim() || 'Таджикистан',
       region: formData.region.trim(),
       city: formData.city.trim(),
       address: formData.address.trim(),
@@ -374,6 +378,22 @@ export default function CustomerView() {
     Новый: 'bg-amber-100 text-amber-700',
   };
 
+  const totalPages = Math.max(1, Math.ceil(sortedCustomers.length / pageSize));
+  const paginatedCustomers = useMemo(
+    () => sortedCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [currentPage, sortedCustomers],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, segmentFilter, sortBy]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="app-page-shell">
       <div className="w-full space-y-6">
@@ -436,7 +456,7 @@ export default function CustomerView() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 2xl:grid-cols-3">
-            {sortedCustomers.map((customer) => (
+            {paginatedCustomers.map((customer) => (
               <motion.div layout key={customer.id} className="h-full">
                 <Card className="flex h-full flex-col rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
                   <div className="mb-6 flex items-start justify-between">
@@ -453,7 +473,7 @@ export default function CustomerView() {
                             companyName: customer.companyName || '',
                             contactName: customer.contactName || '',
                             phone: customer.phone || '',
-                            country: customer.country || '',
+                            country: customer.country || 'Таджикистан',
                             region: customer.region || '',
                             city: customer.city || '',
                             address: customer.address || '',
@@ -526,6 +546,14 @@ export default function CustomerView() {
               </motion.div>
             ))}
           </div>
+
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={sortedCustomers.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
 
         <ConfirmationModal
@@ -625,15 +653,7 @@ export default function CustomerView() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="space-y-2">
-                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Страна</label>
-                      <input
-                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                        value={formData.country}
-                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Регион</label>
                       <input

@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import LoginView from './views/LoginView';
-import Sidebar from './components/layout/Sidebar';
 import { Toaster } from 'react-hot-toast';
 import { Loader2, Menu, X, Warehouse } from 'lucide-react';
+import LoginView from './views/LoginView';
+import Sidebar from './components/layout/Sidebar';
 import { getCurrentUser, isAdminUser } from './utils/userAccess';
 import { clearAuthSession, getStoredUser, hasStoredSession, setAuthSession } from './utils/authStorage';
 import { getSessionUser } from './api/auth.api';
@@ -65,22 +65,21 @@ const Layout = () => {
         onClose={() => setIsSidebarOpen(false)}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
-      
+
       <div className="relative flex min-w-0 flex-1 flex-col">
-        {/* Mobile Header */}
-        <header className="lg:hidden bg-white text-shopify-text p-4 flex items-center justify-between sticky top-0 z-30 border-b border-shopify-border">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-shopify-border bg-white p-4 text-shopify-text lg:hidden">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#e3f1df] text-shopify-green">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e3f1df] text-shopify-green">
               <Warehouse size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-semibold tracking-tight leading-none">Wholesale</span>
-              <span className="text-[10px] text-shopify-muted mt-0.5">Admin</span>
+              <span className="text-lg font-semibold leading-none tracking-tight">Оптовая торговля</span>
+              <span className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-shopify-muted">Панель управления</span>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2.5 bg-shopify-bg hover:bg-[#eef1f3] rounded-xl transition-all duration-300 active:scale-90"
+            className="rounded-xl bg-shopify-bg p-2.5 transition-all duration-300 hover:bg-[#eef1f3] active:scale-90"
           >
             {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -172,10 +171,24 @@ export default function App() {
           <Route path="/pos" element={<POSView />} />
           <Route path="/customers" element={<CustomerView />} />
           <Route path="/expenses" element={<ExpensesView />} />
-          <Route path="/reports" element={<AdminRoute><ReportsView /></AdminRoute>} />
+          <Route
+            path="/reports"
+            element={
+              <AdminRoute>
+                <ReportsView />
+              </AdminRoute>
+            }
+          />
           <Route path="/reminders" element={<RemindersView />} />
           <Route path="/history" element={<HistoryView />} />
-          <Route path="/settings" element={<AdminRoute><SettingsView /></AdminRoute>} />
+          <Route
+            path="/settings"
+            element={
+              <AdminRoute>
+                <SettingsView />
+              </AdminRoute>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

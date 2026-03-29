@@ -126,24 +126,24 @@ export function printCustomerInvoice({
         <title>Накладная #${invoice.id}</title>
         <style>
           * { box-sizing: border-box; }
-          body { margin: 0; padding: 32px; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
+          body { margin: 0; padding: 24px; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
           .sheet { max-width: 900px; margin: 0 auto; }
-          .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 24px; }
-          .title { font-size: 30px; font-weight: 700; margin: 0 0 8px; }
-          .muted { color: #475569; font-size: 14px; line-height: 1.6; }
-          .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
-          .card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc; }
-          .label { margin: 0 0 8px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
-          .value { margin: 0; font-size: 18px; font-weight: 700; }
-          .subvalue { margin: 8px 0 0; color: #475569; font-size: 14px; line-height: 1.5; }
-          .section { margin-top: 24px; }
-          .section h3 { margin: 0 0 12px; font-size: 16px; }
+          .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 18px; }
+          .title { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+          .muted { color: #475569; font-size: 12px; line-height: 1.45; }
+          .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+          .card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px; background: #f8fafc; }
+          .label { margin: 0 0 6px; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+          .value { margin: 0; font-size: 16px; font-weight: 700; }
+          .subvalue { margin: 6px 0 0; color: #475569; font-size: 12px; line-height: 1.35; }
+          .section { margin-top: 18px; }
+          .section h3 { margin: 0 0 10px; font-size: 14px; }
           table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #e2e8f0; padding: 12px; font-size: 14px; text-align: left; vertical-align: top; }
+          th, td { border: 1px solid #e2e8f0; padding: 9px; font-size: 12px; text-align: left; vertical-align: top; }
           th { background: #f8fafc; font-weight: 700; }
-          .summary { margin-left: auto; margin-top: 24px; width: 320px; }
-          .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-          .summary-row.total { font-size: 20px; font-weight: 700; border-top: 2px solid #cbd5e1; margin-top: 8px; padding-top: 12px; }
+          .summary { margin-left: auto; margin-top: 18px; width: 300px; }
+          .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+          .summary-row.total { font-size: 17px; font-weight: 700; border-top: 2px solid #cbd5e1; margin-top: 6px; padding-top: 10px; }
         </style>
       </head>
       <body>

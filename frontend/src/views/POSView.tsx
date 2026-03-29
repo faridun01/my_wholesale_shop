@@ -112,6 +112,78 @@ const normalizeDisplayBaseUnit = (value: string) => {
   return normalized;
 };
 
+const formatStockAmount = (stock: number, packaging: PackagingOption | null, baseUnitName: string) => {
+  const normalizedStock = Math.max(0, Math.floor(Number(stock) || 0));
+  const normalizedBaseUnit = normalizeDisplayBaseUnit(baseUnitName || '\u0448\u0442');
+
+  if (!packaging || Number(packaging.unitsPerPackage || 0) <= 1) {
+    return `${normalizedStock} ${normalizedBaseUnit}`;
+  }
+
+  const unitsPerPackage = Number(packaging.unitsPerPackage || 0);
+  const packageQuantity = Math.floor(normalizedStock / unitsPerPackage);
+  const extraUnits = normalizedStock % unitsPerPackage;
+
+  if (packageQuantity > 0 && extraUnits > 0) {
+    return `${packageQuantity} ${packaging.packageName} + ${extraUnits} ${normalizedBaseUnit}`;
+  }
+
+  if (packageQuantity > 0) {
+    return `${packageQuantity} ${packaging.packageName}`;
+  }
+
+  return `${extraUnits} ${normalizedBaseUnit}`;
+};
+
+const getProductStockLabel = (product: any, fallbackBaseUnitName?: string) => {
+  const packagings = normalizePackagings(product);
+  const defaultPackaging = getDefaultPackaging(packagings);
+  const baseUnitName = normalizeDisplayBaseUnit(
+    String(product?.baseUnitName || product?.unit || fallbackBaseUnitName || defaultPackaging?.baseUnitName || '\u0448\u0442'),
+  );
+
+  return formatStockAmount(Number(product?.stock || 0), defaultPackaging, baseUnitName);
+};
+
+const getProductStockParts = (product: any, fallbackBaseUnitName?: string) => {
+  const packagings = normalizePackagings(product);
+  const defaultPackaging = getDefaultPackaging(packagings);
+  const baseUnitName = normalizeDisplayBaseUnit(
+    String(product?.baseUnitName || product?.unit || fallbackBaseUnitName || defaultPackaging?.baseUnitName || '\u0448\u0442'),
+  );
+  const stock = Math.max(0, Math.floor(Number(product?.stock || 0)));
+
+  if (!defaultPackaging || Number(defaultPackaging.unitsPerPackage || 0) <= 1) {
+    return {
+      primary: `${stock} ${baseUnitName}`,
+      secondary: '',
+    };
+  }
+
+  const unitsPerPackage = Number(defaultPackaging.unitsPerPackage || 0);
+  const packageQuantity = Math.floor(stock / unitsPerPackage);
+  const extraUnits = stock % unitsPerPackage;
+
+  if (packageQuantity > 0 && extraUnits > 0) {
+    return {
+      primary: `${packageQuantity} ${defaultPackaging.packageName}`,
+      secondary: `+ ${extraUnits} ${baseUnitName}`,
+    };
+  }
+
+  if (packageQuantity > 0) {
+    return {
+      primary: `${packageQuantity} ${defaultPackaging.packageName}`,
+      secondary: '',
+    };
+  }
+
+  return {
+    primary: `${extraUnits} ${baseUnitName}`,
+    secondary: '',
+  };
+};
+
 export default function POSView() {
   const cartStorageKey = 'pos_cart_session';
   const pendingCartStorageKey = 'pending_cart';
@@ -444,7 +516,7 @@ export default function POSView() {
       );
 
       if (nextItem.quantity > Number(product.stock || 0)) {
-        toast.error(`Недостаточно товара. Доступно: ${product.stock} ${existing.baseUnitName || product.unit}`);
+      toast.error(`Недостаточно товара. Доступно: ${getProductStockLabel(product, existing.baseUnitName || product.unit)}`);
         return;
       }
 
@@ -452,7 +524,7 @@ export default function POSView() {
     } else {
       const nextItem = createCartItemFromProduct(product);
       if (nextItem.quantity > Number(product.stock || 0)) {
-        toast.error(`Недостаточно товара. Доступно: ${product.stock} ${nextItem.baseUnitName || product.unit}`);
+        toast.error(`Недостаточно товара. Доступно: ${getProductStockLabel(product, nextItem.baseUnitName || product.unit)}`);
         return;
       }
 
@@ -480,7 +552,7 @@ export default function POSView() {
 
     const product = products.find((item) => item.id === id);
     if (product && quantity > product.stock) {
-      toast.error(`Недостаточно товара. Доступно: ${product.stock} ${product.unit}`);
+      toast.error(`Недостаточно товара. Доступно: ${getProductStockLabel(product, product.unit)}`);
       return;
     }
 
@@ -855,32 +927,24 @@ export default function POSView() {
 
                 <div ref={productListRef} className="h-[560px] overflow-y-auto">
                   <div className="space-y-3 p-3 md:hidden">
-                    {filteredProducts.map((product) => (
+                    {filteredProducts.map((product) => {
+                      const stockParts = getProductStockParts(product, product.unit);
+
+                      return (
                       <div key={`mobile-pos-${product.id}`} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-sky-100 text-sky-600">
-                            {product.photoUrl ? (
-                              <img
-                                src={resolveMediaUrl(product.photoUrl, product.id)}
-                                alt={product.name}
-                                className="h-full w-full rounded-2xl object-cover"
-                                referrerPolicy="no-referrer"
-                                onError={(event) => handleBrokenImage(event, product.id)}
-                              />
-                            ) : (
-                              <Package size={18} />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
-                            <p className="mt-1 text-[11px] text-slate-400">ID {product.id}</p>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <div className="rounded-xl bg-sky-50 px-3 py-2">
                             <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Остаток</p>
-                            <p className="mt-1 text-sm text-slate-900">{product.stock}</p>
+                            <div className="mt-1 inline-flex flex-col rounded-xl border border-sky-100 bg-white px-2.5 py-2 text-sky-700">
+                              <span className="whitespace-nowrap text-[13px] font-semibold leading-4">{stockParts.primary}</span>
+                              {stockParts.secondary ? (
+                                <span className="mt-1 whitespace-nowrap text-[11px] font-medium leading-4 text-sky-600/90">{stockParts.secondary}</span>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="rounded-xl bg-sky-50 px-3 py-2">
                             <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Цена</p>
@@ -897,36 +961,28 @@ export default function POSView() {
                           <span>Добавить</span>
                         </button>
                       </div>
-                    ))}
+                    )})}
                   </div>
 
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.map((product) => {
+                    const stockParts = getProductStockParts(product, product.unit);
+
+                    return (
                     <div
                       key={product.id}
-                      className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 md:grid"
+                      className="hidden grid-cols-[minmax(0,1.7fr)_150px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 md:grid"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-                          {product.photoUrl ? (
-                            <img
-                              src={resolveMediaUrl(product.photoUrl, product.id)}
-                              alt={product.name}
-                              className="h-full w-full rounded-2xl object-cover"
-                              referrerPolicy="no-referrer"
-                              onError={(event) => handleBrokenImage(event, product.id)}
-                            />
-                          ) : (
-                            <Package size={18} />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="break-words text-[13px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
-                          <p className="text-xs text-slate-400">ID {product.id}</p>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="break-words text-[13px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
                       </div>
 
-                      <div className="text-center">
-                        <span className="rounded-xl bg-sky-100 px-3 py-1.5 text-sm text-sky-700">{product.stock}</span>
+                      <div className="flex justify-center">
+                        <div className="inline-flex min-w-[118px] flex-col items-center rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2 text-center text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+                          <span className="whitespace-nowrap text-[15px] font-semibold leading-4">{stockParts.primary}</span>
+                          {stockParts.secondary ? (
+                            <span className="mt-1 whitespace-nowrap text-[12px] font-medium leading-4 text-sky-600/90">{stockParts.secondary}</span>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="text-center text-sm text-slate-900">{formatMoney(product.sellingPrice)}</div>
@@ -942,7 +998,7 @@ export default function POSView() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  )})}
 
                   {!filteredProducts.length && (
                     <div className="flex flex-col items-center justify-center px-6 py-20 text-center">

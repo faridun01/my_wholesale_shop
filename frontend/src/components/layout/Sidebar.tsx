@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Banknote,
-  Bell,
+  BarChart3,
   BookOpen,
   Calendar,
   ChevronLeft,
@@ -14,34 +14,31 @@ import {
   ShoppingCart,
   Users,
   Warehouse,
-  BarChart3,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { clsx } from 'clsx';
-import { motion } from 'motion/react';
 import client from '../../api/client';
-import { getCurrentUser, isAdminUser } from '../../utils/userAccess';
-import { clearAuthSession, hasStoredSession } from '../../utils/authStorage';
 import { logout } from '../../api/auth.api';
+import { clearAuthSession, hasStoredSession } from '../../utils/authStorage';
+import { getCurrentUser, isAdminUser } from '../../utils/userAccess';
 
 type NavItem = {
   to: string;
   icon: LucideIcon;
   label: string;
   section: 'Управление' | 'Отношения' | 'Система';
-  primary?: boolean;
 };
 
 const navItems: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Дашборд', section: 'Управление' },
-  { to: '/pos', icon: ShoppingCart, label: 'POS Терминал', section: 'Управление', primary: true },
+  { to: '/pos', icon: ShoppingCart, label: 'POS терминал', section: 'Управление' },
   { to: '/catalog', icon: BookOpen, label: 'Каталог', section: 'Управление' },
   { to: '/products', icon: Package, label: 'Товары', section: 'Управление' },
   { to: '/sales', icon: History, label: 'История продаж', section: 'Управление' },
   { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
   { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
   { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
-  { to: '/reports', icon: BarChart3, label: 'Отчёты', section: 'Система' },
+  { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
   { to: '/settings', icon: Settings, label: 'Настройки', section: 'Система' },
 ];
 
@@ -87,8 +84,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     try {
       await logout();
     } catch {
-      // Clear client session even if the server cookie is already gone.
+      // If server session is already gone, clear local session anyway.
     }
+
     clearAuthSession();
     navigate('/login');
   };
@@ -123,12 +121,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(86vw,320px)] flex-col border-r border-[#223041] bg-[#121a24] text-[#eaf1f8] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0 lg:shadow-none',
-          isCollapsed ? 'lg:w-[88px]' : 'lg:w-64',
+          'fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col overflow-hidden border-r border-[#202c3c] bg-[#111927] text-[#eaf1f8] shadow-2xl transition-[width,transform] duration-300 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none',
+          isCollapsed ? 'w-[92px] lg:w-[92px]' : 'w-[238px] lg:w-[238px]',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className={clsx('pb-2 pt-3', isCollapsed ? 'px-2.5' : 'px-3.5')}>
+        <div className={clsx('border-b border-white/5', isCollapsed ? 'px-3 py-3' : 'px-3.5 py-3')}>
           <div className={clsx('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
             <button
               type="button"
@@ -141,63 +139,60 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                 navigate('/');
                 onClose();
               }}
+              title={isCollapsed ? 'Развернуть меню' : 'Оптовая торговля'}
               className={clsx(
-                'flex items-center text-left transition-all duration-200',
+                'flex shrink-0 items-center justify-center transition-all duration-200',
                 isCollapsed
-                  ? 'justify-center rounded-full border border-[#223041] bg-[#182331] p-2.5 shadow-[0_8px_20px_rgba(8,15,26,0.28)] hover:bg-[#1d2a3b]'
-                  : 'gap-3',
+                  ? 'h-[52px] w-[52px] rounded-[18px] bg-[linear-gradient(180deg,#5a49ff_0%,#4a2fe0_100%)] text-white shadow-[0_12px_28px_rgba(88,72,255,0.28)]'
+                  : 'h-11 w-11 rounded-[16px] bg-[linear-gradient(180deg,#5a49ff_0%,#4a2fe0_100%)] text-white shadow-[0_12px_24px_rgba(88,72,255,0.24)]',
               )}
-              title={isCollapsed ? 'Развернуть меню' : 'Открыть главную'}
             >
-              <div
-                className={clsx(
-                  'flex items-center justify-center text-white',
-                  isCollapsed ? 'h-8 w-8 rounded-full bg-[#0f1722]' : 'h-9 w-9 rounded-xl bg-[#1a2533]',
-                )}
-              >
-                <Warehouse size={isCollapsed ? 16 : 18} />
-              </div>
-              {!isCollapsed && (
-                <div className="flex flex-col">
-                  <span className="text-base font-semibold leading-none tracking-tight">Wholesale</span>
-                  <span className="mt-0.5 text-[10px] text-[#708398]">Commerce admin</span>
-                </div>
-              )}
+              <Warehouse size={isCollapsed ? 21 : 19} />
             </button>
+
+            {!isCollapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold leading-[1.1] tracking-tight text-white">Оптовая торговля</div>
+                  <div className="mt-0.5 text-[9px] uppercase tracking-[0.14em] text-[#7e90a7]">Панель управления</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="ml-auto hidden h-9 w-9 items-center justify-center rounded-xl bg-[#1a2535] text-[#c6d3e3] transition-colors hover:bg-[#223247] hover:text-white lg:flex"
+                  title="Свернуть меню"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+              </>
+            )}
 
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[#1a2533] text-[#c9d5e3] transition-all hover:bg-[#233243] hover:text-white lg:hidden"
+              className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl bg-[#1a2535] text-[#c6d3e3] transition-colors hover:bg-[#223247] hover:text-white lg:hidden"
               title="Закрыть меню"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={17} />
             </button>
-
-            {!isCollapsed && (
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                className="ml-auto hidden h-9 w-9 items-center justify-center rounded-xl bg-[#1a2533] text-[#c9d5e3] transition-all hover:bg-[#233243] hover:text-white lg:flex"
-                title="Свернуть меню"
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
           </div>
         </div>
 
-        <nav className={clsx('custom-scrollbar flex-1 overflow-y-auto overflow-x-hidden pb-1', isCollapsed ? 'px-2' : 'px-3')}>
-          <div className="space-y-2">
+        <nav
+          className={clsx(
+            'flex-1 overflow-hidden',
+            isCollapsed ? 'px-2.5 py-2.5' : 'px-3 py-2.5',
+          )}
+        >
+          <div className={clsx(isCollapsed ? 'space-y-2.5' : 'space-y-2')}>
             {Object.entries(navSections).map(([section, items]) => (
               <div key={section}>
                 {!isCollapsed && (
-                  <p className="mb-1 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7f92a8]">
-                    {section}
-                  </p>
+                  <p className="mb-1 px-3 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#74859a]">{section}</p>
                 )}
 
-                <div className="space-y-0.5">
+                <div className={clsx(isCollapsed ? 'space-y-1.5' : 'space-y-1')}>
                   {items.map((item) => (
                     <NavLink
                       key={item.to}
@@ -208,38 +203,35 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                       title={isCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         clsx(
-                          'relative flex overflow-hidden rounded-2xl border transition-all duration-200',
-                          isCollapsed ? 'justify-center px-2 py-2' : 'items-center gap-3 px-3 py-2',
-                          item.primary && !isActive && 'border-[#202d3d] bg-[#182331] text-[#eef4fb]',
+                          'group relative flex border transition-all duration-200',
+                          isCollapsed
+                            ? 'mx-auto h-[52px] w-[52px] items-center justify-center rounded-[16px]'
+                            : 'items-center gap-3 rounded-[16px] px-3 py-2.5',
                           isActive
-                            ? 'border-white/10 bg-white text-[#111827] shadow-sm'
-                            : 'border-transparent text-[#eef4fb] hover:bg-[#182331] hover:text-white',
+                            ? 'border-[#31426b] bg-[#192542] text-white shadow-[0_10px_22px_rgba(9,15,28,0.24)]'
+                            : 'border-transparent bg-transparent text-[#9daec4] hover:border-[#243146] hover:bg-[#182231] hover:text-white',
                         )
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <item.icon size={16} className="relative z-10 shrink-0" />
-                          {!isCollapsed && <span className="relative z-10 text-[14px] font-medium">{item.label}</span>}
+                          <item.icon size={isCollapsed ? 22 : 17} className="shrink-0" strokeWidth={isActive ? 2.2 : 2} />
 
-                          {item.to === '/reminders' && remindersCount > 0 && !isActive && !isCollapsed && (
-                            <span className="relative z-10 ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ef4444] px-1 text-[9px] font-semibold text-white">
+                          {!isCollapsed && <span className="truncate text-[13px] font-medium">{item.label}</span>}
+
+                          {item.to === '/reminders' && remindersCount > 0 && (
+                            <span
+                              className={clsx(
+                                'flex items-center justify-center rounded-full bg-[#ef4444] text-[9px] font-semibold text-white',
+                                isCollapsed ? 'absolute right-1.5 top-1.5 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
+                              )}
+                            >
                               {remindersCount > 9 ? '9+' : remindersCount}
                             </span>
                           )}
 
-                          {item.to === '/reminders' && remindersCount > 0 && !isActive && isCollapsed && (
-                            <span className="absolute right-1 top-1 z-20 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ef4444] px-1 text-[9px] font-semibold text-white">
-                              {remindersCount > 9 ? '9+' : remindersCount}
-                            </span>
-                          )}
-
-                          {isActive && (
-                            <motion.div
-                              layoutId="active-pill"
-                              className="absolute inset-0 rounded-2xl bg-white"
-                              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                            />
+                          {isCollapsed && isActive && (
+                            <span className="absolute inset-0 rounded-[16px] bg-[linear-gradient(180deg,rgba(99,76,255,0.30)_0%,rgba(79,57,197,0.26)_100%)]" />
                           )}
                         </>
                       )}
@@ -251,53 +243,36 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           </div>
         </nav>
 
-        <div className="mt-auto px-2.5 pb-3 pt-2">
+        <div className={clsx('mt-auto border-t border-white/5', isCollapsed ? 'px-2.5 py-2.5' : 'px-3 py-2.5')}>
           <div
             className={clsx(
-              'relative rounded-[18px] border border-[#223041] bg-[#182331]',
-              isCollapsed ? 'p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]' : 'p-2.5',
+              'rounded-[18px] border border-[#223043] bg-[#172133]',
+              isCollapsed ? 'px-0 py-2.5' : 'p-2.5',
             )}
           >
-            <div className={clsx('flex items-center', isCollapsed ? 'flex-col gap-2' : 'gap-3')}>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#263447] text-[11px] font-semibold text-white">
+            <div className={clsx('flex items-center', isCollapsed ? 'justify-center' : 'gap-3')}>
+              <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[14px] bg-[#223148] text-sm font-semibold text-white">
                 {user.username?.[0]?.toUpperCase()}
               </div>
 
               {!isCollapsed && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-[#eaf1f8]">{user.username}</p>
-                  <p className="truncate text-[10px] uppercase tracking-[0.12em] text-[#73869d]">{user.role}</p>
+                  <p className="truncate text-[9px] uppercase tracking-[0.12em] text-[#73869d]">{user.role}</p>
                 </div>
               )}
-
-              <button
-                onClick={() => navigate('/reminders')}
-                className={clsx(
-                  'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#233243] text-[#c9d5e3] transition-all duration-200 hover:bg-[#2b3c50] hover:text-white',
-                  isCollapsed && 'mx-auto',
-                )}
-                title="Напоминания"
-              >
-                <Bell size={15} />
-                {remindersCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-[#182331] bg-[#ef4444] px-1 text-[9px] font-semibold text-white">
-                    {remindersCount > 9 ? '9+' : remindersCount}
-                  </span>
-                )}
-              </button>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className={clsx(
-                'flex w-full items-center justify-center rounded-xl bg-[#233243] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c9d5e3] transition-all duration-200 hover:bg-[#3a2430] hover:text-[#fecdd3]',
-                isCollapsed ? 'mt-2 px-0 py-2' : 'mt-2.5 gap-2 py-2',
-              )}
-              title="Выйти"
-            >
-              <LogOut size={14} />
-              {!isCollapsed && <span>Выйти</span>}
-            </button>
+            {!isCollapsed && (
+              <button
+                onClick={handleLogout}
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-transparent bg-[#223148] py-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#c9d5e3] transition-colors hover:border-[#5a3441] hover:bg-[#3a2430] hover:text-[#fecdd3]"
+                title="Выйти"
+              >
+                <LogOut size={13} />
+                <span>Выйти</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>

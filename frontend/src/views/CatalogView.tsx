@@ -21,6 +21,7 @@ import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUse
 import { formatMoney } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
+import PaginationControls from '../components/common/PaginationControls';
 
 function shell(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
@@ -34,7 +35,92 @@ function getStoredWarehouseId() {
   return sessionStorage.getItem('pos_warehouse_session') || localStorage.getItem('pos_warehouse_session') || '';
 }
 
+type PackagingOption = {
+  id: number;
+  packageName: string;
+  baseUnitName: string;
+  unitsPerPackage: number;
+  isDefault?: boolean;
+};
+
+const normalizeDisplayBaseUnit = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'шт';
+  if (['пачка', 'пачки', 'пачек', 'шт', 'штук', 'штука', 'штуки', 'pcs', 'piece', 'pieces'].includes(normalized)) {
+    return 'шт';
+  }
+  return normalized;
+};
+
+const normalizePackagings = (product: any): PackagingOption[] =>
+  Array.isArray(product?.packagings)
+    ? product.packagings
+        .map((entry: any) => ({
+          id: Number(entry.id),
+          packageName: String(entry.packageName || '').trim(),
+          baseUnitName: normalizeDisplayBaseUnit(entry.baseUnitName || product?.baseUnitName || product?.unit || 'шт'),
+          unitsPerPackage: Number(entry.unitsPerPackage || 0),
+          isDefault: Boolean(entry.isDefault),
+        }))
+        .filter((entry: PackagingOption) => entry.id > 0 && entry.packageName && entry.unitsPerPackage > 0)
+    : [];
+
+const getDefaultPackaging = (packagings: PackagingOption[]) =>
+  packagings.find((entry) => entry.isDefault) || packagings[0] || null;
+
+const getProductStockParts = (product: any) => {
+  const packagings = normalizePackagings(product);
+  const defaultPackaging = getDefaultPackaging(packagings);
+  const baseUnitName = normalizeDisplayBaseUnit(
+    product?.baseUnitName || product?.unit || defaultPackaging?.baseUnitName || 'шт',
+  );
+  const stock = Math.max(0, Math.floor(Number(product?.stock || 0)));
+
+  if (!defaultPackaging || Number(defaultPackaging.unitsPerPackage || 0) <= 1) {
+    return {
+      primary: `${stock} ${baseUnitName}`,
+      secondary: '',
+      isOutOfStock: stock <= 0,
+    };
+  }
+
+  const unitsPerPackage = Number(defaultPackaging.unitsPerPackage || 0);
+  const packageQuantity = Math.floor(stock / unitsPerPackage);
+  const extraUnits = stock % unitsPerPackage;
+
+  if (stock <= 0) {
+    return {
+      primary: 'Нет',
+      secondary: '',
+      isOutOfStock: true,
+    };
+  }
+
+  if (packageQuantity > 0 && extraUnits > 0) {
+    return {
+      primary: `${packageQuantity} ${defaultPackaging.packageName}`,
+      secondary: `+ ${extraUnits} ${baseUnitName}`,
+      isOutOfStock: false,
+    };
+  }
+
+  if (packageQuantity > 0) {
+    return {
+      primary: `${packageQuantity} ${defaultPackaging.packageName}`,
+      secondary: '',
+      isOutOfStock: false,
+    };
+  }
+
+  return {
+    primary: `${extraUnits} ${baseUnitName}`,
+    secondary: '',
+    isOutOfStock: false,
+  };
+};
+
 export default function CatalogView() {
+  const pageSize = 12;
   const warehouseStorageKey = 'pos_warehouse_session';
   const hasLoadedReferenceDataRef = React.useRef(false);
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -53,6 +139,7 @@ export default function CatalogView() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [cartNotice, setCartNotice] = useState<{ productName: string; count: number } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -124,6 +211,19 @@ export default function CatalogView() {
 
     return matchesSearch && matchesCategory && matchesStock;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedWarehouseId, selectedCategory, stockFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleProductClick = (product: any) => {
     setSelectedProduct(product);
@@ -281,7 +381,10 @@ export default function CatalogView() {
             </div>
           ) : (
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {filteredProducts.map((product, index) => (
+              {paginatedProducts.map((product, index) => {
+                const stockParts = getProductStockParts(product);
+
+                return (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -337,11 +440,12 @@ export default function CatalogView() {
 
                       <span
                         className={shell(
-                          'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium sm:text-sm',
-                          product.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          'shrink-0 rounded-2xl px-3 py-2 text-right text-xs font-medium sm:text-sm',
+                          stockParts.isOutOfStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                         )}
                       >
-                        {product.stock > 0 ? `${product.stock} ${product.unit}` : 'Нет'}
+                        <span className="block whitespace-nowrap leading-4">{stockParts.primary}</span>
+                        {stockParts.secondary ? <span className="mt-1 block whitespace-nowrap text-[11px] leading-4 opacity-90">{stockParts.secondary}</span> : null}
                       </span>
                     </div>
 
@@ -358,7 +462,7 @@ export default function CatalogView() {
                     </button>
                   </div>
                 </motion.div>
-              ))}
+              )})}
 
               {!filteredProducts.length && (
                 <div className="col-span-full flex flex-col items-center justify-center rounded-[28px] border border-white bg-white px-6 py-20 text-center shadow-sm">
@@ -370,6 +474,14 @@ export default function CatalogView() {
               )}
             </section>
           )}
+
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredProducts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
 
@@ -505,14 +617,25 @@ export default function CatalogView() {
                             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
                               Остаток
                             </p>
-                            <p
-                              className={shell(
-                                'mt-1 text-lg font-semibold tracking-tight sm:text-xl lg:text-2xl',
-                                selectedProduct.stock > 0 ? 'text-emerald-600' : 'text-rose-600'
-                              )}
-                            >
-                              {selectedProduct.stock} {selectedProduct.unit}
-                            </p>
+                            {(() => {
+                              const stockParts = getProductStockParts(selectedProduct);
+
+                              return (
+                                <div
+                                  className={shell(
+                                    'mt-1 inline-flex rounded-2xl px-3 py-2',
+                                    stockParts.isOutOfStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+                                  )}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="whitespace-nowrap text-lg font-semibold tracking-tight sm:text-xl lg:text-2xl">{stockParts.primary}</span>
+                                    {stockParts.secondary ? (
+                                      <span className="mt-1 whitespace-nowrap text-xs font-medium sm:text-sm opacity-90">{stockParts.secondary}</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
