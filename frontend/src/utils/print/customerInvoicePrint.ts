@@ -10,9 +10,26 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const normalizeAddressLine = (...parts: unknown[]) =>
+  parts
+    .flatMap((value) => String(value ?? '').split(/\r?\n/g))
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(', ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 interface CustomerInvoicePrintOptions {
   invoice: any;
-  customer: { name?: string; phone?: string } | null;
+  customer: {
+    name?: string;
+    phone?: string;
+    country?: string;
+    region?: string;
+    city?: string;
+    address?: string;
+  } | null;
   statusLabel: string;
   subtotal: number;
   discountAmount: number;
@@ -35,6 +52,8 @@ export function printCustomerInvoice({
     return { ok: false, reason: 'invalid' as const };
   }
 
+  const customerAddress = normalizeAddressLine(customer.country, customer.region, customer.city, customer.address);
+
   const printWindow = window.open('', '_blank', 'width=980,height=900');
   if (!printWindow) {
     return { ok: false, reason: 'blocked' as const };
@@ -56,8 +75,9 @@ export function printCustomerInvoice({
         .join('')
     : '';
 
-  const paymentsBlock = Array.isArray(invoice.paymentEvents) && invoice.paymentEvents.length > 0
-    ? `
+  const paymentsBlock =
+    Array.isArray(invoice.paymentEvents) && invoice.paymentEvents.length > 0
+      ? `
       <div class="section">
         <h3>Оплаты</h3>
         <table>
@@ -84,10 +104,11 @@ export function printCustomerInvoice({
         </table>
       </div>
     `
-    : '';
+      : '';
 
-  const returnsBlock = Array.isArray(invoice.returnEvents) && invoice.returnEvents.length > 0
-    ? `
+  const returnsBlock =
+    Array.isArray(invoice.returnEvents) && invoice.returnEvents.length > 0
+      ? `
       <div class="section">
         <h3>Возвраты</h3>
         <table>
@@ -116,7 +137,7 @@ export function printCustomerInvoice({
         </table>
       </div>
     `
-    : '';
+      : '';
 
   const html = `
     <!doctype html>
@@ -159,7 +180,8 @@ export function printCustomerInvoice({
             <div class="card">
               <p class="label">Клиент</p>
               <p class="value">${escapeHtml(customer.name || '---')}</p>
-              <p class="subvalue">${escapeHtml(customer.phone || 'Нет телефона')}</p>
+              ${customer.phone ? `<p class="subvalue">Телефон: ${escapeHtml(customer.phone)}</p>` : ''}
+              ${customerAddress ? `<p class="subvalue">Адрес: ${escapeHtml(customerAddress)}</p>` : ''}
             </div>
             <div class="card">
               <p class="label">Склад</p>
@@ -168,7 +190,11 @@ export function printCustomerInvoice({
             <div class="card">
               <p class="label">Оплата</p>
               <p class="value">${escapeHtml(formatMoney(appliedPaidAmount))}</p>
-              <p class="subvalue">${changeAmount > PAYMENT_EPSILON ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}` : `Остаток: ${escapeHtml(formatMoney(invoice.invoiceBalance))}`}</p>
+              <p class="subvalue">${
+                changeAmount > PAYMENT_EPSILON
+                  ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}`
+                  : `Остаток: ${escapeHtml(formatMoney(invoice.invoiceBalance))}`
+              }</p>
             </div>
           </div>
           <div class="section">

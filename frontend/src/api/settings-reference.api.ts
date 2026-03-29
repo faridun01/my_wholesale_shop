@@ -26,7 +26,12 @@ export const getSettingsCategories = async (options?: { force?: boolean }) => {
   );
 };
 
+export const createSettingsCategory = async (name: string) => {
+  const response = await client.post('/settings/categories', { name });
+  invalidateReferenceCache(CATEGORIES_CACHE_KEY);
+  return response.data;
+};
+
 export const invalidateSettingsReferenceCache = () => {
   invalidateReferenceCache(PUBLIC_SETTINGS_CACHE_KEY, CATEGORIES_CACHE_KEY);
 };
-

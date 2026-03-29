@@ -921,11 +921,11 @@ export default function SalesView() {
 
   return (
     <div className="app-page-shell">
-      <div className="space-y-4">
+      <div className="flex flex-col space-y-4">
         <div className="rounded-[28px] border border-slate-100 bg-white/95 px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Продажи</h1>
+          <h1 className="text-4xl font-medium tracking-tight text-slate-900">Продажи</h1>
           <p className="mt-1 text-slate-500">Управление накладными и заказами клиентов.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -959,7 +959,7 @@ export default function SalesView() {
       </div>
         </div>
 
-      <div className="mt-1 overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)]">
+      <div className="mt-1 flex flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.18)] md:min-h-[860px]">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-[#fbfcfe] p-4 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-2xl font-semibold text-slate-900">Накладные</h2>
           <div className="relative flex-1 max-w-xl">
@@ -1028,7 +1028,7 @@ export default function SalesView() {
           </button>
         </div>
 
-        <div className="space-y-3 p-3 md:hidden">
+        <div className="flex-1 space-y-3 p-3 md:hidden">
           {paginatedInvoices.map((inv) => {
             const paymentDisabled = isPaymentActionDisabled(inv);
             const returnDisabled = isReturnActionDisabled(inv);
@@ -1137,16 +1137,18 @@ export default function SalesView() {
           )})}
         </div>
 
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={sortedInvoices.length}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          className="border-t-0 pt-0 md:hidden"
-        />
+        <div className="mt-auto border-t border-slate-100 bg-white/95 md:hidden">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={sortedInvoices.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            className="border-t-0"
+          />
+        </div>
 
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden min-h-[560px] flex-1 overflow-x-auto md:block">
           <table className="w-full border-collapse text-left [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3 [&_th]:text-[10px] [&_th]:tracking-[0.14em]">
             <thead>
               <tr className="bg-[#fafbfe] text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
@@ -1292,7 +1294,7 @@ export default function SalesView() {
           </table>
         </div>
 
-        <div className="hidden md:block">
+        <div className="mt-auto hidden border-t border-slate-100 bg-white/95 md:block">
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}

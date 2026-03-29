@@ -69,6 +69,23 @@ export default function DashboardView() {
   const defaultWarehouseId = getUserWarehouseId(user);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(defaultWarehouseId ? String(defaultWarehouseId) : '');
 
+  const getWarehouseLabel = React.useCallback((item: any) => {
+    const directName = item?.warehouse?.name || item?.warehouseName;
+    if (directName) {
+      return directName;
+    }
+
+    const warehouseId = Number(item?.warehouseId || item?.warehouse?.id || 0);
+    if (warehouseId > 0) {
+      const matchedWarehouse = warehouses.find((warehouse) => Number(warehouse?.id) === warehouseId);
+      if (matchedWarehouse?.name) {
+        return matchedWarehouse.name;
+      }
+    }
+
+    return item?.warehouse?.city || 'Склад не указан';
+  }, [warehouses]);
+
   useEffect(() => {
     if (lastSummaryWarehouseIdRef.current === selectedWarehouseId) {
       return;
@@ -324,7 +341,7 @@ export default function DashboardView() {
   }, [overviewPeriod]);
 
   const categoryData = useMemo(() => {
-    const source = filteredTopProducts.length ? filteredTopProducts.slice(0, 5) : filteredLowStock.slice(0, 5);
+    const source = filteredTopProducts.length ? filteredTopProducts.slice(0, 4) : filteredLowStock.slice(0, 4);
     return source.map((item: any) => ({
       name: item.name,
       value: Number(item.totalSold || item.stock || 0),
@@ -338,6 +355,73 @@ export default function DashboardView() {
     filteredLowStock.length > 0 ||
     filteredCustomers.length > 0;
   const showSearchDropdown = searchQuery.length > 0;
+
+  const recentSalesPanel = (
+    <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-6 py-5">
+        <h2 className="text-2xl font-semibold text-slate-900">Последние продажи</h2>
+      </div>
+      <div className="space-y-3 p-4 sm:hidden sm:max-h-none">
+        {filteredSales.slice(0, 5).map((sale: any) => (
+          <div key={sale.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-900">Заказ #{sale.id}</p>
+                <p className="mt-1 text-sm text-slate-500">{sale.customer?.name || 'Клиент'}</p>
+              </div>
+              <span className={card('shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium', statusTone(sale.status))}>
+                {statusLabel(sale.status)}
+              </span>
+            </div>
+            <div className="mt-4 rounded-2xl bg-white px-4 py-3">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(sale.netAmount || 0)}</p>
+            </div>
+          </div>
+        ))}
+        {!filteredSales.length && (
+          <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+            Нет недавних продаж
+          </div>
+        )}
+      </div>
+      <div className="hidden sm:block">
+        <div className={filteredSales.length > 5 ? 'max-h-[360px] overflow-y-auto' : ''}>
+          <table className="w-full text-left">
+          <thead className="bg-[#f4f5fb] text-sm text-slate-500">
+            <tr>
+              <th className="px-6 py-4">Заказ</th>
+              <th className="px-6 py-4">Клиент</th>
+              <th className="px-6 py-4">Сумма</th>
+              <th className="px-6 py-4">Статус</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredSales.slice(0, 5).map((sale: any) => (
+              <tr key={sale.id}>
+                <td className="px-6 py-4 text-sm text-slate-700">#{sale.id}</td>
+                <td className="px-6 py-4 text-sm text-slate-900">{sale.customer?.name || 'Клиент'}</td>
+                <td className="px-6 py-4 text-sm text-slate-900">{formatMoney(sale.netAmount || 0)}</td>
+                <td className="px-6 py-4">
+                  <span className={card('rounded-xl px-3 py-1.5 text-sm', statusTone(sale.status))}>
+                    {statusLabel(sale.status)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {!filteredSales.length && (
+              <tr>
+                <td colSpan={4} className="px-6 py-16 text-center text-sm text-slate-400">
+                  Нет недавних продаж
+                </td>
+              </tr>
+            )}
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="app-page-shell min-h-full">
@@ -449,7 +533,7 @@ export default function DashboardView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">Дашборд</h1>
+              <h1 className="text-4xl font-medium tracking-tight text-slate-900">Дашборд</h1>
               <p className="mt-1 text-[11px] text-slate-500">Обзор продаж, остатков и активности клиентов.</p>
               {searchQuery && (
                 <p className="mt-2 text-[11px] text-slate-500">
@@ -593,74 +677,12 @@ export default function DashboardView() {
                 categoryData={categoryData}
                 ringColors={ringColors}
                 totalRevenue={summary?.totalRevenue || 0}
+                leftBottomContent={recentSalesPanel}
               />
             </React.Suspense>
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-            <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-2xl font-semibold text-slate-900">Последние продажи</h2>
-              </div>
-              <div className="space-y-3 p-4 sm:hidden">
-                {filteredSales.slice(0, 5).map((sale: any) => (
-                  <div key={sale.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-base font-semibold text-slate-900">Заказ #{sale.id}</p>
-                        <p className="mt-1 text-sm text-slate-500">{sale.customer?.name || 'Клиент'}</p>
-                      </div>
-                      <span className={card('shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium', statusTone(sale.status))}>
-                        {statusLabel(sale.status)}
-                      </span>
-                    </div>
-                    <div className="mt-4 rounded-2xl bg-white px-4 py-3">
-                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(sale.netAmount || 0)}</p>
-                    </div>
-                  </div>
-                ))}
-                {!filteredSales.length && (
-                  <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
-                    Нет недавних продаж
-                  </div>
-                )}
-              </div>
-              <div className="hidden overflow-x-auto sm:block">
-                <table className="w-full text-left">
-                  <thead className="bg-[#f4f5fb] text-sm text-slate-500">
-                    <tr>
-                      <th className="px-5 py-4">Заказ</th>
-                      <th className="px-5 py-4">Клиент</th>
-                      <th className="px-5 py-4">Сумма</th>
-                      <th className="px-5 py-4">Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredSales.slice(0, 5).map((sale: any) => (
-                      <tr key={sale.id}>
-                        <td className="px-5 py-4 text-sm text-slate-700">#{sale.id}</td>
-                        <td className="px-5 py-4 text-sm text-slate-900">{sale.customer?.name || 'Клиент'}</td>
-                        <td className="px-5 py-4 text-sm text-slate-900">{formatMoney(sale.netAmount || 0)}</td>
-                        <td className="px-5 py-4">
-                          <span className={card('rounded-xl px-3 py-1.5 text-sm', statusTone(sale.status))}>
-                            {statusLabel(sale.status)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {!filteredSales.length && (
-                      <tr>
-                        <td colSpan={4} className="px-5 py-16 text-center text-sm text-slate-400">
-                          Нет недавних продаж
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
+          <section className="grid gap-4">
             <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <h2 className="text-2xl font-semibold text-slate-900">Товары с низким остатком</h2>
@@ -672,9 +694,12 @@ export default function DashboardView() {
                   <ChevronRight size={16} />
                 </button>
               </div>
-              <div className="space-y-3 p-4 sm:hidden">
-                {filteredLowStock.slice(0, 5).map((item: any) => {
-                  const outOfStock = Number(item.stock || 0) <= 0;
+              <div className={filteredLowStock.length > 5 ? 'max-h-[640px] space-y-3 overflow-y-auto p-4 sm:hidden' : 'space-y-3 p-4 sm:hidden'}>
+                {filteredLowStock.map((item: any) => {
+                  const stockValue = Number(item.stock || 0);
+                  const outOfStock = stockValue <= 0;
+                  const isCriticalLowStock = stockValue > 0 && stockValue < 10;
+                  const warehouseLabel = getWarehouseLabel(item);
                   return (
                     <div key={item.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-start gap-3">
@@ -683,7 +708,7 @@ export default function DashboardView() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="break-words text-sm font-medium leading-5 text-slate-900">{item.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{item.category?.name || 'Без категории'}</p>
+                          <p className="mt-1 text-xs font-medium text-sky-600">{warehouseLabel}</p>
                         </div>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -696,11 +721,15 @@ export default function DashboardView() {
                           <span
                             className={card(
                               'mt-1 inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs',
-                              outOfStock ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                              outOfStock
+                                ? 'bg-rose-100 text-rose-700'
+                                : isCriticalLowStock
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-amber-100 text-amber-700'
                             )}
                           >
                             <AlertTriangle size={13} />
-                            <span>{outOfStock ? 'Нет в наличии' : 'Низкий остаток'}</span>
+                            <span>{outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}</span>
                           </span>
                         </div>
                       </div>
@@ -713,19 +742,22 @@ export default function DashboardView() {
                   </div>
                 )}
               </div>
-              <div className="hidden overflow-x-auto sm:block">
+              <div className={filteredLowStock.length > 5 ? 'hidden max-h-[420px] overflow-y-auto sm:block' : 'hidden overflow-x-auto sm:block'}>
                 <table className="w-full text-left">
                   <thead className="bg-[#f4f5fb] text-sm text-slate-500">
                     <tr>
                       <th className="px-5 py-4">Товар</th>
-                      <th className="px-5 py-4">Категория</th>
+                      <th className="px-5 py-4">Склад</th>
                       <th className="px-5 py-4">Остаток</th>
                       <th className="px-5 py-4">Статус</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredLowStock.slice(0, 5).map((item: any) => {
-                      const outOfStock = Number(item.stock || 0) <= 0;
+                    {filteredLowStock.map((item: any) => {
+                      const stockValue = Number(item.stock || 0);
+                      const outOfStock = stockValue <= 0;
+                      const isCriticalLowStock = stockValue > 0 && stockValue < 10;
+                      const warehouseLabel = getWarehouseLabel(item);
                       return (
                         <tr key={item.id}>
                           <td className="px-5 py-4">
@@ -736,7 +768,7 @@ export default function DashboardView() {
                               <span className="break-words text-[12px] leading-4 text-slate-900">{item.name}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-sm text-slate-500">{item.category?.name || 'Без категории'}</td>
+                          <td className="px-5 py-4 text-sm text-sky-600">{warehouseLabel}</td>
                           <td className="px-5 py-4 text-sm text-slate-900">
                             {item.stock} {item.unit}
                           </td>
@@ -744,11 +776,15 @@ export default function DashboardView() {
                             <span
                               className={card(
                                 'inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm',
-                                outOfStock ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                                outOfStock
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : isCriticalLowStock
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-amber-100 text-amber-700'
                               )}
                             >
                               <AlertTriangle size={14} />
-                              <span>{outOfStock ? 'Нет в наличии' : 'Низкий остаток'}</span>
+                              <span>{outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}</span>
                             </span>
                           </td>
                         </tr>

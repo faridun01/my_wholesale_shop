@@ -9,6 +9,16 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const normalizeAddressLine = (value: unknown) =>
+  String(value ?? '')
+    .split(/\r?\n/g)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(', ')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 interface SalesInvoicePrintOptions {
   invoice: any;
   statusLabel: string;
@@ -37,7 +47,7 @@ export function printSalesInvoice({
 
   const customerName = invoice.customer_name || 'Обычный клиент';
   const customerPhone = invoice.customer_phone || '';
-  const customerAddress = invoice.customer_address || '';
+  const customerAddress = normalizeAddressLine(invoice.customer_address || '');
   const sellerRegionLine = [invoice.company_country, invoice.company_region].filter(Boolean).join(', ');
   const sellerCityLine = [invoice.company_city, invoice.company_address].filter(Boolean).join(', ');
 

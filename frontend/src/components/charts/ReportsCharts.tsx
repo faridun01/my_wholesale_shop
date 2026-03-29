@@ -84,7 +84,7 @@ export default function ReportsCharts({
   const Panel = panel;
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
+    <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
       <Panel title={currentMeta.chartTitle}>
         <div className="h-[320px]">
           <ResponsiveContainer width="100%" height="100%">

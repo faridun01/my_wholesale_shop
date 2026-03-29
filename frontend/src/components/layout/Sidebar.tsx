@@ -154,7 +154,6 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
               <>
                 <div className="min-w-0 flex-1">
                   <div className="text-[16px] font-semibold leading-[1.1] tracking-tight text-white">Оптовая торговля</div>
-                  <div className="mt-0.5 text-[9px] uppercase tracking-[0.14em] text-[#7e90a7]">Панель управления</div>
                 </div>
 
                 <button

@@ -192,6 +192,7 @@ function Panel({
 
 export default function ReportsView({ warehouseId: initialWarehouseId = null }: ReportsViewProps) {
   const detailPageSize = 15;
+  const productProfitPageSize = 15;
   const today = new Date();
   const [reportType, setReportType] = useState<ReportType>('sales');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initialWarehouseId?.toString() || '');
@@ -199,6 +200,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const [dateRange, setDateRange] = useState(() => getMonthRange(today.getFullYear(), today.getMonth()));
   const [reportData, setReportData] = useState<ReportRow[]>([]);
   const [detailPage, setDetailPage] = useState(1);
+  const [productProfitPage, setProductProfitPage] = useState(1);
 
   const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = user.role === 'admin' || user.role === 'ADMIN' || user.role === 'MANAGER';
@@ -244,6 +246,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
   useEffect(() => {
     setDetailPage(1);
+  }, [dateRange, reportType, selectedWarehouseId]);
+
+  useEffect(() => {
+    setProductProfitPage(1);
   }, [dateRange, reportType, selectedWarehouseId]);
 
   useEffect(() => {
@@ -373,6 +379,17 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       }, [])
       .sort((a, b) => b.profit - a.profit);
   }, [reportData, reportType]);
+  const productProfitTotalPages = Math.max(1, Math.ceil(productProfitData.length / productProfitPageSize));
+  const paginatedProductProfitRows = productProfitData.slice(
+    (productProfitPage - 1) * productProfitPageSize,
+    productProfitPage * productProfitPageSize,
+  );
+
+  useEffect(() => {
+    if (productProfitPage > productProfitTotalPages) {
+      setProductProfitPage(productProfitTotalPages);
+    }
+  }, [productProfitPage, productProfitTotalPages]);
 
   const buildReportRows = (rows: ReportRow[]) => {
     const detailHeaders =
@@ -642,7 +659,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <p className={`text-sm ${currentMeta.text}`}>Аналитика</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Отчёты</h1>
+            <h1 className="text-4xl font-medium tracking-tight text-slate-900">Отчёты</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-500">{currentMeta.description}</p>
           </div>
 
@@ -777,7 +794,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {productProfitData.map((row) => (
+                {paginatedProductProfitRows.map((row) => (
                   <tr key={row.name} className="text-sm text-slate-700">
                     <td className="px-5 py-4 text-slate-900">{row.name}</td>
                     <td className="px-5 py-4">{formatCount(row.quantity)}</td>
@@ -796,6 +813,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               </tbody>
             </table>
           </div>
+          {productProfitData.length > productProfitPageSize && (
+            <PaginationControls
+              currentPage={productProfitPage}
+              totalPages={productProfitTotalPages}
+              totalItems={productProfitData.length}
+              pageSize={productProfitPageSize}
+              onPageChange={setProductProfitPage}
+              className="border-t-0"
+            />
+          )}
         </Panel>
       )}
 

@@ -26,7 +26,7 @@ const categories = ['Аренда', 'Зарплата', 'Доставка', 'Т�
 const todayValue = new Date().toISOString().slice(0, 10);
 
 export default function ExpensesView() {
-  const pageSize = 10;
+  const pageSize = 8;
   const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
@@ -421,7 +421,7 @@ export default function ExpensesView() {
               </form>
             </section>
 
-            <section className="overflow-hidden rounded-[24px] border border-slate-100 bg-white">
+            <section className="flex flex-col overflow-hidden rounded-[24px] border border-slate-100 bg-white">
               <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">История расходов</h2>
@@ -492,7 +492,7 @@ export default function ExpensesView() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto lg:overflow-x-visible">
+              <div className="flex-1 overflow-x-auto lg:overflow-x-visible">
                 <table className="min-w-full table-fixed">
                   <thead className="bg-slate-50 text-left text-[12px] text-slate-500">
                     <tr>
@@ -569,13 +569,16 @@ export default function ExpensesView() {
               </div>
 
               {filteredExpenses.length > pageSize && (
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredExpenses.length}
-                  pageSize={pageSize}
-                  onPageChange={setCurrentPage}
-                />
+                <div className="mt-auto border-t border-slate-100 bg-white">
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={filteredExpenses.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    className="border-t-0"
+                  />
+                </div>
               )}
             </section>
           </div>

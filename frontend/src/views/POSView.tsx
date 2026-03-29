@@ -219,10 +219,16 @@ export default function POSView() {
   const getCartPackaging = (item: CartItem) =>
     (Array.isArray(item.packagings) ? item.packagings : []).find((entry) => entry.id === item.selectedPackagingId) || null;
 
+  const getAvailableStockForCartItem = (item: CartItem) => {
+    const currentProduct = products.find((product) => product.id === item.id);
+    return Math.max(0, Math.floor(Number(currentProduct?.stock ?? item.stock ?? 0) || 0));
+  };
+
   const normalizeCartItem = (item: CartItem, overrides: Partial<CartItem> = {}) => {
     const merged = { ...item, ...overrides };
     const packaging = merged.packagings.find((entry) => entry.id === merged.selectedPackagingId) || null;
     const unitsPerPackage = packaging?.unitsPerPackage || 0;
+    const availableStock = getAvailableStockForCartItem(merged as CartItem);
     let packageQuantity = Math.max(0, Math.floor(Number(merged.packageQuantity || 0)));
     let extraUnitQuantity = Math.max(0, Math.floor(Number(merged.extraUnitQuantity || 0)));
 
@@ -232,31 +238,32 @@ export default function POSView() {
 
     let totalBaseUnits = packageQuantity * unitsPerPackage + extraUnitQuantity;
 
-    if (totalBaseUnits > merged.stock) {
+    if (totalBaseUnits > availableStock) {
       if (packaging && unitsPerPackage > 0) {
-        packageQuantity = Math.min(packageQuantity, Math.floor(merged.stock / unitsPerPackage));
-        extraUnitQuantity = Math.min(extraUnitQuantity, Math.max(0, merged.stock - packageQuantity * unitsPerPackage));
+        packageQuantity = Math.min(packageQuantity, Math.floor(availableStock / unitsPerPackage));
+        extraUnitQuantity = Math.min(extraUnitQuantity, Math.max(0, availableStock - packageQuantity * unitsPerPackage));
       } else {
-        extraUnitQuantity = Math.min(extraUnitQuantity, merged.stock);
+        extraUnitQuantity = Math.min(extraUnitQuantity, availableStock);
       }
 
       totalBaseUnits = packageQuantity * unitsPerPackage + extraUnitQuantity;
     }
 
     if (totalBaseUnits <= 0) {
-      if (packaging && unitsPerPackage > 0 && merged.stock >= unitsPerPackage) {
+      if (packaging && unitsPerPackage > 0 && availableStock >= unitsPerPackage) {
         packageQuantity = 1;
         extraUnitQuantity = 0;
         totalBaseUnits = unitsPerPackage;
       } else {
         packageQuantity = 0;
-        extraUnitQuantity = Math.min(Math.max(1, extraUnitQuantity), Math.max(merged.stock, 1));
+        extraUnitQuantity = Math.min(Math.max(1, extraUnitQuantity), Math.max(availableStock, 1));
         totalBaseUnits = extraUnitQuantity;
       }
     }
 
     return {
       ...merged,
+      stock: availableStock,
       selectedPackagingId: packaging?.id ?? null,
       packageQuantity,
       extraUnitQuantity,
@@ -736,6 +743,17 @@ export default function POSView() {
       return;
     }
 
+    const overflowCartItem = cart.find((item) => {
+      const currentProduct = products.find((product) => product.id === item.id);
+      return !currentProduct || Number(item.quantity || 0) > Number(currentProduct.stock || 0);
+    });
+
+    if (overflowCartItem) {
+      const currentProduct = products.find((product) => product.id === overflowCartItem.id);
+      toast.error(`Нельзя продать больше остатка. Доступно: ${getProductStockLabel(currentProduct || overflowCartItem, overflowCartItem.baseUnitName || overflowCartItem.unit)}`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
 
@@ -826,7 +844,7 @@ export default function POSView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900">POS Терминал</h1>
+              <h1 className="text-4xl font-medium tracking-tight text-slate-900">POS Терминал</h1>
               <p className="mt-1 text-sm text-slate-500">Оформление продаж, выбор клиента и создание накладной.</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -918,7 +936,8 @@ export default function POSView() {
                   )}
                 </div>
 
-                <div className="hidden grid-cols-[minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500 md:grid">
+                <div className="hidden grid-cols-[52px_minmax(0,1.7fr)_90px_110px_110px] bg-sky-50 px-5 py-4 text-sm text-slate-500 md:grid">
+                  <div className="text-center">№</div>
                   <div>Товар</div>
                   <div className="text-center">Остаток</div>
                   <div className="text-center">Цена</div>
@@ -927,12 +946,13 @@ export default function POSView() {
 
                 <div ref={productListRef} className="h-[560px] overflow-y-auto">
                   <div className="space-y-3 p-3 md:hidden">
-                    {filteredProducts.map((product) => {
+                    {filteredProducts.map((product, index) => {
                       const stockParts = getProductStockParts(product, product.unit);
 
                       return (
                       <div key={`mobile-pos-${product.id}`} className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm">
                         <div className="min-w-0">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-500">#{index + 1}</p>
                           <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
                         </div>
 
@@ -964,14 +984,16 @@ export default function POSView() {
                     )})}
                   </div>
 
-                  {filteredProducts.map((product) => {
+                  {filteredProducts.map((product, index) => {
                     const stockParts = getProductStockParts(product, product.unit);
 
                     return (
                     <div
                       key={product.id}
-                      className="hidden grid-cols-[minmax(0,1.7fr)_150px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 md:grid"
+                      className="hidden grid-cols-[52px_minmax(0,1.7fr)_150px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 md:grid"
                     >
+                      <div className="text-center text-sm font-semibold text-sky-600">{index + 1}</div>
+
                       <div className="min-w-0">
                         <p className="break-words text-[13px] leading-5 text-slate-900">{formatProductName(product.name)}</p>
                       </div>
@@ -1056,19 +1078,6 @@ export default function POSView() {
                     />
                     {isCustomerDropdownOpen && (
                       <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-60 overflow-y-auto rounded-2xl border border-emerald-100 bg-white p-2 shadow-xl">
-                        <button
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setCustomerId(null);
-                            setCustomerSearch('');
-                            setIsCustomerDropdownOpen(false);
-                          }}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-600 transition-colors hover:bg-emerald-50"
-                        >
-                          <span>Без названия</span>
-                          <span className="text-xs text-slate-400">по умолчанию</span>
-                        </button>
                         {filteredCustomers.map((customer) => (
                           <button
                             key={customer.id}

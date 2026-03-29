@@ -5,17 +5,16 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
-  Filter,
   Pencil,
   Plus,
   Search,
-  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import client from '../api/client';
+import PaginationControls from '../components/common/PaginationControls';
 import { getCurrentUser, isAdminUser } from '../utils/userAccess';
 
 function clsx(...classes: Array<string | false | null | undefined>) {
@@ -127,6 +126,7 @@ function getTypeMeta(type?: string | null) {
 }
 
 export default function RemindersView() {
+  const reminderPageSize = 6;
   const currentUser = getCurrentUser();
   const canDeleteReminder = isAdminUser(currentUser);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
@@ -135,8 +135,9 @@ export default function RemindersView() {
   const [selectedReminder, setSelectedReminder] = useState<ReminderItem | null>(null);
   const [reminderForm, setReminderForm] = useState<ReminderFormState>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTab, setFilterTab] = useState<'all' | 'today' | 'overdue' | 'completed'>('all');
+  const [filterTab, setFilterTab] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [activeMonth, setActiveMonth] = useState(() => startOfDay(new Date()));
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchReminders = async () => {
     try {
@@ -246,6 +247,21 @@ export default function RemindersView() {
       .sort((a, b) => parseReminderDate(a.dueDate || a.createdAt || '').getTime() - parseReminderDate(b.dueDate || b.createdAt || '').getTime());
   }, [filterTab, now, reminders, searchTerm]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredReminders.length / reminderPageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterTab]);
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
+
+  const paginatedReminders = useMemo(() => {
+    const startIndex = (currentPage - 1) * reminderPageSize;
+    return filteredReminders.slice(startIndex, startIndex + reminderPageSize);
+  }, [currentPage, filteredReminders]);
+
   const groupedReminders = useMemo(() => {
     const groups = {
       overdue: [] as ReminderItem[],
@@ -258,6 +274,19 @@ export default function RemindersView() {
     });
     return groups;
   }, [filteredReminders, now]);
+
+  const paginatedGroupedReminders = useMemo(() => {
+    const groups = {
+      overdue: [] as ReminderItem[],
+      today: [] as ReminderItem[],
+      upcoming: [] as ReminderItem[],
+      completed: [] as ReminderItem[],
+    };
+    paginatedReminders.forEach((reminder) => {
+      groups[getReminderBucket(reminder, now)].push(reminder);
+    });
+    return groups;
+  }, [now, paginatedReminders]);
 
   const stats = useMemo(() => {
     const completed = reminders.filter((item) => item.isCompleted).length;
@@ -278,10 +307,10 @@ export default function RemindersView() {
   const activeMonthLabel = activeMonth.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
 
   const sections = [
-    { key: 'overdue', title: 'Просрочено', items: groupedReminders.overdue, accent: 'text-rose-500' },
-    { key: 'today', title: 'Сегодня', items: groupedReminders.today, accent: 'text-slate-900' },
-    { key: 'upcoming', title: 'Предстоящие', items: groupedReminders.upcoming, accent: 'text-slate-900' },
-    { key: 'completed', title: 'Выполнены', items: groupedReminders.completed, accent: 'text-slate-400' },
+    { key: 'overdue', title: 'Просрочено', items: paginatedGroupedReminders.overdue, accent: 'text-rose-500' },
+    { key: 'today', title: 'Сегодня', items: paginatedGroupedReminders.today, accent: 'text-slate-900' },
+    { key: 'upcoming', title: 'Предстоящие', items: paginatedGroupedReminders.upcoming, accent: 'text-slate-900' },
+    { key: 'completed', title: 'Выполнены', items: paginatedGroupedReminders.completed, accent: 'text-slate-400' },
   ] as const;
 
   return (
@@ -289,7 +318,7 @@ export default function RemindersView() {
       <div className="w-full">
         <div className="overflow-hidden rounded-[28px] border border-[#dfe4ff] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-[#eceffd] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-7">
-            <h1 className="text-[34px] font-black tracking-[-0.03em] text-slate-900">Напоминания</h1>
+            <h1 className="text-4xl font-medium tracking-tight text-slate-900">Напоминания</h1>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative min-w-[250px]">
@@ -316,40 +345,51 @@ export default function RemindersView() {
           <div className="grid gap-5 bg-[#f8f9ff] p-5 md:p-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-5">
               <div className="rounded-[24px] border border-[#e7ebff] bg-white p-3 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
+                  <div className="grid min-w-0 grid-cols-5 gap-1 rounded-[20px] bg-[#f7f8ff] p-1">
                     {[
-                      { key: 'all', label: `Все (${reminders.length})` },
-                      { key: 'today', label: `Сегодня (${groupedReminders.today.length})` },
-                      { key: 'overdue', label: `Просрочены (${groupedReminders.overdue.length})` },
-                      { key: 'completed', label: `Выполнены (${groupedReminders.completed.length})` },
+                      { key: 'all', label: 'Все', count: reminders.length },
+                      { key: 'today', label: 'Сегодня', count: groupedReminders.today.length },
+                      { key: 'overdue', label: 'Просрочены', count: groupedReminders.overdue.length },
+                      { key: 'upcoming', label: 'Скоро', count: groupedReminders.upcoming.length },
+                      { key: 'completed', label: 'Выполнены', count: groupedReminders.completed.length },
                     ].map((tab) => (
                       <button
                         key={tab.key}
                         type="button"
                         onClick={() => setFilterTab(tab.key as typeof filterTab)}
                         className={clsx(
-                          'rounded-2xl px-4 py-2 text-sm font-semibold transition-all',
+                          'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-2 py-1.5 text-center text-[10px] font-bold leading-none transition-all',
                           filterTab === tab.key
-                            ? 'bg-[#f5f7ff] text-slate-900 shadow-sm ring-1 ring-[#e7ebff]'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
+                            ? 'bg-white text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.08)] ring-1 ring-[#dfe5ff]'
+                            : 'text-[#5d7190] hover:bg-white/80 hover:text-slate-900',
                         )}
                       >
-                        {tab.label}
+                        <span className="min-w-0 whitespace-nowrap">{tab.label}</span>
+                        <span
+                          className={clsx(
+                            'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-black leading-none',
+                            filterTab === tab.key ? 'bg-[#eef2ff] text-slate-900' : 'bg-white text-[#5d7190]',
+                          )}
+                        >
+                          {tab.count}
+                        </span>
                       </button>
                     ))}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-[#e7ebff] bg-[#fbfcff] px-3 py-2 text-sm font-medium text-slate-500">
-                      <SlidersHorizontal size={14} />
-                      Сортировка
+                  {filteredReminders.length > reminderPageSize && (
+                    <div className="overflow-hidden rounded-[20px] border border-[#e7ebff] bg-[#fbfcff] xl:flex-shrink-0">
+                      <PaginationControls
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filteredReminders.length}
+                        pageSize={reminderPageSize}
+                        onPageChange={setCurrentPage}
+                        className="border-t-0 bg-transparent px-2.5 py-2 sm:px-2.5 sm:py-2 xl:flex-row xl:items-center xl:justify-end xl:gap-2 xl:[&>p]:hidden xl:[&>div]:flex-nowrap xl:[&>div]:gap-1 xl:[&>div>button]:h-8 xl:[&>div>button]:rounded-xl xl:[&>div>button]:px-2 xl:[&>div>button]:text-[11px] xl:[&>div>div>button]:h-8 xl:[&>div>div>button]:min-w-[1.9rem] xl:[&>div>div>button]:rounded-xl xl:[&>div>div>button]:px-2 xl:[&>div>div>button]:text-[11px]"
+                      />
                     </div>
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-[#e7ebff] bg-[#fbfcff] px-3 py-2 text-sm font-medium text-slate-500">
-                      <Filter size={14} />
-                      Фильтр
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -479,11 +519,12 @@ export default function RemindersView() {
                       <p className="mt-1 text-sm text-slate-500">Попробуйте сменить фильтр или создайте новое напоминание.</p>
                     </div>
                   )}
+
                 </div>
               )}
             </div>
 
-            <div className="space-y-5">
+            <div className="flex h-full flex-col gap-5">
               <div className="rounded-[24px] border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
                 <div className="mb-4 flex items-center justify-between">
                 <h3 className="break-words text-[clamp(1.65rem,2.2vw,1.95rem)] font-bold leading-tight tracking-[-0.03em] text-slate-900">
@@ -573,11 +614,11 @@ export default function RemindersView() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
+              <div className="mt-auto rounded-[24px] border border-[#e7ebff] bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-5">
                 <h3 className="break-words text-[clamp(1.65rem,2.1vw,1.95rem)] font-bold leading-tight tracking-[-0.03em] text-slate-900">Категории</h3>
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2.5">
                   {Object.entries(TYPE_META).map(([key, meta]) => (
-                    <div key={key} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3">
+                    <div key={key} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2.5">
                       <div className="flex items-center gap-3">
                         <span className={clsx('flex h-8 w-8 items-center justify-center rounded-xl', meta.iconTone)}>
                           <Calendar size={14} />

@@ -74,7 +74,6 @@ const Layout = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-semibold leading-none tracking-tight">Оптовая торговля</span>
-              <span className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-shopify-muted">Панель управления</span>
             </div>
           </div>
           <button

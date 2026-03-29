@@ -113,6 +113,20 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       prisma.product.findMany({
         where: { ...productWhere, stock: { lte: 10 } },
         take: 5,
+        select: {
+          id: true,
+          name: true,
+          stock: true,
+          unit: true,
+          warehouseId: true,
+          warehouse: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+            },
+          },
+        },
       }),
       prisma.invoice.findMany({
         where: invoiceWhere,

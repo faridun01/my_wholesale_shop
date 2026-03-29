@@ -33,7 +33,7 @@ import {
 } from '../utils/money';
 import { getProductBatches } from '../api/products.api';
 import { getWarehouses } from '../api/warehouses.api';
-import { getSettingsCategories } from '../api/settings-reference.api';
+import { createSettingsCategory, getSettingsCategories } from '../api/settings-reference.api';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
@@ -99,7 +99,7 @@ const detectCategoryName = (name: string) => {
   if (normalized.includes('чистящее средство')) return 'Чистящие средства';
 
   const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  return words.slice(0, 2).join(' ') || 'Прочее';
+  return words.slice(0, 2).join(' ');
 };
 
 const normalizeOcrBaseUnit = (value: string) => {
@@ -231,6 +231,52 @@ const getStockBreakdown = (product: any) => {
   };
 };
 
+const getStockSortMetrics = (product: any) => {
+  const totalUnits = Number(product?.stock || 0);
+  const preferredPackaging = getPreferredPackaging(product);
+  const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 0);
+
+  if (!preferredPackaging || unitsPerPackage <= 1) {
+    return {
+      packageCount: totalUnits,
+      remainderUnits: 0,
+      totalUnits,
+    };
+  }
+
+  return {
+    packageCount: Math.floor(totalUnits / unitsPerPackage),
+    remainderUnits: totalUnits % unitsPerPackage,
+    totalUnits,
+  };
+};
+
+const compareValues = (aValue: any, bValue: any, direction: 'asc' | 'desc') => {
+  if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+  if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+  return 0;
+};
+
+const compareProductsBySort = (a: any, b: any, sortConfig: { key: string; direction: 'asc' | 'desc' | null }) => {
+  if (!sortConfig.direction) return 0;
+  const numericSortKeys = new Set(['costPrice', 'sellingPrice', 'stock', 'totalIncoming', 'minStock', 'initialStock']);
+
+  if (sortConfig.key === 'stock') {
+    const aStock = getStockSortMetrics(a);
+    const bStock = getStockSortMetrics(b);
+
+    return (
+      compareValues(aStock.packageCount, bStock.packageCount, sortConfig.direction) ||
+      compareValues(aStock.remainderUnits, bStock.remainderUnits, sortConfig.direction) ||
+      compareValues(aStock.totalUnits, bStock.totalUnits, sortConfig.direction)
+    );
+  }
+
+  const aValue = numericSortKeys.has(sortConfig.key) ? Number(a[sortConfig.key] || 0) : a[sortConfig.key];
+  const bValue = numericSortKeys.has(sortConfig.key) ? Number(b[sortConfig.key] || 0) : b[sortConfig.key];
+  return compareValues(aValue, bValue, sortConfig.direction);
+};
+
 const getOcrResolvedQuantity = (item: any) => {
   const packageCount = Number(item?.packageCount || 0);
   const unitsPerPackage = Number(item?.unitsPerPackage || 0);
@@ -350,6 +396,7 @@ export default function ProductsView() {
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isReferenceDataReady, setIsReferenceDataReady] = useState(false);
+  const [categoryInput, setCategoryInput] = useState('');
   const ocrRowRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
   const emptyTransferData = {
     fromWarehouseId: '',
@@ -517,7 +564,9 @@ export default function ProductsView() {
 
     const suggestedCategoryName = detectCategoryName(formData.name);
     const suggestedCategory = categories.find(
-      (category) => String(category.name || '').trim().toLowerCase() === suggestedCategoryName.trim().toLowerCase()
+      (category) =>
+        String(category.name || '').trim().toLowerCase() === suggestedCategoryName.trim().toLowerCase() &&
+        String(category.name || '').trim().toLowerCase() !== 'прочее'
     );
 
     setFormData((prev) => {
@@ -531,7 +580,19 @@ export default function ProductsView() {
         categoryId: nextCategoryId,
       };
     });
+    setCategoryInput(suggestedCategory?.name || '');
   }, [categories, formData.name, isCategoryManual, showAddModal, showEditModal]);
+
+  useEffect(() => {
+    if ((!showAddModal && !showEditModal) || categoryInput.trim()) {
+      return;
+    }
+
+    const selectedCategory = categories.find((category) => String(category?.id) === String(formData.categoryId || ''));
+    if (selectedCategory?.name) {
+      setCategoryInput(String(selectedCategory.name));
+    }
+  }, [categories, categoryInput, formData.categoryId, showAddModal, showEditModal]);
 
   useEffect(() => {
     const hasOpenModal =
@@ -1041,12 +1102,40 @@ export default function ProductsView() {
       e.target.value = '';
     }
   };
+
+  const resolveCategoryIdForSubmit = async () => {
+    const typedCategoryName = String(categoryInput || '').trim();
+    const existingCategory = visibleCategories.find(
+      (category) => String(category?.name || '').trim().toLowerCase() === typedCategoryName.toLowerCase()
+    );
+
+    if (existingCategory?.id) {
+      return Number(existingCategory.id);
+    }
+
+    if (formData.categoryId) {
+      return Number(formData.categoryId);
+    }
+
+    if (!typedCategoryName) {
+      throw new Error('Укажите категорию');
+    }
+
+    const createdCategory = await createSettingsCategory(typedCategoryName);
+    const nextCategories = [...categories, createdCategory];
+    setCategories(nextCategories);
+    setCategoryInput(String(createdCategory?.name || typedCategoryName));
+    setFormData((prev) => ({ ...prev, categoryId: String(createdCategory?.id || '') }));
+    return Number(createdCategory.id);
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const categoryId = await resolveCategoryIdForSubmit();
       await createProduct({
         ...formData,
-        categoryId: Number(formData.categoryId),
+        categoryId,
         warehouseId: Number(formData.warehouseId),
         costPrice: roundMoney(formData.costPrice),
         purchaseCostPrice: roundMoney(formData.costPrice),
@@ -1068,9 +1157,10 @@ export default function ProductsView() {
     e.preventDefault();
     if (!selectedProduct) return;
     try {
+      const categoryId = await resolveCategoryIdForSubmit();
       await updateProduct(selectedProduct.id, {
         ...formData,
-        categoryId: Number(formData.categoryId),
+        categoryId,
         warehouseId: Number(formData.warehouseId),
         costPrice: roundMoney(formData.costPrice),
         purchaseCostPrice: roundMoney(formData.costPrice),
@@ -1231,6 +1321,7 @@ export default function ProductsView() {
       initialStock: '0',
       photoUrl: ''
     });
+    setCategoryInput('');
     setIsCategoryManual(false);
     setSelectedProduct(null);
   };
@@ -1246,12 +1337,7 @@ export default function ProductsView() {
   };
 
   const sortedProducts = [...products].sort((a, b) => {
-    if (!sortConfig.direction) return 0;
-    const aValue = numericSortKeys.has(sortConfig.key) ? Number(a[sortConfig.key] || 0) : a[sortConfig.key];
-    const bValue = numericSortKeys.has(sortConfig.key) ? Number(b[sortConfig.key] || 0) : b[sortConfig.key];
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
+    return compareProductsBySort(a, b, sortConfig);
   });
 
   const aggregatedProducts: any[] = Object.values(
@@ -1281,12 +1367,7 @@ export default function ProductsView() {
   );
 
   const sortedAggregatedProducts = [...aggregatedProducts].sort((a, b) => {
-    if (!sortConfig.direction) return 0;
-    const aValue = numericSortKeys.has(sortConfig.key) ? Number(a[sortConfig.key] || 0) : a[sortConfig.key];
-    const bValue = numericSortKeys.has(sortConfig.key) ? Number(b[sortConfig.key] || 0) : b[sortConfig.key];
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
+    return compareProductsBySort(a, b, sortConfig);
   });
 
   const baseProducts = selectedWarehouseId ? sortedProducts : sortedAggregatedProducts;
@@ -1318,7 +1399,7 @@ export default function ProductsView() {
       .map((group) =>
         [...group].sort(
           (a, b) =>
-            Number(b.stock || 0) - Number(a.stock || 0) ||
+            compareProductsBySort(a, b, { key: 'stock', direction: 'desc' }) ||
             Number(b.totalIncoming || 0) - Number(a.totalIncoming || 0) ||
             Number(a.id || 0) - Number(b.id || 0),
         ),
@@ -1352,6 +1433,10 @@ export default function ProductsView() {
   const duplicateProductsCount = React.useMemo(
     () => duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0),
     [duplicateGroups],
+  );
+  const visibleCategories = React.useMemo(
+    () => categories.filter((category) => String(category?.name || '').trim().toLowerCase() !== 'прочее'),
+    [categories],
   );
   const totalPages = Math.max(1, Math.ceil(displayProducts.length / pageSize));
   const paginatedProducts = React.useMemo(
@@ -1401,7 +1486,7 @@ export default function ProductsView() {
       <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">Товары</h1>
+          <h1 className="text-4xl font-medium tracking-tight text-slate-900">Товары</h1>
           <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
@@ -1478,9 +1563,9 @@ export default function ProductsView() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={(e) => e.stopPropagation()}
-                className="flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-2xl"
+                className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-2xl"
             >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-3.5 sm:p-4">
                 <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
                   <div className="p-2 bg-violet-500 text-white rounded-xl">
                     <Package size={20} />
@@ -1491,8 +1576,8 @@ export default function ProductsView() {
                   <X size={20} />
                 </button>
               </div>
-                <form onSubmit={showEditModal ? handleEditProduct : handleAddProduct} className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={showEditModal ? handleEditProduct : handleAddProduct} className="flex-1 space-y-3 overflow-y-auto p-3.5 sm:p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="md:col-span-2">
                     <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Название товара</label>
                     <input 
@@ -1503,7 +1588,7 @@ export default function ProductsView() {
                         setIsCategoryManual(false);
                         setFormData({...formData, name: e.target.value});
                       }}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
                       placeholder="Напр: iPhone 15 Pro Max"
                     />
                   </div>
@@ -1514,26 +1599,39 @@ export default function ProductsView() {
                       required
                       value={formData.unit}
                       onChange={e => setFormData({...formData, unit: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
                       placeholder="шт, кг, литр..."
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Категория</label>
-                    <select 
+                    <input
+                      list="product-categories"
                       required
-                      value={formData.categoryId}
-                      onChange={e => {
-                        setIsCategoryManual(Boolean(e.target.value));
-                        setFormData({...formData, categoryId: e.target.value});
+                      value={categoryInput}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        const matchedCategory = visibleCategories.find(
+                          (category) => String(category?.name || '').trim().toLowerCase() === nextValue.trim().toLowerCase()
+                        );
+
+                        setIsCategoryManual(Boolean(nextValue.trim()));
+                        setCategoryInput(nextValue);
+                        setFormData({
+                          ...formData,
+                          categoryId: matchedCategory?.id ? String(matchedCategory.id) : '',
+                        });
                       }}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm appearance-none bg-white"
-                    >
-                      <option value="">Выберите категорию</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                      placeholder="Выберите или введите категорию"
+                    />
+                    <datalist id="product-categories">
+                      {visibleCategories.map((category) => (
+                        <option key={category.id} value={category.name} />
+                      ))}
+                    </datalist>
                     <p className="mt-1 text-[11px] font-medium text-slate-400">
-                      Категория подставляется автоматически по названию, при необходимости можно выбрать вручную.
+                      Можно выбрать из списка или сразу ввести новую категорию здесь же.
                     </p>
                   </div>
                   <div>
@@ -1542,7 +1640,7 @@ export default function ProductsView() {
                       required
                       value={formData.warehouseId}
                       onChange={e => setFormData({...formData, warehouseId: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm appearance-none bg-white"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
                     >
                       <option value="">Выберите склад</option>
                       {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -1558,7 +1656,7 @@ export default function ProductsView() {
                         value={formData.costPrice}
                         onChange={e => setFormData({...formData, costPrice: e.target.value})}
                         onBlur={e => setFormData({...formData, costPrice: formatPriceInput(e.target.value)})}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
                       />
                       {!showEditModal && (
                         <p className="mt-2 text-xs font-medium text-slate-400">
@@ -1576,7 +1674,7 @@ export default function ProductsView() {
                         min="0"
                         value={formData.expensePercent}
                         onChange={e => setFormData({...formData, expensePercent: e.target.value})}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm"
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
                       />
                     </div>
                   )}
@@ -1589,7 +1687,7 @@ export default function ProductsView() {
                       value={formData.sellingPrice}
                       onChange={e => setFormData({...formData, sellingPrice: e.target.value})}
                       onBlur={e => setFormData({...formData, sellingPrice: formatPriceInput(e.target.value)})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
+                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
                     />
                   </div>
                   {!showEditModal && (
@@ -1601,7 +1699,7 @@ export default function ProductsView() {
                           required
                           value={formData.initialStock}
                           onChange={e => setFormData({...formData, initialStock: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
                         />
                       </div>
                       <div>
@@ -2549,6 +2647,7 @@ export default function ProductsView() {
                         initialStock: product.initialStock?.toString() || '0',
                         photoUrl: product.photoUrl || ''
                       });
+                      setCategoryInput(product.category?.name || '');
                       setShowEditModal(true);
                     }}
                     className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold text-violet-700"
@@ -2767,6 +2866,7 @@ export default function ProductsView() {
                                 initialStock: product.initialStock?.toString() || '0',
                                 photoUrl: product.photoUrl || ''
                               });
+                              setCategoryInput(product.category?.name || '');
                               setShowEditModal(true);
                             }}
                             className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 

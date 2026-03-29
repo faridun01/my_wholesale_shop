@@ -267,7 +267,7 @@ export default function CatalogView() {
         <div className="space-y-4 px-3 py-4 sm:px-5 sm:py-5 lg:space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Каталог</h1>
+              <h1 className="text-4xl font-medium tracking-tight text-slate-900">Каталог</h1>
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 Просмотр товаров и добавление позиций в корзину продаж.
               </p>

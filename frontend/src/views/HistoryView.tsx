@@ -61,7 +61,7 @@ export default function HistoryView() {
       <div className="w-full space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">История</h1>
+          <h1 className="text-4xl font-medium tracking-tight text-slate-900">История</h1>
           <p className="text-slate-500 mt-1 font-medium">Лог всех складских операций.</p>
         </div>
         <button 
