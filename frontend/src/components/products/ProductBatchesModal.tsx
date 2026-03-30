@@ -132,7 +132,7 @@ export default function ProductBatchesModal({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[94vh] w-full max-w-[58rem] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2rem]"
+            className="flex max-h-[94vh] w-full max-w-232 flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-4xl"
           >
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-violet-50/50 p-5 sm:p-6">
               <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">

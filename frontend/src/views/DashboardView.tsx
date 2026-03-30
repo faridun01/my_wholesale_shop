@@ -425,7 +425,7 @@ export default function DashboardView() {
   const showSearchDropdown = searchQuery.length > 0;
 
   const recentSalesPanel = (
-    <div className="overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
+    <div className="overflow-hidden rounded-3xl border border-white bg-white shadow-sm">
       <div className="border-b border-slate-200 px-6 py-5">
         <h2 className="text-2xl font-semibold text-slate-900">Последние продажи</h2>
       </div>

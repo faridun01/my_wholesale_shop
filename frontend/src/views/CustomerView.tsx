@@ -528,7 +528,7 @@ export default function CustomerView() {
           <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 2xl:grid-cols-3">
             {paginatedCustomers.map((customer) => (
               <motion.div layout key={customer.id} className="h-full">
-                <Card className="flex h-full flex-col rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
+                <Card className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
                   <div className="mb-6 flex items-start justify-between">
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 transition-colors duration-300 group-hover:bg-sky-500 group-hover:text-white">
                       <User size={28} strokeWidth={2.2} />
@@ -567,7 +567,7 @@ export default function CustomerView() {
                     </div>
                   </div>
 
-                  <h3 className="mb-3 break-words text-xl font-medium leading-7 text-slate-900">{customer.name}</h3>
+                  <h3 className="mb-3 wrap-break-word text-xl font-medium leading-7 text-slate-900">{customer.name}</h3>
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
                       {customer.customer_segment || 'Новый'}
@@ -653,7 +653,7 @@ export default function CustomerView() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
+                className="relative flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-10 sm:py-8">
                   <h2 className="text-2xl font-medium tracking-tight text-slate-900">
@@ -753,7 +753,7 @@ export default function CustomerView() {
                   <div className="space-y-2">
                     <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Заметки</label>
                     <textarea
-                      className="min-h-[100px] w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      className="min-h-25 w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     />
@@ -781,7 +781,7 @@ export default function CustomerView() {
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 50, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[3rem]"
+                className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[3rem]"
               >
                 <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-10 sm:py-10">
                   <div className="mb-5 flex items-start justify-between gap-4 sm:mb-6">
@@ -821,7 +821,7 @@ export default function CustomerView() {
                       <div
                         key={invoice.id}
                         onClick={() => openInvoiceDetails(invoice)}
-                        className="flex cursor-pointer flex-col items-start gap-4 rounded-[24px] bg-slate-50 p-4 transition-colors hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between md:rounded-3xl md:p-6"
+                        className="flex cursor-pointer flex-col items-start gap-4 rounded-3xl bg-slate-50 p-4 transition-colors hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between md:rounded-3xl md:p-6"
                       >
                         <div className="flex w-full min-w-0 items-center space-x-4 md:space-x-6">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 md:h-14 md:w-14">
@@ -873,7 +873,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isInvoiceDetailsOpen && selectedInvoice && (
-            <div className="fixed inset-0 z-[60] flex items-end justify-center p-3 sm:items-center sm:p-6">
+            <div className="fixed inset-0 z-60 flex items-end justify-center p-3 sm:items-center sm:p-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -885,7 +885,7 @@ export default function CustomerView() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
+                className="relative flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
                   <h3 className="text-2xl font-medium text-slate-900">Накладная #{selectedInvoice.id}</h3>
