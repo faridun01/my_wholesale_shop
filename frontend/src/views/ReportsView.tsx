@@ -15,7 +15,7 @@ interface ReportsViewProps {
   warehouseId?: number | null;
 }
 
-type ReportType = 'sales' | 'profit' | 'returns';
+type ReportType = 'sales' | 'profit' | 'returns' | 'writeoffs';
 
 type ReportRow = {
   date: string;
@@ -164,6 +164,17 @@ const reportMeta: Record<
     badge: 'bg-rose-100',
     text: 'text-rose-700',
   },
+  writeoffs: {
+    title: 'Списания',
+    description: 'Складские списания по товарам, причинам и сотрудникам за выбранный период.',
+    chartTitle: 'Списания по датам',
+    pieTitle: 'Топ списываемых товаров',
+    accent: '#f59e0b',
+    soft: 'bg-amber-50',
+    border: 'border-amber-100',
+    badge: 'bg-amber-100',
+    text: 'text-amber-700',
+  },
 };
 
 function Panel({
@@ -271,7 +282,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           ? Number(row.total_sales || 0)
           : reportType === 'profit'
             ? Number(row.profit || 0)
-            : Number(row.quantity || 0);
+            : reportType === 'returns'
+              ? Number(row.quantity || 0)
+              : Number(row.total_value || 0);
 
       if (existing) {
         existing.value += value;
@@ -294,7 +307,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             ? Number(row.total_sales || 0)
             : reportType === 'profit'
               ? Number(row.profit || 0)
-              : Number(row.quantity || 0);
+              : reportType === 'returns'
+                ? Number(row.quantity || 0)
+                : Number(row.total_value || 0);
 
         if (existing) {
           existing.value += value;
@@ -317,6 +332,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
       if (reportType === 'profit') {
         return sum + Number(row.profit || 0);
+      }
+
+      if (reportType === 'writeoffs') {
+        return sum + Number(row.total_value || 0);
       }
 
       return sum + Number(row.quantity || 0);
@@ -346,7 +365,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       label: reportType === 'returns' ? 'Всего возвратов' : 'Сумма периода',
       value: reportType === 'returns' ? formatCount(summary.totalQuantity) : formatMoney(summary.totalValue),
       meta: `${summary.totalQuantity} шт`,
-      tone: reportType === 'returns' ? reportMeta.returns : reportType === 'profit' ? reportMeta.profit : reportMeta.sales,
+      tone: reportType === 'returns' ? reportMeta.returns : reportType === 'profit' ? reportMeta.profit : reportType === 'writeoffs' ? reportMeta.writeoffs : reportMeta.sales,
     },
   ];
 
@@ -397,7 +416,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         ? ['Дата', 'Накладная', 'Склад', 'Клиент', 'Товар', 'Ед.', 'Кол-во', 'Себестоимость за 1 шт', 'Цена продажи за 1 шт', 'Прибыль за 1 шт', 'Выручка', 'Общая прибыль']
         : reportType === 'profit'
           ? ['Дата', 'Накладная', 'Склад', 'Клиент', 'Товар', 'Ед.', 'Кол-во', 'Себестоимость за 1 шт', 'Цена продажи за 1 шт', 'Прибыль за 1 шт', 'Чистая выручка', 'Общая прибыль']
-          : ['Дата', 'Возврат', 'Склад', 'Сотрудник', 'Товар', 'Ед.', 'Кол-во', 'Цена продажи', 'Сумма возврата', 'Причина'];
+          : reportType === 'returns'
+            ? ['Дата', 'Возврат', 'Склад', 'Сотрудник', 'Товар', 'Ед.', 'Кол-во', 'Цена продажи', 'Сумма возврата', 'Причина']
+            : ['Дата', 'Склад', 'Сотрудник', 'Товар', 'Ед.', 'Кол-во', 'Себестоимость', 'Сумма списания', 'Причина'];
 
     const detailRows = rows.map((row) => {
       if (reportType === 'sales') {
@@ -442,6 +463,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         ];
       }
 
+      if (reportType === 'writeoffs') {
+        return [
+          new Date(row.date).toLocaleDateString('ru-RU'),
+          row.warehouse_name || '',
+          row.staff_name || '',
+          formatProductName(row.product_name),
+          normalizeDisplayBaseUnit(row.unit),
+          formatCount(row.quantity),
+          toFixedNumber(row.cost_price || 0),
+          toFixedNumber(row.total_value || 0),
+          row.reason || '',
+        ];
+      }
+
       return [
         new Date(row.date).toLocaleDateString('ru-RU'),
         row.return_id ? '#' + row.return_id : '',
@@ -468,6 +503,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
       if (reportType === 'profit') {
         return sum + Number(row.profit || 0);
+      }
+
+      if (reportType === 'writeoffs') {
+        return sum + Number(row.total_value || 0);
       }
 
       return sum + Number(row.quantity || 0);
@@ -519,6 +558,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         '',
         toFixedNumber(totalRevenue),
         toFixedNumber(totalProfit),
+      ];
+    }
+
+    if (reportType === 'writeoffs') {
+      return [
+        'ИТОГО',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        toFixedNumber(totalRevenue),
+        '',
       ];
     }
 
@@ -698,6 +751,12 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             >
               Возвраты
             </button>
+            <button
+              onClick={() => setReportType('writeoffs')}
+              className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${reportType === 'writeoffs' ? 'bg-amber-500 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              Списания
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -763,23 +822,25 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         </div>
       </section>
 
-      <React.Suspense
-        fallback={
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
-            <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
-            <ChartSkeleton variant="pie" heightClassName="h-[392px]" />
-          </section>
-        }
-      >
-        <ReportsCharts
-          chartData={chartData}
-          pieData={pieData}
-          reportType={reportType}
-          currentMeta={currentMeta}
-          pieColors={PIE_COLORS}
-          panel={Panel}
-        />
-      </React.Suspense>
+      {reportType !== 'writeoffs' && (
+        <React.Suspense
+          fallback={
+            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
+              <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
+              <ChartSkeleton variant="pie" heightClassName="h-[392px]" />
+            </section>
+          }
+        >
+          <ReportsCharts
+            chartData={chartData}
+            pieData={pieData}
+            reportType={reportType}
+            currentMeta={currentMeta}
+            pieColors={PIE_COLORS}
+            panel={Panel}
+          />
+        </React.Suspense>
+      )}
 
       {reportType === 'profit' && (
         <Panel title="Прибыль по товарам">
@@ -860,6 +921,15 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   </>
                 )}
                 {reportType === 'returns' && <th className="px-5 py-3">Причина</th>}
+                {reportType === 'writeoffs' && (
+                  <>
+                    <th className="px-5 py-3">Сумма</th>
+                    <th className="px-5 py-3">Причина</th>
+                    <th className="px-5 py-3">Сотрудник</th>
+                    <th className="px-5 py-3">Склад</th>
+                    <th className="px-5 py-3">Себест.</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -882,13 +952,22 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                     </>
                   )}
                   {reportType === 'returns' && <td className="px-5 py-4 italic text-rose-600">{row.reason || '-'}</td>}
+                  {reportType === 'writeoffs' && (
+                    <>
+                      <td className="px-5 py-4 text-amber-700">{formatMoney(row.total_value || 0)}</td>
+                      <td className="px-5 py-4 italic text-amber-700">{row.reason || '-'}</td>
+                      <td className="px-5 py-4">{row.staff_name || '-'}</td>
+                      <td className="px-5 py-4">{row.warehouse_name || '-'}</td>
+                      <td className="px-5 py-4">{toFixedNumber(row.cost_price || 0)}</td>
+                    </>
+                  )}
                 </tr>
               ))}
 
               {!reportData.length && (
                 <tr>
                   <td
-                    colSpan={reportType === 'profit' ? 6 : reportType === 'sales' ? 5 : 4}
+                    colSpan={reportType === 'profit' ? 6 : reportType === 'sales' ? 5 : reportType === 'returns' ? 4 : 8}
                     className="px-5 py-16 text-center text-sm text-slate-400"
                   >
                     Нет данных за выбранный период

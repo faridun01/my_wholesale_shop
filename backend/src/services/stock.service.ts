@@ -490,6 +490,92 @@ export class StockService {
     });
   }
 
+  static async writeOffStock(
+    productId: number,
+    warehouseId: number,
+    quantity: number,
+    userId: number,
+    reason: string
+  ) {
+    return prisma.$transaction(async (tx: any) => {
+      const product = await tx.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          warehouseId: true,
+          sellingPrice: true,
+        },
+      });
+
+      if (!product) {
+        throw new Error('Товар не найден');
+      }
+
+      if (Number(product.warehouseId) !== Number(warehouseId)) {
+        throw new Error('Списание можно выполнить только со склада этого товара');
+      }
+
+      const normalizedQuantity = Number(quantity || 0);
+      if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+        throw new Error('Количество для списания должно быть больше нуля');
+      }
+
+      const batches = await tx.productBatch.findMany({
+        where: {
+          productId,
+          warehouseId,
+          remainingQuantity: { gt: 0 },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      const totalAvailable = batches.reduce((sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0), 0);
+      if (totalAvailable < normalizedQuantity) {
+        throw new Error(`Недостаточно остатка для списания. Доступно: ${totalAvailable}, требуется: ${normalizedQuantity}`);
+      }
+
+      let remainingToWriteOff = normalizedQuantity;
+      let totalCost = 0;
+
+      for (const batch of batches) {
+        if (remainingToWriteOff <= 0) {
+          break;
+        }
+
+        const takeFromBatch = Math.min(Number(batch.remainingQuantity || 0), remainingToWriteOff);
+        totalCost += takeFromBatch * Number(batch.costPrice || 0);
+
+        await tx.productBatch.update({
+          where: { id: batch.id },
+          data: {
+            remainingQuantity: { decrement: takeFromBatch },
+          },
+        });
+
+        remainingToWriteOff -= takeFromBatch;
+      }
+
+      await tx.inventoryTransaction.create({
+        data: {
+          productId,
+          warehouseId,
+          userId,
+          qtyChange: -normalizedQuantity,
+          type: 'adjustment',
+          reason: `Списание: ${String(reason || '').trim() || 'служебное списание'}`,
+          costAtTime: normalizedQuantity > 0 ? totalCost / normalizedQuantity : 0,
+          sellingAtTime: Number(product.sellingPrice || 0),
+        },
+      });
+
+      await this.updateProductStockCache(productId, tx);
+
+      return { success: true };
+    });
+  }
+
   static async zeroBatchRemaining(batchId: number, userId: number) {
     return prisma.$transaction(async (tx: any) => {
       const batch = await tx.productBatch.findUnique({

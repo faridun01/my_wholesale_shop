@@ -782,6 +782,67 @@ router.post('/history/:transactionId/reverse-incoming', async (req: AuthRequest,
   }
 });
 
+router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Некорректный товар' });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, warehouseId: true, stock: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+
+    if (!ensureWarehouseAccess(access, product.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const quantity = Number(req.body.quantity || 0);
+    const reason = String(req.body.reason || '').trim();
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Количество для списания должно быть больше нуля' });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: 'Укажите причину списания' });
+    }
+
+    if (Number(product.stock || 0) < quantity) {
+      return res.status(400).json({ error: 'Недостаточно остатка для списания' });
+    }
+
+    if (!product.warehouseId) {
+      return res.status(400).json({ error: 'У товара не найден склад для списания' });
+    }
+
+    const result = await StockService.writeOffStock(
+      productId,
+      product.warehouseId,
+      quantity,
+      req.user!.id,
+      reason
+    );
+
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);

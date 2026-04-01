@@ -10,12 +10,13 @@ import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
 import { useMemo } from 'react';
 import { getCurrentUser, isAdminUser } from '../utils/userAccess';
-import { useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 interface Customer {
   id: number;
   customerType?: 'individual' | 'company';
   name: string;
+  customerCategory?: string;
   companyName?: string;
   contactName?: string;
   phone: string;
@@ -85,6 +86,7 @@ interface StatementInvoice {
 const emptyForm = {
   customerType: 'individual',
   name: '',
+  customerCategory: '',
   companyName: '',
   contactName: '',
   phone: '',
@@ -94,6 +96,12 @@ const emptyForm = {
   address: '',
   notes: '',
 };
+
+const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
+  [
+    'inline-flex items-center rounded-2xl px-4 py-2 text-sm font-medium transition-all',
+    isActive ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100',
+  ].join(' ');
 
 export default function CustomerView() {
   const location = useLocation();
@@ -114,6 +122,17 @@ export default function CustomerView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const PAYMENT_EPSILON = 0.01;
+  const customerCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          customers
+            .map((customer) => String(customer.customerCategory || '').trim())
+            .filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'ru')),
+    [customers],
+  );
   const formatMoneyByRole = (value: unknown, trimCurrency = false) => {
     if (!isAdmin) {
       return 'Скрыто';
@@ -194,6 +213,7 @@ export default function CustomerView() {
     const payload = {
       ...formData,
       name: formData.name.trim(),
+      customerCategory: formData.customerCategory.trim(),
       companyName: formData.companyName.trim(),
       contactName: formData.contactName.trim(),
       phone: formData.phone.trim(),
@@ -468,22 +488,33 @@ export default function CustomerView() {
     <div className="app-page-shell">
       <div className="w-full space-y-6">
         <div className="app-surface app-surface-header">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-4xl font-medium tracking-tight text-slate-900">Клиенты</h1>
-              <p className="mt-1 text-slate-500">Только накладные формируют историю операций и баланс клиента.</p>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h1 className="text-4xl font-medium tracking-tight text-slate-900">Клиенты</h1>
+                <p className="mt-1 text-slate-500">Только накладные формируют историю операций и баланс клиента.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setFormData(emptyForm);
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center justify-center space-x-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-800"
+              >
+                <Plus size={18} />
+                <span>Новый клиент</span>
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setSelectedCustomer(null);
-                setFormData(emptyForm);
-                setIsModalOpen(true);
-              }}
-              className="flex items-center justify-center space-x-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-800"
-            >
-              <Plus size={18} />
-              <span>Новый клиент</span>
-            </button>
+
+            <div className="flex flex-wrap gap-2 rounded-[24px] bg-slate-100 p-2">
+              <NavLink to="/customers" end className={sectionTabClassName}>
+                База клиентов
+              </NavLink>
+              <NavLink to="/customers/debts" className={sectionTabClassName}>
+                Долги и оплаты
+              </NavLink>
+            </div>
           </div>
         </div>
 
@@ -540,6 +571,7 @@ export default function CustomerView() {
                           setFormData({
                             customerType: customer.customerType || 'individual',
                             name: customer.name || '',
+                            customerCategory: customer.customerCategory || '',
                             companyName: customer.companyName || '',
                             contactName: customer.contactName || '',
                             phone: customer.phone || '',
@@ -568,6 +600,11 @@ export default function CustomerView() {
                   </div>
 
                   <h3 className="mb-3 wrap-break-word text-xl font-medium leading-7 text-slate-900">{customer.name}</h3>
+                  {customer.customerCategory && (
+                    <p className="mb-3 inline-flex max-w-full rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                      {customer.customerCategory}
+                    </p>
+                  )}
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
                       {customer.customer_segment || 'Новый'}
@@ -712,6 +749,22 @@ export default function CustomerView() {
                         )
                       }
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Категория клиента</label>
+                    <input
+                      list="customer-category-options"
+                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
+                      value={formData.customerCategory}
+                      onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
+                      placeholder="Например: VIP, Оптовик, Магазин, Партнер"
+                    />
+                    <datalist id="customer-category-options">
+                      {customerCategories.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
                   </div>
 
                   <div className="space-y-2">

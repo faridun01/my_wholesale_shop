@@ -25,6 +25,7 @@ const buildCustomerPayload = (body: any, access: any) => {
   return {
     customerType,
     name,
+    customerCategory: normalizeOptionalString(body?.customerCategory),
     companyName,
     contactName,
     phone: normalizeOptionalString(body?.phone),

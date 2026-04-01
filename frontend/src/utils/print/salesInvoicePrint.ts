@@ -54,10 +54,9 @@ export function printSalesInvoice({
   const getDisplayPrice = (item: any) => {
     const sellingPricePerUnit = Number(item.sellingPrice || 0);
     const packageQuantity = Number(item.packageQuantity || 0);
-    const extraUnitQuantity = Number(item.extraUnitQuantity || 0);
     const unitsPerPackage = Number(item.unitsPerPackageSnapshot || item.unitsPerPackage || 0);
 
-    if (packageQuantity > 0 && extraUnitQuantity === 0 && unitsPerPackage > 0) {
+    if (packageQuantity > 0 && unitsPerPackage > 0) {
       return sellingPricePerUnit * unitsPerPackage;
     }
 
@@ -98,14 +97,14 @@ export function printSalesInvoice({
     const quantity = Number(item.quantity || 0);
 
     if (packageQuantity > 0 && packageName) {
-      const lines = [`${packageQuantity} ${packageName}`];
+      const primaryLine =
+        extraUnitQuantity > 0
+          ? `${packageQuantity} ${packageName} + ${extraUnitQuantity} ${baseUnitName}`
+          : `${packageQuantity} ${packageName}`;
+      const lines = [primaryLine];
 
       if (unitsPerPackage > 0) {
-        lines.push(`${unitsPerPackage} ${baseUnitName} в ${packageName}`);
-      }
-
-      if (extraUnitQuantity > 0) {
-        lines.push(`${extraUnitQuantity} ${baseUnitName}`);
+        lines.push(`${packageQuantity * unitsPerPackage} ${baseUnitName} в ${packageName}`);
       }
 
       return lines;

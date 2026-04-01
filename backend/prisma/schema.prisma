@@ -169,6 +169,7 @@ model Customer {
   id        Int      @id @default(autoincrement())
   customerType String @default("individual") @map("customer_type")
   name      String
+  customerCategory String? @map("customer_category")
   companyName String? @map("company_name")
   contactName String? @map("contact_name")
   phone     String?

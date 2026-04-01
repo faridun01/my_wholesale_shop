@@ -20,6 +20,40 @@ const normalizeAddressLine = (...parts: unknown[]) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const normalizeDisplayBaseUnit = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'шт';
+  if (['пачка', 'пачки', 'пачек', 'шт', 'штук', 'штука', 'штуки', 'pcs', 'piece', 'pieces'].includes(normalized)) {
+    return 'шт';
+  }
+  return normalized;
+};
+
+const getCustomerInvoiceQuantityLines = (item: any) => {
+  const packageQuantity = Math.max(0, Number(item?.packageQuantity || 0));
+  const extraUnitQuantity = Math.max(0, Number(item?.extraUnitQuantity || 0));
+  const unitsPerPackage = Math.max(0, Number(item?.unitsPerPackageSnapshot ?? item?.unitsPerPackage ?? 0));
+  const packageName = String(item?.packageNameSnapshot || item?.packageName || '').trim();
+  const baseUnitName = normalizeDisplayBaseUnit(item?.baseUnitNameSnapshot || item?.baseUnitName || item?.unit || 'шт');
+  const quantity = Math.max(0, Number(item?.quantity || 0));
+
+  if (packageQuantity > 0 && packageName) {
+    const primaryLine =
+      extraUnitQuantity > 0
+        ? `${packageQuantity} ${packageName} + ${extraUnitQuantity} ${baseUnitName}`
+        : `${packageQuantity} ${packageName}`;
+    const lines = [primaryLine];
+
+    if (unitsPerPackage > 0) {
+      lines.push(`${packageQuantity * unitsPerPackage} ${baseUnitName} в ${packageName}`);
+    }
+
+    return lines;
+  }
+
+  return [`${quantity} ${baseUnitName}`];
+};
+
 interface CustomerInvoicePrintOptions {
   invoice: any;
   customer: {
@@ -66,7 +100,7 @@ export function printCustomerInvoice({
             <tr>
               <td>${index + 1}</td>
               <td>${escapeHtml(item.product?.name || '---')}</td>
-              <td>${escapeHtml(item.quantity)} шт</td>
+              <td>${getCustomerInvoiceQuantityLines(item).map((line) => `<div>${escapeHtml(line)}</div>`).join('')}</td>
               <td>${escapeHtml(formatMoney(item.sellingPrice))}</td>
               <td>${escapeHtml(formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0)))}</td>
             </tr>

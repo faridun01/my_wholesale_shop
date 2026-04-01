@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import client from '../api/client';
-import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, deleteProductBatch } from '../api/products.api';
+import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, deleteProductBatch, writeOffProduct } from '../api/products.api';
 import { 
   Plus, 
   PlusCircle,
@@ -15,6 +15,7 @@ import {
   Loader2,
   ChevronUp,
   ChevronDown,
+  Scissors,
   X,
   History,
   DollarSign,
@@ -342,6 +343,7 @@ const getOcrProblemReason = (item: any, rateValue: unknown, expensePercentValue:
 
 export default function ProductsView() {
   const pageSize = 12;
+  const writeOffReasonPresets = ['Брак', 'Потеря', 'Внутреннее использование', 'Корректировка'];
   const ProductHistoryModal = React.lazy(() => import('../components/products/ProductHistoryModal'));
   const ProductBatchesModal = React.lazy(() => import('../components/products/ProductBatchesModal'));
   const hasLoadedReferenceDataRef = React.useRef(false);
@@ -359,6 +361,7 @@ export default function ProductsView() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showRestockModal, setShowRestockModal] = useState(false);
+  const [showWriteOffModal, setShowWriteOffModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -384,6 +387,11 @@ export default function ProductsView() {
     costPrice: '',
     sellingPrice: '',
     reason: '',
+  });
+  const [writeOffData, setWriteOffData] = useState({
+    productId: '',
+    quantity: '1',
+    reason: 'брак',
   });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [ocrOriginalCount, setOcrOriginalCount] = useState(0);
@@ -418,6 +426,7 @@ export default function ProductsView() {
 
   const closeHistoryModal = () => {
     setShowHistoryModal(false);
+    setShowWriteOffModal(false);
     setProductHistory([]);
     setSelectedProduct(null);
   };
@@ -449,6 +458,15 @@ export default function ProductsView() {
     setShowRestockModal(false);
     setRestockData(emptyRestockData);
     setSelectedProduct(null);
+  };
+
+  const closeWriteOffModal = () => {
+    setShowWriteOffModal(false);
+    setWriteOffData({
+      productId: '',
+      quantity: '1',
+      reason: 'брак',
+    });
   };
 
   const closeMergeModal = () => {
@@ -601,6 +619,7 @@ export default function ProductsView() {
       showEditModal ||
       showTransferModal ||
       showRestockModal ||
+      showWriteOffModal ||
       showMergeModal ||
       showDeleteConfirm ||
       showHistoryModal ||
@@ -616,6 +635,7 @@ export default function ProductsView() {
         return;
       }
 
+      if (showWriteOffModal) return closeWriteOffModal();
       if (showDeleteConfirm) return closeDeleteConfirm();
       if (showHistoryModal) return closeHistoryModal();
       if (showBatchesModal) return closeBatchesModal();
@@ -637,6 +657,7 @@ export default function ProductsView() {
     showHistoryModal,
     showMergeModal,
     showRestockModal,
+    showWriteOffModal,
     showTransferModal,
   ]);
 
@@ -1224,6 +1245,89 @@ export default function ProductsView() {
     }
   };
 
+  const handleOpenWriteOffModal = (productArg?: any) => {
+    if (!selectedWarehouseId) {
+      toast.error('Сначала выберите склад');
+      return;
+    }
+
+    const baseProduct = productArg || selectedProduct;
+    if (!baseProduct?.id) {
+      toast.error('Выберите товар из списка и нажмите списание');
+      return;
+    }
+
+    const availableStock = Number(baseProduct.stock || 0);
+    if (availableStock <= 0) {
+      toast.error('У этого товара нет остатка для списания');
+      return;
+    }
+
+    setSelectedProduct(baseProduct);
+    setWriteOffData({
+      productId: String(baseProduct.id),
+      quantity: String(Math.min(1, availableStock) || 1),
+      reason: 'брак',
+    });
+    setShowWriteOffModal(true);
+  };
+
+  const handleSubmitWriteOff = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedWriteOffProduct?.id) {
+      return;
+    }
+
+    const quantity = Number(String(writeOffData.quantity || '').trim());
+    const reason = String(writeOffData.reason || '').trim();
+    const availableStock = Number(selectedWriteOffProduct.stock || 0);
+
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+      toast.error('Введите целое количество для списания');
+      return;
+    }
+
+    if (quantity > availableStock) {
+      toast.error(`Нельзя списать больше остатка. Сейчас доступно: ${availableStock}`);
+      return;
+    }
+
+    if (!reason) {
+      toast.error('Нужно указать причину списания');
+      return;
+    }
+
+    try {
+      await writeOffProduct(selectedWriteOffProduct.id, { quantity, reason });
+      const history = await getProductHistory(selectedWriteOffProduct.id);
+      if (selectedProduct?.id === selectedWriteOffProduct.id) {
+        setProductHistory(history);
+      }
+      await fetchInitialData();
+      setSelectedProduct((prev: any) => (
+        prev && prev.id === selectedWriteOffProduct.id
+          ? { ...prev, stock: Math.max(0, Number(prev.stock || 0) - quantity) }
+          : prev
+      ));
+      closeWriteOffModal();
+      toast.success('Списание успешно проведено');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error || err.message || 'Не удалось выполнить списание');
+    }
+  };
+
+  const handleSetWriteOffQuantity = (value: number) => {
+    if (!selectedWriteOffProduct) {
+      return;
+    }
+
+    const availableStock = Number(selectedWriteOffProduct.stock || 0);
+    const nextValue = Math.max(1, Math.min(Math.floor(value), Math.floor(availableStock)));
+    setWriteOffData((prev) => ({ ...prev, quantity: String(nextValue) }));
+  };
+
   const getMergeCandidates = (product: any) => {
     const sourceFamily = normalizeProductFamilyName(String(product?.name || ''));
     const sourceWarehouseId = Number(product?.warehouseId || selectedWarehouseId || 0);
@@ -1435,6 +1539,26 @@ export default function ProductsView() {
     () => duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0),
     [duplicateGroups],
   );
+  const writeOffProducts = React.useMemo(
+    () =>
+      filteredProducts
+        .filter((product) => Number(product?.stock || 0) > 0)
+        .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'ru')),
+    [filteredProducts],
+  );
+  const selectedWriteOffProduct = React.useMemo(
+    () => writeOffProducts.find((product) => String(product.id) === String(writeOffData.productId || '')) || null,
+    [writeOffData.productId, writeOffProducts],
+  );
+  const selectedWriteOffPackaging = React.useMemo(
+    () => getDefaultPackaging(normalizePackagings(selectedWriteOffProduct)),
+    [selectedWriteOffProduct],
+  );
+  const normalizedWriteOffReason = String(writeOffData.reason || '').trim().toLowerCase();
+  const isCustomWriteOffReason = Boolean(
+    normalizedWriteOffReason &&
+      !writeOffReasonPresets.some((reason) => reason.toLowerCase() === normalizedWriteOffReason)
+  );
   const visibleCategories = React.useMemo(
     () => categories.filter((category) => String(category?.name || '').trim().toLowerCase() !== 'прочее'),
     [categories],
@@ -1550,15 +1674,6 @@ export default function ProductsView() {
           <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <button
-            type="button"
-            onClick={exportStockReport}
-            disabled={!displayProducts.length}
-            className="flex w-full items-center justify-center space-x-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            <FileSpreadsheet size={18} />
-            <span>Скачать остаток</span>
-          </button>
           {isAdmin && <label className={clsx(
             "flex w-full items-center justify-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all sm:w-auto",
             selectedWarehouseId
@@ -2128,6 +2243,208 @@ export default function ProductsView() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {showWriteOffModal && selectedWriteOffProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeWriteOffModal}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-2 backdrop-blur-md sm:items-center sm:p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-3xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:max-h-[88vh] sm:rounded-[2rem]"
+            >
+              <div className="border-b border-amber-100 bg-[linear-gradient(135deg,#fff8eb_0%,#ffffff_58%,#fff4db_100%)] px-4 py-4 sm:px-6 sm:py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">
+                      <Scissors size={12} />
+                      <span>Списание</span>
+                    </div>
+                    <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Списание товара</h3>
+                    <p className="mt-1 text-sm font-medium text-slate-500">
+                      Быстрая складская операция по выбранному товару.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeWriteOffModal}
+                    className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmitWriteOff} className="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Товар</p>
+                    <p className="mt-2 text-[14px] font-bold leading-tight text-slate-900">
+                      {selectedWriteOffProduct ? formatProductName(selectedWriteOffProduct.name) : 'Не выбран'}
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Склад</p>
+                    <p className="mt-2 text-[14px] font-bold text-slate-900">
+                      {selectedWriteOffProduct?.warehouse?.name || warehouses.find((warehouse) => warehouse.id === selectedWriteOffProduct?.warehouseId)?.name || '---'}
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border border-amber-200 bg-[linear-gradient(135deg,#fff8e8_0%,#fffdf8_100%)] px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Остаток</p>
+                    <p className="mt-2 whitespace-pre-line text-[15px] font-black text-amber-900">
+                      {selectedWriteOffProduct ? getStockBreakdown(selectedWriteOffProduct).primary : '0'}
+                    </p>
+                    {selectedWriteOffProduct && getStockBreakdown(selectedWriteOffProduct).secondary && (
+                      <p className="mt-1 text-[11px] font-medium text-amber-700">
+                        {getStockBreakdown(selectedWriteOffProduct).secondary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+                  <section className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество</label>
+                      <span className="text-[11px] font-semibold text-slate-400">Только целое число</span>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
+                      <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                          value={writeOffData.quantity}
+                          onChange={(event) => {
+                            const digitsOnly = event.target.value.replace(/[^\d]/g, '');
+                            setWriteOffData((prev) => ({ ...prev, quantity: digitsOnly }));
+                          }}
+                          className="w-full bg-transparent text-[34px] font-black tracking-tight text-slate-900 outline-none"
+                        />
+                        <p className="mt-1 text-[11px] font-medium text-slate-400">Количество к списанию</p>
+                      </div>
+                      <div className="rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Доступно</p>
+                        <div className="mt-2 text-[34px] leading-none font-black text-slate-900">
+                          {Number(selectedWriteOffProduct.stock || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[1, 5, 10].map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleSetWriteOffQuantity(value)}
+                          className={clsx(
+                            'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                            Number(writeOffData.quantity || 0) === value
+                              ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                              : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                          )}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                      {selectedWriteOffPackaging && Number(selectedWriteOffPackaging.unitsPerPackage || 0) > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffPackaging.unitsPerPackage || 0))}
+                          className={clsx(
+                            'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                            Number(writeOffData.quantity || 0) === Number(selectedWriteOffPackaging.unitsPerPackage || 0)
+                              ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                              : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                          )}
+                        >
+                          1 {selectedWriteOffPackaging.packageName}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffProduct?.stock || 0))}
+                        className={clsx(
+                          'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                          Number(writeOffData.quantity || 0) === Number(selectedWriteOffProduct?.stock || 0)
+                            ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                        )}
+                      >
+                        Всё
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-[24px] border border-slate-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина списания</label>
+                      <span className="text-[11px] font-semibold text-slate-400">Выбери готовый вариант или введи свой</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {writeOffReasonPresets.map((reason) => {
+                        const isSelected = normalizedWriteOffReason === reason.toLowerCase();
+                        return (
+                          <button
+                            key={reason}
+                            type="button"
+                            onClick={() => setWriteOffData((prev) => ({ ...prev, reason: reason.toLowerCase() }))}
+                            className={clsx(
+                              'rounded-[18px] border px-3 py-3 text-left text-[13px] font-bold transition-all duration-150',
+                              isSelected
+                                ? 'border-amber-400 bg-[linear-gradient(135deg,#fff6d9_0%,#ffe6b3_100%)] text-amber-800 shadow-[0_10px_24px_rgba(245,158,11,0.18)]'
+                                : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                            )}
+                          >
+                            {reason}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 transition-all focus-within:border-amber-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-amber-500/10">
+                      <input
+                        type="text"
+                        required
+                        value={writeOffData.reason}
+                        onChange={(event) => setWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
+                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                        placeholder="Своя причина"
+                      />
+                      {isCustomWriteOffReason && (
+                        <p className="mt-1 text-[11px] font-medium text-amber-700">Используется пользовательская причина</p>
+                      )}
+                    </div>
+                  </section>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeWriteOffModal}
+                    className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-[linear-gradient(135deg,#f59e0b_0%,#ea580c_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(234,88,12,0.28)] transition-all hover:-translate-y-px hover:brightness-105 active:scale-[0.98]"
+                  >
+                    Подтвердить списание
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {ocrResults && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -2476,6 +2793,7 @@ export default function ProductsView() {
             product={selectedProduct}
             productHistory={productHistory}
             onReverseIncoming={handleReverseIncoming}
+            onWriteOff={isAdmin ? handleOpenWriteOffModal : undefined}
           />
           <ProductBatchesModal
             key={showBatchesModal ? `batches-${selectedProduct?.id || 'empty'}` : 'batches-closed'}
@@ -2574,7 +2892,7 @@ export default function ProductsView() {
 
       <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 md:flex-row flex-1 max-w-2xl">
+          <div className="flex flex-col gap-3 md:flex-row flex-1 max-w-4xl">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
               <input 
@@ -2585,7 +2903,7 @@ export default function ProductsView() {
                 className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
               />
             </div>
-            <div className="relative w-full sm:min-w-[180px] sm:w-auto">
+            <div className="relative w-full sm:min-w-[190px] sm:w-auto">
               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
               <select
                 value={selectedWarehouseId}
@@ -2599,6 +2917,15 @@ export default function ProductsView() {
                 ))}
               </select>
             </div>
+            <button
+              type="button"
+              onClick={exportStockReport}
+              disabled={!displayProducts.length}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              <FileSpreadsheet size={16} />
+              <span>Скачать остаток</span>
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
@@ -2748,6 +3075,13 @@ export default function ProductsView() {
                     className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs font-semibold text-sky-700"
                   >
                     История
+                  </button>
+                  <button
+                    onClick={() => handleOpenWriteOffModal(product)}
+                    disabled={Number(product.stock || 0) <= 0}
+                    className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold text-amber-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    Списать
                   </button>
                   <button
                     onClick={() => handleShowBatches(product)}
@@ -2984,6 +3318,16 @@ export default function ProductsView() {
                           <History size={14} />
                         </button>
                         {isAdmin && (
+                          <button
+                            onClick={() => handleOpenWriteOffModal(product)}
+                            disabled={Number(product.stock || 0) <= 0}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
+                            title="Списать"
+                          >
+                            <Scissors size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
                             <button 
                               onClick={() => {
                                 const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
@@ -3061,5 +3405,3 @@ export default function ProductsView() {
     </div>
   );
 }
-
-

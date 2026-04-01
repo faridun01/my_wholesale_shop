@@ -63,3 +63,8 @@ export const reverseIncomingTransaction = async (transactionId: number) => {
   const response = await client.post(`/products/history/${transactionId}/reverse-incoming`);
   return response.data;
 };
+
+export const writeOffProduct = async (id: number, data: { quantity: number; reason: string }) => {
+  const response = await client.post(`/products/${id}/write-off`, data);
+  return response.data;
+};

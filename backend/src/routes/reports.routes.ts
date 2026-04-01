@@ -347,7 +347,7 @@ router.get('/returns', authorize(['ADMIN']), async (req: AuthRequest, res, next)
         warehouse: true,
         user: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     const report = transactions
@@ -364,6 +364,50 @@ router.get('/returns', authorize(['ADMIN']), async (req: AuthRequest, res, next)
         reason: t.reason,
       }))
       .filter((row) => !/^Invoice #\d+ Cancelled$/i.test(String(row.reason || '').trim()));
+
+    res.json(report);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const { start, end } = req.query;
+    const where: any = {
+      type: 'adjustment',
+      qtyChange: { lt: 0 },
+      sellingAtTime: { not: null },
+      createdAt: {
+        gte: start ? new Date(start as string) : undefined,
+        lte: end ? new Date(end as string) : undefined,
+      },
+    };
+    if (warehouseId) where.warehouseId = warehouseId;
+
+    const transactions = await prisma.inventoryTransaction.findMany({
+      where,
+      include: {
+        product: true,
+        warehouse: true,
+        user: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const report = transactions.map((t: any) => ({
+      date: t.createdAt.toISOString().split('T')[0],
+      warehouse_name: t.warehouse?.name || '',
+      staff_name: t.user?.username || '',
+      product_name: t.product?.name || '',
+      unit: t.product?.unit || '',
+      quantity: Math.abs(Number(t.qtyChange || 0)),
+      cost_price: Number(t.costAtTime || 0),
+      total_value: Math.abs(Number(t.qtyChange || 0)) * Number(t.costAtTime || 0),
+      reason: String(t.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Write-off',
+    }));
 
     res.json(report);
   } catch (error) {

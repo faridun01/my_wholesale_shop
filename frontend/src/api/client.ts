@@ -19,6 +19,21 @@ const client = axios.create({
   withCredentials: true,
 });
 
+const getReadableNetworkMessage = (error: any) => {
+  const rawMessage = String(error?.message || '').toLowerCase();
+  const errorCode = String(error?.code || '').toUpperCase();
+
+  if (errorCode === 'ECONNABORTED' || rawMessage.includes('timeout')) {
+    return 'Сервер долго не отвечает. Попробуйте ещё раз.';
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'Нет подключения к интернету.';
+  }
+
+  return 'Не удалось связаться с сервером. Проверьте, запущен ли backend и доступен ли API.';
+};
+
 client.interceptors.request.use(
   (config) => {
     if (config.data instanceof FormData) {
@@ -42,6 +57,11 @@ client.interceptors.response.use(
       clearAuthSession();
       window.location.href = '/login';
     }
+
+    if (!error.response) {
+      error.message = getReadableNetworkMessage(error);
+    }
+
     return Promise.reject(error);
   }
 );

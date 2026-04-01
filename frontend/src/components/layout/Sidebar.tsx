@@ -207,6 +207,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      end={item.to === '/customers'}
                       onClick={() => {
                         if (window.innerWidth < 1024) onClose();
                       }}

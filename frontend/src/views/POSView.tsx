@@ -232,6 +232,12 @@ export default function POSView() {
     );
   };
 
+  const getCartOverflowMessage = (item: CartItem) => {
+    const currentProduct = products.find((product) => product.id === item.id);
+    const sourceProduct = currentProduct || item;
+    return `Нельзя продать больше остатка. Доступно: ${getProductStockLabel(sourceProduct, item.baseUnitName || item.unit)}`;
+  };
+
   const normalizeCartItem = (item: CartItem, overrides: Partial<CartItem> = {}) => {
     const merged = { ...item, ...overrides };
     const packaging = merged.packagings.find((entry) => entry.id === merged.selectedPackagingId) || null;
@@ -794,6 +800,15 @@ export default function POSView() {
     }
   }, [cart]);
 
+  const cartOverflowMessage = React.useMemo(() => {
+    const overflowCartItem = cart.find((item) => {
+      const currentProduct = products.find((product) => product.id === item.id);
+      return !currentProduct || Number(item.quantity || 0) > Number(currentProduct.stock || 0);
+    });
+
+    return overflowCartItem ? getCartOverflowMessage(overflowCartItem) : null;
+  }, [cart, products]);
+
   const subtotal = cart.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
   const normalizedDiscount = Math.max(0, discount);
   const discountAmount = subtotal * (normalizedDiscount / 100);
@@ -829,8 +844,7 @@ export default function POSView() {
     });
 
     if (overflowCartItem) {
-      const currentProduct = products.find((product) => product.id === overflowCartItem.id);
-      toast.error(`Нельзя продать больше остатка. Доступно: ${getProductStockLabel(currentProduct || overflowCartItem, overflowCartItem.baseUnitName || overflowCartItem.unit)}`);
+      toast.error(getCartOverflowMessage(overflowCartItem));
       return;
     }
 
@@ -868,7 +882,7 @@ export default function POSView() {
         navigate('/sales', { state: { warehouseId: String(warehouseId) } });
     } catch (err: any) {
       const message = err.response?.data?.error || err.message || 'Ошибка при создании продажи';
-      toast.error(message === 'Network Error' ? 'Ошибка сети. Проверьте подключение.' : message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -1134,6 +1148,12 @@ export default function POSView() {
                       <span className="text-base font-semibold text-slate-900">{formatMoney(total)}</span>
                     </div>
                   </div>
+
+                  {cartOverflowMessage && (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                      {cartOverflowMessage}
+                    </div>
+                  )}
 
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />

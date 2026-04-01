@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { formatCount, formatMoney } from '../../utils/format';
 
-type ReportType = 'sales' | 'profit' | 'returns';
+type ReportType = 'sales' | 'profit' | 'returns' | 'writeoffs';
 
 type ChartPoint = {
   date: string;
