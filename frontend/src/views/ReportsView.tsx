@@ -909,31 +909,46 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         title="Детализация"
         headerActions={
           <div className="flex items-center gap-2">
+            <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500 md:inline-flex">
+              {reportData.length} записей
+            </span>
             <button
               onClick={exportToExcel}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               Excel
             </button>
           </div>
         }
       >
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 md:hidden">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Журнал периода</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Последовательный список операций по выбранному типу отчёта.
+          </p>
+        </div>
+
         <div className="space-y-3 md:hidden">
           {paginatedDetailRows.length ? (
             paginatedDetailRows.map((row, index) => (
-              <article key={`${row.date}-${row.product_name}-${index}`} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+              <article
+                key={`${row.date}-${row.product_name}-${index}`}
+                className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.035)]"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-500">{new Date(row.date).toLocaleDateString('ru-RU')}</p>
-                    <h3 className="mt-1 text-sm font-semibold leading-5 text-slate-900">{formatProductName(row.product_name)}</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      {new Date(row.date).toLocaleDateString('ru-RU')}
+                    </p>
+                    <h3 className="mt-1 text-[13px] font-semibold leading-5 text-slate-900">{formatProductName(row.product_name)}</h3>
                   </div>
-                  <div className="shrink-0 rounded-2xl bg-white px-3 py-2 text-right shadow-sm ring-1 ring-slate-200">
+                  <div className="shrink-0 rounded-xl bg-white px-2.5 py-2 text-right shadow-sm ring-1 ring-slate-200">
                     <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Кол-во</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{formatCount(row.quantity)}</p>
+                    <p className="mt-1 text-[13px] font-semibold text-slate-900">{formatCount(row.quantity)}</p>
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2">
+                <div className="mt-2.5 grid gap-2">
                   {reportType === 'sales' && (
                     <>
                       <MobileDetailField label="Цена прод." value={toFixedNumber(row.selling_price || 0)} />
@@ -968,41 +983,45 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             </div>
           )}
         </div>
-        <div className="hidden max-h-[640px] overflow-auto -mx-5 md:block">
+        <div className="hidden overflow-hidden rounded-[24px] border border-slate-200 md:block">
+        <div className="max-h-[640px] overflow-auto -mx-5">
           <table className="min-w-[720px] w-full text-left">
-            <thead className="bg-slate-50 text-sm text-slate-500">
+            <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-slate-500">
               <tr>
-                <th className="px-5 py-3">Дата</th>
-                <th className="px-5 py-3">Товар</th>
-                <th className="px-5 py-3">Кол-во</th>
+                <th className="px-5 py-3.5 font-semibold">Дата</th>
+                <th className="px-5 py-3.5 font-semibold">Товар</th>
+                <th className="px-5 py-3.5 font-semibold">Кол-во</th>
                 {reportType === 'sales' && (
                   <>
-                    <th className="px-5 py-3">Цена прод.</th>
-                    <th className="px-5 py-3">Итого</th>
+                    <th className="px-5 py-3.5 font-semibold">Цена прод.</th>
+                    <th className="px-5 py-3.5 font-semibold">Итого</th>
                   </>
                 )}
                 {reportType === 'profit' && (
                   <>
-                    <th className="px-5 py-3">Цена прод.</th>
-                    <th className="px-5 py-3">Себест.</th>
-                    <th className="px-5 py-3">Прибыль</th>
+                    <th className="px-5 py-3.5 font-semibold">Цена прод.</th>
+                    <th className="px-5 py-3.5 font-semibold">Себест.</th>
+                    <th className="px-5 py-3.5 font-semibold">Прибыль</th>
                   </>
                 )}
-                {reportType === 'returns' && <th className="px-5 py-3">Причина</th>}
+                {reportType === 'returns' && <th className="px-5 py-3.5 font-semibold">Причина</th>}
                 {reportType === 'writeoffs' && (
                   <>
-                    <th className="px-5 py-3">Сумма</th>
-                    <th className="px-5 py-3">Причина</th>
-                    <th className="px-5 py-3">Сотрудник</th>
-                    <th className="px-5 py-3">Склад</th>
-                    <th className="px-5 py-3">Себест.</th>
+                    <th className="px-5 py-3.5 font-semibold">Сумма</th>
+                    <th className="px-5 py-3.5 font-semibold">Причина</th>
+                    <th className="px-5 py-3.5 font-semibold">Сотрудник</th>
+                    <th className="px-5 py-3.5 font-semibold">Склад</th>
+                    <th className="px-5 py-3.5 font-semibold">Себест.</th>
                   </>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedDetailRows.map((row, index) => (
-                <tr key={`${row.date}-${row.product_name}-${index}`} className="text-sm text-slate-700">
+                <tr
+                  key={`${row.date}-${row.product_name}-${index}`}
+                  className="text-sm text-slate-700 transition-colors odd:bg-white even:bg-slate-50/45 hover:bg-slate-50"
+                >
                   <td className="px-5 py-4">{new Date(row.date).toLocaleDateString('ru-RU')}</td>
                   <td className="px-5 py-4 text-slate-900">{formatProductName(row.product_name)}</td>
                   <td className="px-5 py-4">{row.quantity}</td>
@@ -1044,6 +1063,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               )}
             </tbody>
           </table>
+        </div>
         </div>
         {reportData.length > detailPageSize && (
           <PaginationControls
