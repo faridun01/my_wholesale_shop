@@ -1,4 +1,4 @@
-import { formatMoney } from '../format';
+﻿import { formatMoney } from '../format';
 
 const PAYMENT_EPSILON = 0.01;
 
@@ -27,6 +27,37 @@ const normalizeDisplayBaseUnit = (value: unknown) => {
     return 'шт';
   }
   return normalized;
+};
+
+const normalizeStatusLabel = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized.includes('част')) {
+    return 'Частично оплачено';
+  }
+
+  if (normalized.includes('не')) {
+    return 'Не оплачено';
+  }
+
+  if (normalized.includes('смеш')) {
+    return 'Смешанные статусы';
+  }
+
+  return 'Оплачено';
+};
+
+const formatRuDate = (value: unknown, withTime = false) => {
+  const date = new Date(String(value || ''));
+  if (Number.isNaN(date.getTime())) {
+    return '---';
+  }
+
+  return withTime ? date.toLocaleString('ru-RU') : date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 };
 
 const getCustomerInvoiceQuantityLines = (item: any) => {
@@ -74,8 +105,19 @@ export interface CustomerInvoicePrintOptions {
   changeAmount: number;
 }
 
-interface BatchCustomerInvoicePrintOptions {
+export interface CustomerInvoicesBatchCustomer {
+  id: number;
+  name: string;
+  phone?: string;
+  purchasedTotal: number;
+  paidTotal: number;
+  debtTotal: number;
+  statusLabel: string;
   invoices: CustomerInvoicePrintOptions[];
+}
+
+interface BatchCustomerInvoicePrintOptions {
+  customers: CustomerInvoicesBatchCustomer[];
   filterLabel: string;
   generatedAt?: Date;
 }
@@ -98,7 +140,7 @@ const renderPaymentsBlock = (invoice: any) =>
               .map(
                 (payment: any) => `
                   <tr>
-                    <td>${escapeHtml(new Date(payment.createdAt).toLocaleString('ru-RU'))}</td>
+                    <td>${escapeHtml(formatRuDate(payment.createdAt, true))}</td>
                     <td>${escapeHtml(formatMoney(payment.amount))}</td>
                     <td>${escapeHtml(payment.staff_name)}</td>
                   </tr>
@@ -130,7 +172,7 @@ const renderReturnsBlock = (invoice: any) =>
               .map(
                 (itemReturn: any) => `
                   <tr>
-                    <td>${escapeHtml(new Date(itemReturn.createdAt).toLocaleString('ru-RU'))}</td>
+                    <td>${escapeHtml(formatRuDate(itemReturn.createdAt, true))}</td>
                     <td>-${escapeHtml(formatMoney(itemReturn.totalValue))}</td>
                     <td>${escapeHtml(itemReturn.reason || '---')}</td>
                     <td>${escapeHtml(itemReturn.staff_name)}</td>
@@ -165,11 +207,9 @@ const renderCustomerInvoiceSection = (
   const customerAddress = normalizeAddressLine(customer?.country, customer?.region, customer?.city, customer?.address);
   const sellerRegionLine = [invoice.company_country, invoice.company_region].filter(Boolean).join(', ');
   const sellerCityLine = [invoice.company_city, invoice.company_address].filter(Boolean).join(', ');
-  const invoiceDateLabel = new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const invoiceDateLabel = formatRuDate(invoice.createdAt);
+  const normalizedInvoiceStatusLabel = normalizeStatusLabel(statusLabel);
+  const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance || 0));
   const itemsRows = Array.isArray(invoice.items)
     ? invoice.items
         .map(
@@ -220,11 +260,11 @@ const renderCustomerInvoiceSection = (
         </div>
         <div class="party-block party-meta">
           <p class="label">Информация</p>
-          <p class="value">Статус: ${escapeHtml(statusLabel)}</p>
+          <p class="value">Статус: ${escapeHtml(normalizedInvoiceStatusLabel)}</p>
           <p class="subvalue">${
             changeAmount > PAYMENT_EPSILON
               ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}`
-              : `Остаток: ${escapeHtml(formatMoney(invoice.invoiceBalance))}`
+              : `Остаток: ${escapeHtml(formatMoney(invoiceBalance))}`
           }</p>
         </div>
       </div>
@@ -249,13 +289,92 @@ const renderCustomerInvoiceSection = (
         ${Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount))}</strong></div>` : ''}
         <div class="summary-row total"><span>ИТОГО</span><strong>${escapeHtml(formatMoney(netAmount))}</strong></div>
         <div class="summary-row"><span>Оплачено</span><strong>${escapeHtml(formatMoney(appliedPaidAmount))}</strong></div>
-        <div class="summary-row"><span>Остаток</span><strong>${escapeHtml(formatMoney(invoice.invoiceBalance))}</strong></div>
+        <div class="summary-row"><span>Остаток</span><strong>${escapeHtml(formatMoney(invoiceBalance))}</strong></div>
       </div>
       ${renderPaymentsBlock(invoice)}
       ${renderReturnsBlock(invoice)}
     </section>
   `;
 };
+
+const renderBatchOverviewSection = (
+  customers: CustomerInvoicesBatchCustomer[],
+  filterLabel: string,
+  generatedAt: Date,
+) => `
+  <section class="sheet">
+    <div class="header">
+      <h1 class="title">Клиенты и долги</h1>
+      <div class="subtitle">Фильтр: ${escapeHtml(filterLabel)} | ${escapeHtml(generatedAt.toLocaleString('ru-RU'))}</div>
+    </div>
+    <div class="section section-no-gap">
+      <h3>Список клиентов</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Клиент</th>
+            <th>Телефон</th>
+            <th>Купил всего</th>
+            <th>Оплатил всего</th>
+            <th>Долг</th>
+            <th>Статус оплаты</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${customers
+            .map(
+              (customer) => `
+                <tr>
+                  <td>${escapeHtml(customer.name)}</td>
+                  <td>${escapeHtml(customer.phone || 'Нет телефона')}</td>
+                  <td>${escapeHtml(formatMoney(customer.purchasedTotal))}</td>
+                  <td>${escapeHtml(formatMoney(customer.paidTotal))}</td>
+                  <td>${escapeHtml(formatMoney(customer.debtTotal))}</td>
+                  <td>${escapeHtml(normalizeStatusLabel(customer.statusLabel))}</td>
+                </tr>
+              `,
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  </section>
+`;
+
+const renderCustomerGroupHeader = (customer: CustomerInvoicesBatchCustomer) => `
+  <section class="sheet customer-group-sheet">
+    <div class="customer-group-card">
+      <div>
+        <p class="label">Клиент</p>
+        <p class="value">${escapeHtml(customer.name)}</p>
+        <p class="subvalue">${escapeHtml(customer.phone || 'Нет телефона')}</p>
+        <p class="subvalue">Накладные: ${escapeHtml(customer.invoices.map((entry) => `#${entry.invoice?.id}`).join(', '))}</p>
+      </div>
+      <div class="customer-group-grid">
+        <div class="customer-group-stat">
+          <span class="customer-group-stat-label">Номера накладных</span>
+          <strong>${escapeHtml(customer.invoices.map((entry) => `#${entry.invoice?.id}`).join(', '))}</strong>
+        </div>
+        <div class="customer-group-stat">
+          <span class="customer-group-stat-label">Купил всего</span>
+          <strong>${escapeHtml(formatMoney(customer.purchasedTotal))}</strong>
+        </div>
+        <div class="customer-group-stat">
+          <span class="customer-group-stat-label">Оплатил всего</span>
+          <strong>${escapeHtml(formatMoney(customer.paidTotal))}</strong>
+        </div>
+        <div class="customer-group-stat">
+          <span class="customer-group-stat-label">Долг</span>
+          <strong>${escapeHtml(formatMoney(customer.debtTotal))}</strong>
+        </div>
+        <div class="customer-group-stat">
+          <span class="customer-group-stat-label">Статус оплаты</span>
+          <strong>${escapeHtml(normalizeStatusLabel(customer.statusLabel))}</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
 
 const buildDocumentHtml = (sectionsHtml: string, title: string, autoClose = false) => `<!doctype html>
   <html lang="ru">
@@ -264,27 +383,33 @@ const buildDocumentHtml = (sectionsHtml: string, title: string, autoClose = fals
       <title>${escapeHtml(title)}</title>
       <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 24px; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
+        body { margin: 0; padding: 16px; font-family: Arial, sans-serif; color: #0f172a; background: #fff; }
         .sheet { max-width: 900px; margin: 0 auto; }
         .sheet + .sheet { page-break-before: always; margin-top: 24px; }
-        .doc-meta { display: flex; justify-content: space-between; gap: 12px; margin: 0 auto 12px; max-width: 900px; color: #64748b; font-size: 11px; }
-        .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; }
-        .title { font-size: 30px; font-weight: 800; margin: 0; }
-        .subtitle { margin-top: 6px; font-size: 16px; font-weight: 700; color: #334155; }
-        .parties { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+        .doc-meta { display: flex; justify-content: space-between; gap: 12px; margin: 0 auto 8px; max-width: 900px; color: #64748b; font-size: 9px; }
+        .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px; }
+        .title { font-size: 24px; font-weight: 800; margin: 0; }
+        .subtitle { margin-top: 4px; font-size: 12px; font-weight: 700; color: #334155; }
+        .parties { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
         .party-block { padding: 0; border: none; background: transparent; }
         .party-meta { text-align: right; }
-        .label { margin: 0 0 6px; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
-        .value { margin: 0; font-size: 16px; font-weight: 800; }
-        .subvalue { margin: 4px 0 0; color: #475569; font-size: 12px; line-height: 1.35; font-weight: 700; }
-        .section { margin-top: 18px; }
-        .section h3 { margin: 0 0 10px; font-size: 14px; font-weight: 800; }
+        .label { margin: 0 0 4px; color: #64748b; font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+        .value { margin: 0; font-size: 13px; font-weight: 800; }
+        .subvalue { margin: 2px 0 0; color: #475569; font-size: 10px; line-height: 1.25; font-weight: 700; }
+        .section { margin-top: 12px; }
+        .section h3 { margin: 0 0 6px; font-size: 11px; font-weight: 800; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #0f172a; padding: 9px; font-size: 12px; text-align: left; vertical-align: top; font-weight: 800; }
+        th, td { border: 1px solid #0f172a; padding: 5px 6px; font-size: 10px; text-align: left; vertical-align: top; font-weight: 700; }
         th { background: #f8fafc; font-weight: 800; }
-        .summary { margin-left: auto; margin-top: 18px; width: 300px; }
-        .summary-row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #0f172a; font-size: 12px; font-weight: 800; }
-        .summary-row.total { font-size: 22px; font-weight: 900; border-top: 3px solid #0f172a; border-bottom: 3px solid #0f172a; margin-top: 8px; padding: 12px 0; letter-spacing: 0.08em; }
+        .summary { margin-left: auto; margin-top: 12px; width: 260px; }
+        .summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid #0f172a; font-size: 10px; font-weight: 700; }
+        .summary-row.total { font-size: 16px; font-weight: 900; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; margin-top: 6px; padding: 8px 0; letter-spacing: 0.06em; }
+        .section-no-gap { margin-top: 0; }
+        .customer-group-sheet { page-break-before: always; }
+        .customer-group-card { display: grid; grid-template-columns: minmax(0, 180px) minmax(0, 1fr); gap: 12px; border: 2px solid #0f172a; padding: 12px; }
+        .customer-group-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .customer-group-stat { border: 1px solid #0f172a; padding: 8px 10px; }
+        .customer-group-stat-label { display: block; margin-bottom: 3px; color: #64748b; font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
         @page { size: A4 portrait; margin: 10mm; }
       </style>
     </head>
@@ -323,11 +448,11 @@ export function printCustomerInvoice(options: CustomerInvoicePrintOptions) {
 }
 
 export function printCustomerInvoicesBatch({
-  invoices,
+  customers,
   filterLabel,
   generatedAt = new Date(),
 }: BatchCustomerInvoicePrintOptions) {
-  if (typeof window === 'undefined' || !Array.isArray(invoices) || invoices.length === 0) {
+  if (typeof window === 'undefined' || !Array.isArray(customers) || customers.length === 0) {
     return { ok: false as const, reason: 'invalid' as const };
   }
 
@@ -357,19 +482,28 @@ export function printCustomerInvoicesBatch({
     return { ok: false as const, reason: 'unavailable' as const };
   }
 
-  const sectionsHtml = invoices
-    .map((invoice, index) =>
-      renderCustomerInvoiceSection(invoice, {
-        pageNumber: index + 1,
-        totalPages: invoices.length,
-        generatedAt,
-        filterLabel,
+  const allInvoices = customers.flatMap((customer) => customer.invoices);
+  const totalPages = allInvoices.length;
+  let pageNumber = 0;
+
+  const sectionsHtml = [
+    renderBatchOverviewSection(customers, filterLabel, generatedAt),
+    ...customers.flatMap((customer) => [
+      renderCustomerGroupHeader(customer),
+      ...customer.invoices.map((invoice) => {
+        pageNumber += 1;
+        return renderCustomerInvoiceSection(invoice, {
+          pageNumber,
+          totalPages,
+          generatedAt,
+          filterLabel,
+        });
       }),
-    )
-    .join('');
+    ]),
+  ].join('');
 
   iframeDocument.open();
-  iframeDocument.write(buildDocumentHtml(sectionsHtml, `Накладные - ${filterLabel}`));
+  iframeDocument.write(buildDocumentHtml(sectionsHtml, `Клиенты и долги - ${filterLabel}`));
   iframeDocument.close();
 
   iframe.onload = () => {

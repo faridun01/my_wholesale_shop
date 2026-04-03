@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Printer, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,11 +8,14 @@ import { getCustomerHistory, getCustomers } from '../api/customers.api';
 import { formatCount, formatMoney } from '../utils/format';
 import { getCurrentUser, isAdminUser } from '../utils/userAccess';
 import {
-  buildCustomerDebtSummary,
+  customerMatchesPaymentFilter,
   customerPaymentStatusMeta,
   getCustomerDebtTotal,
+  getCustomerInvoicesByStatus,
+  getCustomerPaidTotalByFilter,
   getCustomerPaidTotal,
   getCustomerPaymentStatus,
+  getCustomerPurchasedTotalByFilter,
   getCustomerPurchasedTotal,
   hasCustomerPurchases,
   type DebtCustomer,
@@ -38,6 +41,18 @@ type StatementInvoice = {
   items?: any[];
   paymentEvents?: any[];
   returnEvents?: any[];
+};
+
+const getDebtFilterLabel = (filter: Exclude<DebtFilter, 'all'>) => {
+  if (filter === 'paid') {
+    return 'Оплачено';
+  }
+
+  if (filter === 'partial') {
+    return 'Частично оплачено';
+  }
+
+  return 'Не оплачено';
 };
 
 const filterTabs: Array<{ key: DebtFilter; label: string }> = [
@@ -72,6 +87,7 @@ export default function CustomerDebtsView() {
   const [sortBy, setSortBy] = useState<SortMode>('debt');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingInvoices, setIsExportingInvoices] = useState(false);
+  const [customerHistories, setCustomerHistories] = useState<Record<number, StatementInvoice[]>>({});
 
   const formatMoneyByRole = (value: unknown) => {
     if (!isAdmin) {
@@ -125,22 +141,44 @@ export default function CustomerDebtsView() {
         return true;
       }
 
-      return getCustomerPaymentStatus(customer) === statusFilter;
+      return customerMatchesPaymentFilter(customer, statusFilter);
     });
   }, [customersWithPurchases, isAdmin, searchTerm, statusFilter]);
+
+  const searchMatchedCustomers = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return customersWithPurchases.filter((customer) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return (
+        String(customer.name || '').toLowerCase().includes(normalizedSearch) ||
+        String(customer.phone || '').includes(normalizedSearch)
+      );
+    });
+  }, [customersWithPurchases, searchTerm]);
 
   const filterCounts = useMemo(
     () => ({
       all: customersWithPurchases.length,
-      paid: customersWithPurchases.filter((customer) => getCustomerPaymentStatus(customer) === 'paid').length,
-      partial: customersWithPurchases.filter((customer) => getCustomerPaymentStatus(customer) === 'partial').length,
-      unpaid: customersWithPurchases.filter((customer) => getCustomerPaymentStatus(customer) === 'unpaid').length,
+      paid: customersWithPurchases.filter((customer) => customerMatchesPaymentFilter(customer, 'paid')).length,
+      partial: customersWithPurchases.filter((customer) => customerMatchesPaymentFilter(customer, 'partial')).length,
+      unpaid: customersWithPurchases.filter((customer) => customerMatchesPaymentFilter(customer, 'unpaid')).length,
     }),
     [customersWithPurchases],
   );
 
   const sortedCustomers = useMemo(() => {
     return [...filteredCustomers].sort((a, b) => {
+      if (statusFilter !== 'all') {
+        const matchingInvoiceDiff = getCustomerInvoicesByStatus(b, statusFilter) - getCustomerInvoicesByStatus(a, statusFilter);
+        if (matchingInvoiceDiff !== 0) {
+          return matchingInvoiceDiff;
+        }
+      }
+
       if (sortBy === 'name') {
         return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
       }
@@ -164,9 +202,67 @@ export default function CustomerDebtsView() {
 
       return getCustomerPurchasedTotal(b) - getCustomerPurchasedTotal(a);
     });
-  }, [filteredCustomers, sortBy]);
+  }, [filteredCustomers, sortBy, statusFilter]);
 
-  const summary = useMemo(() => buildCustomerDebtSummary(filteredCustomers), [filteredCustomers]);
+  const summary = useMemo(() => {
+    if (statusFilter === 'all') {
+      return filteredCustomers.reduce(
+        (acc, customer) => {
+          acc.totalDebt += getCustomerDebtTotal(customer);
+          acc.totalPaid += getCustomerPaidTotal(customer);
+
+          if (customerMatchesPaymentFilter(customer, 'paid')) {
+            acc.fullyPaidCount += 1;
+          }
+
+          if (customerMatchesPaymentFilter(customer, 'partial')) {
+            acc.partialCount += 1;
+          }
+
+          if (customerMatchesPaymentFilter(customer, 'unpaid')) {
+            acc.unpaidCount += 1;
+          }
+
+          return acc;
+        },
+        {
+          totalDebt: 0,
+          totalPaid: 0,
+          fullyPaidCount: 0,
+          partialCount: 0,
+          unpaidCount: 0,
+        },
+      );
+    }
+
+    return filteredCustomers.reduce(
+      (acc, customer) => {
+        const purchasedTotal = getCustomerPurchasedTotalByFilter(customer, statusFilter);
+        const paidTotal = getCustomerPaidTotalByFilter(customer, statusFilter);
+        const debtTotal = Math.max(0, purchasedTotal - paidTotal);
+
+        acc.totalDebt += debtTotal;
+        acc.totalPaid += paidTotal;
+
+        if (statusFilter === 'paid') {
+          acc.fullyPaidCount += 1;
+        } else if (statusFilter === 'partial') {
+          acc.partialCount += 1;
+        } else {
+          acc.unpaidCount += 1;
+        }
+
+        return acc;
+      },
+      {
+        totalDebt: 0,
+        totalPaid: 0,
+        fullyPaidCount: 0,
+        partialCount: 0,
+        unpaidCount: 0,
+      },
+    );
+  }, [filteredCustomers, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(sortedCustomers.length / pageSize));
   const paginatedCustomers = useMemo(
     () => sortedCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
@@ -183,10 +279,59 @@ export default function CustomerDebtsView() {
     }
   }, [currentPage, totalPages]);
 
-  const getInvoiceSubtotal = (invoice: StatementInvoice) =>
-    Array.isArray(invoice?.items)
-      ? invoice.items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.sellingPrice || 0), 0)
-      : Number(invoice?.totalAmount || 0);
+  useEffect(() => {
+    if (!isAdmin || paginatedCustomers.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchVisibleHistories = async () => {
+      const results = await Promise.allSettled(
+        paginatedCustomers.map(async (customer) => ({
+          customerId: customer.id,
+          invoices: (await getCustomerHistory(customer.id)) as StatementInvoice[],
+        })),
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      setCustomerHistories((prev) => {
+        const next = { ...prev };
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            next[result.value.customerId] = Array.isArray(result.value.invoices) ? result.value.invoices : [];
+          }
+        });
+        return next;
+      });
+    };
+
+    fetchVisibleHistories();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAdmin, paginatedCustomers]);
+
+  const getInvoiceSubtotal = (invoice: StatementInvoice) => {
+    const storedTotal = Number(invoice?.totalAmount || 0);
+    const itemsSubtotal = Array.isArray(invoice?.items)
+      ? invoice.items.reduce((sum: number, item: any) => {
+          const quantity = Number(item?.quantity || 0);
+          const price = Number(item?.sellingPrice ?? item?.totalPrice ?? 0);
+          return sum + quantity * price;
+        }, 0)
+      : 0;
+
+    if (itemsSubtotal > PAYMENT_EPSILON) {
+      return itemsSubtotal;
+    }
+
+    return storedTotal;
+  };
 
   const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
     const subtotal = getInvoiceSubtotal(invoice);
@@ -195,26 +340,54 @@ export default function CustomerDebtsView() {
   };
 
   const getInvoiceNetAmount = (invoice: StatementInvoice) => {
+    const storedNet = Math.max(0, Number(invoice?.netAmount || 0));
+    if (storedNet > PAYMENT_EPSILON) {
+      return storedNet;
+    }
+
     const subtotal = getInvoiceSubtotal(invoice);
     const discountAmount = getInvoiceDiscountAmount(invoice);
     const returnedAmount = Number(invoice?.returnedAmount || 0);
     const calculatedNet = subtotal - discountAmount - returnedAmount;
-    const storedNet = Number(invoice?.netAmount || 0);
-
-    if (Math.abs(calculatedNet - storedNet) <= PAYMENT_EPSILON) {
-      return storedNet;
-    }
 
     return Math.max(0, calculatedNet);
   };
 
+  const getInvoicePaidAmount = (invoice: StatementInvoice) => Math.max(0, Number(invoice?.paidAmount || 0));
+
   const getInvoiceChangeAmount = (invoice: StatementInvoice) => {
-    const change = Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceNetAmount(invoice);
+    const change = getInvoicePaidAmount(invoice) - getInvoiceNetAmount(invoice);
     return change > PAYMENT_EPSILON ? change : 0;
   };
 
   const getInvoiceAppliedPaidAmount = (invoice: StatementInvoice) =>
-    Math.max(0, Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceChangeAmount(invoice));
+    Math.max(0, getInvoicePaidAmount(invoice) - getInvoiceChangeAmount(invoice));
+
+  const getInvoicesDebtTotal = (invoices: StatementInvoice[]) =>
+    invoices.reduce((sum, invoice) => {
+      const storedBalance = Math.max(0, Number(invoice?.invoiceBalance || 0));
+      if (storedBalance > PAYMENT_EPSILON) {
+        return sum + storedBalance;
+      }
+
+      const computedBalance = getInvoiceNetAmount(invoice) - getInvoiceAppliedPaidAmount(invoice);
+      return sum + (computedBalance > PAYMENT_EPSILON ? computedBalance : 0);
+    }, 0);
+
+  const getInvoicesNetTotal = (invoices: StatementInvoice[]) =>
+    invoices.reduce((sum, invoice) => sum + getInvoiceNetAmount(invoice), 0);
+
+  const getInvoicesPaidTotal = (invoices: StatementInvoice[]) =>
+    invoices.reduce((sum, invoice) => sum + getInvoiceAppliedPaidAmount(invoice), 0);
+
+  const getVisibleInvoicesForCustomer = (customer: DebtCustomer) => {
+    const historyInvoices = customerHistories[customer.id];
+    if (!Array.isArray(historyInvoices)) {
+      return null;
+    }
+
+    return historyInvoices.filter((invoice) => statusFilter === 'all' || getStatementInvoiceStatus(invoice) === statusFilter);
+  };
 
   const getStatementInvoiceStatus = (invoice: StatementInvoice): Exclude<DebtFilter, 'all'> => {
     if (String(invoice?.status || '').toLowerCase() === 'paid') {
@@ -235,8 +408,18 @@ export default function CustomerDebtsView() {
     return 'unpaid';
   };
 
+  const getBatchCustomerStatusLabel = (invoices: StatementInvoice[]) => {
+    const uniqueStatuses = Array.from(new Set(invoices.map((invoice) => getStatementInvoiceStatus(invoice))));
+
+    if (uniqueStatuses.length === 1) {
+      return getDebtFilterLabel(uniqueStatuses[0]);
+    }
+
+    return 'Смешанные статусы';
+  };
+
   const handlePrint = async () => {
-    if (filteredCustomers.length === 0) {
+    if (searchMatchedCustomers.length === 0) {
       toast.error('Нет клиентов для выгрузки');
       return;
     }
@@ -245,30 +428,26 @@ export default function CustomerDebtsView() {
     try {
       const selectedFilter = filterTabs.find((tab) => tab.key === statusFilter)?.label || 'Все';
       const histories = await Promise.allSettled(
-        filteredCustomers.map(async (customer) => ({
+        searchMatchedCustomers.map(async (customer) => ({
           customer,
           invoices: (await getCustomerHistory(customer.id)) as StatementInvoice[],
         })),
       );
 
       const failedRequests = histories.filter((result) => result.status === 'rejected').length;
-      const printableInvoices = histories.flatMap((result) => {
+      const printableCustomers = histories.flatMap((result) => {
         if (result.status !== 'fulfilled') {
           return [];
         }
 
         const { customer, invoices } = result.value;
 
-        return (Array.isArray(invoices) ? invoices : [])
-          .filter((invoice) => statusFilter === 'all' || getStatementInvoiceStatus(invoice) === statusFilter)
+        const matchingStatementInvoices = (Array.isArray(invoices) ? invoices : [])
+          .filter((invoice) => statusFilter === 'all' || getStatementInvoiceStatus(invoice) === statusFilter);
+        const matchingInvoices = matchingStatementInvoices
           .map((invoice) => {
             const invoiceStatus = getStatementInvoiceStatus(invoice);
-            const statusLabel =
-              invoiceStatus === 'paid'
-                ? 'Оплачено'
-                : invoiceStatus === 'partial'
-                  ? 'Частично оплачено'
-                  : 'Не оплачено';
+            const statusLabel = getDebtFilterLabel(invoiceStatus);
 
             return {
               invoice,
@@ -284,15 +463,38 @@ export default function CustomerDebtsView() {
               changeAmount: getInvoiceChangeAmount(invoice),
             };
           });
+
+        if (matchingInvoices.length === 0) {
+          return [];
+        }
+
+        const matchingPurchasedTotal = getInvoicesNetTotal(matchingStatementInvoices);
+        const matchingPaidTotal = getInvoicesPaidTotal(matchingStatementInvoices);
+        const matchingDebtTotal = getInvoicesDebtTotal(matchingStatementInvoices);
+        const customerStatusLabel =
+          statusFilter === 'all' ? getBatchCustomerStatusLabel(matchingStatementInvoices) : getDebtFilterLabel(statusFilter);
+
+        return [
+          {
+            id: customer.id,
+            name: customer.name || 'Без имени',
+            phone: customer.phone || undefined,
+            purchasedTotal: matchingPurchasedTotal,
+            paidTotal: matchingPaidTotal,
+            debtTotal: matchingDebtTotal,
+            statusLabel: customerStatusLabel,
+            invoices: matchingInvoices,
+          },
+        ];
       });
 
-      if (printableInvoices.length === 0) {
+      if (printableCustomers.length === 0) {
         toast.error(`По фильтру "${selectedFilter}" накладные не найдены`);
         return;
       }
 
       const result = printCustomerInvoicesBatch({
-        invoices: printableInvoices,
+        customers: printableCustomers,
         filterLabel: selectedFilter,
       });
 
@@ -446,12 +648,34 @@ export default function CustomerDebtsView() {
                   </tr>
                 ) : (
                   paginatedCustomers.map((customer) => {
-                    const status = getCustomerPaymentStatus(customer);
-                    const statusMeta = customerPaymentStatusMeta[status];
+                    const aggregateStatus = getCustomerPaymentStatus(customer);
+                    const displayStatus = statusFilter === 'all' ? aggregateStatus : statusFilter;
+                    const statusMeta = customerPaymentStatusMeta[displayStatus];
                     const warehouseNames =
                       Array.isArray(customer.warehouse_names) && customer.warehouse_names.length > 0
                         ? customer.warehouse_names.join(', ')
                         : '---';
+                    const visibleHistoryInvoices = getVisibleInvoicesForCustomer(customer);
+                    const visibleInvoiceCount =
+                      visibleHistoryInvoices !== null
+                        ? visibleHistoryInvoices.length
+                        : statusFilter === 'all'
+                          ? Number(customer.invoice_count || 0)
+                          : getCustomerInvoicesByStatus(customer, statusFilter);
+                    const visiblePurchasedTotal =
+                      visibleHistoryInvoices !== null
+                        ? getInvoicesNetTotal(visibleHistoryInvoices)
+                        : getCustomerPurchasedTotalByFilter(customer, statusFilter);
+                    const visiblePaidTotal =
+                      visibleHistoryInvoices !== null
+                        ? getInvoicesPaidTotal(visibleHistoryInvoices)
+                        : getCustomerPaidTotalByFilter(customer, statusFilter);
+                    const visibleDebtTotal =
+                      visibleHistoryInvoices !== null
+                        ? getInvoicesDebtTotal(visibleHistoryInvoices)
+                        : statusFilter === 'paid'
+                          ? 0
+                          : getCustomerDebtTotal(customer);
 
                     return (
                       <tr key={customer.id} className="text-xs text-slate-700">
@@ -460,12 +684,12 @@ export default function CustomerDebtsView() {
                         </td>
                         <td className="px-4 py-3">{warehouseNames}</td>
                         <td className="px-4 py-3">{customer.phone || 'Нет телефона'}</td>
-                        <td className="px-4 py-3">{formatCount(customer.invoice_count || 0)}</td>
-                        <td className="px-4 py-3">{formatMoneyByRole(getCustomerPurchasedTotal(customer))}</td>
-                        <td className="px-4 py-3">{formatMoneyByRole(getCustomerPaidTotal(customer))}</td>
+                        <td className="px-4 py-3">{formatCount(visibleInvoiceCount)}</td>
+                        <td className="px-4 py-3">{formatMoneyByRole(visiblePurchasedTotal)}</td>
+                        <td className="px-4 py-3">{formatMoneyByRole(visiblePaidTotal)}</td>
                         <td className="px-4 py-3">
-                          <span className={isAdmin && getCustomerDebtTotal(customer) > 0 ? 'font-medium text-rose-600' : ''}>
-                            {formatMoneyByRole(getCustomerDebtTotal(customer))}
+                          <span className={isAdmin && visibleDebtTotal > 0 ? 'font-medium text-rose-600' : ''}>
+                            {formatMoneyByRole(visibleDebtTotal)}
                           </span>
                         </td>
                         <td className="px-4 py-3">

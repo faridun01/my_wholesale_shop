@@ -10,6 +10,14 @@ export type DebtCustomer = {
   total_paid?: number;
   balance?: number;
   invoice_count?: number;
+  paid_invoice_count?: number;
+  partial_invoice_count?: number;
+  unpaid_invoice_count?: number;
+  paid_invoiced_total?: number;
+  paid_collected_total?: number;
+  partial_invoiced_total?: number;
+  partial_collected_total?: number;
+  unpaid_invoiced_total?: number;
   last_purchase_at?: string | null;
 };
 
@@ -46,6 +54,38 @@ export function getCustomerPaidTotal(customer: DebtCustomer) {
   return Number(customer.total_paid || 0);
 }
 
+export function getCustomerPurchasedTotalByFilter(customer: DebtCustomer, filter: CustomerPaymentStatus | 'all') {
+  if (filter === 'paid') {
+    return Number(customer.paid_invoiced_total || 0);
+  }
+
+  if (filter === 'partial') {
+    return Number(customer.partial_invoiced_total || 0);
+  }
+
+  if (filter === 'unpaid') {
+    return Number(customer.unpaid_invoiced_total || 0);
+  }
+
+  return getCustomerPurchasedTotal(customer);
+}
+
+export function getCustomerPaidTotalByFilter(customer: DebtCustomer, filter: CustomerPaymentStatus | 'all') {
+  if (filter === 'paid') {
+    return Number(customer.paid_collected_total || 0);
+  }
+
+  if (filter === 'partial') {
+    return Number(customer.partial_collected_total || 0);
+  }
+
+  if (filter === 'unpaid') {
+    return 0;
+  }
+
+  return getCustomerPaidTotal(customer);
+}
+
 export function getCustomerDebtTotal(customer: DebtCustomer) {
   const debt = Number(customer.balance || 0);
   return debt > PAYMENT_EPSILON ? debt : 0;
@@ -75,25 +115,58 @@ export function getCustomerPaymentStatus(customer: DebtCustomer): CustomerPaymen
   return 'paid';
 }
 
+export function getCustomerInvoicesByStatus(customer: DebtCustomer, status: CustomerPaymentStatus) {
+  if (status === 'paid') {
+    return Number(customer.paid_invoice_count || 0);
+  }
+
+  if (status === 'partial') {
+    return Number(customer.partial_invoice_count || 0);
+  }
+
+  return Number(customer.unpaid_invoice_count || 0);
+}
+
+export function customerMatchesPaymentFilter(customer: DebtCustomer, filter: CustomerPaymentStatus | 'all') {
+  if (filter === 'all') {
+    return hasCustomerPurchases(customer);
+  }
+
+  const explicitCount = getCustomerInvoicesByStatus(customer, filter);
+  if (explicitCount > 0) {
+    return true;
+  }
+
+  const hasExplicitCounts =
+    Number(customer.paid_invoice_count || 0) > 0 ||
+    Number(customer.partial_invoice_count || 0) > 0 ||
+    Number(customer.unpaid_invoice_count || 0) > 0;
+
+  if (hasExplicitCounts) {
+    return false;
+  }
+
+  return getCustomerPaymentStatus(customer) === filter;
+}
+
 export function buildCustomerDebtSummary(customers: DebtCustomer[]): CustomerDebtSummary {
   return customers.reduce<CustomerDebtSummary>(
     (summary, customer) => {
-      const status = getCustomerPaymentStatus(customer);
       const debt = getCustomerDebtTotal(customer);
       const paid = getCustomerPaidTotal(customer);
 
       summary.totalDebt += debt;
       summary.totalPaid += paid;
 
-      if (status === 'paid') {
+      if (customerMatchesPaymentFilter(customer, 'paid')) {
         summary.fullyPaidCount += 1;
       }
 
-      if (status === 'partial') {
+      if (customerMatchesPaymentFilter(customer, 'partial')) {
         summary.partialCount += 1;
       }
 
-      if (status === 'unpaid') {
+      if (customerMatchesPaymentFilter(customer, 'unpaid')) {
         summary.unpaidCount += 1;
       }
 

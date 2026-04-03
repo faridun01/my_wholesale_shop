@@ -95,6 +95,31 @@ const mapCustomerWithTotals = (customer: any) => {
     0,
   );
   const balance = invoices.reduce((sum: number, invoice: any) => sum + getInvoiceBalance(invoice), 0);
+  const paidInvoices = invoices.filter((invoice: any) => getInvoiceBalance(invoice) <= PAYMENT_EPSILON);
+  const partialInvoices = invoices.filter((invoice: any) => {
+    const invoicePaidAmount = Math.max(0, Number(invoice.paidAmount || 0));
+    const invoiceBalance = getInvoiceBalance(invoice);
+    return invoicePaidAmount > PAYMENT_EPSILON && invoiceBalance > PAYMENT_EPSILON;
+  });
+  const unpaidInvoices = invoices.filter((invoice: any) => {
+    const invoicePaidAmount = Math.max(0, Number(invoice.paidAmount || 0));
+    const invoiceBalance = getInvoiceBalance(invoice);
+    return invoicePaidAmount <= PAYMENT_EPSILON && invoiceBalance > PAYMENT_EPSILON;
+  });
+  const paidInvoicedTotal = paidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
+  const paidCollectedTotal = paidInvoices.reduce(
+    (sum: number, invoice: any) => sum + Math.min(Number(invoice.paidAmount || 0), Number(invoice.netAmount || 0)),
+    0,
+  );
+  const partialInvoicedTotal = partialInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
+  const partialCollectedTotal = partialInvoices.reduce(
+    (sum: number, invoice: any) => sum + Math.min(Number(invoice.paidAmount || 0), Number(invoice.netAmount || 0)),
+    0,
+  );
+  const unpaidInvoicedTotal = unpaidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
+  const paidInvoiceCount = invoices.filter((invoice: any) => getInvoiceBalance(invoice) <= PAYMENT_EPSILON).length;
+  const partialInvoiceCount = partialInvoices.length;
+  const unpaidInvoiceCount = unpaidInvoices.length;
   const invoiceCount = invoices.length;
   const averageInvoice = invoiceCount > 0 ? totalInvoiced / invoiceCount : 0;
   const customerSegment = getCustomerSegment({
@@ -126,6 +151,14 @@ const mapCustomerWithTotals = (customer: any) => {
     total_paid: totalPaid,
     balance,
     invoice_count: invoiceCount,
+    paid_invoice_count: paidInvoiceCount,
+    partial_invoice_count: partialInvoiceCount,
+    unpaid_invoice_count: unpaidInvoiceCount,
+    paid_invoiced_total: paidInvoicedTotal,
+    paid_collected_total: paidCollectedTotal,
+    partial_invoiced_total: partialInvoicedTotal,
+    partial_collected_total: partialCollectedTotal,
+    unpaid_invoiced_total: unpaidInvoicedTotal,
     average_invoice: averageInvoice,
     customer_segment: customerSegment,
     last_purchase_at: lastPurchaseAt,
