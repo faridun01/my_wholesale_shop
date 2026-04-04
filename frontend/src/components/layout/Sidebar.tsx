@@ -155,8 +155,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
         className={clsx(
           'fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden border-r border-[#202c3c] bg-[#111927] text-[#eaf1f8] shadow-2xl transition-[width,transform] duration-300 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:overflow-hidden lg:shadow-none',
           sidebarCollapsed
-            ? 'w-[82vw] max-w-[312px] lg:w-[92px] lg:max-w-none'
-            : 'w-[82vw] max-w-[312px] lg:w-[246px] lg:max-w-none',
+            ? 'w-[86vw] max-w-[336px] lg:w-[92px] lg:max-w-none'
+            : 'w-[86vw] max-w-[336px] lg:w-[272px] lg:max-w-none',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -215,7 +215,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
         <nav
           className={clsx(
             'flex-1 overflow-visible lg:overflow-hidden',
-            sidebarCollapsed ? 'px-2.5 py-2' : 'px-3.5 py-3',
+            sidebarCollapsed ? 'px-2.5 py-2' : 'px-3 py-3',
           )}
         >
           <div className={clsx(sidebarCollapsed ? 'space-y-2' : 'space-y-2')}>
@@ -240,7 +240,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                           'group relative flex border transition-all duration-200',
                           sidebarCollapsed
                             ? 'mx-auto h-[50px] w-[50px] items-center justify-center rounded-[16px]'
-                            : 'items-center gap-3 rounded-[18px] px-3.5 py-3',
+                            : 'items-center gap-3 rounded-[18px] px-3 py-3',
                           isActive
                             ? 'border-[#31426b] bg-[#192542] text-white shadow-[0_10px_22px_rgba(9,15,28,0.24)]'
                             : 'border-transparent bg-transparent text-[#9daec4] hover:border-[#243146] hover:bg-[#182231] hover:text-white',

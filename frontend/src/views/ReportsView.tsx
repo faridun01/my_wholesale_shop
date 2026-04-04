@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, Warehouse, X } from 'lucide-react';
+import { FileSpreadsheet, Warehouse } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import { getWarehouses } from '../api/warehouses.api';
@@ -212,7 +212,6 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const [reportData, setReportData] = useState<ReportRow[]>([]);
   const [detailPage, setDetailPage] = useState(1);
   const [productProfitPage, setProductProfitPage] = useState(1);
-  const [showExportPreview, setShowExportPreview] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -407,12 +406,6 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     (productProfitPage - 1) * productProfitPageSize,
     productProfitPage * productProfitPageSize,
   );
-  const exportPreviewRows = reportData.slice(0, 6);
-  const exportSheetCount = Math.max(
-    1,
-    reportData.reduce((acc, row) => acc.add(row.warehouse_name || 'Без склада'), new Set<string>()).size + 1
-  );
-
   useEffect(() => {
     if (productProfitPage > productProfitTotalPages) {
       setProductProfitPage(productProfitTotalPages);
@@ -712,28 +705,14 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     XLSX.writeFile(workbook, `otchet_${reportType}_${reportMonth}_skachano_${downloadedAt}.xlsx`);
   };
 
-  const openExportPreview = () => {
+  const handleExportReport = async () => {
     if (!reportData.length) {
       toast.error('Сначала загрузите данные отчёта');
       return;
     }
-
-    setShowExportPreview(true);
-  };
-
-  const closeExportPreview = () => {
-    if (isExporting) {
-      return;
-    }
-
-    setShowExportPreview(false);
-  };
-
-  const handleExportWithPreview = async () => {
     try {
       setIsExporting(true);
       await exportToExcel();
-      setShowExportPreview(false);
     } catch (err) {
       console.error(err);
       toast.error('Не удалось скачать отчёт');
@@ -754,11 +733,12 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
-              onClick={openExportPreview}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800"
+              onClick={handleExportReport}
+              disabled={isExporting}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FileSpreadsheet size={16} />
-              <span>Excel</span>
+              <span>{isExporting ? 'Скачивание...' : 'Excel'}</span>
             </button>
           </div>
         </div>
@@ -946,10 +926,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         headerActions={
           <div className="flex items-center gap-2">
             <button
-              onClick={openExportPreview}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50"
+              onClick={handleExportReport}
+              disabled={isExporting}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Excel
+              {isExporting ? 'Скачивание...' : 'Excel'}
             </button>
           </div>
         }
@@ -1043,124 +1024,6 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         )}
       </Panel>
 
-      {showExportPreview && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={closeExportPreview}
-        >
-          <div
-            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2rem]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-6">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 sm:text-xl">Превью перед скачиванием</h3>
-                <p className="mt-1 text-sm text-slate-500">Проверьте отчёт перед выгрузкой в Excel.</p>
-              </div>
-              <button
-                type="button"
-                onClick={closeExportPreview}
-                disabled={isExporting}
-                className="text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto p-4 sm:p-6">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Отчёт</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{currentMeta.title}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Период</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{dateRange.start} - {dateRange.end}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Склад</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{selectedWarehouseName}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Листы / строки</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{exportSheetCount} / {reportData.length}</p>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-3xl border border-slate-200">
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900">Первые строки отчёта</h4>
-                    <p className="text-xs text-slate-500">
-                      Показаны {exportPreviewRows.length} из {reportData.length} строк
-                    </p>
-                  </div>
-                </div>
-                <div className="max-h-[45vh] overflow-auto">
-                  <table className="min-w-full text-left">
-                    <thead className="bg-slate-50 text-sm text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">Дата</th>
-                        <th className="px-4 py-3">Товар</th>
-                        <th className="px-4 py-3">Склад</th>
-                        <th className="px-4 py-3">
-                          {reportType === 'returns'
-                            ? 'Возврат'
-                            : reportType === 'writeoffs'
-                              ? 'Сумма списания'
-                              : reportType === 'profit'
-                                ? 'Прибыль'
-                                : 'Выручка'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                      {exportPreviewRows.map((row, index) => (
-                        <tr key={`${row.date}-${row.product_name}-preview-${index}`}>
-                          <td className="px-4 py-3">{new Date(row.date).toLocaleDateString('ru-RU')}</td>
-                          <td className="px-4 py-3 text-slate-900">{formatProductName(row.product_name)}</td>
-                          <td className="px-4 py-3">{row.warehouse_name || 'Без склада'}</td>
-                          <td className="px-4 py-3">
-                            {reportType === 'returns'
-                              ? formatCount(row.quantity)
-                              : formatMoney(
-                                  reportType === 'writeoffs'
-                                    ? Number(row.total_value || 0)
-                                    : reportType === 'profit'
-                                      ? Number(row.profit || 0)
-                                      : Number(row.total_sales || 0)
-                                )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end sm:p-6">
-              <button
-                type="button"
-                onClick={closeExportPreview}
-                disabled={isExporting}
-                className="rounded-xl px-6 py-3 font-medium text-slate-500 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                onClick={handleExportWithPreview}
-                disabled={isExporting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <FileSpreadsheet size={18} />
-                <span>{isExporting ? 'Скачивание...' : 'Скачать Excel'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );

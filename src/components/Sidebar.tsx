@@ -23,14 +23,14 @@ interface SidebarProps {
 export const SidebarItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void, key?: any }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+    className={`w-full min-w-0 flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
       active 
         ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 translate-x-1' 
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
   >
-    <Icon size={20} />
-    <span className="font-medium">{label}</span>
+    <Icon size={20} className="shrink-0" />
+    <span className="min-w-0 truncate font-medium">{label}</span>
   </button>
 );
 
@@ -47,21 +47,21 @@ export const Sidebar = ({ currentView, setCurrentView, user, onLogout, isMobile,
 
   return (
     <div className={`flex flex-col h-full ${isMobile ? 'bg-slate-900' : ''}`}>
-      <div className="p-6 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+      <div className="p-5 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center space-x-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/50">
             <Package className="text-white" size={24} />
           </div>
-          <span className="text-xl font-black text-white tracking-tight">WHOLESALE</span>
+          <span className="truncate text-lg font-black text-white tracking-tight sm:text-xl">WHOLESALE</span>
         </div>
         {isMobile && (
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="shrink-0 text-slate-400 hover:text-white">
             <X size={24} />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 mt-4">
+      <nav className="mt-3 flex-1 px-3 space-y-2">
         {items.filter(item => !item.roles || item.roles.includes(user?.role)).map(item => (
           <SidebarItem 
             key={item.id}
@@ -76,7 +76,7 @@ export const Sidebar = ({ currentView, setCurrentView, user, onLogout, isMobile,
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-3 border-t border-slate-800">
         <div className="bg-slate-800/50 rounded-2xl p-4 mb-4">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Пользователь</p>
           <p className="text-white font-bold truncate">{user?.username}</p>

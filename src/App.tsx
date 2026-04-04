@@ -211,7 +211,7 @@ export default function App() {
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              className="fixed inset-y-0 left-0 w-72 bg-slate-900 text-white z-50 lg:hidden"
+              className="fixed inset-y-0 left-0 w-[86vw] max-w-72 bg-slate-900 text-white z-50 lg:hidden"
             >
               <Sidebar 
                 currentView={currentView} 
