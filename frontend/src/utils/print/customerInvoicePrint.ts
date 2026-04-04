@@ -482,25 +482,7 @@ export function printCustomerInvoicesBatch({
     return { ok: false as const, reason: 'unavailable' as const };
   }
 
-  const allInvoices = customers.flatMap((customer) => customer.invoices);
-  const totalPages = allInvoices.length;
-  let pageNumber = 0;
-
-  const sectionsHtml = [
-    renderBatchOverviewSection(customers, filterLabel, generatedAt),
-    ...customers.flatMap((customer) => [
-      renderCustomerGroupHeader(customer),
-      ...customer.invoices.map((invoice) => {
-        pageNumber += 1;
-        return renderCustomerInvoiceSection(invoice, {
-          pageNumber,
-          totalPages,
-          generatedAt,
-          filterLabel,
-        });
-      }),
-    ]),
-  ].join('');
+  const sectionsHtml = renderBatchOverviewSection(customers, filterLabel, generatedAt);
 
   iframeDocument.open();
   iframeDocument.write(buildDocumentHtml(sectionsHtml, `Клиенты и долги - ${filterLabel}`));
