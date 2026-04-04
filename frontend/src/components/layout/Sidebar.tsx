@@ -153,14 +153,14 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden border-r border-[#202c3c] bg-[#111927] text-[#eaf1f8] shadow-2xl transition-[width,transform] duration-300 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:overflow-hidden lg:shadow-none',
+          'fixed inset-y-0 left-0 z-50 flex h-[100dvh] flex-col overflow-y-auto overflow-x-hidden border-r border-[#202c3c] bg-[#111927] text-[#eaf1f8] shadow-2xl transition-[width,transform] duration-300 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:overflow-y-auto lg:shadow-none',
           sidebarCollapsed
-            ? 'w-[86vw] max-w-[336px] lg:w-[92px] lg:max-w-none'
-            : 'w-[86vw] max-w-[336px] lg:w-[272px] lg:max-w-none',
+            ? 'w-screen max-w-full sm:w-[84vw] sm:max-w-[320px] lg:w-[84px] lg:max-w-none'
+            : 'w-screen max-w-full sm:w-[84vw] sm:max-w-[320px] lg:w-[248px] lg:max-w-none',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className={clsx('border-b border-white/5', sidebarCollapsed ? 'px-3 py-2.5' : 'px-4 py-3.5')}>
+        <div className={clsx('border-b border-white/5', sidebarCollapsed ? 'px-2.5 py-2.5' : 'px-3.5 py-3')}>
           <div className={clsx('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-3')}>
             <button
               type="button"
@@ -177,7 +177,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
               className={clsx(
                 'flex shrink-0 items-center justify-center transition-all duration-200',
                 sidebarCollapsed
-                  ? 'h-[50px] w-[50px] rounded-[18px] bg-[linear-gradient(180deg,#5a49ff_0%,#4a2fe0_100%)] text-white shadow-[0_12px_28px_rgba(88,72,255,0.28)]'
+                  ? 'h-[46px] w-[46px] rounded-[16px] bg-[linear-gradient(180deg,#5a49ff_0%,#4a2fe0_100%)] text-white shadow-[0_12px_28px_rgba(88,72,255,0.28)]'
                   : 'h-11 w-11 rounded-[16px] bg-[linear-gradient(180deg,#5a49ff_0%,#4a2fe0_100%)] text-white shadow-[0_12px_24px_rgba(88,72,255,0.24)]',
               )}
             >
@@ -214,8 +214,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
         <nav
           className={clsx(
-            'flex-1 overflow-visible lg:overflow-hidden',
-            sidebarCollapsed ? 'px-2.5 py-2' : 'px-3 py-3',
+            'flex-1 overflow-visible',
+            sidebarCollapsed ? 'px-2 py-2' : 'px-2.5 py-2.5',
           )}
         >
           <div className={clsx(sidebarCollapsed ? 'space-y-2' : 'space-y-2')}>
@@ -239,8 +239,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                         clsx(
                           'group relative flex border transition-all duration-200',
                           sidebarCollapsed
-                            ? 'mx-auto h-[50px] w-[50px] items-center justify-center rounded-[16px]'
-                            : 'items-center gap-3 rounded-[18px] px-3 py-3',
+                            ? 'mx-auto h-[46px] w-[46px] items-center justify-center rounded-[16px]'
+                            : 'items-center gap-3 rounded-[16px] px-3 py-2.5',
                           isActive
                             ? 'border-[#31426b] bg-[#192542] text-white shadow-[0_10px_22px_rgba(9,15,28,0.24)]'
                             : 'border-transparent bg-transparent text-[#9daec4] hover:border-[#243146] hover:bg-[#182231] hover:text-white',
@@ -277,7 +277,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           </div>
         </nav>
 
-        <div className={clsx('mt-auto border-t border-white/5', sidebarCollapsed ? 'px-2.5 py-2' : 'px-3.5 py-3')}>
+        <div className={clsx('mt-auto border-t border-white/5', sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-2.5')}>
           <div
             className={clsx(
               'rounded-[18px] border border-[#223043] bg-[#172133]',
