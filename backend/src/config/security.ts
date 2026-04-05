@@ -5,15 +5,30 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
 ];
 
+const normalizeOrigin = (origin: string) => origin.trim().replace(/\/+$/, '');
+
+const expandOriginVariants = (origin: string) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  if (!normalizedOrigin) {
+    return [];
+  }
+
+  if (/^https?:\/\//i.test(normalizedOrigin)) {
+    return [normalizedOrigin];
+  }
+
+  return [`http://${normalizedOrigin}`, `https://${normalizedOrigin}`];
+};
+
 const parseOrigins = (value?: string | null) =>
   (value ?? '')
     .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+    .flatMap((origin) => expandOriginVariants(origin));
 
 export const allowedOrigins = Array.from(
   new Set([
-    ...DEFAULT_ALLOWED_ORIGINS,
+    ...DEFAULT_ALLOWED_ORIGINS.map(normalizeOrigin),
     ...parseOrigins(process.env.CORS_ORIGINS),
     ...parseOrigins(process.env.FRONTEND_ORIGIN),
   ])
