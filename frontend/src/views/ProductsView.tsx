@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
-import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, deleteProductBatch, writeOffProduct } from '../api/products.api';
+import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, reverseCorrectionWriteOffTransaction, deleteProductBatch, writeOffProduct, returnWriteOffTransaction, deleteWriteOffTransactionPermanently } from '../api/products.api';
 import { 
   Plus, 
   PlusCircle,
@@ -11,7 +12,6 @@ import {
   Edit,
   Trash2,
   Camera,
-  FileSpreadsheet,
   Loader2,
   ChevronUp,
   ChevronDown,
@@ -21,12 +21,15 @@ import {
   DollarSign,
   Layers,
   GitMerge,
-  Image as ImageIcon
+  Image as ImageIcon,
+  FileText,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { formatDollar, formatMoney, roundMoney, toFixedNumber } from '../utils/format';
+import { formatDollar, formatMoney, formatPercent, roundMoney, toFixedNumber } from '../utils/format';
 import {
   calculateEffectiveCost,
   calculateLineTotal,
@@ -39,6 +42,7 @@ import { createSettingsCategory, getSettingsCategories } from '../api/settings-r
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
+import { downloadStockReportPdf } from '../utils/print/stockReportPdf';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
@@ -151,6 +155,96 @@ type PackagingOption = {
   isDefault?: boolean;
 };
 
+type ProductFormData = {
+  name: string;
+  unit: string;
+  baseUnitName: string;
+  packagingEnabled: boolean;
+  packageName: string;
+  unitsPerPackage: string;
+  categoryId: string;
+  warehouseId: string;
+  costPrice: string;
+  expensePercent: string;
+  sellingPrice: string;
+  minStock: string;
+  initialStock: string;
+  photoUrl: string;
+};
+
+const createEmptyProductForm = (): ProductFormData => ({
+  name: '',
+  unit: 'шт',
+  baseUnitName: 'шт',
+  packagingEnabled: true,
+  packageName: 'коробка',
+  unitsPerPackage: '',
+  categoryId: '',
+  warehouseId: '',
+  costPrice: '',
+  expensePercent: '0',
+  sellingPrice: '',
+  minStock: '0',
+  initialStock: '0',
+  photoUrl: ''
+});
+
+const buildProductFormData = (product?: any): ProductFormData => {
+  if (!product) {
+    return createEmptyProductForm();
+  }
+
+  const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+  const baseUnitName = normalizeOcrBaseUnit(product.baseUnitName || product.unit || 'шт');
+  const unitsPerPackage = Number(defaultPackaging?.unitsPerPackage || 0);
+
+  return {
+    name: product.name || '',
+    unit: baseUnitName,
+    baseUnitName,
+    packagingEnabled: unitsPerPackage > 0,
+    packageName: normalizeOcrPackageName(defaultPackaging?.packageName || 'коробка') || 'коробка',
+    unitsPerPackage: unitsPerPackage > 0 ? String(unitsPerPackage) : '',
+    categoryId: product.categoryId?.toString() || '',
+    warehouseId: product.warehouseId?.toString() || '',
+    costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+    expensePercent: String(product.expensePercent ?? 0),
+    sellingPrice: formatPriceInput(product.sellingPrice),
+    minStock: product.minStock?.toString() || '0',
+    initialStock: product.initialStock?.toString() || '0',
+    photoUrl: product.photoUrl || ''
+  };
+};
+
+const buildProductSubmitPayload = (formData: ProductFormData, categoryId: number) => {
+  const baseUnitName = normalizeOcrBaseUnit(formData.baseUnitName || formData.unit || 'шт');
+  const unitsPerPackage = Number(formData.unitsPerPackage || 0);
+  const packagingEnabled = formData.packagingEnabled && unitsPerPackage > 0;
+
+  return {
+    name: formData.name,
+    unit: baseUnitName,
+    baseUnitName,
+    categoryId,
+    warehouseId: Number(formData.warehouseId),
+    costPrice: roundMoney(formData.costPrice),
+    purchaseCostPrice: roundMoney(formData.costPrice),
+    expensePercent: parseFloat(formData.expensePercent || '0'),
+    sellingPrice: roundMoney(formData.sellingPrice),
+    minStock: parseFloat(formData.minStock),
+    initialStock: parseFloat(formData.initialStock),
+    photoUrl: formData.photoUrl,
+    packaging: packagingEnabled
+      ? {
+          packageName: normalizeOcrPackageName(formData.packageName || 'коробка'),
+          baseUnitName,
+          unitsPerPackage,
+          isDefault: true,
+        }
+      : null,
+  };
+};
+
 const normalizePackagings = (product: any): PackagingOption[] =>
   Array.isArray(product?.packagings)
     ? product.packagings
@@ -253,6 +347,31 @@ const getStockSortMetrics = (product: any) => {
   };
 };
 
+const getProductEfficiencyMetrics = (product: any) => {
+  const costPrice = Number(product?.costPrice || 0);
+  const sellingPrice = Number(product?.sellingPrice || 0);
+  const profitPerUnit = sellingPrice - costPrice;
+  const marginPercent = sellingPrice > 0 ? (profitPerUnit / sellingPrice) * 100 : 0;
+
+  let label = 'Слабая';
+  let className = 'bg-rose-50 text-rose-700 border-rose-100';
+
+  if (marginPercent >= 25) {
+    label = 'Высокая';
+    className = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  } else if (marginPercent >= 12) {
+    label = 'Нормальная';
+    className = 'bg-amber-50 text-amber-700 border-amber-100';
+  }
+
+  return {
+    profitPerUnit,
+    marginPercent,
+    label,
+    className,
+  };
+};
+
 const compareValues = (aValue: any, bValue: any, direction: 'asc' | 'desc') => {
   if (aValue < bValue) return direction === 'asc' ? -1 : 1;
   if (aValue > bValue) return direction === 'asc' ? 1 : -1;
@@ -348,6 +467,8 @@ export default function ProductsView() {
   const ProductBatchesModal = React.lazy(() => import('../components/products/ProductBatchesModal'));
   const hasLoadedReferenceDataRef = React.useRef(false);
   const latestProductsRequestRef = React.useRef(0);
+  const initialSortAppliedRef = React.useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = React.useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const userWarehouseId = getUserWarehouseId(user);
@@ -366,12 +487,16 @@ export default function ProductsView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showBatchesModal, setShowBatchesModal] = useState(false);
+  const [showReturnWriteOffModal, setShowReturnWriteOffModal] = useState(false);
+  const [showDeleteWriteOffConfirm, setShowDeleteWriteOffConfirm] = useState(false);
   const [productHistory, setProductHistory] = useState<any[]>([]);
   const [productBatches, setProductBatches] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedHistoryTransaction, setSelectedHistoryTransaction] = useState<any>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [isMergingDuplicates, setIsMergingDuplicates] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(userWarehouseId ? String(userWarehouseId) : '');
+  const [forceWarehouseLowStockView, setForceWarehouseLowStockView] = useState(false);
   const [transferData, setTransferData] = useState({
     fromWarehouseId: '',
     toWarehouseId: '',
@@ -392,6 +517,10 @@ export default function ProductsView() {
     productId: '',
     quantity: '1',
     reason: 'брак',
+  });
+  const [returnWriteOffData, setReturnWriteOffData] = useState({
+    quantity: '1',
+    reason: 'ошибка ввода',
   });
   const [ocrResults, setOcrResults] = useState<any[] | null>(null);
   const [ocrOriginalCount, setOcrOriginalCount] = useState(0);
@@ -428,7 +557,10 @@ export default function ProductsView() {
   const closeHistoryModal = () => {
     setShowHistoryModal(false);
     setShowWriteOffModal(false);
+    setShowReturnWriteOffModal(false);
+    setShowDeleteWriteOffConfirm(false);
     setProductHistory([]);
+    setSelectedHistoryTransaction(null);
     setSelectedProduct(null);
   };
 
@@ -468,6 +600,20 @@ export default function ProductsView() {
       quantity: '1',
       reason: 'брак',
     });
+  };
+
+  const closeReturnWriteOffModal = () => {
+    setShowReturnWriteOffModal(false);
+    setSelectedHistoryTransaction(null);
+    setReturnWriteOffData({
+      quantity: '1',
+      reason: 'ошибка ввода',
+    });
+  };
+
+  const closeDeleteWriteOffConfirm = () => {
+    setShowDeleteWriteOffConfirm(false);
+    setSelectedHistoryTransaction(null);
   };
 
   const closeMergeModal = () => {
@@ -510,18 +656,7 @@ export default function ProductsView() {
       ? transferPackageQuantity * transferUnitsPerPackage
       : Number(transferData.quantity || 0);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    unit: 'шт',
-    categoryId: '',
-    warehouseId: '',
-    costPrice: '',
-    expensePercent: '0',
-    sellingPrice: '',
-    minStock: '0',
-    initialStock: '0',
-    photoUrl: ''
-  });
+  const [formData, setFormData] = useState<ProductFormData>(createEmptyProductForm());
   const numericSortKeys = new Set(['costPrice', 'sellingPrice', 'stock', 'totalIncoming', 'minStock', 'initialStock']);
   const effectiveFormCostPrice = (() => {
     return calculateEffectiveCost(formData.costPrice, formData.expensePercent);
@@ -621,8 +756,10 @@ export default function ProductsView() {
       showTransferModal ||
       showRestockModal ||
       showWriteOffModal ||
+      showReturnWriteOffModal ||
       showMergeModal ||
       showDeleteConfirm ||
+      showDeleteWriteOffConfirm ||
       showHistoryModal ||
       showBatchesModal ||
       Boolean(ocrResults);
@@ -637,7 +774,9 @@ export default function ProductsView() {
       }
 
       if (showWriteOffModal) return closeWriteOffModal();
+      if (showReturnWriteOffModal) return closeReturnWriteOffModal();
       if (showDeleteConfirm) return closeDeleteConfirm();
+      if (showDeleteWriteOffConfirm) return closeDeleteWriteOffConfirm();
       if (showHistoryModal) return closeHistoryModal();
       if (showBatchesModal) return closeBatchesModal();
       if (showMergeModal) return closeMergeModal();
@@ -654,9 +793,11 @@ export default function ProductsView() {
     showAddModal,
     showBatchesModal,
     showDeleteConfirm,
+    showDeleteWriteOffConfirm,
     showEditModal,
     showHistoryModal,
     showMergeModal,
+    showReturnWriteOffModal,
     showRestockModal,
     showWriteOffModal,
     showTransferModal,
@@ -1156,17 +1297,7 @@ export default function ProductsView() {
     e.preventDefault();
     try {
       const categoryId = await resolveCategoryIdForSubmit();
-      await createProduct({
-        ...formData,
-        categoryId,
-        warehouseId: Number(formData.warehouseId),
-        costPrice: roundMoney(formData.costPrice),
-        purchaseCostPrice: roundMoney(formData.costPrice),
-        expensePercent: parseFloat(formData.expensePercent || '0'),
-        sellingPrice: roundMoney(formData.sellingPrice),
-        minStock: parseFloat(formData.minStock),
-        initialStock: parseFloat(formData.initialStock)
-      });
+      await createProduct(buildProductSubmitPayload(formData, categoryId));
       toast.success('Товар успешно добавлен!');
       setShowAddModal(false);
       resetForm();
@@ -1181,17 +1312,7 @@ export default function ProductsView() {
     if (!selectedProduct) return;
     try {
       const categoryId = await resolveCategoryIdForSubmit();
-      await updateProduct(selectedProduct.id, {
-        ...formData,
-        categoryId,
-        warehouseId: Number(formData.warehouseId),
-        costPrice: roundMoney(formData.costPrice),
-        purchaseCostPrice: roundMoney(formData.costPrice),
-        expensePercent: parseFloat(formData.expensePercent || '0'),
-        sellingPrice: roundMoney(formData.sellingPrice),
-        minStock: parseFloat(formData.minStock),
-        initialStock: parseFloat(formData.initialStock)
-      });
+      await updateProduct(selectedProduct.id, buildProductSubmitPayload(formData, categoryId));
       toast.success('Товар успешно обновлён!');
       setShowEditModal(false);
       resetForm();
@@ -1243,6 +1364,96 @@ export default function ProductsView() {
       toast.success('Приход успешно отменён');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Не удалось отменить приход');
+    }
+  };
+
+  const handleReverseCorrectionWriteOff = async (transactionId: number) => {
+    if (!selectedProduct || !transactionId) return;
+
+    const confirmed = window.confirm(
+      'Отменить корректировочное списание? Система вернёт товар на склад и восстановит приход по этой корректировке.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await reverseCorrectionWriteOffTransaction(transactionId);
+      const history = await getProductHistory(selectedProduct.id);
+      setProductHistory(history);
+      await fetchInitialData();
+      toast.success('Корректировочное списание успешно отменено');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Не удалось отменить корректировку');
+    }
+  };
+
+  const handleOpenReturnWriteOffModal = (transaction: any) => {
+    const originalQuantity = Math.abs(Number(transaction?.qtyChange || 0));
+    if (!transaction?.transactionId || originalQuantity <= 0) {
+      toast.error('Некорректное списание для возврата');
+      return;
+    }
+
+    setSelectedHistoryTransaction(transaction);
+    setReturnWriteOffData({
+      quantity: String(originalQuantity),
+      reason: 'ошибка ввода',
+    });
+    setShowReturnWriteOffModal(true);
+  };
+
+  const handleSubmitReturnWriteOff = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!selectedProduct?.id || !selectedHistoryTransaction?.transactionId) {
+      return;
+    }
+
+    const quantity = Number(String(returnWriteOffData.quantity || '').trim());
+    const reason = String(returnWriteOffData.reason || '').trim();
+
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+      toast.error('Введите целое количество для возврата');
+      return;
+    }
+
+    try {
+      await returnWriteOffTransaction(Number(selectedHistoryTransaction.transactionId), { quantity, reason });
+      const history = await getProductHistory(selectedProduct.id);
+      setProductHistory(history);
+      await fetchInitialData();
+      closeReturnWriteOffModal();
+      toast.success('Списание возвращено на склад');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Не удалось вернуть списание');
+    }
+  };
+
+  const handleOpenDeleteWriteOffConfirm = (transaction: any) => {
+    if (!transaction?.transactionId) {
+      toast.error('Некорректное списание для удаления');
+      return;
+    }
+
+    setSelectedHistoryTransaction(transaction);
+    setShowDeleteWriteOffConfirm(true);
+  };
+
+  const handleDeleteWriteOffPermanently = async () => {
+    if (!selectedProduct?.id || !selectedHistoryTransaction?.transactionId) {
+      return;
+    }
+
+    try {
+      await deleteWriteOffTransactionPermanently(Number(selectedHistoryTransaction.transactionId));
+      const history = await getProductHistory(selectedProduct.id);
+      setProductHistory(history);
+      await fetchInitialData();
+      closeDeleteWriteOffConfirm();
+      toast.success('Списание удалено без возможности восстановления');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Не удалось удалить списание');
     }
   };
 
@@ -1409,24 +1620,16 @@ export default function ProductsView() {
   };
 
   const getRobustDuplicateKey = (product: any) => {
-    const warehouseId = selectedWarehouseId ? Number(product?.warehouseId || selectedWarehouseId || 0) : 0;
+    const warehouseId =
+      selectedWarehouseId || forceWarehouseLowStockView
+        ? Number(product?.warehouseId || selectedWarehouseId || 0)
+        : 0;
     const fallbackName = normalizeCatalogName(String(product?.name || ''));
     return `${warehouseId}::${fallbackName}`;
   };
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      unit: 'шт',
-      categoryId: '',
-      warehouseId: '',
-      costPrice: '',
-      expensePercent: '0',
-      sellingPrice: '',
-      minStock: '0',
-      initialStock: '0',
-      photoUrl: ''
-    });
+    setFormData(createEmptyProductForm());
     setCategoryInput('');
     setIsCategoryManual(false);
     setSelectedProduct(null);
@@ -1476,8 +1679,8 @@ export default function ProductsView() {
     return compareProductsBySort(a, b, sortConfig);
   });
 
-  const baseProducts = selectedWarehouseId ? sortedProducts : sortedAggregatedProducts;
-  const isAggregateMode = !selectedWarehouseId;
+  const baseProducts = selectedWarehouseId || forceWarehouseLowStockView ? sortedProducts : sortedAggregatedProducts;
+  const isAggregateMode = !selectedWarehouseId && !forceWarehouseLowStockView;
   const normalizedSearch = normalizeCatalogName(search);
 
   const filteredProducts = baseProducts.filter(p => {
@@ -1573,7 +1776,31 @@ export default function ProductsView() {
   useEffect(() => {
     setCurrentPage(1);
     setExpandedMobileActionsId(null);
-  }, [search, selectedWarehouseId, sortConfig.key, sortConfig.direction]);
+  }, [forceWarehouseLowStockView, search, selectedWarehouseId, sortConfig.key, sortConfig.direction]);
+
+  useEffect(() => {
+    const sortMode = String(searchParams.get('sort') || '').trim().toLowerCase();
+    const requestedView = String(searchParams.get('view') || '').trim().toLowerCase();
+    const shouldForceWarehouseLowStockView = requestedView === 'warehouse-low-stock';
+
+    if (forceWarehouseLowStockView !== shouldForceWarehouseLowStockView) {
+      setForceWarehouseLowStockView(shouldForceWarehouseLowStockView);
+    }
+
+    if (sortMode !== 'low-stock' || initialSortAppliedRef.current) {
+      if (!requestedView) {
+        return;
+      }
+    } else {
+      initialSortAppliedRef.current = true;
+      setSortConfig({ key: 'stock', direction: 'asc' });
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('sort');
+    nextParams.delete('view');
+    setSearchParams(nextParams, { replace: true });
+  }, [forceWarehouseLowStockView, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -1608,53 +1835,32 @@ export default function ProductsView() {
   };
 
   const exportStockReport = async () => {
-    if (!displayProducts.length) {
+    if (!filteredProducts.length) {
       toast.error('Нет товаров для выгрузки');
       return;
     }
 
-    const XLSX = await import('xlsx');
     const warehouseName = warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
     const downloadedAt = new Date();
-    const downloadedAtLabel = downloadedAt.toLocaleString('ru-RU');
-    const downloadedAtValue = downloadedAt.toISOString().slice(0, 10);
-    const rows: unknown[][] = [
-      ['Отчёт по остаткам товаров'],
-      ['Склад', warehouseName],
-      ['Скачано', downloadedAtLabel],
-      [],
-      ['Товар', 'Остаток', 'Склад'],
-      ...displayProducts.map((product) => {
+
+    await downloadStockReportPdf({
+      warehouseName,
+      generatedAt: downloadedAt,
+      rows: filteredProducts.map((product, index) => {
         const stockBreakdown = getStockBreakdown(product);
 
-        return [
-          formatProductName(product.name),
-          String(stockBreakdown.primary || '')
+        return {
+          index: index + 1,
+          name: formatProductName(product.name),
+          stock: String(stockBreakdown.primary || '')
             .replace(/\n/g, ' + ')
             .replace(/\s+/g, ' ')
             .trim(),
-          product.warehouse?.name || warehouseName,
-        ];
+        };
       }),
-    ];
+    });
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    worksheet['!cols'] = [
-      { wch: 42 },
-      { wch: 28 },
-      { wch: 22 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Остатки');
-
-    const safeWarehouseName = String(warehouseName || 'vse-sklady')
-      .toLowerCase()
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zа-я0-9_-]+/gi, '') || 'vse-sklady';
-
-    XLSX.writeFile(workbook, `ostatki_${safeWarehouseName}_${downloadedAtValue}.xlsx`);
-    toast.success('Остатки товаров скачаны');
+    toast.success('Остатки товаров скачаны в PDF');
   };
 
   return (
@@ -1770,15 +1976,93 @@ export default function ProductsView() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Ед. измерения</label>
-                    <input 
-                      type="text" 
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Базовая единица</label>
+                    <select
                       required
-                      value={formData.unit}
-                      onChange={e => setFormData({...formData, unit: e.target.value})}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
-                      placeholder="шт, кг, литр..."
-                    />
+                      value={formData.baseUnitName}
+                      onChange={(e) => {
+                        const nextBaseUnit = normalizeOcrBaseUnit(e.target.value);
+                        setFormData({
+                          ...formData,
+                          baseUnitName: nextBaseUnit,
+                          unit: nextBaseUnit,
+                        });
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                    >
+                      <option value="шт">Шт</option>
+                      <option value="кг">Кг</option>
+                      <option value="литр">Литр</option>
+                      <option value="бутылка">Бутылка</option>
+                      <option value="флакон">Флакон</option>
+                    </select>
+                    <p className="mt-1 text-[11px] font-medium text-slate-400">
+                      Это основная единица учёта товара на складе.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
+                        <p className="text-xs font-medium text-slate-500">Новые товары по умолчанию создаются в коробках или мешках. Штуки считаются автоматически.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            packagingEnabled: !prev.packagingEnabled,
+                            packageName: prev.packageName || 'коробка',
+                            unitsPerPackage: prev.packagingEnabled ? '' : prev.unitsPerPackage,
+                          }))
+                        }
+                        className={clsx(
+                          'rounded-full border px-3 py-1.5 text-xs font-bold transition-all',
+                          formData.packagingEnabled
+                            ? 'border-amber-300 bg-amber-100 text-amber-800'
+                            : 'border-slate-200 bg-white text-slate-600'
+                        )}
+                      >
+                        {formData.packagingEnabled ? 'Коробки / мешки' : 'Только шт'}
+                      </button>
+                    </div>
+
+                    {formData.packagingEnabled && (
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Тип упаковки</label>
+                          <select
+                            value={formData.packageName}
+                            onChange={(e) => setFormData({ ...formData, packageName: normalizeOcrPackageName(e.target.value) || 'коробка' })}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                          >
+                            <option value="коробка">Коробка</option>
+                            <option value="мешок">Мешок</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">
+                            Сколько шт в {formData.packageName === 'мешок' ? 'мешке' : 'коробке'}
+                          </label>
+                          <input
+                            type="number"
+                            min="2"
+                            step="1"
+                            required={formData.packagingEnabled}
+                            value={formData.unitsPerPackage}
+                            onChange={(e) => setFormData({ ...formData, unitsPerPackage: e.target.value })}
+                            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                            placeholder="Напр: 24"
+                          />
+                        </div>
+                        <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700">
+                          1 {formData.packageName || 'коробка'} = {Number(formData.unitsPerPackage || 0) || '...'} {normalizeDisplayBaseUnit(formData.baseUnitName || 'шт')}
+                        </div>
+                        <div className="sm:col-span-2 text-[11px] font-medium text-slate-500">
+                          При пополнении этот товар будет удобно добавляться в {formData.packageName === 'мешок' ? 'мешках' : 'коробках'}, а ниже система сама покажет итог в штуках.
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Категория</label>
@@ -2136,20 +2420,24 @@ export default function ProductsView() {
                           >
                             {restockPackagings.map((packaging) => (
                               <option key={packaging.id} value={packaging.id}>
-                                {packaging.packageName} x {packaging.unitsPerPackage}
+                                {packaging.packageName} • {packaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
                               </option>
                             ))}
                           </select>
+                          <p className="mt-2 text-xs font-medium text-slate-400">
+                            Пополнение идёт упаковками. Штуки считаются автоматически ниже.
+                          </p>
                         </div>
                         <div>
                           <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">
-                            Количество {selectedRestockPackaging.packageName}
+                            Сколько {selectedRestockPackaging.packageName === 'мешок' ? 'мешков' : 'коробок'}
                           </label>
                           <input
                             type="number"
-                            min="0"
+                            min="1"
                             required
                             value={restockData.packageQuantityInput}
+                            placeholder={selectedRestockPackaging.packageName === 'мешок' ? 'Введите количество мешков' : 'Введите количество коробок'}
                           onChange={e =>
                             setRestockData((prev) => ({
                               ...prev,
@@ -2165,8 +2453,8 @@ export default function ProductsView() {
                           <p className="mt-2 text-xs font-medium text-slate-400">
                             1 {formatCountWithUnit(1, selectedRestockPackaging.packageName).replace(/^1\s+/, '')} = {selectedRestockPackaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
                           </p>
-                          <p className="mt-1 text-xs font-medium text-slate-400">
-                            Итого: {totalRestockUnits} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                          <p className="mt-1 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                            Итого в штуках: {totalRestockUnits} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
                           </p>
                         </div>
                       </>
@@ -2786,6 +3074,9 @@ export default function ProductsView() {
             product={selectedProduct}
             productHistory={productHistory}
             onReverseIncoming={handleReverseIncoming}
+            onReverseCorrectionWriteOff={handleReverseCorrectionWriteOff}
+            onReturnWriteOff={handleOpenReturnWriteOffModal}
+            onDeleteWriteOffPermanently={handleOpenDeleteWriteOffConfirm}
             onWriteOff={isAdmin ? handleOpenWriteOffModal : undefined}
           />
           <ProductBatchesModal
@@ -2883,6 +3174,116 @@ export default function ProductsView() {
           />
         </React.Suspense>
 
+        <React.Suspense fallback={null}>
+          <ConfirmationModal
+            isOpen={showDeleteWriteOffConfirm}
+            onClose={closeDeleteWriteOffConfirm}
+            onConfirm={handleDeleteWriteOffPermanently}
+            title="Удалить списание навсегда?"
+            message="Операция полностью удалит запись списания из истории. Складской остаток и приход будут восстановлены, но восстановить саму удалённую запись потом уже нельзя."
+            confirmText="Удалить навсегда"
+            cancelText="Отмена"
+            type="danger"
+          />
+        </React.Suspense>
+
+      <AnimatePresence>
+        {showReturnWriteOffModal && selectedHistoryTransaction && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeReturnWriteOffModal}
+            className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:rounded-[2rem]"
+            >
+              <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#eefcf6_0%,#ffffff_58%,#f3fbff_100%)] px-4 py-4 sm:px-6 sm:py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">
+                      <RotateCcw size={12} />
+                      <span>Возврат списания</span>
+                    </div>
+                    <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Вернуть товар на склад</h3>
+                    <p className="mt-1 text-sm font-medium text-slate-500">Используйте это, если списание было введено ошибочно.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeReturnWriteOffModal}
+                    className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmitReturnWriteOff} className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Списание</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{new Date(selectedHistoryTransaction.createdAt).toLocaleString('ru-RU')}</p>
+                  </div>
+                  <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Доступно вернуть</p>
+                    <p className="mt-2 text-sm font-black text-emerald-900">{Math.abs(Number(selectedHistoryTransaction.qtyChange || 0))}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество возврата</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={returnWriteOffData.quantity}
+                    onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
+                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-2xl font-black text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина возврата</label>
+                  <input
+                    type="text"
+                    value={returnWriteOffData.reason}
+                    onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
+                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                    placeholder="Ошибка ввода"
+                  />
+                </div>
+
+                <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  Возврат восстановит остаток на складе и приход по этому списанию.
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeReturnWriteOffModal}
+                    className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-[linear-gradient(135deg,#10b981_0%,#0f766e_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(16,185,129,0.24)] transition-all hover:-translate-y-px hover:brightness-105"
+                  >
+                    Вернуть на склад
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex w-full flex-col gap-3 lg:max-w-4xl lg:flex-1">
@@ -2914,17 +3315,17 @@ export default function ProductsView() {
               <button
                 type="button"
                 onClick={exportStockReport}
-                disabled={!displayProducts.length}
+                disabled={!filteredProducts.length}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
-                <FileSpreadsheet size={16} />
-                <span>Скачать остаток</span>
+                <FileText size={16} />
+                <span>Скачать остаток PDF</span>
               </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3.5 py-2 text-[11px] font-semibold text-emerald-700">
-              Товаров: {displayProducts.length}
+              Товаров: {filteredProducts.length}
             </div>
             {duplicateProductsCount > 0 ? (
               <>
@@ -3034,10 +3435,10 @@ export default function ProductsView() {
                   </div>
                 </div>
 
-                <div className={clsx(
-                  "grid gap-3",
-                  isAdmin ? "grid-cols-3" : "grid-cols-2"
-                )}>
+                  <div className={clsx(
+                    "grid gap-3",
+                    isAdmin ? "grid-cols-4" : "grid-cols-2"
+                  )}>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
                     <p className="mt-1 break-words text-sm font-semibold text-slate-900">
@@ -3056,6 +3457,19 @@ export default function ProductsView() {
                       <p className="mt-1 break-words text-sm font-semibold text-slate-900">
                         {isAggregateMode ? '-' : formatMoney(product.costPrice)}
                       </p>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Рентабельность</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                        {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
+                      </p>
+                      {!isAggregateMode && (
+                        <span className={clsx('mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
+                          {getProductEfficiencyMetrics(product).label}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3081,18 +3495,7 @@ export default function ProductsView() {
                       <button
                         onClick={() => {
                           setSelectedProduct(product);
-                          setFormData({
-                            name: product.name || '',
-                            unit: product.unit || '',
-                            categoryId: product.categoryId?.toString() || '',
-                            warehouseId: product.warehouseId?.toString() || '',
-                            costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                            expensePercent: String(product.expensePercent ?? 0),
-                            sellingPrice: formatPriceInput(product.sellingPrice),
-                            minStock: product.minStock?.toString() || '0',
-                            initialStock: product.initialStock?.toString() || '0',
-                            photoUrl: product.photoUrl || ''
-                          });
+                          setFormData(buildProductFormData(product));
                           setCategoryInput(product.category?.name || '');
                           setShowEditModal(true);
                           setExpandedMobileActionsId(null);
@@ -3241,6 +3644,7 @@ export default function ProductsView() {
                   </div>
                 </th>
                 <th className="px-5 py-3">Приход</th>
+                {isAdmin && <th className="px-5 py-3">Рентабельность</th>}
                 {isAdmin && <th className="px-5 py-3 text-right">Действия</th>}
               </tr>
             </thead>
@@ -3321,6 +3725,20 @@ export default function ProductsView() {
                   <td className="px-5 py-3">
                     <p className="text-xs font-medium text-slate-500">{product.totalIncoming} <span className="text-[10px] font-medium text-slate-400 uppercase">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span></p>
                   </td>
+                  {isAdmin && (
+                    <td className="px-5 py-3">
+                      {selectedWarehouseId ? (
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-900">{formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}</p>
+                          <span className={clsx('inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
+                            {getProductEfficiencyMetrics(product).label}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
+                    </td>
+                  )}
                   {isAdmin && <td className="px-5 py-3 text-right">
                     {selectedWarehouseId ? (
                     <div className="flex flex-col items-end space-y-1.5">
@@ -3329,18 +3747,7 @@ export default function ProductsView() {
                           <button 
                             onClick={() => {
                               setSelectedProduct(product);
-                              setFormData({
-                                name: product.name || '',
-                                unit: product.unit || '',
-                                categoryId: product.categoryId?.toString() || '',
-                                warehouseId: product.warehouseId?.toString() || '',
-                                costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                                expensePercent: String(product.expensePercent ?? 0),
-                                sellingPrice: formatPriceInput(product.sellingPrice),
-                                minStock: product.minStock?.toString() || '0',
-                                initialStock: product.initialStock?.toString() || '0',
-                                photoUrl: product.photoUrl || ''
-                              });
+                              setFormData(buildProductFormData(product));
                               setCategoryInput(product.category?.name || '');
                               setShowEditModal(true);
                             }}

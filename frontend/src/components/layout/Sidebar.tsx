@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   History,
   LayoutDashboard,
+  LineChart,
   LogOut,
   Package,
   Settings,
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
   { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
   { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
   { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
+  { to: '/analytics', icon: LineChart, label: 'Аналитика', section: 'Система' },
   { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
   { to: '/settings', icon: Settings, label: 'Настройки', section: 'Система' },
 ];
@@ -113,24 +115,26 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     navigate('/login');
   };
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (!isAdmin && (item.to === '/' || item.to === '/expenses' || item.to === '/reports' || item.to === '/settings')) {
-      return false;
-    }
-    if (item.to === '/expenses' || item.to === '/reports' || item.to === '/settings') {
-      return isAdmin;
-    }
-    return true;
-  }).map((item) => {
-    if (!isAdmin && item.to === '/sales') {
-      return {
-        ...item,
-        label: 'Мои накладные',
-      };
-    }
+  const filteredNavItems = navItems
+    .filter((item) => {
+      if (!isAdmin && (item.to === '/' || item.to === '/expenses' || item.to === '/analytics' || item.to === '/reports' || item.to === '/settings')) {
+        return false;
+      }
+      if (item.to === '/expenses' || item.to === '/analytics' || item.to === '/reports' || item.to === '/settings') {
+        return isAdmin;
+      }
+      return true;
+    })
+    .map((item) => {
+      if (!isAdmin && item.to === '/sales') {
+        return {
+          ...item,
+          label: 'Мои накладные',
+        };
+      }
 
-    return item;
-  });
+      return item;
+    });
 
   const navSections = filteredNavItems.reduce<Record<string, NavItem[]>>((acc, item) => {
     if (!acc[item.section]) {
@@ -139,6 +143,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     acc[item.section].push(item);
     return acc;
   }, {});
+
   const sidebarCollapsed = isDesktopViewport && isCollapsed;
 
   return (
@@ -218,14 +223,14 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             sidebarCollapsed ? 'px-2 py-2' : 'px-2.5 py-2.5',
           )}
         >
-          <div className={clsx(sidebarCollapsed ? 'space-y-2' : 'space-y-2')}>
+          <div className="space-y-2">
             {Object.entries(navSections).map(([section, items]) => (
               <div key={section}>
                 {!sidebarCollapsed && (
                   <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#74859a]">{section}</p>
                 )}
 
-                <div className={clsx(sidebarCollapsed ? 'space-y-1' : 'space-y-1')}>
+                <div className="space-y-1">
                   {items.map((item) => (
                     <NavLink
                       key={item.to}

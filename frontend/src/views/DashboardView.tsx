@@ -746,6 +746,7 @@ export default function DashboardView() {
                 ringColors={ringColors}
                 totalRevenue={summary?.totalRevenue || 0}
                 leftBottomContent={recentSalesPanel}
+                onOpenProfitReport={() => navigate('/reports?type=profit')}
               />
             </React.Suspense>
           </section>
@@ -760,7 +761,7 @@ export default function DashboardView() {
                   </span>
                 </div>
                 <button
-                  onClick={() => navigate('/products')}
+                  onClick={() => navigate(isAdmin ? '/products?sort=low-stock&view=warehouse-low-stock' : '/products?sort=low-stock')}
                   className="inline-flex items-center gap-1 text-sm text-[#5b8def] transition-colors hover:text-[#3d73da]"
                 >
                   <span>Смотреть все</span>

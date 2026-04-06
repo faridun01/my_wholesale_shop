@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
-import { formatCount, formatMoney } from '../utils/format';
+import { formatCount, formatMoney, formatPercent } from '../utils/format';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
 import { useMemo } from 'react';
@@ -32,6 +32,7 @@ interface Customer {
   average_invoice?: number;
   customer_segment?: 'VIP' | 'Постоянный' | 'Обычный' | 'Новый' | string;
   last_purchase_at?: string | null;
+  payment_efficiency?: number;
 }
 
 interface StatementPayment {
@@ -102,6 +103,30 @@ const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
     'inline-flex items-center rounded-2xl px-4 py-2 text-sm font-medium transition-all',
     isActive ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100',
   ].join(' ');
+
+const getCustomerEfficiencyMetrics = (customer: Customer) => {
+  const totalInvoiced = Number(customer.total_invoiced || 0);
+  const totalPaid = Number(customer.total_paid || 0);
+  const balance = Number(customer.balance || 0);
+  const paymentEfficiency = totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0;
+
+  let label = 'Риск';
+  let className = 'bg-rose-100 text-rose-700';
+
+  if (paymentEfficiency >= 95 && balance <= 0) {
+    label = 'Сильный';
+    className = 'bg-emerald-100 text-emerald-700';
+  } else if (paymentEfficiency >= 75) {
+    label = 'Нормальный';
+    className = 'bg-amber-100 text-amber-700';
+  }
+
+  return {
+    paymentEfficiency,
+    label,
+    className,
+  };
+};
 
 export default function CustomerView() {
   const location = useLocation();
@@ -609,9 +634,14 @@ export default function CustomerView() {
                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
                       {customer.customer_segment || 'Новый'}
                     </span>
-                    <span className="text-xs text-slate-400">
-                      Накладных: {formatCount(customer.invoice_count || 0)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getCustomerEfficiencyMetrics(customer).className}`}>
+                        {getCustomerEfficiencyMetrics(customer).label}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Накладных: {formatCount(customer.invoice_count || 0)}
+                      </span>
+                    </div>
                   </div>
                   {customer.last_purchase_at && (
                     <p className="mb-4 text-xs text-slate-400">
@@ -627,7 +657,7 @@ export default function CustomerView() {
                     </div>
                   </div>
 
-                  <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-[#f4f5fb] p-4 lg:grid-cols-3">
+                  <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-[#f4f5fb] p-4 lg:grid-cols-4">
                     <div className="min-w-0 rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3">
                       <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Накладные</p>
                       <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-slate-900 xl:text-[11px]">{formatMoneyByRole(customer.total_invoiced, true)}</p>
@@ -639,6 +669,12 @@ export default function CustomerView() {
                     <div className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3">
                       <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Долг</p>
                       <p className={`whitespace-nowrap text-[10px] leading-4 tabular-nums xl:text-[11px] ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
+                    </div>
+                    <div className="min-w-0 rounded-2xl border border-violet-100 bg-violet-50 px-3 py-3">
+                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Эффективность</p>
+                      <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-violet-700 xl:text-[11px]">
+                        {isAdmin ? formatPercent(getCustomerEfficiencyMetrics(customer).paymentEfficiency, 1) : 'Скрыто'}
+                      </p>
                     </div>
                   </div>
 

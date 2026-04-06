@@ -65,11 +65,18 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
     const access = await getAccessContext(req);
     const isAdmin = access.isAdmin;
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const { start, end } = req.query;
 
-    const whereClause: any = { cancelled: false };
+    const whereClause: any = {
+      cancelled: false,
+      createdAt: {
+        gte: start ? new Date(start as string) : undefined,
+        lte: end ? new Date(end as string) : undefined,
+      },
+    };
     if (warehouseId) whereClause.warehouseId = warehouseId;
 
-    const [invoices, products, customers, warehouses, batches] = await Promise.all([
+    const [invoices, products, customers, warehouses, batches, writeoffTransactions] = await Promise.all([
       prisma.invoice.findMany({
         where: whereClause,
         select: {
@@ -77,9 +84,30 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
           paidAmount: true,
           warehouseId: true,
           createdAt: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
           items: {
             select: {
+              quantity: true,
+              returnedQty: true,
               sellingPrice: true,
+              costPrice: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
               saleAllocations: {
                 select: {
                   quantity: true,
@@ -108,6 +136,40 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
           warehouseId: warehouseId ?? undefined
         }
       }),
+      prisma.inventoryTransaction.findMany({
+        where: {
+          type: 'adjustment',
+          qtyChange: { lt: 0 },
+          createdAt: {
+            gte: start ? new Date(start as string) : undefined,
+            lte: end ? new Date(end as string) : undefined,
+          },
+          warehouseId: warehouseId ?? undefined,
+        },
+        select: {
+          qtyChange: true,
+          costAtTime: true,
+          reason: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+          warehouse: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
     ]);
 
     let totalRevenue = 0;
@@ -118,6 +180,9 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
 
     const monthlyData: any = {};
     const warehousePerformance: any = {};
+    const productPerformance: Record<string, { id: number; name: string; quantity: number; revenue: number; profit: number }> = {};
+    const staffPerformance: Record<string, { id: number; name: string; invoices: number; revenue: number; profit: number }> = {};
+    const customerPerformance: Record<string, { id: number; name: string; invoices: number; revenue: number; debt: number }> = {};
 
     for (const inv of invoices) {
       const month = inv.createdAt.toLocaleString('ru-RU', { month: 'short' });
@@ -129,7 +194,8 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
       const paidAmount = Number(inv.paidAmount);
 
       totalRevenue += netAmount;
-      totalDebts += Math.max(0, netAmount - paidAmount);
+      const invoiceDebt = Math.max(0, netAmount - paidAmount);
+      totalDebts += invoiceDebt;
       monthlyData[month].sales += netAmount;
 
       if (!warehousePerformance[inv.warehouseId]) {
@@ -137,21 +203,125 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
       }
       warehousePerformance[inv.warehouseId].sales += netAmount;
 
+      const staffKey = String(inv.user?.id || 0);
+      if (!staffPerformance[staffKey]) {
+        staffPerformance[staffKey] = {
+          id: Number(inv.user?.id || 0),
+          name: inv.user?.username || 'Неизвестно',
+          invoices: 0,
+          revenue: 0,
+          profit: 0,
+        };
+      }
+      staffPerformance[staffKey].invoices += 1;
+      staffPerformance[staffKey].revenue += netAmount;
+
+      const customerKey = String(inv.customer?.id || 0);
+      if (!customerPerformance[customerKey]) {
+        customerPerformance[customerKey] = {
+          id: Number(inv.customer?.id || 0),
+          name: inv.customer?.name || 'Без клиента',
+          invoices: 0,
+          revenue: 0,
+          debt: 0,
+        };
+      }
+      customerPerformance[customerKey].invoices += 1;
+      customerPerformance[customerKey].revenue += netAmount;
+      customerPerformance[customerKey].debt += invoiceDebt;
+
       for (const item of inv.items) {
         const lineRevenue = getLineNetRevenue(inv, item);
         const lineCost = getLineCost(item);
         const lineProfit = lineRevenue - lineCost;
+        const quantity = getRemainingQuantity(item);
+        const productKey = String(item.product?.id || 0);
 
         totalCost += lineCost;
         if (isAdmin) {
           totalProfit += lineProfit;
           monthlyData[month].profit += lineProfit;
           warehousePerformance[inv.warehouseId].profit += lineProfit;
+          staffPerformance[staffKey].profit += lineProfit;
         }
+
+        if (!productPerformance[productKey]) {
+          productPerformance[productKey] = {
+            id: Number(item.product?.id || 0),
+            name: item.product?.name || 'Без названия',
+            quantity: 0,
+            revenue: 0,
+            profit: 0,
+          };
+        }
+
+        productPerformance[productKey].quantity += quantity;
+        productPerformance[productKey].revenue += lineRevenue;
+        productPerformance[productKey].profit += lineProfit;
       }
     }
 
     const stockValuation = batches.reduce((sum: number, b: any) => sum + (Number(b.costPrice) * b.remainingQuantity), 0);
+    const writeoffByReason: Record<string, { name: string; quantity: number; value: number; operations: number }> = {};
+    const writeoffByStaff: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
+    const writeoffByProduct: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
+    const writeoffByWarehouse: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
+
+    for (const transaction of writeoffTransactions) {
+      const quantity = Math.abs(Number(transaction.qtyChange || 0));
+      const value = quantity * Number(transaction.costAtTime || 0);
+      const normalizedReason = String(transaction.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Списание';
+      const reasonKey = normalizedReason.toLowerCase();
+      const staffKey = String(transaction.user?.id || 0);
+      const productKey = String(transaction.product?.id || 0);
+
+      if (!writeoffByReason[reasonKey]) {
+        writeoffByReason[reasonKey] = { name: normalizedReason, quantity: 0, value: 0, operations: 0 };
+      }
+      writeoffByReason[reasonKey].quantity += quantity;
+      writeoffByReason[reasonKey].value += value;
+      writeoffByReason[reasonKey].operations += 1;
+
+      if (!writeoffByStaff[staffKey]) {
+        writeoffByStaff[staffKey] = {
+          id: Number(transaction.user?.id || 0),
+          name: transaction.user?.username || 'Неизвестно',
+          quantity: 0,
+          value: 0,
+          operations: 0,
+        };
+      }
+      writeoffByStaff[staffKey].quantity += quantity;
+      writeoffByStaff[staffKey].value += value;
+      writeoffByStaff[staffKey].operations += 1;
+
+      if (!writeoffByProduct[productKey]) {
+        writeoffByProduct[productKey] = {
+          id: Number(transaction.product?.id || 0),
+          name: transaction.product?.name || 'Без названия',
+          quantity: 0,
+          value: 0,
+          operations: 0,
+        };
+      }
+      writeoffByProduct[productKey].quantity += quantity;
+      writeoffByProduct[productKey].value += value;
+      writeoffByProduct[productKey].operations += 1;
+
+      const warehouseKey = String(transaction.warehouse?.id || 0);
+      if (!writeoffByWarehouse[warehouseKey]) {
+        writeoffByWarehouse[warehouseKey] = {
+          id: Number(transaction.warehouse?.id || 0),
+          name: transaction.warehouse?.name || 'Без склада',
+          quantity: 0,
+          value: 0,
+          operations: 0,
+        };
+      }
+      writeoffByWarehouse[warehouseKey].quantity += quantity;
+      writeoffByWarehouse[warehouseKey].value += value;
+      writeoffByWarehouse[warehouseKey].operations += 1;
+    }
 
     res.json({
       summary: {
@@ -167,6 +337,31 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
       },
       chartData: Object.values(monthlyData),
       warehousePerformance: Object.values(warehousePerformance),
+      productPerformance: Object.values(productPerformance)
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 20),
+      staffPerformance: Object.values(staffPerformance)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 20),
+      customerPerformance: Object.values(customerPerformance)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 20),
+      customerDebts: Object.values(customerPerformance)
+        .filter((item) => item.debt > MONEY_EPSILON)
+        .sort((a, b) => b.debt - a.debt)
+        .slice(0, 20),
+      writeoffReasons: Object.values(writeoffByReason)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 20),
+      writeoffByStaff: Object.values(writeoffByStaff)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 20),
+      writeoffByProduct: Object.values(writeoffByProduct)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 20),
+      writeoffByWarehouse: Object.values(writeoffByWarehouse)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 20),
     });
   } catch (error) {
     next(error);
@@ -397,17 +592,54 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), async (req: AuthReques
       orderBy: { createdAt: 'desc' },
     });
 
-    const report = transactions.map((t: any) => ({
-      date: t.createdAt.toISOString().split('T')[0],
-      warehouse_name: t.warehouse?.name || '',
-      staff_name: t.user?.username || '',
-      product_name: t.product?.name || '',
-      unit: t.product?.unit || '',
-      quantity: Math.abs(Number(t.qtyChange || 0)),
-      cost_price: Number(t.costAtTime || 0),
-      total_value: Math.abs(Number(t.qtyChange || 0)) * Number(t.costAtTime || 0),
-      reason: String(t.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Write-off',
-    }));
+    const transactionIds = transactions.map((transaction: any) => Number(transaction.id)).filter((id: number) => Number.isFinite(id) && id > 0);
+    const returnTransactions = transactionIds.length
+      ? await prisma.inventoryTransaction.findMany({
+          where: {
+            type: 'adjustment',
+            qtyChange: { gt: 0 },
+            referenceId: { in: transactionIds },
+          },
+          select: {
+            referenceId: true,
+            qtyChange: true,
+          },
+        })
+      : [];
+
+    const report = transactions.map((t: any) => {
+      const returnedQty = returnTransactions
+        .filter(
+          (candidate: any) =>
+            Number(candidate.referenceId || 0) === Number(t.id) &&
+            Number(candidate.qtyChange || 0) > 0
+        )
+        .reduce((sum: number, candidate: any) => sum + Number(candidate.qtyChange || 0), 0);
+
+      const originalQty = Math.abs(Number(t.qtyChange || 0));
+
+      return {
+        transaction_id: t.id,
+        date: t.createdAt.toISOString().split('T')[0],
+        warehouse_name: t.warehouse?.name || '',
+        staff_name: t.user?.username || '',
+        product_name: t.product?.name || '',
+        unit: t.product?.unit || '',
+        quantity: originalQty,
+        returned_qty: returnedQty,
+        cost_price: Number(t.costAtTime || 0),
+        total_value: originalQty * Number(t.costAtTime || 0),
+        reason: String(t.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Write-off',
+        can_return: originalQty > returnedQty,
+        can_delete: returnedQty <= 0,
+        status:
+          returnedQty <= 0
+            ? 'writeoff'
+            : returnedQty < originalQty
+              ? 'partial_return'
+              : 'full_return',
+      };
+    }).filter((row) => row.status !== 'full_return');
 
     res.json(report);
   } catch (error) {

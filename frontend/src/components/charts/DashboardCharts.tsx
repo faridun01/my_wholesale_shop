@@ -29,6 +29,7 @@ interface DashboardChartsProps {
   ringColors: string[];
   totalRevenue: number;
   leftBottomContent?: React.ReactNode;
+  onOpenProfitReport?: () => void;
 }
 
 export default function DashboardCharts({
@@ -37,6 +38,7 @@ export default function DashboardCharts({
   ringColors,
   totalRevenue,
   leftBottomContent,
+  onOpenProfitReport,
 }: DashboardChartsProps) {
   const totalCategoryValue = categoryData.reduce((sum, item) => sum + item.value, 0);
   const topCategory = categoryData[0] || null;
@@ -83,12 +85,23 @@ export default function DashboardCharts({
       </div>
 
       <div className="flex h-full min-w-0 flex-col rounded-[24px] border border-white bg-white p-4 shadow-sm">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Продажи по категориям</h2>
-          <p className="mt-2 text-[11px] text-slate-500">Общая выручка</p>
-          <p className="mt-2 break-words text-[clamp(1.05rem,1.45vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
-            {formatMoney(totalRevenue)}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Продажи по категориям</h2>
+            <p className="mt-2 text-[11px] text-slate-500">Общая выручка</p>
+            <p className="mt-2 break-words text-[clamp(1.05rem,1.45vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
+              {formatMoney(totalRevenue)}
+            </p>
+          </div>
+          {onOpenProfitReport ? (
+            <button
+              type="button"
+              onClick={onOpenProfitReport}
+              className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              Товары по прибыли
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-5 h-[220px] sm:h-[240px]">

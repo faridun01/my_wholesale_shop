@@ -2,6 +2,14 @@ import prisma from '../db/prisma.js';
 import { buildProductNameKey } from '../utils/product-packaging.js';
 
 export class StockService {
+  static isCorrectionWriteOffReason(reason: string | null | undefined) {
+    return String(reason || '').trim().toLowerCase().includes('корректиров');
+  }
+
+  static isWriteOffWithIncomingSync(reason: string | null | undefined) {
+    return String(reason || '').includes('[incoming-sync]');
+  }
+
   static async syncProductPackaging(
     sourceProduct: any,
     destinationProductId: number,
@@ -538,6 +546,8 @@ export class StockService {
 
       let remainingToWriteOff = normalizedQuantity;
       let totalCost = 0;
+      const normalizedReason = String(reason || '').trim() || 'служебное списание';
+      const shouldSyncIncoming = true;
 
       for (const batch of batches) {
         if (remainingToWriteOff <= 0) {
@@ -551,6 +561,7 @@ export class StockService {
           where: { id: batch.id },
           data: {
             remainingQuantity: { decrement: takeFromBatch },
+            ...(shouldSyncIncoming ? { quantity: { decrement: takeFromBatch } } : {}),
           },
         });
 
@@ -571,6 +582,249 @@ export class StockService {
       });
 
       await this.updateProductStockCache(productId, tx);
+
+      return { success: true };
+    });
+  }
+
+  static async reverseCorrectionWriteOff(transactionId: number, userId: number) {
+    return prisma.$transaction(async (tx: any) => {
+      const transaction = await tx.inventoryTransaction.findUnique({
+        where: { id: transactionId },
+      });
+
+      if (!transaction) {
+        throw new Error('Списание не найдено');
+      }
+
+      if (
+        transaction.type !== 'adjustment' ||
+        Number(transaction.qtyChange || 0) >= 0 ||
+        !String(transaction.reason || '').startsWith('Списание:') ||
+        !this.isCorrectionWriteOffReason(transaction.reason)
+      ) {
+        throw new Error('Можно отменить только корректировочное списание');
+      }
+
+      const existingReversal = await tx.inventoryTransaction.findFirst({
+        where: {
+          referenceId: transaction.id,
+          qtyChange: { gt: 0 },
+          type: 'adjustment',
+        },
+      });
+
+      if (existingReversal) {
+        throw new Error('Это корректировочное списание уже отменено');
+      }
+
+      const product = await tx.product.findUnique({
+        where: { id: transaction.productId },
+        select: {
+          id: true,
+          purchaseCostPrice: true,
+          expensePercent: true,
+          costPrice: true,
+          active: true,
+        },
+      });
+
+      if (!product || !product.active) {
+        throw new Error('Товар не найден');
+      }
+
+      const restoredQuantity = Math.abs(Number(transaction.qtyChange || 0));
+      if (!Number.isFinite(restoredQuantity) || restoredQuantity <= 0) {
+        throw new Error('Некорректное количество для отмены списания');
+      }
+
+      await tx.productBatch.create({
+        data: {
+          productId: transaction.productId,
+          warehouseId: transaction.warehouseId,
+          quantity: restoredQuantity,
+          remainingQuantity: restoredQuantity,
+          purchaseCostPrice: product.purchaseCostPrice ?? null,
+          expensePercent: Number(product.expensePercent || 0),
+          costPrice: Number(transaction.costAtTime ?? product.costPrice ?? 0),
+        },
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: transaction.productId,
+          warehouseId: transaction.warehouseId,
+          userId,
+          qtyChange: restoredQuantity,
+          type: 'adjustment',
+          reason: `Отмена корректировочного списания #${transaction.id}`,
+          referenceId: transaction.id,
+          costAtTime: transaction.costAtTime,
+          sellingAtTime: transaction.sellingAtTime,
+        },
+      });
+
+      await this.updateProductStockCache(transaction.productId, tx);
+
+      return { success: true };
+    });
+  }
+
+  static async returnWriteOffTransaction(transactionId: number, quantity: number, userId: number, reason?: string) {
+    return prisma.$transaction(async (tx: any) => {
+      const transaction = await tx.inventoryTransaction.findUnique({
+        where: { id: transactionId },
+      });
+
+      if (!transaction) {
+        throw new Error('Списание не найдено');
+      }
+
+      if (
+        transaction.type !== 'adjustment' ||
+        Number(transaction.qtyChange || 0) >= 0 ||
+        !String(transaction.reason || '').includes('Списание')
+      ) {
+        throw new Error('Вернуть можно только списание товара');
+      }
+
+      const normalizedQuantity = Number(quantity || 0);
+      if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+        throw new Error('Количество для возврата должно быть больше нуля');
+      }
+
+      const originalQuantity = Math.abs(Number(transaction.qtyChange || 0));
+      const returnedTransactions = await tx.inventoryTransaction.findMany({
+        where: {
+          referenceId: transaction.id,
+          type: 'adjustment',
+          qtyChange: { gt: 0 },
+        },
+        select: { qtyChange: true },
+      });
+
+      const alreadyReturned = returnedTransactions.reduce((sum: number, item: any) => sum + Number(item.qtyChange || 0), 0);
+      const availableToReturn = originalQuantity - alreadyReturned;
+
+      if (availableToReturn <= 0) {
+        throw new Error('Это списание уже полностью возвращено');
+      }
+
+      if (normalizedQuantity > availableToReturn) {
+        throw new Error(`Нельзя вернуть больше доступного. Сейчас доступно: ${availableToReturn}`);
+      }
+
+      const product = await tx.product.findUnique({
+        where: { id: transaction.productId },
+        select: {
+          id: true,
+          purchaseCostPrice: true,
+          expensePercent: true,
+          costPrice: true,
+          active: true,
+        },
+      });
+
+      if (!product || !product.active) {
+        throw new Error('Товар не найден');
+      }
+
+      await tx.productBatch.create({
+        data: {
+          productId: transaction.productId,
+          warehouseId: transaction.warehouseId,
+          quantity: normalizedQuantity,
+          remainingQuantity: normalizedQuantity,
+          purchaseCostPrice: product.purchaseCostPrice ?? null,
+          expensePercent: Number(product.expensePercent || 0),
+          costPrice: Number(transaction.costAtTime ?? product.costPrice ?? 0),
+        },
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: transaction.productId,
+          warehouseId: transaction.warehouseId,
+          userId,
+          qtyChange: normalizedQuantity,
+          type: 'adjustment',
+          reason: `Возврат списания #${transaction.id}${String(reason || '').trim() ? `: ${String(reason).trim()}` : ''}`,
+          referenceId: transaction.id,
+          costAtTime: transaction.costAtTime,
+          sellingAtTime: transaction.sellingAtTime,
+        },
+      });
+
+      await this.updateProductStockCache(transaction.productId, tx);
+
+      return { success: true };
+    });
+  }
+
+  static async deleteWriteOffTransactionPermanently(transactionId: number) {
+    return prisma.$transaction(async (tx: any) => {
+      const transaction = await tx.inventoryTransaction.findUnique({
+        where: { id: transactionId },
+      });
+
+      if (!transaction) {
+        throw new Error('Списание не найдено');
+      }
+
+      if (
+        transaction.type !== 'adjustment' ||
+        Number(transaction.qtyChange || 0) >= 0 ||
+        !String(transaction.reason || '').includes('Списание')
+      ) {
+        throw new Error('Удалить можно только списание товара');
+      }
+
+      const linkedReturns = await tx.inventoryTransaction.findMany({
+        where: {
+          referenceId: transaction.id,
+          type: 'adjustment',
+          qtyChange: { gt: 0 },
+        },
+        select: { id: true },
+      });
+
+      if (linkedReturns.length > 0) {
+        throw new Error('У этого списания уже есть возврат. Сначала удалите возвратные операции.');
+      }
+
+      const product = await tx.product.findUnique({
+        where: { id: transaction.productId },
+        select: {
+          id: true,
+          purchaseCostPrice: true,
+          expensePercent: true,
+          costPrice: true,
+        },
+      });
+
+      if (!product) {
+        throw new Error('Товар не найден');
+      }
+
+      const restoredQuantity = Math.abs(Number(transaction.qtyChange || 0));
+
+      await tx.productBatch.create({
+        data: {
+          productId: transaction.productId,
+          warehouseId: transaction.warehouseId,
+          quantity: restoredQuantity,
+          remainingQuantity: restoredQuantity,
+          purchaseCostPrice: product.purchaseCostPrice ?? null,
+          expensePercent: Number(product.expensePercent || 0),
+          costPrice: Number(transaction.costAtTime ?? product.costPrice ?? 0),
+        },
+      });
+
+      await tx.inventoryTransaction.delete({
+        where: { id: transaction.id },
+      });
+
+      await this.updateProductStockCache(transaction.productId, tx);
 
       return { success: true };
     });

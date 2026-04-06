@@ -2,6 +2,7 @@
 import prisma from '../db/prisma.js';
 import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
+import { authorize } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import {
   buildProductNameKey,
@@ -782,6 +783,107 @@ router.post('/history/:transactionId/reverse-incoming', async (req: AuthRequest,
   }
 });
 
+router.post('/history/:transactionId/reverse-writeoff', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
+
+    const transactionId = Number(req.params.transactionId);
+    if (!Number.isFinite(transactionId) || transactionId <= 0) {
+      return res.status(400).json({ error: 'Некорректное списание для отмены' });
+    }
+
+    const transaction = await prisma.inventoryTransaction.findUnique({
+      where: { id: transactionId },
+      select: { warehouseId: true },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Списание не найдено' });
+    }
+
+    if (!access.isAdmin && !ensureWarehouseAccess(access, transaction.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await StockService.reverseCorrectionWriteOff(transactionId, req.user!.id);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+router.post('/history/:transactionId/return-writeoff', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+
+    const transactionId = Number(req.params.transactionId);
+    if (!Number.isFinite(transactionId) || transactionId <= 0) {
+      return res.status(400).json({ error: 'Некорректное списание для возврата' });
+    }
+
+    const transaction = await prisma.inventoryTransaction.findUnique({
+      where: { id: transactionId },
+      select: { warehouseId: true },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Списание не найдено' });
+    }
+
+    if (!access.isAdmin && !ensureWarehouseAccess(access, transaction.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const quantity = Number(req.body.quantity || 0);
+    const reason = String(req.body.reason || '').trim();
+    const result = await StockService.returnWriteOffTransaction(transactionId, quantity, req.user!.id, reason);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+router.delete('/history/:transactionId/writeoff', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+
+    const transactionId = Number(req.params.transactionId);
+    if (!Number.isFinite(transactionId) || transactionId <= 0) {
+      return res.status(400).json({ error: 'Некорректное списание для удаления' });
+    }
+
+    const transaction = await prisma.inventoryTransaction.findUnique({
+      where: { id: transactionId },
+      select: { warehouseId: true },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Списание не найдено' });
+    }
+
+    if (!access.isAdmin && !ensureWarehouseAccess(access, transaction.warehouseId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await StockService.deleteWriteOffTransactionPermanently(transactionId);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
@@ -999,21 +1101,66 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
         .replace(/^Cost price:/i, 'Себестоимость:');
     };
 
-    const transactionHistory = transactions.map((t: any) => ({
-      id: `tx-${t.id}`,
-      transactionId: t.id,
-      createdAt: t.createdAt,
-      type: t.type,
-      qtyChange: t.qtyChange,
-      warehouse: t.warehouse,
-      warehouseName: t.warehouse?.name || '---',
-      username: t.user.username,
-      reason: formatHistoryReason(t.reason),
-      canReverseIncoming:
-        access.isAdmin &&
-        t.type === 'incoming' &&
-        Number(t.qtyChange || 0) > 0,
-    }));
+    const transactionHistory = transactions.map((t: any) => {
+      const returnedQty = transactions
+        .filter(
+          (candidate: any) =>
+            Number(candidate.referenceId || 0) === Number(t.id) &&
+            candidate.type === 'adjustment' &&
+            Number(candidate.qtyChange || 0) > 0
+        )
+        .reduce((sum: number, candidate: any) => sum + Number(candidate.qtyChange || 0), 0);
+
+      const originalQty = Math.abs(Number(t.qtyChange || 0));
+      const isWriteOff = t.type === 'adjustment' && Number(t.qtyChange || 0) < 0 && String(t.reason || '').includes('Списание');
+      const isWriteOffReturn = t.type === 'adjustment' && Number(t.qtyChange || 0) > 0 && String(t.reason || '').includes('Возврат списания');
+
+      let writeOffStatus: string | null = null;
+      if (isWriteOff) {
+        if (returnedQty <= 0) {
+          writeOffStatus = 'writeoff';
+        } else if (returnedQty < originalQty) {
+          writeOffStatus = 'partial_return';
+        } else {
+          writeOffStatus = 'full_return';
+        }
+      } else if (isWriteOffReturn) {
+        writeOffStatus = 'return_record';
+      }
+
+      return {
+        id: `tx-${t.id}`,
+        transactionId: t.id,
+        createdAt: t.createdAt,
+        type: t.type,
+        qtyChange: t.qtyChange,
+        warehouse: t.warehouse,
+        warehouseName: t.warehouse?.name || '---',
+        username: t.user.username,
+        reason: formatHistoryReason(t.reason),
+        returnedQty,
+        writeOffStatus,
+        canReverseIncoming:
+          access.isAdmin &&
+          t.type === 'incoming' &&
+          Number(t.qtyChange || 0) > 0,
+        canReverseCorrectionWriteOff:
+          access.isAdmin &&
+          t.type === 'adjustment' &&
+          Number(t.qtyChange || 0) < 0 &&
+          String(t.reason || '').includes('Списание') &&
+          StockService.isCorrectionWriteOffReason(t.reason) &&
+          returnedQty <= 0,
+        canReturnWriteOff:
+          access.isAdmin &&
+          isWriteOff &&
+          originalQty > returnedQty,
+        canDeleteWriteOffPermanently:
+          access.isAdmin &&
+          isWriteOff &&
+          returnedQty <= 0,
+      };
+    });
 
     const priceEvents = priceHistory.map((p: any) => ({
       id: `price-${p.id}`,
