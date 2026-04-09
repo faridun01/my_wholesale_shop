@@ -22,6 +22,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const trustProxySetting = process.env.TRUST_PROXY;
+
+if (trustProxySetting === 'true') {
+  app.set('trust proxy', true);
+} else if (trustProxySetting === 'false') {
+  app.set('trust proxy', false);
+} else if (trustProxySetting && Number.isFinite(Number(trustProxySetting))) {
+  app.set('trust proxy', Number(trustProxySetting));
+} else if (trustProxySetting) {
+  app.set('trust proxy', trustProxySetting);
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 app.disable('x-powered-by');
 app.use(securityHeaders);
@@ -78,7 +91,7 @@ app.post('/api/upload', authenticate, imageUpload.single('photo'), async (req, r
 
 // Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+  console.error(err);
   
   if (err.message === 'Origin not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
@@ -101,10 +114,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   }
 
   if (typeof err.status === 'number') {
+    if (err.status >= 500) {
+      return res.status(err.status).json({ error: 'Internal server error' });
+    }
+
     return res.status(err.status).json({ error: err.message || 'Request failed' });
   }
   
-  res.status(500).json({ error: err.message || 'Something went wrong!' });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 export default app;

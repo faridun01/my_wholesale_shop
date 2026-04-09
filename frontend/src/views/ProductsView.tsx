@@ -42,7 +42,6 @@ import { createSettingsCategory, getSettingsCategories } from '../api/settings-r
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
-import { downloadStockReportPdf } from '../utils/print/stockReportPdf';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
@@ -1842,6 +1841,8 @@ export default function ProductsView() {
 
     const warehouseName = warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
     const downloadedAt = new Date();
+
+    const { downloadStockReportPdf } = await import('../utils/print/stockReportPdf');
 
     await downloadStockReportPdf({
       warehouseName,

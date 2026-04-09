@@ -4,6 +4,7 @@ import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
 import {
   buildProductNameKey,
   calculateEffectiveCostPrice,
@@ -133,23 +134,31 @@ router.get('/', async (req, res, next) => {
     const access = await getAccessContext(req as AuthRequest);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const sortBy = String(req.query.sortBy || '').toLowerCase();
-    const products = await prisma.product.findMany({
-      where: {
-        active: true,
-        warehouseId: warehouseId ?? undefined,
-      },
-      include: { 
-        category: true, 
-        warehouse: true,
-        packagings: {
-          where: { active: true },
-          orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
+    const where = {
+      active: true,
+      warehouseId: warehouseId ?? undefined,
+    };
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: { 
+          category: true, 
+          warehouse: true,
+          packagings: {
+            where: { active: true },
+            orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
+          },
+          batches: warehouseId ? {
+            where: { warehouseId: Number(warehouseId) }
+          } : false
         },
-        batches: warehouseId ? {
-          where: { warehouseId: Number(warehouseId) }
-        } : false
-      },
-    });
+        skip,
+        take: limit,
+      }),
+      prisma.product.count({ where }),
+    ]);
+    setPaginationHeaders(res, { page, limit, total });
 
     const productsWithResolvedPhoto = applyFamilyPhotoFallback(products as any[])
       .sort((a: any, b: any) => {
@@ -976,6 +985,7 @@ router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
 router.get('/:id/price-history', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 200, maxLimit: 1000 });
     const product = await prisma.product.findUnique({
       where: { id: Number(req.params.id) },
       select: { warehouseId: true },
@@ -987,10 +997,17 @@ router.get('/:id/price-history', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const history = await prisma.priceHistory.findMany({
-      where: { productId: Number(req.params.id) },
-      orderBy: { createdAt: 'desc' }
-    });
+    const where = { productId: Number(req.params.id) };
+    const [history, total] = await Promise.all([
+      prisma.priceHistory.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.priceHistory.count({ where }),
+    ]);
+    setPaginationHeaders(res, { page, limit, total });
     res.json(history);
   } catch (error) {
     next(error);
@@ -1001,6 +1018,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const productId = Number(req.params.id);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
     const product = await prisma.product.findUnique({
       where: { id: productId },
       select: { warehouseId: true },
@@ -1026,21 +1044,32 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     };
 
     const productWarehouseId = product.warehouseId ?? undefined;
+    const transactionWhere = {
+      productId,
+      ...(productWarehouseId ? { warehouseId: productWarehouseId } : {}),
+    };
 
-    const [transactions, priceHistory] = await Promise.all([
+    const [transactions, priceHistory, totalTransactions, totalPriceEvents] = await Promise.all([
       prisma.inventoryTransaction.findMany({
-        where: {
-          productId,
-          ...(productWarehouseId ? { warehouseId: productWarehouseId } : {}),
-        },
+        where: transactionWhere,
         include: { user: true, warehouse: true },
+        skip,
+        take: limit,
         orderBy: { createdAt: 'desc' }
       }),
       prisma.priceHistory.findMany({
         where: { productId },
+        take: Math.min(limit, 300),
         orderBy: { createdAt: 'desc' }
-      })
+      }),
+      prisma.inventoryTransaction.count({ where: transactionWhere }),
+      prisma.priceHistory.count({ where: { productId } }),
     ]);
+    setPaginationHeaders(res, {
+      page,
+      limit,
+      total: totalTransactions + (access.isAdmin ? totalPriceEvents : 0),
+    });
 
     const warehouseIdsFromReasons = Array.from(
       new Set(
@@ -1186,6 +1215,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
 router.get('/:id/batches', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 300, maxLimit: 1000 });
     const product = await prisma.product.findUnique({
       where: { id: Number(req.params.id) },
       select: { warehouseId: true },
@@ -1196,16 +1226,22 @@ router.get('/:id/batches', async (req: AuthRequest, res, next) => {
     if (!access.isAdmin && !ensureWarehouseAccess(access, product.warehouseId)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-
-    const batches = await prisma.productBatch.findMany({
-      where: { 
-        productId: Number(req.params.id),
-        ...(product.warehouseId ? { warehouseId: product.warehouseId } : {}),
-        remainingQuantity: { gt: 0 }
-      },
-      include: { warehouse: true, saleAllocations: { select: { id: true } } },
-      orderBy: { createdAt: 'asc' }
-    });
+    const where = { 
+      productId: Number(req.params.id),
+      ...(product.warehouseId ? { warehouseId: product.warehouseId } : {}),
+      remainingQuantity: { gt: 0 }
+    };
+    const [batches, total] = await Promise.all([
+      prisma.productBatch.findMany({
+        where,
+        include: { warehouse: true, saleAllocations: { select: { id: true } } },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'asc' }
+      }),
+      prisma.productBatch.count({ where }),
+    ]);
+    setPaginationHeaders(res, { page, limit, total });
     res.json(
       batches.map((batch: any) => ({
         ...batch,

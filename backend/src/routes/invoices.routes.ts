@@ -4,6 +4,7 @@ import { InvoiceService } from '../services/invoice.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
+import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -13,24 +14,34 @@ const canAccessInvoice = (
   invoiceMeta: { warehouseId: number | null; userId: number | null },
 ) => access.isAdmin || (ensureWarehouseAccess(access, invoiceMeta.warehouseId) && invoiceMeta.userId === access.userId);
 
-
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        cancelled: false,
-        warehouseId: warehouseId ?? undefined,
-        userId: access.isAdmin ? undefined : (access.userId ?? -1),
-      },
-      include: {
-        customer: true,
-        user: true,
-        items: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
+    const where = {
+      cancelled: false,
+      warehouseId: warehouseId ?? undefined,
+      userId: access.isAdmin ? undefined : (access.userId ?? -1),
+    };
+
+    const [invoices, total] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: {
+          customer: true,
+          user: true,
+          items: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.invoice.count({ where }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
+
     res.json(
       invoices.map((inv: any) => {
         const totalProfit = inv.items.reduce((sum: number, item: any) => {

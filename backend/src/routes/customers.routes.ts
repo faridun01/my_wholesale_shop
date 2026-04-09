@@ -2,7 +2,9 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext } from '../utils/access.js';
+import { maskInvoiceFinancials } from '../utils/customerVisibility.js';
 import { DEFAULT_CUSTOMER_NAME, getCanonicalDefaultCustomer, isDefaultCustomerName, mergeDuplicateCustomers } from '../utils/defaultCustomer.js';
+import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -198,7 +200,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const defaultCustomer = await mergeDuplicateCustomers(prisma, req.user?.id || null);
-
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
 
     const baseWhere: any = {
       OR: [
@@ -209,25 +211,32 @@ router.get('/', async (req: AuthRequest, res, next) => {
       ],
     };
 
-    const customers = await prisma.customer.findMany({
-      where: baseWhere,
-      include: {
-        invoices: {
-          where: { cancelled: false },
-          select: {
-            netAmount: true,
-            paidAmount: true,
-            createdAt: true,
-            warehouse: {
-              select: {
-                name: true,
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where: baseWhere,
+        include: {
+          invoices: {
+            where: { cancelled: false },
+            select: {
+              netAmount: true,
+              paidAmount: true,
+              createdAt: true,
+              warehouse: {
+                select: {
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.customer.count({ where: baseWhere }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
 
     const mappedCustomers = customers.map(mapCustomerWithTotals);
     mappedCustomers.sort((a: any, b: any) => {
@@ -358,6 +367,7 @@ router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 300, maxLimit: 1000 });
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
       return res.status(404).json({ error: 'Клиент не найден' });
@@ -365,61 +375,44 @@ router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        customerId,
-        cancelled: false,
-        warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
-        userId: access.isAdmin ? undefined : (access.userId ?? -1),
-      },
-      include: {
-        items: { include: { product: true } },
-        payments: {
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
+
+    const where = {
+      customerId,
+      cancelled: false,
+      warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
+      userId: access.isAdmin ? undefined : (access.userId ?? -1),
+    };
+
+    const [invoices, total] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: {
+          items: { include: { product: true } },
+          payments: {
+            include: { user: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          returns: {
+            include: { user: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          warehouse: true,
+          user: true,
         },
-        returns: {
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
-        },
-        warehouse: true,
-        user: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.invoice.count({ where }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
+
     if (access.isAdmin) {
       return res.json(invoices);
     }
 
-    const maskedInvoices = invoices.map((invoice: any) => ({
-      ...invoice,
-      totalAmount: 0,
-      discount: 0,
-      netAmount: 0,
-      paidAmount: 0,
-      returnedAmount: 0,
-      invoiceBalance: 0,
-      items: Array.isArray(invoice.items)
-        ? invoice.items.map((item: any) => ({
-            ...item,
-            sellingPrice: 0,
-          }))
-        : [],
-      paymentEvents: Array.isArray(invoice.paymentEvents)
-        ? invoice.paymentEvents.map((payment: any) => ({
-            ...payment,
-            amount: 0,
-          }))
-        : [],
-      returnEvents: Array.isArray(invoice.returnEvents)
-        ? invoice.returnEvents.map((event: any) => ({
-            ...event,
-            totalValue: 0,
-          }))
-        : [],
-    }));
-
-    res.json(maskedInvoices);
+    res.json(invoices.map(maskInvoiceFinancials));
   } catch (error) {
     next(error);
   }
@@ -429,6 +422,7 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 300, maxLimit: 1000 });
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
       return res.status(404).json({ error: 'Клиент не найден' });
@@ -436,20 +430,32 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const payments = await prisma.payment.findMany({
-      where: {
-        customerId,
-        invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
-      },
-      include: {
-        user: true,
-        invoice: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+
+    const where = {
+      customerId,
+      invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
+    };
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        include: {
+          user: true,
+          invoice: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
+
     res.json(
       payments.map((p: any) => ({
         ...p,
+        amount: access.isAdmin ? p.amount : 0,
         staff_name: p.user.username,
       })),
     );
@@ -462,6 +468,7 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 300, maxLimit: 1000 });
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
       return res.status(404).json({ error: 'Клиент не найден' });
@@ -469,20 +476,32 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const returns = await prisma.return.findMany({
-      where: {
-        customerId,
-        invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
-      },
-      include: {
-        user: true,
-        invoice: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+
+    const where = {
+      customerId,
+      invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
+    };
+
+    const [returns, total] = await Promise.all([
+      prisma.return.findMany({
+        where,
+        include: {
+          user: true,
+          invoice: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.return.count({ where }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
+
     res.json(
       returns.map((r: any) => ({
         ...r,
+        totalValue: access.isAdmin ? r.totalValue : 0,
         staff_name: r.user.username,
       })),
     );
@@ -495,6 +514,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const customerId = Number(req.params.id);
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 300, maxLimit: 1000 });
     const { customer, allowed } = await getCustomerAccess(access, customerId);
     if (!customer) {
       return res.status(404).json({ error: 'Клиент не найден' });
@@ -502,28 +522,39 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        customerId,
-        cancelled: false,
-        warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
-        userId: access.isAdmin ? undefined : (access.userId ?? -1),
-      },
-      include: {
-        items: { include: { product: true } },
-        payments: {
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
+
+    const where = {
+      customerId,
+      cancelled: false,
+      warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
+      userId: access.isAdmin ? undefined : (access.userId ?? -1),
+    };
+
+    const [invoices, total] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: {
+          items: { include: { product: true } },
+          payments: {
+            include: { user: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          returns: {
+            include: { user: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          warehouse: true,
+          user: true,
         },
-        returns: {
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
-        },
-        warehouse: true,
-        user: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.invoice.count({ where }),
+    ]);
+
+    setPaginationHeaders(res, { page, limit, total });
+
     const history = invoices.map((invoice: any) => ({
       ...invoice,
       invoiceBalance: getInvoiceBalance(invoice),
@@ -543,7 +574,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
       })),
     }));
 
-    res.json(history);
+    res.json(access.isAdmin ? history : history.map(maskInvoiceFinancials));
   } catch (error) {
     next(error);
   }

@@ -15,6 +15,37 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('jspdf') || id.includes('jspdf-autotable')) {
+                return 'pdf-vendor';
+              }
+
+              if (id.includes('xlsx')) {
+                return 'spreadsheet-vendor';
+              }
+
+              if (id.includes('recharts') || id.includes('d3-')) {
+                return 'charts-vendor';
+              }
+
+              if (id.includes('react-router')) {
+                return 'router-vendor';
+              }
+
+              if (id.includes('react-dom') || id.includes('react')) {
+                return 'react-vendor';
+              }
+            }
+
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       // HMR can be disabled via DISABLE_HMR env var.
       // File watching may be disabled to prevent flickering during agent edits.

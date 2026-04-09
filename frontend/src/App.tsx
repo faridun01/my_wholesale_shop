@@ -69,18 +69,29 @@ const Layout = () => {
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-shopify-border bg-white p-4 text-shopify-text lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-shopify-border bg-white/95 px-4 py-3 text-shopify-text backdrop-blur lg:hidden">
           <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e3f1df] text-shopify-green">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#e9f8f0_0%,#d8efe4_100%)] text-[#0f9f6e] shadow-[0_10px_24px_rgba(15,159,110,0.14)]">
               <Warehouse size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-semibold leading-none tracking-tight">Оптовая торговля</span>
+              <span className="text-base font-semibold leading-none tracking-tight text-slate-900">
+                Оптовая торговля
+              </span>
+              <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                Меню и навигация
+              </span>
             </div>
           </div>
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="rounded-xl bg-shopify-bg p-2.5 transition-all duration-300 hover:bg-[#eef1f3] active:scale-90"
+            className={`
+              rounded-2xl border p-2.5 transition-all duration-300 active:scale-95
+              ${isSidebarOpen
+                ? 'border-[#cfe9dd] bg-[#eef8f2] text-[#0b7d59]'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}
+            `}
+            aria-label={isSidebarOpen ? 'Закрыть меню' : 'Открыть меню'}
           >
             {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>

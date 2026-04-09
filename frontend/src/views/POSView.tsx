@@ -238,6 +238,18 @@ export default function POSView() {
     return `Нельзя продать больше остатка. Доступно: ${getProductStockLabel(sourceProduct, item.baseUnitName || item.unit)}`;
   };
 
+  const getCartStockSummary = (item: CartItem) => {
+    const currentProduct = products.find((product) => product.id === item.id);
+    const sourceProduct = currentProduct || item;
+    const availableStock = getAvailableStockForCartItem(item);
+    const remainingStock = Math.max(0, availableStock - Math.max(0, Number(item.quantity || 0)));
+
+    return {
+      availableLabel: getProductStockLabel(sourceProduct, item.baseUnitName || item.unit),
+      remainingLabel: getProductStockLabel({ ...sourceProduct, stock: remainingStock }, item.baseUnitName || item.unit),
+    };
+  };
+
   const normalizeCartItem = (item: CartItem, overrides: Partial<CartItem> = {}) => {
     const merged = { ...item, ...overrides };
     const packaging = merged.packagings.find((entry) => entry.id === merged.selectedPackagingId) || null;
@@ -893,6 +905,10 @@ export default function POSView() {
       return false;
     }
 
+    if (Math.max(0, Number(product.stock || 0)) <= 0) {
+      return false;
+    }
+
     if (cart.some((item) => Number(item.id) === Number(product.id))) {
       return false;
     }
@@ -1207,6 +1223,10 @@ export default function POSView() {
                 <div className="max-h-[38vh] overflow-y-auto px-4 md:max-h-[320px] md:px-5">
                   {cart.map((item) => (
                     <div key={item.id} className="border-b border-slate-100 py-4 last:border-b-0">
+                      {(() => {
+                        const stockSummary = getCartStockSummary(item);
+
+                        return (
                       <div className="flex items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                           {item.photoUrl ? (
@@ -1224,23 +1244,19 @@ export default function POSView() {
 
                         <div className="min-w-0 flex-1">
                           <p
-                            className="overflow-hidden break-words text-[12px] leading-[16px] text-slate-900"
-                            style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                            }}
+                            className="break-words whitespace-normal text-[13px] font-semibold leading-[18px] text-slate-950"
+                            style={{ overflowWrap: 'anywhere' }}
                           >
                             {formatProductName(item.name)}
                           </p>
 
                           <div className="mt-3 space-y-3">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-[11px] text-slate-500">
+                              <div className="min-w-0 border-t border-slate-100 pt-2">
+                                <p className="text-[11px] font-medium text-slate-500">
                                   {formatMoney(item.sellingPrice)} x {item.quantity} {item.baseUnitName}
                                 </p>
-                                <p className="text-[13px] font-semibold text-slate-900">
+                                <p className="mt-1 text-[14px] font-semibold text-slate-900">
                                   {formatMoney(item.sellingPrice * item.quantity)}
                                 </p>
                               </div>
@@ -1250,6 +1266,17 @@ export default function POSView() {
                               >
                                 <Trash2 size={14} />
                               </button>
+                            </div>
+
+                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-3 py-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                <span className="font-medium text-emerald-700">
+                                  Доступно: {stockSummary.availableLabel}
+                                </span>
+                                <span className="text-slate-500">
+                                  После этой позиции: {stockSummary.remainingLabel}
+                                </span>
+                              </div>
                             </div>
 
                             <div className="grid gap-2 md:grid-cols-[minmax(0,1.2fr)_88px_96px]">
@@ -1301,6 +1328,8 @@ export default function POSView() {
                           </div>
                         </div>
                       </div>
+                        );
+                      })()}
                     </div>
                   ))}
 

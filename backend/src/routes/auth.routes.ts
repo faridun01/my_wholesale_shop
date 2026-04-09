@@ -126,12 +126,10 @@ router.put('/users/:id', authenticate, async (req, res, next) => {
     const currentUser = (req as any).user;
     const isAdmin = currentUser.role.toUpperCase() === 'ADMIN';
 
-    // Only ADMIN can update others, users can update themselves
     if (!isAdmin && currentUser.id !== targetId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Non-admins cannot change their own role or warehouse
     const updateData = { ...req.body };
     if (!isAdmin) {
       delete updateData.role;
