@@ -353,8 +353,11 @@ export class InvoiceService {
       }
 
       if (
-        (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
-        Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
+        !isAdmin &&
+        (
+          (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
+          Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
+        )
       ) {
         throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
       }

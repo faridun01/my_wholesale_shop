@@ -479,12 +479,12 @@ export default function SalesView() {
 
     const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
     const hasReturnedAmount = Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON;
-    if (hasReturns || hasReturnedAmount) {
-      return false;
-    }
-
     if (isAdmin) {
       return true;
+    }
+
+    if (hasReturns || hasReturnedAmount) {
+      return false;
     }
 
     if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
@@ -502,16 +502,16 @@ export default function SalesView() {
       return 'Накладную нельзя изменить';
     }
 
+    if (isAdmin) {
+      return invoice.cancelled ? 'Отменённую накладную нельзя изменить' : 'Администратор может изменить накладную';
+    }
+
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {
       return 'Накладную с возвратом нельзя изменить';
     }
 
     if (Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
       return 'Накладную с возвратом нельзя изменить';
-    }
-
-    if (isAdmin) {
-      return invoice.cancelled ? 'Отменённую накладную нельзя изменить' : 'Администратор может изменить накладную';
     }
 
     if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
