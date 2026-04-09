@@ -311,6 +311,7 @@ export class InvoiceService {
   static async updateInvoice(invoiceId: number, data: {
     customerId: number;
     userId: number;
+    isAdmin?: boolean;
     items: {
       productId: number;
       quantity: number;
@@ -327,7 +328,7 @@ export class InvoiceService {
       brand?: string | null;
     }[];
   }) {
-    const { customerId, items } = data;
+    const { customerId, items, isAdmin = false } = data;
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('Invoice must contain at least one item');
@@ -352,10 +353,18 @@ export class InvoiceService {
       }
 
       if (
-        (Array.isArray(invoice.payments) && invoice.payments.length > 0) ||
         (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
-        Number(invoice.paidAmount || 0) > PAYMENT_EPSILON ||
         Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
+      ) {
+        throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
+      }
+
+      if (
+        !isAdmin &&
+        (
+          (Array.isArray(invoice.payments) && invoice.payments.length > 0) ||
+          Number(invoice.paidAmount || 0) > PAYMENT_EPSILON
+        )
       ) {
         throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
       }

@@ -135,6 +135,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       ? await InvoiceService.updateInvoice(invoiceId, {
           customerId,
           userId: req.user!.id,
+          isAdmin: access.isAdmin,
           items: req.body.items,
         })
       : await InvoiceService.reassignCustomer(invoiceId, customerId);

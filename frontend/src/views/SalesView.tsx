@@ -477,29 +477,29 @@ export default function SalesView() {
       return false;
     }
 
+    const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
+    const hasReturnedAmount = Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON;
+    if (hasReturns || hasReturnedAmount) {
+      return false;
+    }
+
+    if (isAdmin) {
+      return true;
+    }
+
     if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
       return false;
     }
 
     const hasPayments = Array.isArray(invoice.payments) && invoice.payments.length > 0;
-    const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
     const hasPaidAmount = Number(invoice.paidAmount || 0) > PAYMENT_EPSILON;
-    const hasReturnedAmount = Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON;
 
-    return !hasPayments && !hasReturns && !hasPaidAmount && !hasReturnedAmount;
+    return !hasPayments && !hasPaidAmount;
   };
 
   const getEditBlockedReason = (invoice: any) => {
     if (!invoice) {
       return 'Накладную нельзя изменить';
-    }
-
-    if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
-      return 'Можно редактировать только свои накладные';
-    }
-
-    if (invoice.cancelled) {
-      return 'Отменённую накладную нельзя изменить';
     }
 
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {
@@ -508,6 +508,18 @@ export default function SalesView() {
 
     if (Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
       return 'Накладную с возвратом нельзя изменить';
+    }
+
+    if (isAdmin) {
+      return invoice.cancelled ? 'Отменённую накладную нельзя изменить' : 'Администратор может изменить накладную';
+    }
+
+    if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
+      return 'Можно редактировать только свои накладные';
+    }
+
+    if (invoice.cancelled) {
+      return 'Отменённую накладную нельзя изменить';
     }
 
     if (Array.isArray(invoice.payments) && invoice.payments.length > 0) {

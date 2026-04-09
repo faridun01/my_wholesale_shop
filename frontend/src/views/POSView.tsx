@@ -893,7 +893,9 @@ export default function POSView() {
       return false;
     }
 
-    if (product.stock <= 0) return false;
+    if (cart.some((item) => Number(item.id) === Number(product.id))) {
+      return false;
+    }
 
     const query = deferredProductSearch.trim().toLowerCase();
     if (!query) return true;
@@ -1061,7 +1063,7 @@ export default function POSView() {
 
                         <button
                           onClick={() => addToCart(product)}
-                          disabled={isAdmin && !warehouseId}
+                          disabled={Number(product.stock || 0) <= 0 || (isAdmin && !warehouseId)}
                           className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-sky-500 px-3 py-2.5 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus size={15} />
@@ -1099,7 +1101,7 @@ export default function POSView() {
                       <div className="text-right">
                         <button
                           onClick={() => addToCart(product)}
-                          disabled={isAdmin && !warehouseId}
+                          disabled={Number(product.stock || 0) <= 0 || (isAdmin && !warehouseId)}
                           className="inline-flex items-center gap-1 rounded-xl bg-sky-500 px-3 py-2 text-sm text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus size={15} />
