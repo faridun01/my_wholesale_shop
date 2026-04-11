@@ -387,6 +387,8 @@ router.get('/sales', authorize(['ADMIN']), async (req: AuthRequest, res, next) =
       select: {
         id: true,
         createdAt: true,
+        discount: true,
+        netAmount: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {
@@ -466,6 +468,7 @@ router.get('/profit', async (req: AuthRequest, res, next) => {
         id: true,
         createdAt: true,
         discount: true,
+        netAmount: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {

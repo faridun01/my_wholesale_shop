@@ -67,6 +67,13 @@ type EditProductOption = {
   stock?: number;
 };
 
+type ReturnMode = 'package' | 'unit';
+
+type ReturnInvoiceItem = any & {
+  returnQty: string;
+  returnMode: ReturnMode;
+};
+
 const normalizeProductSearchValue = (value: unknown) => formatProductName(value).toLowerCase();
 const normalizeDisplayBaseUnit = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -345,11 +352,22 @@ export default function SalesView() {
     setIsReturning(true);
     try {
       const itemsToReturn = returnItems
-        .filter(item => item.returnQty > 0)
-        .map(item => ({
-          invoiceItemId: item.id,
-          quantity: parseFloat(item.returnQty)
-        }));
+        .map((item: ReturnInvoiceItem) => {
+          const rawQuantity = Number(item.returnQty || 0);
+          const packaging = getReturnItemPackaging(item);
+          const quantity =
+            item.returnMode === 'package' && packaging
+              ? rawQuantity * packaging.unitsPerPackage
+              : rawQuantity;
+
+          return {
+            invoiceItemId: Number(item.id),
+            rawQuantity,
+            quantity,
+            item,
+          };
+        })
+        .filter((item) => item.rawQuantity > 0);
 
       if (itemsToReturn.length === 0) {
         toast.error('Выберите товары для возврата');
@@ -357,13 +375,37 @@ export default function SalesView() {
         return;
       }
 
+      for (const item of itemsToReturn) {
+        const remainingUnits = getReturnItemRemainingUnits(item.item);
+        const packaging = getReturnItemPackaging(item.item);
+
+        if (!Number.isFinite(item.rawQuantity) || item.rawQuantity <= 0) {
+          toast.error('Введите корректное количество для возврата');
+          setIsReturning(false);
+          return;
+        }
+
+        if (item.item.returnMode === 'package') {
+          const maxPackages = packaging ? Math.floor(remainingUnits / packaging.unitsPerPackage) : 0;
+          if (!Number.isInteger(item.rawQuantity) || item.rawQuantity > maxPackages) {
+            toast.error(`Можно вернуть не больше ${maxPackages} ${packaging?.packageName || 'упаковок'}`);
+            setIsReturning(false);
+            return;
+          }
+        } else if (item.quantity > remainingUnits) {
+          toast.error(`Можно вернуть не больше ${remainingUnits} ${packaging?.baseUnitName || 'шт'}`);
+          setIsReturning(false);
+          return;
+        }
+      }
+
       await client.post(`/invoices/${selectedInvoice.id}/return`, {
-        items: itemsToReturn,
+        items: itemsToReturn.map(({ invoiceItemId, quantity }) => ({ invoiceItemId, quantity })),
         reason: returnReason
       });
       toast.success('Возврат оформлен');
       closeReturnModal();
-      fetchInvoices();
+      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при оформлении возврата');
     } finally {
@@ -473,16 +515,20 @@ export default function SalesView() {
   }
 
   const canEditInvoice = (invoice: any) => {
-    if (!invoice || invoice.cancelled) {
+    if (!invoice) {
+      return false;
+    }
+
+    if (isAdmin) {
+      return true;
+    }
+
+    if (invoice.cancelled) {
       return false;
     }
 
     const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
     const hasReturnedAmount = Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON;
-    if (isAdmin) {
-      return true;
-    }
-
     if (hasReturns || hasReturnedAmount) {
       return false;
     }
@@ -503,7 +549,7 @@ export default function SalesView() {
     }
 
     if (isAdmin) {
-      return invoice.cancelled ? 'Отменённую накладную нельзя изменить' : 'Администратор может изменить накладную';
+      return 'Администратор может изменить накладную';
     }
 
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {
@@ -1013,6 +1059,31 @@ export default function SalesView() {
     return normalized || 'уп';
   };
 
+  const getReturnItemPackaging = (item: any) => {
+    const unitsPerPackage = Math.max(0, Number(item?.unitsPerPackageSnapshot ?? item?.unitsPerPackage ?? 0));
+    const packageName = String(item?.packageNameSnapshot || item?.packageName || '').trim();
+
+    if (!packageName || unitsPerPackage <= 0) {
+      return null;
+    }
+
+    return {
+      packageName,
+      unitsPerPackage,
+      baseUnitName: normalizeDisplayBaseUnit(item?.unit || item?.baseUnitNameSnapshot || item?.baseUnitName || 'шт'),
+    };
+  };
+
+  const getReturnItemRemainingUnits = (item: any) =>
+    Math.max(0, Number(item?.quantity ?? item?.totalBaseUnits ?? 0) - Number(item?.returnedQty || 0));
+
+  const createReturnInvoiceItems = (items: any[]): ReturnInvoiceItem[] =>
+    (Array.isArray(items) ? items : []).map((item: any) => ({
+      ...item,
+      returnQty: '',
+      returnMode: getReturnItemPackaging(item) ? 'package' : 'unit',
+    }));
+
   const getInvoiceItemQuantityParts = (item: any) => {
     const packageQuantity = Math.max(0, Number(item?.packageQuantity || 0));
     const extraUnitQuantity = Math.max(0, Number(item?.extraUnitQuantity || 0));
@@ -1331,7 +1402,7 @@ export default function SalesView() {
                     onClick={() => {
                       if (returnDisabled) return;
                       setSelectedInvoice(inv);
-                      setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
+                      setReturnItems(createReturnInvoiceItems(inv.items || []));
                       setShowReturnModal(true);
                     }}
                     disabled={returnDisabled}
@@ -1457,7 +1528,7 @@ export default function SalesView() {
                             e.stopPropagation();
                             if (returnDisabled) return;
                             setSelectedInvoice(inv);
-                            setReturnItems(inv.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
+                            setReturnItems(createReturnInvoiceItems(inv.items || []));
                             setShowReturnModal(true);
                           }}
                           disabled={returnDisabled}
@@ -1796,7 +1867,7 @@ export default function SalesView() {
                 <button
                     onClick={() => {
                       if (isReturnActionDisabled(selectedInvoice)) return;
-                      setReturnItems(selectedInvoice.items?.map((item: any) => ({ ...item, returnQty: 0 })) || []);
+                      setReturnItems(createReturnInvoiceItems(selectedInvoice.items || []));
                       setShowReturnModal(true);
                     }}
                     disabled={isReturnActionDisabled(selectedInvoice)}
@@ -2348,8 +2419,12 @@ export default function SalesView() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {returnItems.map((item: any, idx: number) => {
+                        {returnItems.map((item: ReturnInvoiceItem, idx: number) => {
                           const quantityInfo = getInvoiceItemQuantityParts(item);
+                          const packaging = getReturnItemPackaging(item);
+                          const remainingUnits = getReturnItemRemainingUnits(item);
+                          const maxPackages = packaging ? Math.floor(remainingUnits / packaging.unitsPerPackage) : 0;
+                          const inputMax = item.returnMode === 'package' ? maxPackages : remainingUnits;
 
                           return (
                             <tr key={item.id}>
@@ -2359,20 +2434,48 @@ export default function SalesView() {
                                 {quantityInfo.secondary && (
                                   <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">{quantityInfo.secondary}</p>
                                 )}
+                                <p className="mt-1 whitespace-nowrap text-[10px] text-slate-400">
+                                  Доступно: {packaging ? `${maxPackages} ${packaging.packageName} или ` : ''}{formatCount(remainingUnits)} {packaging?.baseUnitName || 'шт'}
+                                </p>
                               </td>
                               <td className="px-6 py-4">
-                              <input 
-                                type="number" 
-                                min="0"
-                                max={item.quantity - (item.returnedQty || 0)}
-                                value={item.returnQty}
-                                onChange={(e) => {
-                                  const newItems = [...returnItems];
-                                  newItems[idx].returnQty = e.target.value;
-                                  setReturnItems(newItems);
-                                }}
-                                className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-center outline-none focus:ring-2 focus:ring-amber-500"
-                              />
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                  {packaging ? (
+                                    <select
+                                      value={item.returnMode}
+                                      onChange={(e) => {
+                                        const newItems = [...returnItems] as ReturnInvoiceItem[];
+                                        newItems[idx] = {
+                                          ...newItems[idx],
+                                          returnMode: e.target.value === 'package' ? 'package' : 'unit',
+                                          returnQty: '',
+                                        };
+                                        setReturnItems(newItems);
+                                      }}
+                                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+                                    >
+                                      <option value="package">{packaging.packageName}</option>
+                                      <option value="unit">{packaging.baseUnitName}</option>
+                                    </select>
+                                  ) : null}
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    step="1"
+                                    max={inputMax}
+                                    value={item.returnQty}
+                                    onChange={(e) => {
+                                      const newItems = [...returnItems] as ReturnInvoiceItem[];
+                                      newItems[idx] = {
+                                        ...newItems[idx],
+                                        returnQty: e.target.value,
+                                      };
+                                      setReturnItems(newItems);
+                                    }}
+                                    placeholder={item.returnMode === 'package' ? 'Кол-во коробок' : 'Кол-во шт'}
+                                    className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-black text-center outline-none focus:ring-2 focus:ring-amber-500"
+                                  />
+                                </div>
                               </td>
                             </tr>
                           );
@@ -2402,7 +2505,7 @@ export default function SalesView() {
                 </button>
                 <button 
                   onClick={handleReturn}
-                  disabled={isReturning || returnItems.every(item => !item.returnQty || parseFloat(item.returnQty) === 0)}
+                  disabled={isReturning || returnItems.every((item: ReturnInvoiceItem) => !item.returnQty || parseFloat(item.returnQty) === 0)}
                   className="flex-1 py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {isReturning ? 'Оформление...' : 'Оформить возврат'}

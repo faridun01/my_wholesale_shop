@@ -175,7 +175,7 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
     }
 
     const userId = req.user!.id;
-    const result = await InvoiceService.cancelInvoice(Number(req.params.id), userId);
+    const result = await InvoiceService.cancelInvoice(Number(req.params.id), userId, { force: true });
     res.json(result);
   } catch (error) {
     next(error);
@@ -230,7 +230,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     }
 
     if (!invoice.cancelled) {
-      await InvoiceService.cancelInvoice(invoiceId, req.user!.id);
+      await InvoiceService.cancelInvoice(invoiceId, req.user!.id, { force: true });
     }
 
     res.json({ success: true });

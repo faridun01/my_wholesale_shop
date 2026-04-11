@@ -50,6 +50,32 @@ function buildRequestedQuantityByProduct(
   return requested;
 }
 
+function buildCurrentInvoiceItemSnapshot(item: any) {
+  const originalTotalBaseUnits = Math.max(0, Number(item?.totalBaseUnits ?? item?.quantity ?? 0));
+  const returnedQty = Math.max(0, Number(item?.returnedQty || 0));
+  const remainingBaseUnits = roundMoney(Math.max(0, originalTotalBaseUnits - returnedQty));
+
+  if (remainingBaseUnits <= PAYMENT_EPSILON) {
+    return null;
+  }
+
+  const unitsPerPackage = Math.max(0, Number(item?.unitsPerPackageSnapshot ?? 0));
+  const hasPackaging = Number(item?.packageQuantity || 0) > 0 && unitsPerPackage > 0;
+  const packageQuantity = hasPackaging ? Math.floor(remainingBaseUnits / unitsPerPackage) : null;
+  const packagedUnits = hasPackaging ? packageQuantity! * unitsPerPackage : 0;
+  const extraUnitQuantity = hasPackaging ? roundMoney(remainingBaseUnits - packagedUnits) : roundMoney(remainingBaseUnits);
+
+  return {
+    ...item,
+    quantity: remainingBaseUnits,
+    totalBaseUnits: remainingBaseUnits,
+    packageQuantity,
+    extraUnitQuantity,
+    returnedQty: 0,
+    totalPrice: roundMoney(remainingBaseUnits * Number(item?.sellingPrice || 0)),
+  };
+}
+
 export class InvoiceService {
   /**
    * Creates a new invoice and allocates stock.
@@ -348,7 +374,7 @@ export class InvoiceService {
         throw new Error('Invoice not found');
       }
 
-      if (invoice.cancelled) {
+      if (invoice.cancelled && !isAdmin) {
         throw new Error('Cancelled invoice cannot be edited');
       }
 
@@ -515,6 +541,7 @@ export class InvoiceService {
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
           netAmount,
+          cancelled: isAdmin ? false : invoice.cancelled,
           status: getInvoiceStatus(Number(invoice.paidAmount || 0), Number(netAmount)),
         },
       });
@@ -526,7 +553,9 @@ export class InvoiceService {
   /**
    * Cancels an invoice and returns stock.
    */
-  static async cancelInvoice(invoiceId: number, userId: number) {
+  static async cancelInvoice(invoiceId: number, userId: number, options?: { force?: boolean }) {
+    const force = Boolean(options?.force);
+
     return await prisma.$transaction(async (tx: any) => {
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
@@ -545,11 +574,11 @@ export class InvoiceService {
         throw new Error('Invoice not found or already cancelled');
       }
 
-      if ((invoice.payments?.length || 0) > 0 || Number(invoice.paidAmount || 0) > PAYMENT_EPSILON) {
+      if (!force && ((invoice.payments?.length || 0) > 0 || Number(invoice.paidAmount || 0) > PAYMENT_EPSILON)) {
         throw new Error('Нельзя удалить накладную, по которой уже есть оплата');
       }
 
-      if ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
+      if (!force && ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON)) {
         throw new Error('Нельзя удалить накладную, по которой уже есть возврат');
       }
 
@@ -622,7 +651,10 @@ export class InvoiceService {
       include: { user: true }
     });
 
-    const normalizedItems = invoiceItems.map((item) => ({
+    const normalizedItems = invoiceItems
+      .map((item) => buildCurrentInvoiceItemSnapshot(item))
+      .filter(Boolean)
+      .map((item: any) => ({
       ...item,
       product_name: item.productNameSnapshot || item.product.name,
       unit: item.baseUnitNameSnapshot || item.product.baseUnitName || item.product.unit,
@@ -704,7 +736,9 @@ export class InvoiceService {
             qtyChange: returnItem.quantity,
             type: 'return',
             reason: `${reason} (Накладная #${invoiceId})`,
-            referenceId: invoiceId
+            referenceId: invoiceId,
+            costAtTime: Number(originalItem.costPrice || 0),
+            sellingAtTime: Number(originalItem.sellingPrice || 0),
           }
         });
 
