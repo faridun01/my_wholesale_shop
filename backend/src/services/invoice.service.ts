@@ -541,6 +541,7 @@ export class InvoiceService {
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
           netAmount,
+          returnedAmount: 0,
           cancelled: isAdmin ? false : invoice.cancelled,
           status: getInvoiceStatus(Number(invoice.paidAmount || 0), Number(netAmount)),
         },

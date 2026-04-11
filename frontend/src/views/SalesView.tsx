@@ -475,15 +475,16 @@ export default function SalesView() {
   }
 
   function getInvoiceNetAmount(invoice: any) {
-    const subtotal = getInvoiceSubtotal(invoice);
-    const discountAmount = getInvoiceDiscountAmount(invoice);
-    const returnedAmount = Number(invoice?.returnedAmount || 0);
-    const calculatedNet = subtotal - discountAmount - returnedAmount;
-    const storedNet = Number(invoice?.netAmount || 0);
-
-    if (Math.abs(calculatedNet - storedNet) <= PAYMENT_EPSILON) {
+    const storedNet = Number(invoice?.netAmount);
+    if (Number.isFinite(storedNet) && storedNet >= 0) {
       return storedNet;
     }
+
+    const subtotal = getInvoiceSubtotal(invoice);
+    const discountAmount = getInvoiceDiscountAmount(invoice);
+    const taxAmount = Number(invoice?.tax || 0);
+    const returnedAmount = Number(invoice?.returnedAmount || 0);
+    const calculatedNet = subtotal - discountAmount + taxAmount - returnedAmount;
 
     return Math.max(0, calculatedNet);
   }
