@@ -1078,11 +1078,16 @@ export default function SalesView() {
     Math.max(0, Number(item?.quantity ?? item?.totalBaseUnits ?? 0) - Number(item?.returnedQty || 0));
 
   const createReturnInvoiceItems = (items: any[]): ReturnInvoiceItem[] =>
-    (Array.isArray(items) ? items : []).map((item: any) => ({
-      ...item,
-      returnQty: '',
-      returnMode: getReturnItemPackaging(item) ? 'package' : 'unit',
-    }));
+    (Array.isArray(items) ? items : [])
+      .filter((item: any) => getReturnItemRemainingUnits(item) > PAYMENT_EPSILON)
+      .map((item: any) => ({
+        ...item,
+        returnQty: '',
+        returnMode: getReturnItemPackaging(item) ? 'package' : 'unit',
+      }));
+
+  const hasReturnableItems = (invoice: any) =>
+    Array.isArray(invoice?.items) && invoice.items.some((item: any) => getReturnItemRemainingUnits(item) > PAYMENT_EPSILON);
 
   const getInvoiceItemQuantityParts = (item: any) => {
     const packageQuantity = Math.max(0, Number(item?.packageQuantity || 0));
@@ -1118,7 +1123,7 @@ export default function SalesView() {
     getInvoiceBalance(invoice) <= PAYMENT_EPSILON;
 
   const isReturnActionDisabled = (invoice: any) =>
-    Boolean(invoice?.cancelled) || isInvoicePaidInFull(invoice);
+    Boolean(invoice?.cancelled) || isInvoicePaidInFull(invoice) || !hasReturnableItems(invoice);
 
   const refreshSelectedInvoice = async (invoiceId: number) => {
     try {

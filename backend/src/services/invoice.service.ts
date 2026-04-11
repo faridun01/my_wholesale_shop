@@ -711,20 +711,34 @@ export class InvoiceService {
 
       if (!invoice) throw new Error('Invoice not found');
       if (invoice.status === 'paid') throw new Error('Cannot return items for a fully paid invoice');
+      if (invoice.cancelled) throw new Error('Нельзя оформить возврат по отменённой накладной');
 
       let totalRefundValue = 0;
       const affectedProductIds = new Set<number>();
+      let processedReturnCount = 0;
 
       for (const returnItem of items) {
         const originalItem = invoice.items.find((i: any) => Number(i.id) === Number(returnItem.invoiceItemId));
-        if (!originalItem) continue;
+        if (!originalItem) {
+          throw new Error(`Строка накладной #${returnItem.invoiceItemId} не найдена`);
+        }
 
-        if (originalItem.returnedQty + returnItem.quantity > originalItem.quantity) {
+        const normalizedQuantity = Number(returnItem.quantity || 0);
+        if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+          throw new Error(`Некорректное количество возврата для строки #${originalItem.id}`);
+        }
+
+        const availableToReturn = Math.max(0, Number(originalItem.quantity || 0) - Number(originalItem.returnedQty || 0));
+        if (availableToReturn <= PAYMENT_EPSILON) {
+          throw new Error(`Товар по строке #${originalItem.id} уже полностью возвращён`);
+        }
+
+        if (normalizedQuantity - availableToReturn > PAYMENT_EPSILON) {
           throw new Error(`Нельзя вернуть больше, чем было продано для строки #${originalItem.id}`);
         }
 
         // 1. Return stock to batches (FIFO reverse) - this ensures stock goes back to the same warehouse
-        await StockService.deallocateStock(originalItem.id, returnItem.quantity, undefined, tx, false);
+        await StockService.deallocateStock(originalItem.id, normalizedQuantity, undefined, tx, false);
         affectedProductIds.add(Number(originalItem.productId));
 
         // 2. Record inventory transaction
@@ -733,7 +747,7 @@ export class InvoiceService {
             productId: Number(originalItem.productId),
             warehouseId: invoice.warehouseId,
             userId,
-            qtyChange: returnItem.quantity,
+            qtyChange: normalizedQuantity,
             type: 'return',
             reason: `${reason} (Накладная #${invoiceId})`,
             referenceId: invoiceId,
@@ -745,11 +759,16 @@ export class InvoiceService {
         // 3. Update InvoiceItem returnedQty
         await tx.invoiceItem.update({
           where: { id: originalItem.id },
-          data: { returnedQty: { increment: returnItem.quantity } }
+          data: { returnedQty: { increment: normalizedQuantity } }
         });
 
         // 4. Calculate refund value
-        totalRefundValue += roundMoney(Number(originalItem.sellingPrice) * returnItem.quantity);
+        totalRefundValue += roundMoney(Number(originalItem.sellingPrice) * normalizedQuantity);
+        processedReturnCount += 1;
+      }
+
+      if (processedReturnCount === 0) {
+        throw new Error('Нет доступных товаров для возврата');
       }
 
       for (const productId of affectedProductIds) {
