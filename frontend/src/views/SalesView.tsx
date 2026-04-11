@@ -872,9 +872,17 @@ export default function SalesView() {
     return editInvoiceSubtotal * (discountPercent / 100);
   }, [editInvoiceSubtotal, selectedInvoice?.discount]);
 
+  const editInvoiceTaxAmount = React.useMemo(() => {
+    const taxAmount = Number(selectedInvoice?.tax || 0);
+    if (!Number.isFinite(taxAmount) || taxAmount <= 0) {
+      return 0;
+    }
+    return taxAmount;
+  }, [selectedInvoice?.tax]);
+
   const editInvoiceNetAmount = React.useMemo(
-    () => Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount),
-    [editInvoiceDiscountAmount, editInvoiceSubtotal],
+    () => Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount + editInvoiceTaxAmount),
+    [editInvoiceDiscountAmount, editInvoiceSubtotal, editInvoiceTaxAmount],
   );
 
   const openEditInvoiceModal = async (invoice: any) => {
@@ -1028,6 +1036,12 @@ export default function SalesView() {
                 ...updatedInvoice,
                 customer_name: updatedInvoice.customer_name || updatedInvoice.customer?.name || invoice.customer_name,
                 staff_name: updatedInvoice.staff_name || updatedInvoice.user?.username || invoice.staff_name,
+                items: Array.isArray(updatedInvoice.items) ? updatedInvoice.items : invoice.items,
+                totalAmount: updatedInvoice.totalAmount,
+                netAmount: updatedInvoice.netAmount,
+                paidAmount: updatedInvoice.paidAmount,
+                returnedAmount: updatedInvoice.returnedAmount,
+                status: updatedInvoice.status,
               }
             : invoice,
         ),
@@ -2272,6 +2286,11 @@ export default function SalesView() {
                     {Number(selectedInvoice?.discount || 0) > 0 ? (
                       <p className="mt-3 text-sm text-slate-500">
                         Скидка {Number(selectedInvoice.discount || 0)}%: -{formatMoney(editInvoiceDiscountAmount)}
+                      </p>
+                    ) : null}
+                    {Number(selectedInvoice?.tax || 0) > 0 ? (
+                      <p className="mt-1 text-sm text-slate-500">
+                        Налог: +{formatMoney(editInvoiceTaxAmount)}
                       </p>
                     ) : null}
                   </div>
