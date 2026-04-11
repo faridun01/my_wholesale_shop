@@ -472,6 +472,19 @@ export class InvoiceService {
         await StockService.deallocateStock(existingItem.id, undefined, undefined, tx, false);
       }
 
+      if ((Array.isArray(invoice.returns) && invoice.returns.length > 0) || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
+        await tx.return.deleteMany({
+          where: { invoiceId },
+        });
+
+        await tx.inventoryTransaction.deleteMany({
+          where: {
+            type: 'return',
+            referenceId: invoiceId,
+          },
+        });
+      }
+
       await tx.invoiceItem.deleteMany({
         where: { invoiceId },
       });
