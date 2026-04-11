@@ -339,7 +339,8 @@ export default function SalesView() {
       });
       toast.success('Оплата принята');
       closePaymentModal();
-      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
+      await refreshSelectedInvoice(selectedInvoice.id);
+      await fetchInvoices();
     } catch (err) {
       toast.error('Ошибка при приёме оплаты');
     } finally {
@@ -405,7 +406,8 @@ export default function SalesView() {
       });
       toast.success('Возврат оформлен');
       closeReturnModal();
-      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
+      await refreshSelectedInvoice(selectedInvoice.id);
+      await fetchInvoices();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при оформлении возврата');
     } finally {
@@ -925,16 +927,11 @@ export default function SalesView() {
         });
         const updatedInvoice = res.data;
         setSelectedInvoice(updatedInvoice);
-        setInvoices((current) =>
-          current.map((invoice) =>
-            Number(invoice.id) === Number(updatedInvoice.id)
-              ? { ...invoice, ...updatedInvoice }
-              : invoice,
-          ),
-        );
+        applyInvoiceToHistory(updatedInvoice);
         toast.success('Клиент изменен только для текущей накладной');
         closeEditModal();
-        await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
+        await refreshSelectedInvoice(selectedInvoice.id);
+        await fetchInvoices();
       } catch (err: any) {
         toast.error(err.response?.data?.error || 'Ошибка при смене клиента');
       } finally {
@@ -1028,27 +1025,11 @@ export default function SalesView() {
       });
       const updatedInvoice = res.data;
       setSelectedInvoice(updatedInvoice);
-      setInvoices((current) =>
-        current.map((invoice) =>
-          Number(invoice.id) === Number(updatedInvoice.id)
-            ? {
-                ...invoice,
-                ...updatedInvoice,
-                customer_name: updatedInvoice.customer_name || updatedInvoice.customer?.name || invoice.customer_name,
-                staff_name: updatedInvoice.staff_name || updatedInvoice.user?.username || invoice.staff_name,
-                items: Array.isArray(updatedInvoice.items) ? updatedInvoice.items : invoice.items,
-                totalAmount: updatedInvoice.totalAmount,
-                netAmount: updatedInvoice.netAmount,
-                paidAmount: updatedInvoice.paidAmount,
-                returnedAmount: updatedInvoice.returnedAmount,
-                status: updatedInvoice.status,
-              }
-            : invoice,
-        ),
-      );
+      applyInvoiceToHistory(updatedInvoice);
       toast.success('Накладная обновлена');
       closeEditModal();
-      await Promise.all([fetchInvoices(), refreshSelectedInvoice(selectedInvoice.id)]);
+      await refreshSelectedInvoice(selectedInvoice.id);
+      await fetchInvoices();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при обновлении продажи');
     } finally {
@@ -1103,6 +1084,9 @@ export default function SalesView() {
   const hasReturnableItems = (invoice: any) =>
     Array.isArray(invoice?.items) && invoice.items.some((item: any) => getReturnItemRemainingUnits(item) > PAYMENT_EPSILON);
 
+  const getReturnItemDisplayName = (item: any) =>
+    formatProductName(item?.product_name || item?.productNameSnapshot || item?.product?.name || 'Товар без названия');
+
   const getInvoiceItemQuantityParts = (item: any) => {
     const packageQuantity = Math.max(0, Number(item?.packageQuantity || 0));
     const extraUnitQuantity = Math.max(0, Number(item?.extraUnitQuantity || 0));
@@ -1139,12 +1123,58 @@ export default function SalesView() {
   const isReturnActionDisabled = (invoice: any) =>
     Boolean(invoice?.cancelled) || isInvoicePaidInFull(invoice) || !hasReturnableItems(invoice);
 
+  const applyInvoiceToHistory = (updatedInvoice: any) => {
+    if (!updatedInvoice?.id) {
+      return;
+    }
+
+    setInvoices((current) =>
+      current.map((invoice) =>
+        Number(invoice.id) === Number(updatedInvoice.id)
+          ? {
+              ...invoice,
+              ...updatedInvoice,
+              customer_name: updatedInvoice.customer_name || updatedInvoice.customer?.name || invoice.customer_name,
+              staff_name: updatedInvoice.staff_name || updatedInvoice.user?.username || invoice.staff_name,
+              items: Array.isArray(updatedInvoice.items) ? updatedInvoice.items : invoice.items,
+              totalAmount: updatedInvoice.totalAmount,
+              netAmount: updatedInvoice.netAmount,
+              paidAmount: updatedInvoice.paidAmount,
+              returnedAmount: updatedInvoice.returnedAmount,
+              discount: updatedInvoice.discount,
+              tax: updatedInvoice.tax,
+              status: updatedInvoice.status,
+              cancelled: Boolean(updatedInvoice.cancelled),
+            }
+          : invoice,
+      ),
+    );
+  };
+
   const refreshSelectedInvoice = async (invoiceId: number) => {
     try {
       const res = await client.get(`/invoices/${invoiceId}`);
       setSelectedInvoice(res.data);
+      applyInvoiceToHistory(res.data);
+      return res.data;
     } catch (err) {
       console.error(err);
+      return null;
+    }
+  };
+
+  const openReturnInvoiceModal = async (invoice: any) => {
+    if (!invoice || isReturnActionDisabled(invoice)) {
+      return;
+    }
+
+    try {
+      const res = await client.get(`/invoices/${invoice.id}`);
+      setSelectedInvoice(res.data);
+      setReturnItems(createReturnInvoiceItems(res.data.items || []));
+      setShowReturnModal(true);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Ошибка при загрузке накладной');
     }
   };
 
@@ -1419,10 +1449,7 @@ export default function SalesView() {
                   </button>
                 <button
                     onClick={() => {
-                      if (returnDisabled) return;
-                      setSelectedInvoice(inv);
-                      setReturnItems(createReturnInvoiceItems(inv.items || []));
-                      setShowReturnModal(true);
+                      void openReturnInvoiceModal(inv);
                     }}
                     disabled={returnDisabled}
                     className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
@@ -1545,10 +1572,7 @@ export default function SalesView() {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (returnDisabled) return;
-                            setSelectedInvoice(inv);
-                            setReturnItems(createReturnInvoiceItems(inv.items || []));
-                            setShowReturnModal(true);
+                            void openReturnInvoiceModal(inv);
                           }}
                           disabled={returnDisabled}
                           className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
@@ -1885,9 +1909,7 @@ export default function SalesView() {
                   </button>
                 <button
                     onClick={() => {
-                      if (isReturnActionDisabled(selectedInvoice)) return;
-                      setReturnItems(createReturnInvoiceItems(selectedInvoice.items || []));
-                      setShowReturnModal(true);
+                      void openReturnInvoiceModal(selectedInvoice);
                     }}
                     disabled={isReturnActionDisabled(selectedInvoice)}
                     className={`inline-flex items-center gap-2 rounded-2xl border px-6 py-3 text-sm font-bold transition-all md:px-8 md:py-4 ${
@@ -2434,7 +2456,12 @@ export default function SalesView() {
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Выберите товары для возврата</h4>
                   <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full table-fixed text-left text-sm">
+                      <colgroup>
+                        <col className="w-[38%]" />
+                        <col className="w-[40%]" />
+                        <col className="w-[22%]" />
+                      </colgroup>
                       <thead>
                         <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                           <th className="px-6 py-4">Товар</th>
@@ -2449,10 +2476,22 @@ export default function SalesView() {
                           const remainingUnits = getReturnItemRemainingUnits(item);
                           const maxPackages = packaging ? Math.floor(remainingUnits / packaging.unitsPerPackage) : 0;
                           const inputMax = item.returnMode === 'package' ? maxPackages : remainingUnits;
+                          const itemMeta = [
+                            `Строка #${idx + 1}`,
+                            item?.product?.sku ? `Артикул: ${item.product.sku}` : null,
+                            item?.brandSnapshot || item?.product?.brand ? `Бренд: ${item.brandSnapshot || item.product.brand}` : null,
+                          ].filter(Boolean).join(' · ');
 
                           return (
                             <tr key={item.id}>
-                              <td className="px-6 py-4 font-black text-slate-900">{formatProductName(item.product_name)}</td>
+                              <td className="px-6 py-4">
+                                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                  {itemMeta}
+                                </p>
+                                <p className="break-words text-sm font-black leading-5 text-slate-900">
+                                  {getReturnItemDisplayName(item)}
+                                </p>
+                              </td>
                               <td className="whitespace-nowrap px-6 py-4 text-[11px] text-slate-500">
                                 <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{quantityInfo.primary}</p>
                                 {quantityInfo.secondary && (
