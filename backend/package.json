@@ -8,6 +8,8 @@
     "build": "tsc -p .",
     "start": "node dist/server.js",
     "lint": "tsc -p . --noEmit",
+    "reconcile:invoice-history": "tsx src/scripts/reconcile-invoice-history.ts",
+    "reconcile:invoice-history:apply": "tsx src/scripts/reconcile-invoice-history.ts --apply",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:recategorize": "node prisma/recategorize-products.mjs"
