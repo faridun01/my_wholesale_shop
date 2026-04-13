@@ -1085,7 +1085,7 @@ export default function POSView() {
             <p className="text-sm text-slate-500">Оформление продаж, выбор клиента и создание накладной.</p>
           </div>
 
-          <div className="flex gap-4 border-b border-slate-200 bg-white px-4 py-3 rounded-[24px] lg:hidden">
+          <div className="flex gap-4 border-b border-slate-200 bg-white px-4 py-3 rounded-3xl lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
@@ -1108,7 +1108,7 @@ export default function POSView() {
 
           <div className="grid items-stretch gap-4 lg:grid-cols-[1.55fr_0.95fr]">
             <section className={clsx(activeTab === 'products' ? 'block lg:h-full' : 'hidden lg:block lg:h-full')}>
-              <div className="flex h-full flex-col overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
+              <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-white bg-white shadow-sm">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -1122,7 +1122,7 @@ export default function POSView() {
                           value={warehouseId}
                           onChange={(e) => handleWarehouseChange(e.target.value)}
                           disabled={!isAdmin}
-                          className="min-w-[170px] appearance-none bg-transparent text-sm text-slate-700 outline-none"
+                          className="min-w-42.5 appearance-none bg-transparent text-sm text-slate-700 outline-none"
                         >
                           <option value="">Выберите склад</option>
                           {warehouses.map((warehouse) => (
@@ -1155,7 +1155,7 @@ export default function POSView() {
                           });
                         }}
                         placeholder="Поиск товара или ID..."
-                        className="w-full rounded-[24px] border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
+                        className="w-full rounded-3xl border border-sky-100 bg-sky-50 py-4 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-sky-300"
                       />
                     </div>
                   </div>
@@ -1175,7 +1175,7 @@ export default function POSView() {
                   <div className="text-right">Действие</div>
                 </div>
 
-                <div ref={productListRef} className="h-[560px] overflow-y-auto">
+                <div ref={productListRef} className="h-140 overflow-y-auto">
                   <div className="space-y-3 p-3 md:hidden">
                     {filteredProducts.map((product, index) => {
                       const stockParts = getProductStockParts(product, product.unit);
@@ -1191,7 +1191,7 @@ export default function POSView() {
                       >
                         <div className="min-w-0">
                           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-500">#{index + 1}</p>
-                          <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
+                          <p className="wrap-break-word text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1206,7 +1206,7 @@ export default function POSView() {
                           </div>
                           <div className="rounded-xl bg-sky-50 px-3 py-2">
                             <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Цена</p>
-                            <p className="mt-1 break-words text-sm text-slate-900">{formatMoney(product.sellingPrice)}</p>
+                            <p className="mt-1 wrap-break-word text-sm text-slate-900">{formatMoney(product.sellingPrice)}</p>
                           </div>
                         </div>
 
@@ -1241,11 +1241,11 @@ export default function POSView() {
                           <div className="text-center text-sm font-semibold text-sky-600">{index + 1}</div>
 
                           <div className="min-w-0">
-                            <p className="break-words text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
+                            <p className="wrap-break-word text-[12px] leading-4 text-slate-900">{formatProductName(product.name)}</p>
                           </div>
 
                           <div className="flex justify-center">
-                            <div className="inline-flex min-w-[108px] flex-col items-center rounded-2xl border border-sky-100 bg-sky-50 px-2.5 py-1.5 text-center text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+                            <div className="inline-flex min-w-27 flex-col items-center rounded-2xl border border-sky-100 bg-sky-50 px-2.5 py-1.5 text-center text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
                               <span className="whitespace-nowrap text-[13px] font-semibold leading-4">{stockParts.primary}</span>
                               {stockParts.secondary ? (
                                 <span className="mt-1 whitespace-nowrap text-[11px] font-medium leading-4 text-sky-600/90">{stockParts.secondary}</span>
@@ -1286,7 +1286,7 @@ export default function POSView() {
             </section>
 
             <aside className={clsx(activeTab === 'cart' ? 'block lg:h-full' : 'hidden lg:block lg:h-full')}>
-              <div className="flex h-full flex-col overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
+              <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-white bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-900">Корзина</h2>
@@ -1366,7 +1366,7 @@ export default function POSView() {
                   )}
                 </div>
 
-                <div className="max-h-[38vh] overflow-y-auto px-4 md:max-h-[320px] md:px-5">
+                <div className="max-h-[38vh] overflow-y-auto px-4 md:max-h-80 md:px-5">
                   {cart.map((item) => (
                     <div key={item.id} className="border-b border-slate-100 py-3 last:border-b-0">
                       {(() => {
@@ -1394,7 +1394,7 @@ export default function POSView() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <p
-                              className="break-words whitespace-normal text-[12px] font-semibold leading-[16px] text-slate-950"
+                              className="wrap-break-word whitespace-normal text-[12px] font-semibold leading-4 text-slate-950"
                               style={{ overflowWrap: 'anywhere' }}
                             >
                               {formatProductName(item.name)}
