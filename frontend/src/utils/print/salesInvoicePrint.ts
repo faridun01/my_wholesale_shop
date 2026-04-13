@@ -81,6 +81,7 @@ export function printSalesInvoice({
     month: 'long',
     year: 'numeric',
   });
+  const hasInvoiceDiscount = Number(invoice.discount || 0) > 0;
 
   const getDisplayPrice = (item: any) => {
     const sellingPricePerUnit = Number(item.sellingPrice || 0);
@@ -95,6 +96,8 @@ export function printSalesInvoice({
   };
 
   const getUnitPrice = (item: any) => Number(item.sellingPrice || 0);
+  const getDiscountedUnitPrice = (item: any) =>
+    getUnitPrice(item) * (1 - Math.max(0, Number(invoice.discount || 0)) / 100);
 
   const getQuantityLabel = (item: any) => {
     const packageQuantity = Number(item.packageQuantity || 0);
@@ -133,6 +136,7 @@ export function printSalesInvoice({
                 .join('')}</td>
               <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
               <td>${escapeHtml(formatMoney(getUnitPrice(item)))}</td>
+              ${hasInvoiceDiscount ? `<td>${escapeHtml(formatMoney(getDiscountedUnitPrice(item)))}</td>` : ''}
               <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
             </tr>
           `,
@@ -171,8 +175,17 @@ export function printSalesInvoice({
           .col-quantity { width: 78px; }
           .col-package-price { width: 74px; }
           .col-unit-price { width: 70px; }
+          .col-discounted-price { width: 70px; }
           .col-total { width: 70px; }
           .product-cell { width: 292px; }
+          .has-discount-column .col-number { width: 24px; }
+          .has-discount-column .col-product { width: 236px; }
+          .has-discount-column .product-cell { width: 236px; }
+          .has-discount-column .col-quantity { width: 72px; }
+          .has-discount-column .col-package-price { width: 62px; }
+          .has-discount-column .col-unit-price { width: 62px; }
+          .has-discount-column .col-discounted-price { width: 68px; }
+          .has-discount-column .col-total { width: 62px; }
           .product-name {
             display: -webkit-box;
             -webkit-line-clamp: 2;
@@ -196,7 +209,7 @@ export function printSalesInvoice({
         </style>
       </head>
       <body>
-        <div class="sheet">
+        <div class="sheet ${hasInvoiceDiscount ? 'has-discount-column' : ''}">
           <div class="doc-title">
             <p class="doc-title-text">Накладная №${invoice.id}</p>
             <p class="doc-title-date">${escapeHtml(invoiceDateLabel)}</p>
@@ -228,6 +241,7 @@ export function printSalesInvoice({
                   <th class="col-quantity">Количество</th>
                   <th class="col-package-price">Цена за упаковку</th>
                   <th class="col-unit-price">Цена за штуку</th>
+                  ${hasInvoiceDiscount ? '<th class="col-discounted-price">&#1062;&#1077;&#1085;&#1072; &#1087;&#1086;&#1089;&#1083;&#1077; &#1089;&#1082;&#1080;&#1076;&#1082;&#1080;</th>' : ''}
                   <th class="col-total">Сумма</th>
                 </tr>
               </thead>
@@ -256,3 +270,4 @@ export function printSalesInvoice({
 
   return { ok: true as const };
 }
+
