@@ -5,6 +5,17 @@ import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { securityConfig } from '../config/security.js';
 import { createRateLimit, resetRateLimit } from '../middlewares/rate-limit.middleware.js';
+import { validateRequest } from '../middlewares/validation.middleware.js';
+import {
+  changePasswordBodySchema,
+  loginBodySchema,
+  registerBodySchema,
+  twoFactorDisableBodySchema,
+  twoFactorLoginBodySchema,
+  twoFactorVerifySetupBodySchema,
+  updateUserBodySchema,
+  userIdParamSchema,
+} from '../schemas/auth.schemas.js';
 
 const router = Router();
 
@@ -64,7 +75,7 @@ const twoFactorRateLimit = createRateLimit({
   keyGenerator: twoFactorRateLimitKey,
 });
 
-router.post('/login', loginRateLimit, async (req, res, next) => {
+router.post('/login', loginRateLimit, validateRequest({ body: loginBodySchema }), async (req, res, next) => {
   try {
     const { username, password } = req.body;
     const result = await AuthService.login(username, password);
@@ -103,7 +114,12 @@ router.post('/logout', (_req, res) => {
   res.json({ success: true });
 });
 
-router.post('/register', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+router.post(
+  '/register',
+  authenticate,
+  authorize(['ADMIN']),
+  validateRequest({ body: registerBodySchema }),
+  async (req, res, next) => {
   try {
     const user = await AuthService.register(req.body);
     res.json(user);
@@ -120,7 +136,11 @@ router.post('/public-register', async (req, res, next) => {
   }
 });
 
-router.put('/users/:id', authenticate, async (req, res, next) => {
+router.put(
+  '/users/:id',
+  authenticate,
+  validateRequest({ params: userIdParamSchema, body: updateUserBodySchema }),
+  async (req, res, next) => {
   try {
     const targetId = Number(req.params.id);
     const currentUser = (req as any).user;
@@ -145,7 +165,12 @@ router.put('/users/:id', authenticate, async (req, res, next) => {
   }
 });
 
-router.delete('/users/:id', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+router.delete(
+  '/users/:id',
+  authenticate,
+  authorize(['ADMIN']),
+  validateRequest({ params: userIdParamSchema }),
+  async (req, res, next) => {
   try {
     await AuthService.deleteUser(Number(req.params.id));
     res.json({ success: true });
@@ -154,7 +179,12 @@ router.delete('/users/:id', authenticate, authorize(['ADMIN']), async (req, res,
   }
 });
 
-router.post('/change-password', authenticate, passwordChangeRateLimit, async (req: AuthRequest, res, next) => {
+router.post(
+  '/change-password',
+  authenticate,
+  passwordChangeRateLimit,
+  validateRequest({ body: changePasswordBodySchema }),
+  async (req: AuthRequest, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -169,7 +199,7 @@ router.post('/change-password', authenticate, passwordChangeRateLimit, async (re
   }
 });
 
-router.post('/2fa/login', twoFactorRateLimit, async (req, res, next) => {
+router.post('/2fa/login', twoFactorRateLimit, validateRequest({ body: twoFactorLoginBodySchema }), async (req, res, next) => {
   try {
     const { twoFactorToken, code } = req.body;
     if (!twoFactorToken || !code) {
@@ -194,7 +224,12 @@ router.post('/2fa/setup', authenticate, async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post('/2fa/verify-setup', authenticate, twoFactorRateLimit, async (req: AuthRequest, res, next) => {
+router.post(
+  '/2fa/verify-setup',
+  authenticate,
+  twoFactorRateLimit,
+  validateRequest({ body: twoFactorVerifySetupBodySchema }),
+  async (req: AuthRequest, res, next) => {
   try {
     const { setupToken, code } = req.body;
     if (!setupToken || !code) {
@@ -209,7 +244,12 @@ router.post('/2fa/verify-setup', authenticate, twoFactorRateLimit, async (req: A
   }
 });
 
-router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRequest, res, next) => {
+router.post(
+  '/2fa/disable',
+  authenticate,
+  twoFactorRateLimit,
+  validateRequest({ body: twoFactorDisableBodySchema }),
+  async (req: AuthRequest, res, next) => {
   try {
     const { currentPassword, code } = req.body;
     if (!currentPassword || !code) {
@@ -224,7 +264,12 @@ router.post('/2fa/disable', authenticate, twoFactorRateLimit, async (req: AuthRe
   }
 });
 
-router.post('/users/:id/2fa/setup', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+router.post(
+  '/users/:id/2fa/setup',
+  authenticate,
+  authorize(['ADMIN']),
+  validateRequest({ params: userIdParamSchema }),
+  async (req, res, next) => {
   try {
     const result = await AuthService.createTwoFactorSetupForUser(Number(req.params.id));
     res.json(result);
@@ -233,7 +278,13 @@ router.post('/users/:id/2fa/setup', authenticate, authorize(['ADMIN']), async (r
   }
 });
 
-router.post('/users/:id/2fa/verify-setup', authenticate, authorize(['ADMIN']), twoFactorRateLimit, async (req, res, next) => {
+router.post(
+  '/users/:id/2fa/verify-setup',
+  authenticate,
+  authorize(['ADMIN']),
+  twoFactorRateLimit,
+  validateRequest({ params: userIdParamSchema, body: twoFactorVerifySetupBodySchema }),
+  async (req, res, next) => {
   try {
     const { setupToken, code } = req.body;
     if (!setupToken || !code) {
@@ -248,7 +299,12 @@ router.post('/users/:id/2fa/verify-setup', authenticate, authorize(['ADMIN']), t
   }
 });
 
-router.post('/users/:id/2fa/disable', authenticate, authorize(['ADMIN']), async (req, res, next) => {
+router.post(
+  '/users/:id/2fa/disable',
+  authenticate,
+  authorize(['ADMIN']),
+  validateRequest({ params: userIdParamSchema }),
+  async (req, res, next) => {
   try {
     const result = await AuthService.adminDisableTwoFactor(Number(req.params.id));
     res.json(result);

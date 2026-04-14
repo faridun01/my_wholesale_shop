@@ -33,6 +33,8 @@ model User {
   reminders    Reminder[]
   expenses     Expense[]
 
+  @@index([active, warehouseId])
+  @@index([role, active])
   @@map("users")
 }
 
@@ -57,6 +59,7 @@ model Warehouse {
   transactions InventoryTransaction[]
   expenses     Expense[]
 
+  @@index([active, city])
   @@map("warehouses")
 }
 
@@ -108,6 +111,8 @@ model Product {
   @@unique([warehouseId, nameKey])
   @@unique([name, warehouseId])
   @@unique([sku, warehouseId])
+  @@index([warehouseId, active, createdAt])
+  @@index([categoryId, warehouseId, active])
   @@map("products")
 }
 
@@ -131,6 +136,8 @@ model ProductPackaging {
 
   @@unique([productId, packageName, unitsPerPackage])
   @@unique([barcode, warehouseId])
+  @@index([productId, active, isDefault])
+  @@index([warehouseId, active])
   @@map("product_packagings")
 }
 
@@ -143,6 +150,7 @@ model PriceHistory {
 
   product Product @relation(fields: [productId], references: [id])
 
+  @@index([productId, createdAt])
   @@map("price_history")
 }
 
@@ -162,6 +170,9 @@ model ProductBatch {
   warehouse       Warehouse        @relation(fields: [warehouseId], references: [id])
   saleAllocations SaleAllocation[]
 
+  @@index([warehouseId, remainingQuantity])
+  @@index([productId, warehouseId])
+  @@index([createdAt])
   @@map("product_batches")
 }
 
@@ -187,6 +198,8 @@ model Customer {
   payments Payment[]
   returns  Return[]
 
+  @@index([active, city, createdAt])
+  @@index([createdByUserId, createdAt])
   @@map("customers")
 }
 
@@ -240,6 +253,8 @@ model PurchaseDocument {
   warehouse Warehouse              @relation(fields: [warehouseId], references: [id])
   items     PurchaseDocumentItem[]
 
+  @@index([warehouseId, createdAt])
+  @@index([supplierId, createdAt])
   @@map("purchase_documents")
 }
 
@@ -265,6 +280,9 @@ model PurchaseDocumentItem {
   purchaseDocument PurchaseDocument @relation(fields: [purchaseDocumentId], references: [id])
   matchedProduct   Product?         @relation(fields: [matchedProductId], references: [id])
 
+  @@index([purchaseDocumentId])
+  @@index([matchedProductId])
+  @@index([nameKey])
   @@map("purchase_document_items")
 }
 
@@ -300,6 +318,10 @@ model Invoice {
   payments     Payment[]
   returns      Return[]
 
+  @@index([warehouseId, cancelled, createdAt])
+  @@index([cancelled, createdAt])
+  @@index([customerId, createdAt])
+  @@index([userId, createdAt])
   @@map("invoices")
 }
 
@@ -327,6 +349,8 @@ model InvoiceItem {
   product         Product          @relation(fields: [productId], references: [id])
   saleAllocations SaleAllocation[]
 
+  @@index([invoiceId])
+  @@index([productId])
   @@map("invoice_items")
 }
 
@@ -339,6 +363,8 @@ model SaleAllocation {
   invoiceItem  InvoiceItem  @relation(fields: [invoiceItemId], references: [id])
   batch        ProductBatch @relation(fields: [batchId], references: [id])
 
+  @@index([invoiceItemId])
+  @@index([batchId])
   @@map("sale_allocations")
 }
 
@@ -355,6 +381,9 @@ model Payment {
   invoice  Invoice? @relation(fields: [invoiceId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
 
+  @@index([customerId, createdAt])
+  @@index([invoiceId, createdAt])
+  @@index([userId, createdAt])
   @@map("payments")
 }
 
@@ -374,6 +403,8 @@ model Expense {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   user      User      @relation(fields: [userId], references: [id])
 
+  @@index([warehouseId, expenseDate])
+  @@index([userId, createdAt])
   @@map("expenses")
 }
 
@@ -390,6 +421,9 @@ model Return {
   customer Customer @relation(fields: [customerId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
 
+  @@index([invoiceId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([userId, createdAt])
   @@map("returns")
 }
 
@@ -410,6 +444,11 @@ model InventoryTransaction {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   user      User      @relation(fields: [userId], references: [id])
 
+  @@index([type, warehouseId, createdAt])
+  @@index([warehouseId, createdAt])
+  @@index([productId, createdAt])
+  @@index([referenceId])
+  @@index([userId, createdAt])
   @@map("inventory_transactions")
 }
 
@@ -435,5 +474,8 @@ model Reminder {
 
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId, isCompleted, dueDate])
+  @@index([dueDate])
+  @@index([referenceId])
   @@map("reminders")
 }

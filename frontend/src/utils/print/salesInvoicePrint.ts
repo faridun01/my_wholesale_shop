@@ -19,6 +19,9 @@ const normalizeAddressLine = (value: unknown) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const formatMoneyWithoutCurrency = (value: unknown) => formatMoney(value, '').trim();
+const roundMoneyValue = (value: number) => Number(value.toFixed(2));
+
 const splitAddressLines = (value: unknown) => {
   const parts = normalizeAddressLine(value)
     .split(',')
@@ -60,7 +63,7 @@ export function printSalesInvoice({
   invoice,
   subtotal,
   discountAmount,
-  netAmount,
+  netAmount: _netAmount,
 }: SalesInvoicePrintOptions) {
   if (typeof window === 'undefined' || !invoice) {
     return { ok: false, reason: 'invalid' as const };
@@ -81,7 +84,9 @@ export function printSalesInvoice({
     month: 'long',
     year: 'numeric',
   });
-  const hasInvoiceDiscount = Number(invoice.discount || 0) > 0;
+  const invoiceItems = Array.isArray(invoice.items) ? invoice.items : [];
+  const fallbackSubtotal = Math.max(0, Number(subtotal || 0));
+  const fallbackDiscountAmount = Math.max(0, Number(discountAmount || 0));
 
   const getDisplayPrice = (item: any) => {
     const sellingPricePerUnit = Number(item.sellingPrice || 0);
@@ -95,9 +100,90 @@ export function printSalesInvoice({
     return sellingPricePerUnit;
   };
 
-  const getUnitPrice = (item: any) => Number(item.sellingPrice || 0);
-  const getDiscountedUnitPrice = (item: any) =>
-    getUnitPrice(item) * (1 - Math.max(0, Number(invoice.discount || 0)) / 100);
+  const getCurrentUnitPrice = (item: any) => Number(item.sellingPrice || 0);
+  const getUnitPrice = (item: any) => {
+    const explicitOriginalPrice = Number(
+      item?.originalSellingPrice ?? item?.originalUnitPrice ?? item?.sellingPriceBeforeDiscount ?? item?.listPrice,
+    );
+    if (Number.isFinite(explicitOriginalPrice) && explicitOriginalPrice > 0) {
+      return explicitOriginalPrice;
+    }
+
+    const snapshotProductPrice = Number(item?.product?.sellingPrice);
+    if (Number.isFinite(snapshotProductPrice) && snapshotProductPrice > 0) {
+      return snapshotProductPrice;
+    }
+
+    const currentPrice = getCurrentUnitPrice(item);
+    const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? 0);
+    if (Number.isFinite(lineDiscountPercent) && lineDiscountPercent > 0 && lineDiscountPercent < 100) {
+      return currentPrice / (1 - lineDiscountPercent / 100);
+    }
+
+    return currentPrice;
+  };
+  const getDiscountedUnitPrice = (item: any) => getCurrentUnitPrice(item);
+  const getItemBaseUnits = (item: any) => {
+    const totalBaseUnits = Number(item?.totalBaseUnits);
+    if (Number.isFinite(totalBaseUnits) && totalBaseUnits > 0) {
+      return totalBaseUnits;
+    }
+
+    const quantity = Number(item?.quantity);
+    if (Number.isFinite(quantity) && quantity > 0) {
+      return quantity;
+    }
+
+    const unitsPerPackage = Number(item?.unitsPerPackageSnapshot ?? item?.unitsPerPackage ?? 0);
+    const packageQuantity = Number(item?.packageQuantity ?? 0);
+    const extraUnitQuantity = Number(item?.extraUnitQuantity ?? 0);
+    if (unitsPerPackage > 0 && packageQuantity > 0) {
+      return packageQuantity * unitsPerPackage + Math.max(0, extraUnitQuantity);
+    }
+
+    return 0;
+  };
+  const getLineTotalAfterLineDiscount = (item: any) => {
+    const storedLineTotal = Number(item?.totalPrice);
+    if (Number.isFinite(storedLineTotal) && storedLineTotal >= 0) {
+      return storedLineTotal;
+    }
+
+    return getItemBaseUnits(item) * getDiscountedUnitPrice(item);
+  };
+  const hasLineDiscount = (item: any) => {
+    const originalUnitPrice = Number(getUnitPrice(item));
+    const discountedUnitPrice = Number(getDiscountedUnitPrice(item));
+
+    if (!Number.isFinite(originalUnitPrice) || !Number.isFinite(discountedUnitPrice)) {
+      return false;
+    }
+
+    return originalUnitPrice - discountedUnitPrice > 0.0001;
+  };
+  const hasLineDiscountItems = invoiceItems.some(hasLineDiscount);
+  const hasPriceAfterDiscountColumn = hasLineDiscountItems;
+  const subtotalBeforeDiscountFromItems = roundMoneyValue(
+    invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item) * getUnitPrice(item), 0),
+  );
+  const subtotalAfterLineDiscountFromItems = roundMoneyValue(
+    invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalAfterLineDiscount(item), 0),
+  );
+  const lineDiscountAmountFromItems = roundMoneyValue(
+    Math.max(0, subtotalBeforeDiscountFromItems - subtotalAfterLineDiscountFromItems),
+  );
+  const invoiceDiscountPercent = Math.max(0, Number(invoice?.discount || 0));
+  const invoiceDiscountAmountFromItems = roundMoneyValue(
+    subtotalAfterLineDiscountFromItems * (invoiceDiscountPercent / 100),
+  );
+  const subtotalBeforeDiscount = invoiceItems.length > 0 ? subtotalBeforeDiscountFromItems : fallbackSubtotal;
+  const totalDiscountAmount = invoiceItems.length > 0
+    ? roundMoneyValue(lineDiscountAmountFromItems + invoiceDiscountAmountFromItems)
+    : fallbackDiscountAmount;
+  const amountAfterDiscount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - totalDiscountAmount));
+  const returnedAmount = Math.max(0, Number(invoice.returnedAmount || 0));
+  const finalTotalAmount = roundMoneyValue(Math.max(0, amountAfterDiscount - returnedAmount));
+  const discountLabel = 'Скидка';
 
   const getQuantityLabel = (item: any) => {
     const packageQuantity = Number(item.packageQuantity || 0);
@@ -124,25 +210,23 @@ export function printSalesInvoice({
     return [`${quantity} ${baseUnitName}`];
   };
 
-  const itemsRows = Array.isArray(invoice.items)
-    ? invoice.items
+  const itemsRows = invoiceItems
         .map(
           (item: any, index: number) => `
             <tr>
-              <td>${index + 1}</td>
+              <td class="num-cell">${index + 1}</td>
               <td class="product-cell"><span class="product-name">${escapeHtml(formatProductName(item.product_name || item.productNameSnapshot || item.product_name_snapshot))}</span></td>
               <td class="quantity-cell">${getQuantityLabel(item)
                 .map((line) => `<span class="quantity-line">${escapeHtml(line)}</span>`)
                 .join('')}</td>
-              <td>${escapeHtml(formatMoney(getDisplayPrice(item)))}</td>
-              <td>${escapeHtml(formatMoney(getUnitPrice(item)))}</td>
-              ${hasInvoiceDiscount ? `<td>${escapeHtml(formatMoney(getDiscountedUnitPrice(item)))}</td>` : ''}
-              <td>${escapeHtml(formatMoney(item.totalPrice))}</td>
+              <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getDisplayPrice(item)))}</td>
+              <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getUnitPrice(item)))}</td>
+              ${hasPriceAfterDiscountColumn ? `<td class="num-cell">${hasLineDiscount(item) ? escapeHtml(formatMoneyWithoutCurrency(getDiscountedUnitPrice(item))) : '—'}</td>` : ''}
+              <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getLineTotalAfterLineDiscount(item)))}</td>
             </tr>
           `,
         )
-        .join('')
-    : '';
+        .join('');
 
   const html = `
     <!doctype html>
@@ -170,6 +254,7 @@ export function printSalesInvoice({
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
           th, td { border: 2px solid #0f172a; padding: 3px 4px; font-size: 8.5px; text-align: left; vertical-align: top; line-height: 1.05; font-weight: 700; }
           th { background: #ffffff; font-weight: 800; font-size: 8px; color: #111827; }
+          .num-cell { text-align: center; vertical-align: middle; }
           .col-number { width: 28px; }
           .col-product { width: 292px; }
           .col-quantity { width: 78px; }
@@ -209,7 +294,7 @@ export function printSalesInvoice({
         </style>
       </head>
       <body>
-        <div class="sheet ${hasInvoiceDiscount ? 'has-discount-column' : ''}">
+        <div class="sheet ${hasPriceAfterDiscountColumn ? 'has-discount-column' : ''}">
           <div class="doc-title">
             <p class="doc-title-text">Накладная №${invoice.id}</p>
             <p class="doc-title-date">${escapeHtml(invoiceDateLabel)}</p>
@@ -241,7 +326,7 @@ export function printSalesInvoice({
                   <th class="col-quantity">Количество</th>
                   <th class="col-package-price">Цена за упаковку</th>
                   <th class="col-unit-price">Цена за штуку</th>
-                  ${hasInvoiceDiscount ? '<th class="col-discounted-price">&#1062;&#1077;&#1085;&#1072; &#1087;&#1086;&#1089;&#1083;&#1077; &#1089;&#1082;&#1080;&#1076;&#1082;&#1080;</th>' : ''}
+                  ${hasPriceAfterDiscountColumn ? '<th class="col-discounted-price">&#1062;&#1077;&#1085;&#1072; &#1087;&#1086;&#1089;&#1083;&#1077; &#1089;&#1082;&#1080;&#1076;&#1082;&#1080;</th>' : ''}
                   <th class="col-total">Сумма</th>
                 </tr>
               </thead>
@@ -250,10 +335,11 @@ export function printSalesInvoice({
           </div>
 
           <div class="summary">
-            <div class="summary-row"><span>Подытог</span><strong>${escapeHtml(formatMoney(subtotal))}</strong></div>
-            <div class="summary-row"><span>Скидка (${escapeHtml(invoice.discount || 0)}%)</span><strong>-${escapeHtml(formatMoney(discountAmount))}</strong></div>
-            ${Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount || 0))}</strong></div>` : ''}
-            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoney(netAmount))}</span></div>
+            <div class="summary-row"><span>Сумма до скидки</span><strong>${escapeHtml(formatMoneyWithoutCurrency(subtotalBeforeDiscount))}</strong></div>
+            <div class="summary-row"><span>${escapeHtml(discountLabel)}</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(totalDiscountAmount))}</strong></div>
+            <div class="summary-row"><span>Сумма после скидки</span><strong>${escapeHtml(formatMoneyWithoutCurrency(amountAfterDiscount))}</strong></div>
+            ${returnedAmount > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(returnedAmount))}</strong></div>` : ''}
+            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoneyWithoutCurrency(finalTotalAmount))}</span></div>
           </div>
         </div>
       </body>

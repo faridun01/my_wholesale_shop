@@ -3,6 +3,13 @@ import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
+import { validateRequest } from '../middlewares/validation.middleware.js';
+import { commonReportsQuerySchema, transactionsQuerySchema } from '../schemas/reports.schemas.js';
+import {
+  buildCancelledInvoiceWhere,
+  buildInventoryWhere,
+  buildInvoiceLineReportRows,
+} from './reports.helpers.js';
 
 const router = Router();
 const MONEY_EPSILON = 0.0001;
@@ -60,21 +67,13 @@ function getLineCost(item: any) {
 
 router.use(authenticate);
 
-router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
+router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const isAdmin = access.isAdmin;
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-
-    const whereClause: any = {
-      cancelled: false,
-      createdAt: {
-        gte: start ? new Date(start as string) : undefined,
-        lte: end ? new Date(end as string) : undefined,
-      },
-    };
-    if (warehouseId) whereClause.warehouseId = warehouseId;
+    const whereClause = buildCancelledInvoiceWhere({ warehouseId, start, end });
 
     const [invoices, products, customers, warehouses, batches, writeoffTransactions] = await Promise.all([
       prisma.invoice.findMany({
@@ -137,15 +136,13 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
         }
       }),
       prisma.inventoryTransaction.findMany({
-        where: {
+        where: buildInventoryWhere({
           type: 'adjustment',
-          qtyChange: { lt: 0 },
-          createdAt: {
-            gte: start ? new Date(start as string) : undefined,
-            lte: end ? new Date(end as string) : undefined,
-          },
-          warehouseId: warehouseId ?? undefined,
-        },
+          warehouseId,
+          start,
+          end,
+          additional: { qtyChange: { lt: 0 } },
+        }),
         select: {
           qtyChange: true,
           costAtTime: true,
@@ -368,19 +365,12 @@ router.get('/analytics', authorize(['ADMIN']), async (req: AuthRequest, res, nex
   }
 });
 
-router.get('/sales', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
+router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-    const where: any = {
-      cancelled: false,
-      createdAt: {
-        gte: start ? new Date(start as string) : undefined,
-        lte: end ? new Date(end as string) : undefined,
-      },
-    };
-    if (warehouseId) where.warehouseId = warehouseId;
+    const where = buildCancelledInvoiceWhere({ warehouseId, start, end });
 
     const invoices = await prisma.invoice.findMany({
       where,
@@ -410,33 +400,13 @@ router.get('/sales', authorize(['ADMIN']), async (req: AuthRequest, res, next) =
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap((inv: any) =>
-      inv.items
-        .map((item: any) => {
-          const quantity = getRemainingQuantity(item);
-          if (quantity <= 0) return null;
-
-          const revenue = getLineNetRevenue(inv, item);
-          const cost = getLineCost(item);
-
-          return {
-            invoice_id: inv.id,
-            date: inv.createdAt.toISOString().split('T')[0],
-            warehouse_name: inv.warehouse?.name || '',
-            customer_name: inv.customer?.name || '',
-            product_name: item.product.name,
-            unit: item.product.unit || '',
-            quantity,
-            selling_price: Number(item.sellingPrice),
-            gross_sales: Number(item.sellingPrice) * quantity,
-            discount_percent: Number(inv.discount || 0),
-            total_sales: revenue,
-            cost_price: quantity > 0 ? cost / quantity : 0,
-            profit: revenue - cost,
-          };
-        })
-        .filter(Boolean)
-    );
+    const report = buildInvoiceLineReportRows({
+      invoices,
+      getRemainingQuantity,
+      getLineNetRevenue,
+      getLineCost,
+      netSalesKey: 'total_sales',
+    });
 
     res.json(report);
   } catch (error) {
@@ -444,7 +414,7 @@ router.get('/sales', authorize(['ADMIN']), async (req: AuthRequest, res, next) =
   }
 });
 
-router.get('/profit', async (req: AuthRequest, res, next) => {
+router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     if (!access.isAdmin) {
@@ -453,14 +423,7 @@ router.get('/profit', async (req: AuthRequest, res, next) => {
 
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-    const where: any = {
-      cancelled: false,
-      createdAt: {
-        gte: start ? new Date(start as string) : undefined,
-        lte: end ? new Date(end as string) : undefined,
-      },
-    };
-    if (warehouseId) where.warehouseId = warehouseId;
+    const where = buildCancelledInvoiceWhere({ warehouseId, start, end });
 
     const invoices = await prisma.invoice.findMany({
       where,
@@ -490,33 +453,13 @@ router.get('/profit', async (req: AuthRequest, res, next) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    const report = invoices.flatMap((inv: any) =>
-      inv.items
-        .map((item: any) => {
-          const quantity = getRemainingQuantity(item);
-          if (quantity <= 0) return null;
-
-          const revenue = getLineNetRevenue(inv, item);
-          const cost = getLineCost(item);
-
-          return {
-            invoice_id: inv.id,
-            date: inv.createdAt.toISOString().split('T')[0],
-            warehouse_name: inv.warehouse?.name || '',
-            customer_name: inv.customer?.name || '',
-            product_name: item.product.name,
-            unit: item.product.unit || '',
-            quantity,
-            selling_price: Number(item.sellingPrice),
-            gross_sales: Number(item.sellingPrice) * quantity,
-            discount_percent: Number(inv.discount || 0),
-            net_sales: revenue,
-            cost_price: quantity > 0 ? cost / quantity : 0,
-            profit: revenue - cost,
-          };
-        })
-        .filter(Boolean)
-    );
+    const report = buildInvoiceLineReportRows({
+      invoices,
+      getRemainingQuantity,
+      getLineNetRevenue,
+      getLineCost,
+      netSalesKey: 'net_sales',
+    });
 
     res.json(report);
   } catch (error) {
@@ -524,19 +467,12 @@ router.get('/profit', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.get('/returns', authorize(['ADMIN']), async (req: AuthRequest, res, next) => {
+router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-    const where: any = {
-      type: 'return',
-      createdAt: {
-        gte: start ? new Date(start as string) : undefined,
-        lte: end ? new Date(end as string) : undefined,
-      },
-    };
-    if (warehouseId) where.warehouseId = warehouseId;
+    const where = buildInventoryWhere({ type: 'return', warehouseId, start, end });
 
     const transactions = await prisma.inventoryTransaction.findMany({
       where,
@@ -569,21 +505,21 @@ router.get('/returns', authorize(['ADMIN']), async (req: AuthRequest, res, next)
   }
 });
 
-router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), async (req: AuthRequest, res, next) => {
+router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-    const where: any = {
+    const where = buildInventoryWhere({
       type: 'adjustment',
-      qtyChange: { lt: 0 },
-      sellingAtTime: { not: null },
-      createdAt: {
-        gte: start ? new Date(start as string) : undefined,
-        lte: end ? new Date(end as string) : undefined,
+      warehouseId,
+      start,
+      end,
+      additional: {
+        qtyChange: { lt: 0 },
+        sellingAtTime: { not: null },
       },
-    };
-    if (warehouseId) where.warehouseId = warehouseId;
+    });
 
     const transactions = await prisma.inventoryTransaction.findMany({
       where,
@@ -650,7 +586,7 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), async (req: AuthReques
   }
 });
 
-router.get('/transactions', async (req: AuthRequest, res, next) => {
+router.get('/transactions', validateRequest({ query: transactionsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
     if (!access.isAdmin) {

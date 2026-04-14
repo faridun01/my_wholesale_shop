@@ -228,12 +228,36 @@ export default function POSView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
   const [productSearch, setProductSearch] = useState('');
+  const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
   const [pendingWarehouseId, setPendingWarehouseId] = useState<string | null>(null);
   const productListRef = useRef<HTMLDivElement | null>(null);
   const lastProductScrollRef = useRef(0);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deferredProductSearch = useDeferredValue(productSearch);
   const deferredCustomerSearch = useDeferredValue(customerSearch);
+
+  const highlightProductRow = (productId: number | null) => {
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
+    setHighlightedProductId(productId);
+    if (productId !== null) {
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedProductId((current) => (current === productId ? null : current));
+      }, 1000);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const getCartPackaging = (item: CartItem) =>
     (Array.isArray(item.packagings) ? item.packagings : []).find((entry) => entry.id === item.selectedPackagingId) || null;
@@ -1044,7 +1068,14 @@ export default function POSView() {
       return;
     }
 
+    const currentIndex = filteredProducts.findIndex((entry) => Number(entry.id) === Number(product.id));
+    const nextProduct =
+      currentIndex >= 0
+        ? filteredProducts[currentIndex + 1] || filteredProducts[currentIndex - 1] || null
+        : null;
+
     addToCart(product);
+    highlightProductRow(nextProduct ? Number(nextProduct.id) : null);
   };
 
   const filteredCustomers = [...customers]
@@ -1186,6 +1217,7 @@ export default function POSView() {
                         onClick={() => handleAddFromList(product)}
                         className={clsx(
                           'rounded-2xl border border-sky-100 bg-white p-3 shadow-sm transition-colors',
+                          highlightedProductId === Number(product.id) && 'ring-2 ring-sky-300 bg-sky-50/60',
                           canAddProductFromList(product) ? 'cursor-pointer hover:bg-sky-50/50' : '',
                         )}
                       >
@@ -1225,7 +1257,7 @@ export default function POSView() {
                     )})}
                   </div>
 
-                  <div className="hidden min-h-full flex-col justify-end md:flex">
+                  <div className="hidden flex-col md:flex">
                     {filteredProducts.map((product, index) => {
                       const stockParts = getProductStockParts(product, product.unit);
 
@@ -1235,6 +1267,7 @@ export default function POSView() {
                           onClick={() => handleAddFromList(product)}
                           className={clsx(
                             'grid grid-cols-[52px_minmax(0,1.7fr)_150px_110px_110px] items-center border-b border-slate-100 px-5 py-3 last:border-b-0 transition-colors',
+                            highlightedProductId === Number(product.id) && 'bg-sky-100/60',
                             canAddProductFromList(product) ? 'cursor-pointer hover:bg-sky-50/40' : '',
                           )}
                         >

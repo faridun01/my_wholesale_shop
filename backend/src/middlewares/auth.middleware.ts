@@ -39,6 +39,14 @@ const buildAuthUser = (user: {
 });
 
 const parseCookies = (cookieHeader?: string) => {
+  const safeDecode = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+
   const entries = String(cookieHeader || '')
     .split(';')
     .map((chunk) => chunk.trim())
@@ -50,8 +58,8 @@ const parseCookies = (cookieHeader?: string) => {
       }
 
       return [
-        decodeURIComponent(chunk.slice(0, separatorIndex).trim()),
-        decodeURIComponent(chunk.slice(separatorIndex + 1).trim()),
+        safeDecode(chunk.slice(0, separatorIndex).trim()),
+        safeDecode(chunk.slice(separatorIndex + 1).trim()),
       ] as const;
     });
 
@@ -122,7 +130,11 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 };
 
 export const authenticateUploadAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
+  const allowUploadQueryToken = String(process.env.ALLOW_UPLOAD_QUERY_TOKEN || 'false').toLowerCase() === 'true';
+  const queryToken =
+    allowUploadQueryToken && typeof req.query.token === 'string'
+      ? req.query.token
+      : null;
   const token = getRequestToken(req) || queryToken;
 
   if (!token) {

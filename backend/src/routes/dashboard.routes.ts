@@ -2,40 +2,18 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
-import { DEFAULT_CUSTOMER_NAME } from '../utils/defaultCustomer.js';
+import {
+  buildDashboardWhere,
+  buildDashboardWindows,
+  computeInventoryValue,
+  countUniqueProductsByName,
+  filterAndSortLowStock,
+  getInvoiceDebt,
+  getPeriodRevenue,
+  safePercentChange,
+} from './dashboard.helpers.js';
 
 const router = Router();
-const LOW_STOCK_THRESHOLD = 5;
-const LOW_STOCK_PACKAGE_THRESHOLD = 4;
-const safePercentChange = (current: number, previous: number) => {
-  if (previous === 0 && current === 0) return 0;
-  if (previous === 0) return 100;
-  return ((current - previous) / previous) * 100;
-};
-
-const PAYMENT_EPSILON = 0.01;
-
-const getInvoiceDebt = (netAmount: number, paidAmount: number) => {
-  const balance = Number(netAmount || 0) - Number(paidAmount || 0);
-  return balance > PAYMENT_EPSILON ? balance : 0;
-};
-
-const getDefaultPackaging = (packagings: Array<{ isDefault?: boolean; unitsPerPackage?: number; packageName?: string }>) =>
-  packagings.find((entry) => Boolean(entry?.isDefault)) || packagings[0] || null;
-
-const getPeriodRevenue = (
-  invoices: Array<{ createdAt: Date; netAmount: number | string | { toString(): string } }>,
-  start: Date,
-  end: Date,
-) =>
-  invoices.reduce((sum, invoice) => {
-    const createdAt = new Date(invoice.createdAt);
-    if (createdAt >= start && createdAt < end) {
-      return sum + Number(invoice.netAmount || 0);
-    }
-
-    return sum;
-  }, 0);
 
 router.get('/summary', async (req: AuthRequest, res, next) => {
   try {
@@ -44,41 +22,18 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const windows = buildDashboardWindows(new Date());
 
     // Get user from request (assuming auth middleware is present)
     // For now, we'll get all stats, but in a real app, we'd filter by role.
     const isAdmin = access.isAdmin;
     const selectedWarehouseId = getScopedWarehouseId(access, req.query.warehouseId);
-    const invoiceWhere = {
-      cancelled: false,
-      warehouseId: selectedWarehouseId ?? (isAdmin ? undefined : (access.warehouseId ?? -1)),
-    };
-    const productWhere = {
-      active: true,
-      warehouseId: selectedWarehouseId ?? (isAdmin ? undefined : (access.warehouseId ?? -1)),
-    };
-    const lowStockProductWhere = {
-      active: true,
-      warehouseId: isAdmin ? undefined : (access.warehouseId ?? -1),
-    };
-    const customerWhere = {
-      active: true,
-      city: isAdmin ? undefined : (access.city ?? '__no_city__'),
-      NOT: {
-        name: {
-          equals: DEFAULT_CUSTOMER_NAME,
-          mode: 'insensitive' as const,
-        },
-      },
-    };
-    const warehouseWhere = isAdmin
-      ? { active: true }
-      : { active: true, id: access.warehouseId ?? -1, city: access.city ?? undefined };
+    const { invoiceWhere, productWhere, lowStockProductWhere, customerWhere, warehouseWhere } = buildDashboardWhere({
+      isAdmin,
+      selectedWarehouseId,
+      accessWarehouseId: access.warehouseId,
+      accessCity: access.city,
+    });
 
     const [
       salesToday,
@@ -99,7 +54,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       previousMonthProductsRaw,
     ] = await Promise.all([
       prisma.invoice.aggregate({
-        where: { ...invoiceWhere, createdAt: { gte: today } },
+        where: { ...invoiceWhere, createdAt: { gte: windows.today } },
         _sum: { netAmount: true },
       }),
       prisma.product.findMany({
@@ -189,89 +144,60 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       prisma.invoice.findMany({
         where: {
           ...invoiceWhere,
-          createdAt: { gte: monthStart, lt: nextMonthStart },
+          createdAt: { gte: windows.monthStart, lt: windows.nextMonthStart },
         },
         select: { netAmount: true },
       }),
       prisma.invoice.findMany({
         where: {
           ...invoiceWhere,
-          createdAt: { gte: prevMonthStart, lt: monthStart },
+          createdAt: { gte: windows.prevMonthStart, lt: windows.monthStart },
         },
         select: { netAmount: true },
       }),
       prisma.customer.count({
         where: {
           ...customerWhere,
-          createdAt: { gte: monthStart, lt: nextMonthStart },
+          createdAt: { gte: windows.monthStart, lt: windows.nextMonthStart },
         },
       }),
       prisma.customer.count({
         where: {
           ...customerWhere,
-          createdAt: { gte: prevMonthStart, lt: monthStart },
+          createdAt: { gte: windows.prevMonthStart, lt: windows.monthStart },
         },
       }),
       prisma.product.findMany({
         where: {
           ...productWhere,
-          createdAt: { gte: monthStart, lt: nextMonthStart },
+          createdAt: { gte: windows.monthStart, lt: windows.nextMonthStart },
         },
         select: { name: true },
       }),
       prisma.product.findMany({
         where: {
           ...productWhere,
-          createdAt: { gte: prevMonthStart, lt: monthStart },
+          createdAt: { gte: windows.prevMonthStart, lt: windows.monthStart },
         },
         select: { name: true },
       }),
     ]);
 
-    const normalizeProductKey = (value: string) =>
-      String(value || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, ' ');
-
     const totalProducts = selectedWarehouseId
       ? totalProductsRaw.length
-      : new Set(totalProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
+      : countUniqueProductsByName(totalProductsRaw as Array<{ name: string }>);
 
-    const inventoryValue = inventoryBatches.reduce((sum, batch) => {
-      return sum + Number(batch.remainingQuantity || 0) * Number(batch.costPrice || 0);
-    }, 0);
+    const inventoryValue = computeInventoryValue(inventoryBatches);
 
     const currentMonthProducts = selectedWarehouseId
       ? currentMonthProductsRaw.length
-      : new Set(currentMonthProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
+      : countUniqueProductsByName(currentMonthProductsRaw as Array<{ name: string }>);
 
-    const lowStock = lowStockRaw
-      .filter((product: any) => {
-        const stockUnits = Math.max(0, Number(product?.stock || 0));
-        const packagings = Array.isArray(product?.packagings) ? product.packagings : [];
-        const defaultPackaging = getDefaultPackaging(packagings);
-        const unitsPerPackage = Number(defaultPackaging?.unitsPerPackage || 0);
-
-        if (defaultPackaging && unitsPerPackage > 0) {
-          const packageCount = stockUnits / unitsPerPackage;
-          return stockUnits <= LOW_STOCK_THRESHOLD || packageCount < LOW_STOCK_PACKAGE_THRESHOLD;
-        }
-
-        return stockUnits <= LOW_STOCK_THRESHOLD;
-      })
-      .sort((a: any, b: any) => {
-        const stockDiff = Number(a?.stock || 0) - Number(b?.stock || 0);
-        if (stockDiff !== 0) {
-          return stockDiff;
-        }
-
-        return String(a?.name || '').localeCompare(String(b?.name || ''), 'ru');
-      });
+    const lowStock = filterAndSortLowStock(lowStockRaw as any[]);
 
     const previousMonthProducts = selectedWarehouseId
       ? previousMonthProductsRaw.length
-      : new Set(previousMonthProductsRaw.map((product: { name: string }) => normalizeProductKey(product.name))).size;
+      : countUniqueProductsByName(previousMonthProductsRaw as Array<{ name: string }>);
 
     // Calculate total profit and debts
     let totalProfit = 0;
@@ -329,42 +255,26 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     const ordersChange = safePercentChange(currentMonthInvoices.length, previousMonthInvoices.length);
     const customersChange = safePercentChange(currentMonthCustomers, previousMonthCustomers);
     const productsChange = safePercentChange(currentMonthProducts, previousMonthProducts);
-    const todayStart = new Date(today);
-    const tomorrowStart = new Date(today);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-    const yesterdayStart = new Date(today);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-    const prevWeekStart = new Date(weekStart);
-    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
-    const quarterStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
-    const prevQuarterStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 - 3, 1);
-    const nextQuarterStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 3, 1);
-    const yearStart = new Date(today.getFullYear(), 0, 1);
-    const nextYearStart = new Date(today.getFullYear() + 1, 0, 1);
-    const prevYearStart = new Date(today.getFullYear() - 1, 0, 1);
-
     const periodRevenue = {
       week: {
-        current: getPeriodRevenue(allInvoices, weekStart, tomorrowStart),
-        previous: getPeriodRevenue(allInvoices, prevWeekStart, weekStart),
+        current: getPeriodRevenue(allInvoices, windows.weekStart, windows.tomorrowStart),
+        previous: getPeriodRevenue(allInvoices, windows.prevWeekStart, windows.weekStart),
       },
       month: {
-        current: getPeriodRevenue(allInvoices, monthStart, nextMonthStart),
-        previous: getPeriodRevenue(allInvoices, prevMonthStart, monthStart),
+        current: getPeriodRevenue(allInvoices, windows.monthStart, windows.nextMonthStart),
+        previous: getPeriodRevenue(allInvoices, windows.prevMonthStart, windows.monthStart),
       },
       quarter: {
-        current: getPeriodRevenue(allInvoices, quarterStart, nextQuarterStart),
-        previous: getPeriodRevenue(allInvoices, prevQuarterStart, quarterStart),
+        current: getPeriodRevenue(allInvoices, windows.quarterStart, windows.nextQuarterStart),
+        previous: getPeriodRevenue(allInvoices, windows.prevQuarterStart, windows.quarterStart),
       },
       year: {
-        current: getPeriodRevenue(allInvoices, yearStart, nextYearStart),
-        previous: getPeriodRevenue(allInvoices, prevYearStart, yearStart),
+        current: getPeriodRevenue(allInvoices, windows.yearStart, windows.nextYearStart),
+        previous: getPeriodRevenue(allInvoices, windows.prevYearStart, windows.yearStart),
       },
       today: {
-        current: getPeriodRevenue(allInvoices, todayStart, tomorrowStart),
-        previous: getPeriodRevenue(allInvoices, yesterdayStart, todayStart),
+        current: getPeriodRevenue(allInvoices, windows.todayStart, windows.tomorrowStart),
+        previous: getPeriodRevenue(allInvoices, windows.yesterdayStart, windows.todayStart),
       },
     };
 

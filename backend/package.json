@@ -8,6 +8,7 @@
     "build": "tsc -p .",
     "start": "node dist/server.js",
     "lint": "tsc -p . --noEmit",
+    "test": "npm run build && node dist/services/reminder.service.test.js && node dist/middlewares/auth.middleware.test.js",
     "reconcile:invoice-history": "tsx src/scripts/reconcile-invoice-history.ts",
     "reconcile:invoice-history:apply": "tsx src/scripts/reconcile-invoice-history.ts --apply",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
