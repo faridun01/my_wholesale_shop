@@ -38,6 +38,7 @@ app.use('/api/settings', authenticate, settingsRoutes);
 app.use('/api/reminders', authenticate, reminderRoutes);
 app.use('/api/payments', authenticate, paymentRoutes);
 app.use('/api/expenses', authenticate, expenseRoutes);
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 import multer from 'multer';
 const upload = multer({ dest: 'uploads/' });
