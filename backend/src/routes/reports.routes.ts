@@ -167,13 +167,31 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           },
         },
       }),
+      prisma.expense.findMany({
+        where: {
+          warehouseId: warehouseId ?? undefined,
+          expenseDate: {
+            gte: start ? new Date(start as string) : undefined,
+            lte: end ? new Date(end as string) : undefined,
+          },
+        },
+        select: {
+          amount: true,
+          category: true,
+        },
+      }),
     ]);
 
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalCost = 0;
+    let totalExpenses = 0;
     const totalSalesCount = invoices.length;
     let totalDebts = 0;
+
+    for (const expense of expenses) {
+      totalExpenses += Number(expense.amount || 0);
+    }
 
     const monthlyData: any = {};
     const warehousePerformance: any = {};
@@ -325,12 +343,14 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         totalRevenue,
         totalProfit: isAdmin ? totalProfit : null,
         totalCost: isAdmin ? totalCost : null,
+        totalExpenses: isAdmin ? totalExpenses : null,
         totalSalesCount,
         totalCustomers: customers.length,
         totalProducts: products.length,
         totalDebts,
         stockValuation: isAdmin ? stockValuation : null,
-        margin: isAdmin ? (totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0) : null,
+        margin: isAdmin ? (totalRevenue > 0 ? ((totalProfit - totalExpenses) / totalRevenue) * 100 : 0) : null,
+        netProfit: isAdmin ? (totalProfit - totalExpenses) : null,
       },
       chartData: Object.values(monthlyData),
       warehousePerformance: Object.values(warehousePerformance),

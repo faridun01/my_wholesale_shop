@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Users,
   Warehouse,
+  Banknote,
 } from 'lucide-react';
 import {
   Bar,
@@ -31,12 +32,14 @@ type AnalyticsSummary = {
   totalRevenue: number;
   totalProfit: number | null;
   totalCost: number | null;
+  totalExpenses: number | null;
   totalSalesCount: number;
   totalCustomers: number;
   totalProducts: number;
   totalDebts: number;
   stockValuation: number | null;
   margin: number | null;
+  netProfit: number | null;
 };
 
 type NamedMetric = {
@@ -518,14 +521,14 @@ export default function AnalyticsView() {
               <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <CalendarRange size={16} className="text-slate-500" />
-                  {'\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u043c'}
+                  {'Управление периодом'}
                 </div>
 
                 <div className="mt-4 inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1">
                   {[
-                    { key: 'month', label: '\u041c\u0435\u0441\u044f\u0446' },
-                    { key: 'quarter', label: '\u041a\u0432\u0430\u0440\u0442\u0430\u043b' },
-                    { key: 'year', label: '\u0413\u043e\u0434' },
+                    { key: 'month', label: 'Месяц' },
+                    { key: 'quarter', label: 'Квартал' },
+                    { key: 'year', label: 'Год' },
                   ].map((option) => (
                     <button
                       key={option.key}
@@ -578,10 +581,11 @@ export default function AnalyticsView() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <MetricCard icon={<DollarSign size={18} className="text-emerald-700" />} label={'\u0412\u044b\u0440\u0443\u0447\u043a\u0430'} value={formatMoney(summary?.totalRevenue || 0)} help={'\u041e\u0431\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442.'} tone="emerald" />
-          <MetricCard icon={<TrendingUp size={18} className="text-sky-700" />} label={'\u041f\u0440\u0438\u0431\u044b\u043b\u044c'} value={formatMoney(summary?.totalProfit || 0)} help={'\u0427\u0438\u0441\u0442\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442.'} tone="sky" />
-          <MetricCard icon={<Boxes size={18} className="text-amber-700" />} label={'\u041c\u0430\u0440\u0436\u0430'} value={formatPercent(summary?.margin || 0, 1)} help={'\u0420\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u043f\u0440\u043e\u0434\u0430\u0436.'} tone="amber" />
+          <MetricCard icon={<TrendingUp size={18} className="text-sky-700" />} label={'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c'} value={formatMoney(summary?.netProfit || 0)} help={'\u0414\u043e\u0445\u043e\u0434 \u0437\u0430 \u0432\u044b\u0447\u0435\u0442\u043e\u043c \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432.'} tone="sky" />
+          <MetricCard icon={<Banknote size={18} className="text-rose-700" />} label={'\u0420\u0430\u0441\u0445\u043e\u0434\u044b'} value={formatMoney(summary?.totalExpenses || 0)} help={'\u0410\u0440\u0435\u043d\u0434\u0430, \u0437/\u043f \u0438 \u0434\u0440.'} tone="amber" />
+          <MetricCard icon={<Boxes size={18} className="text-amber-700" />} label={'\u041c\u0430\u0440\u0436\u0430 (\u0447\u0438\u0441\u0442.)'} value={formatPercent(summary?.margin || 0, 1)} help={'\u0420\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0431\u0438\u0437\u043d\u0435\u0441\u0430.'} tone="amber" />
           <MetricCard icon={<Package size={18} className="text-slate-700" />} label={'\u0414\u043e\u043b\u0433\u0438'} value={formatMoney(summary?.totalDebts || 0)} help={'\u041d\u0435\u043e\u043f\u043b\u0430\u0447\u0435\u043d\u043d\u044b\u0435 \u0441\u0443\u043c\u043c\u044b.'} tone="slate" />
         </section>
 
