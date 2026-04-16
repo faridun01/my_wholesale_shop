@@ -20,13 +20,11 @@ const PDF_TEXT = {
   number: '№',
   item: 'Наименование товара',
   pricePerUnit: 'Цена за шт',
-  unitsPerPackage: 'Кол-во в упак.',
+  unitsPerPackage: 'Упаковка',
   pricePerPackage: 'Цена за упак.',
   warehouse: 'Склад',
   generatedAt: 'Дата',
-  positions: 'Позиций',
   shortTitle: 'Прайс-лист',
-  page: 'Стр.',
 } as const;
 
 const PDF_FONT_FILE = 'arial.ttf';
@@ -107,35 +105,24 @@ export async function downloadPriceListPdf({
   await ensurePdfFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 8;
+  const margin = 10;
   const fileDate = formatDateForFile(generatedAt);
   const safeWarehouse = buildSafeFilePart(warehouseName);
   const generatedAtLabel = formatDateTime(generatedAt);
 
-  doc.setFillColor(79, 70, 229); // Desktop indigo color for price list
-  doc.roundedRect(margin, margin, pageWidth - margin * 2, 16, 3, 3, 'F');
-
-  doc.setTextColor(255, 255, 255);
+  // Simple Header
+  doc.setTextColor(0, 0, 0);
   doc.setFont(PDF_FONT_NAME, 'bold');
   doc.setFontSize(14);
-  doc.text(PDF_TEXT.title, margin + 4, 14.5);
+  doc.text(PDF_TEXT.title, pageWidth / 2, 12, { align: 'center' });
 
   doc.setFont(PDF_FONT_NAME, 'normal');
-  doc.setFontSize(7.5);
-  doc.text(`${PDF_TEXT.warehouse}: ${warehouseName}`, margin + 4, 19.5);
-  doc.text(`${PDF_TEXT.generatedAt}: ${generatedAtLabel}`, pageWidth - margin - 4, 19.5, { align: 'right' });
-
-  doc.setTextColor(15, 23, 42);
-  doc.setFillColor(243, 244, 246);
-  doc.roundedRect(margin, 28, pageWidth - margin * 2, 8, 2.5, 2.5, 'F');
-  doc.setFont(PDF_FONT_NAME, 'bold');
-  doc.setFontSize(7.5);
-  doc.text(`${PDF_TEXT.positions}: ${rows.length}`, margin + 4, 33.2);
+  doc.setFontSize(9);
+  doc.text(`${PDF_TEXT.generatedAt}: ${generatedAtLabel}`, pageWidth / 2, 18, { align: 'center' });
 
   autoTable(doc, {
-    startY: 40,
-    margin: { left: margin, right: margin, bottom: 12 },
+    startY: 24,
+    margin: { left: margin, right: margin, bottom: 8 },
     head: [[PDF_TEXT.number, PDF_TEXT.item, PDF_TEXT.pricePerUnit, PDF_TEXT.unitsPerPackage, PDF_TEXT.pricePerPackage]],
     body: rows.map((row) => [
       String(row.index),
@@ -147,43 +134,29 @@ export async function downloadPriceListPdf({
     theme: 'grid',
     styles: {
       font: PDF_FONT_NAME,
-      fontSize: 8,
-      lineColor: [209, 213, 219],
+      fontSize: 7.2, // Smaller font to fit more items
+      lineColor: [180, 180, 180],
       lineWidth: 0.1,
-      cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
-      textColor: [31, 41, 55],
+      cellPadding: 0.8, // Minimal padding
+      textColor: [0, 0, 0],
       valign: 'middle',
-      overflow: 'linebreak',
     },
     headStyles: {
-      font: PDF_FONT_NAME,
-      fillColor: [79, 70, 229],
-      textColor: [255, 255, 255],
+      fillColor: [245, 245, 245],
+      textColor: [0, 0, 0],
       fontStyle: 'bold',
-      fontSize: 8.5,
+      fontSize: 7.5,
       halign: 'center',
-      cellPadding: 2.5,
-    },
-    alternateRowStyles: {
-      fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 'auto', fontStyle: 'bold' },
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 'auto' },
       2: { cellWidth: 25, halign: 'right' },
-      3: { cellWidth: 25, halign: 'center' },
-      4: { cellWidth: 25, halign: 'right' },
+      3: { cellWidth: 22, halign: 'center' },
+      4: { cellWidth: 30, halign: 'right' },
     },
-    didDrawPage: () => {
-      const pageNumber = doc.getNumberOfPages();
-      doc.setDrawColor(229, 231, 235);
-      doc.line(margin, pageHeight - 8, pageWidth - margin, pageHeight - 8);
-      doc.setTextColor(107, 114, 128);
-      doc.setFont(PDF_FONT_NAME, 'normal');
-      doc.setFontSize(7);
-      doc.text(`${PDF_TEXT.shortTitle} - ${warehouseName}`, margin, pageHeight - 4);
-      doc.text(`${PDF_TEXT.page} ${pageNumber}`, pageWidth - margin, pageHeight - 4, { align: 'right' });
-    },
+    // Attempt to make it compact to fit more items
+    rowPageBreak: 'avoid',
   });
 
   doc.save(`price_list_${safeWarehouse}_${fileDate}.pdf`);

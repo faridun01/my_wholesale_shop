@@ -3349,7 +3349,7 @@ export default function ProductsView() {
                   className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="relative w-full">
                   <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
                   <select
@@ -3371,7 +3371,7 @@ export default function ProductsView() {
                   className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   <FileText size={16} />
-                  <span>Скачать остаток PDF</span>
+                  <span>Скачать остаток</span>
                 </button>
                 <button
                   type="button"
