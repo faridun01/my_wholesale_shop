@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { StockService } from '../services/stock.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -16,6 +16,7 @@ import {
 import { roundMoney } from '../utils/money.js';
 
 const router = Router();
+const StockSvc = StockService as any;
 
 const normalizeProductFamilyName = (value: string | null | undefined) =>
   normalizeProductName(String(value || '')).name
@@ -213,8 +214,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
         : null;
     const finalName = canonicalName || normalizedName.name;
     const parsedPackaging = packaging || parsePackagingFromRawName(rest.rawName || rest.name);
-    const resolvedBaseUnitName = normalizeBaseUnitName(rest.baseUnitName || parsedPackaging?.baseUnitName || rest.unit);
-    const resolvedPurchaseCostPrice = roundMoney(purchaseCostPrice ?? costPrice ?? 0);
+    const resolvedBaseUnitName = normalizeBaseUnitName(String(rest.baseUnitName || parsedPackaging?.baseUnitName || rest.unit || ''));
+    const resolvedPurchaseCostPrice = roundMoney(Number(purchaseCostPrice ?? costPrice ?? 0));
     const resolvedExpensePercent = Number(expensePercent ?? 0);
     const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
@@ -294,8 +295,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
     });
 
     // Then add initial stock via StockService to create batches and transactions
-    if (initialStock > 0 && wId) {
-      await StockService.addStock(
+    if (Number(initialStock) > 0 && wId) {
+      await StockSvc.addStock(
         product.id,
         Number(wId),
         Number(initialStock),
@@ -715,7 +716,7 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
       });
     }
 
-    const batch = await StockService.addStock(
+    const batch = await StockSvc.addStock(
       productId,
       warehouseId,
       quantity,
@@ -747,7 +748,7 @@ router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.transferStock(
+    const result = await StockSvc.transferStock(
       productId,
       fromWarehouseId,
       toWarehouseId,
@@ -785,7 +786,7 @@ router.post('/history/:transactionId/reverse-incoming', async (req: AuthRequest,
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.reverseIncomingTransaction(transactionId, req.user!.id);
+    const result = await StockSvc.reverseIncomingTransaction(transactionId, req.user!.id);
     res.json(result);
   } catch (error) {
     next(error);
@@ -817,7 +818,7 @@ router.post('/history/:transactionId/reverse-writeoff', async (req: AuthRequest,
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.reverseCorrectionWriteOff(transactionId, req.user!.id);
+    const result = await StockSvc.reverseCorrectionWriteOff(transactionId, req.user!.id);
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -851,7 +852,7 @@ router.post('/history/:transactionId/return-writeoff', authorize(['ADMIN', 'MANA
 
     const quantity = Number(req.body.quantity || 0);
     const reason = String(req.body.reason || '').trim();
-    const result = await StockService.returnWriteOffTransaction(transactionId, quantity, req.user!.id, reason);
+    const result = await StockSvc.returnWriteOffTransaction(transactionId, quantity, req.user!.id, reason);
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -883,7 +884,7 @@ router.delete('/history/:transactionId/writeoff', authorize(['ADMIN', 'MANAGER']
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.deleteWriteOffTransactionPermanently(transactionId);
+    const result = await StockSvc.deleteWriteOffTransactionPermanently(transactionId);
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -937,7 +938,7 @@ router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'У товара не найден склад для списания' });
     }
 
-    const result = await StockService.writeOffStock(
+    const result = await StockSvc.writeOffStock(
       productId,
       product.warehouseId,
       quantity,
@@ -968,7 +969,7 @@ router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const batch = await StockService.addStock(
+    const batch = await StockSvc.addStock(
       Number(product_id),
       Number(warehouse_id),
       Number(quantity_change),
@@ -1178,7 +1179,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
           t.type === 'adjustment' &&
           Number(t.qtyChange || 0) < 0 &&
           String(t.reason || '').includes('Списание') &&
-          StockService.isCorrectionWriteOffReason(t.reason) &&
+          StockSvc.isCorrectionWriteOffReason(t.reason) &&
           returnedQty <= 0,
         canReturnWriteOff:
           access.isAdmin &&
@@ -1284,7 +1285,7 @@ router.post('/batches/:batchId/zero', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.zeroBatchRemaining(batchId, req.user!.id);
+    const result = await StockSvc.zeroBatchRemaining(batchId, req.user!.id);
     res.json(result);
   } catch (error) {
     next(error);
@@ -1316,7 +1317,7 @@ router.delete('/batches/:batchId', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockService.deleteBatch(batchId);
+    const result = await StockSvc.deleteBatch(batchId);
     res.json(result);
   } catch (error) {
     next(error);

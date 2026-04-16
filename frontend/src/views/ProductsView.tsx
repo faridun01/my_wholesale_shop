@@ -1,13 +1,28 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
-import { getProducts, createProduct, updateProduct, deleteProduct, restockProduct, getProductHistory, mergeProduct, reverseIncomingTransaction, reverseCorrectionWriteOffTransaction, deleteProductBatch, writeOffProduct, returnWriteOffTransaction, deleteWriteOffTransactionPermanently } from '../api/products.api';
-import { 
-  Plus, 
+import * as ProductsApi from '../api/products.api';
+const {
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  restockProduct,
+  getProductHistory,
+  mergeProduct,
+  reverseIncomingTransaction,
+  reverseCorrectionWriteOffTransaction,
+  deleteProductBatch,
+  writeOffProduct,
+  returnWriteOffTransaction,
+  deleteWriteOffTransactionPermanently
+} = ProductsApi as any;
+import {
+  Plus,
   PlusCircle,
-  Search, 
-  Filter, 
-  Package, 
+  Search,
+  Filter,
+  Package,
   ArrowRightLeft,
   Edit,
   Trash2,
@@ -235,11 +250,11 @@ const buildProductSubmitPayload = (formData: ProductFormData, categoryId: number
     photoUrl: formData.photoUrl,
     packaging: packagingEnabled
       ? {
-          packageName: normalizeOcrPackageName(formData.packageName || 'коробка'),
-          baseUnitName,
-          unitsPerPackage,
-          isDefault: true,
-        }
+        packageName: normalizeOcrPackageName(formData.packageName || 'коробка'),
+        baseUnitName,
+        unitsPerPackage,
+        isDefault: true,
+      }
       : null,
   };
 };
@@ -247,14 +262,14 @@ const buildProductSubmitPayload = (formData: ProductFormData, categoryId: number
 const normalizePackagings = (product: any): PackagingOption[] =>
   Array.isArray(product?.packagings)
     ? product.packagings
-        .map((entry: any) => ({
-          id: Number(entry.id),
-          packageName: String(entry.packageName || '').trim(),
-          baseUnitName: String(entry.baseUnitName || product?.unit || 'шт').trim() || 'шт',
-          unitsPerPackage: Number(entry.unitsPerPackage || 0),
-          isDefault: Boolean(entry.isDefault),
-        }))
-        .filter((entry: PackagingOption) => entry.id > 0 && entry.packageName && entry.unitsPerPackage > 0)
+      .map((entry: any) => ({
+        id: Number(entry.id),
+        packageName: String(entry.packageName || '').trim(),
+        baseUnitName: String(entry.baseUnitName || product?.unit || 'шт').trim() || 'шт',
+        unitsPerPackage: Number(entry.unitsPerPackage || 0),
+        isDefault: Boolean(entry.isDefault),
+      }))
+      .filter((entry: PackagingOption) => entry.id > 0 && entry.packageName && entry.unitsPerPackage > 0)
     : [];
 
 const getDefaultPackaging = (packagings: PackagingOption[]) =>
@@ -673,20 +688,20 @@ export default function ProductsView() {
     : 0;
   const visibleOcrResults = Array.isArray(ocrResults)
     ? ocrResults.filter((item) =>
-        showOnlyProblematicOcrRows
-          ? item.enabled !== false && Boolean(getOcrProblemReason(item, usdRate, scanExpensePercent))
-          : true
-      )
+      showOnlyProblematicOcrRows
+        ? item.enabled !== false && Boolean(getOcrProblemReason(item, usdRate, scanExpensePercent))
+        : true
+    )
     : [];
   const problematicOcrRows = Array.isArray(ocrResults)
     ? ocrResults
-        .filter((item) => item.enabled !== false)
-        .map((item) => ({
-          lineIndex: Number(item.lineIndex || 0),
-          reason: getOcrProblemReason(item, usdRate, scanExpensePercent),
-        }))
-        .filter((item): item is { lineIndex: number; reason: string } => Boolean(item.reason))
-        .sort((a, b) => a.lineIndex - b.lineIndex)
+      .filter((item) => item.enabled !== false)
+      .map((item) => ({
+        lineIndex: Number(item.lineIndex || 0),
+        reason: getOcrProblemReason(item, usdRate, scanExpensePercent),
+      }))
+      .filter((item): item is { lineIndex: number; reason: string } => Boolean(item.reason))
+      .sort((a, b) => a.lineIndex - b.lineIndex)
     : [];
 
   const jumpToOcrLine = (lineIndex: number) => {
@@ -1083,7 +1098,7 @@ export default function ProductsView() {
               ? calculateUnitCostFromLineTotal(lineTotal * rate, quantity)
               : unitsPerPackage > 0
                 ? calculateUnitCostFromPackage(price * rate, unitsPerPackage)
-              : calculateUnitCostFromLineTotal(price * rate, quantity);
+                : calculateUnitCostFromLineTotal(price * rate, quantity);
           const effectiveCostPricePerPieceTJS = calculateEffectiveCost(costPricePerPieceTJS, expensePercent);
 
           if (validationReason) {
@@ -1685,11 +1700,11 @@ export default function ProductsView() {
   const filteredProducts = baseProducts.filter(p => {
     const productSearchValue = normalizeCatalogName(String(p.name || ''));
     const matchesSearch = !normalizedSearch || productSearchValue.includes(normalizedSearch);
-    
+
     // If a warehouse is selected, we only show products that have stock in that warehouse
     // OR are assigned to that warehouse as their default warehouse.
     const matchesWarehouse = !selectedWarehouseId || p.stock > 0 || p.warehouseId === Number(selectedWarehouseId);
-    
+
     return matchesSearch && matchesWarehouse;
   });
 
@@ -1760,7 +1775,7 @@ export default function ProductsView() {
   const normalizedWriteOffReason = String(writeOffData.reason || '').trim().toLowerCase();
   const isCustomWriteOffReason = Boolean(
     normalizedWriteOffReason &&
-      !writeOffReasonPresets.some((reason) => reason.toLowerCase() === normalizedWriteOffReason)
+    !writeOffReasonPresets.some((reason) => reason.toLowerCase() === normalizedWriteOffReason)
   );
   const visibleCategories = React.useMemo(
     () => categories.filter((category) => String(category?.name || '').trim().toLowerCase() !== 'прочее'),
@@ -1864,417 +1879,452 @@ export default function ProductsView() {
     toast.success('Остатки товаров скачаны в PDF');
   };
 
+  const exportPriceList = async () => {
+    if (!filteredProducts.length) {
+      toast.error('Нет товаров для выгрузки');
+      return;
+    }
+
+    const warehouseName = warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
+    const downloadedAt = new Date();
+
+    const { downloadPriceListPdf } = await import('../utils/print/priceListPdf');
+
+    await downloadPriceListPdf({
+      warehouseName,
+      generatedAt: downloadedAt,
+      rows: filteredProducts.map((product, index) => {
+        const preferredPackaging = getPreferredPackaging(product);
+        const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 1);
+        const sellingPrice = Number(product.sellingPrice || 0);
+        const packagePrice = preferredPackaging?.packageSellingPrice
+          ? Number(preferredPackaging.packageSellingPrice)
+          : sellingPrice * unitsPerPackage;
+
+        return {
+          index: index + 1,
+          name: formatProductName(product.name),
+          pricePerUnit: formatMoney(sellingPrice),
+          unitsPerPackage: unitsPerPackage > 1 ? `${unitsPerPackage} шт` : '—',
+          pricePerPackage: unitsPerPackage > 1 ? formatMoney(packagePrice) : '—'
+        };
+      }),
+    });
+
+    toast.success('Прайс-лист скачан в PDF');
+  };
+
   return (
     <div className="app-page-shell">
       <div className="space-y-6">
-      <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">Товары</h1>
-          <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
+        <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">Товары</h1>
+              <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              {isAdmin && <label className={clsx(
+                "flex w-full items-center justify-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all sm:w-auto",
+                selectedWarehouseId
+                  ? "cursor-pointer border-sky-100 bg-sky-50 text-slate-700 hover:bg-white"
+                  : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+              )}>
+                {isScanning ? <Loader2 size={16} className="animate-spin text-sky-600" /> : <Camera size={16} className={selectedWarehouseId ? "text-sky-600" : "text-slate-400"} />}
+                <span>{isScanning ? 'Чтение накладной...' : 'Загрузить накладную'}</span>
+                <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleScanInvoice} disabled={isScanning || !selectedWarehouseId} />
+              </label>}
+              {isAdmin && <button
+                onClick={() => {
+                  if (!selectedWarehouseId) {
+                    toast.error('Пожалуйста, выберите склад перед добавлением товара');
+                    return;
+                  }
+                  resetForm();
+                  setFormData(prev => ({ ...prev, warehouseId: selectedWarehouseId }));
+                  setShowAddModal(true);
+                }}
+                className={clsx(
+                  "flex w-full items-center justify-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95 sm:w-auto",
+                  selectedWarehouseId
+                    ? "bg-violet-500 text-white shadow-sm hover:bg-violet-600"
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                <Plus size={18} />
+                <span>Добавить</span>
+              </button>}
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          {isAdmin && <label className={clsx(
-            "flex w-full items-center justify-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all sm:w-auto",
-            selectedWarehouseId
-              ? "cursor-pointer border-sky-100 bg-sky-50 text-slate-700 hover:bg-white"
-              : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-          )}>
-            {isScanning ? <Loader2 size={16} className="animate-spin text-sky-600" /> : <Camera size={16} className={selectedWarehouseId ? "text-sky-600" : "text-slate-400"} />}
-            <span>{isScanning ? 'Чтение накладной...' : 'Загрузить накладную'}</span>
-            <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleScanInvoice} disabled={isScanning || !selectedWarehouseId} />
-          </label>}
-          {isAdmin && <button 
-            onClick={() => {
-              if (!selectedWarehouseId) {
-                toast.error('Пожалуйста, выберите склад перед добавлением товара');
-                return;
-              }
-              resetForm();
-              setFormData(prev => ({ ...prev, warehouseId: selectedWarehouseId }));
-              setShowAddModal(true);
-            }}
-            className={clsx(
-              "flex w-full items-center justify-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95 sm:w-auto",
-              selectedWarehouseId 
-                ? "bg-violet-500 text-white shadow-sm hover:bg-violet-600" 
-                : "bg-slate-200 text-slate-400 cursor-not-allowed"
-            )}
-          >
-            <Plus size={18} />
-            <span>Добавить</span>
-          </button>}
-        </div>
-      </div>
-      </div>
-      
-      <AnimatePresence>
-        {isScanning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-          >
+
+        <AnimatePresence>
+          {isScanning && (
             <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
             >
-              <div className="flex flex-col items-center text-center">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                  <Loader2 size={30} className="animate-spin" />
+              <motion.div
+                initial={{ scale: 0.96, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-2xl"
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                    <Loader2 size={30} className="animate-spin" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Идёт чтение накладной</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Система сама распознаёт позиции, количество и закупку. Обычно лучше всего читается одна чёткая страница.
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">Идёт чтение накладной</h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  Система сама распознаёт позиции, количество и закупку. Обычно лучше всего читается одна чёткая страница.
-                </p>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          )}
 
-        {(showAddModal || showEditModal) && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeProductFormModal}
+          {(showAddModal || showEditModal) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeProductFormModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-                className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-2xl"
             >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={(e) => e.stopPropagation()}
+                className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-2xl"
+              >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-3.5 sm:p-4">
-                <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-2 bg-violet-500 text-white rounded-xl">
-                    <Package size={20} />
-                  </div>
-                  <span>{showEditModal ? 'Редактировать товар' : 'Новый товар'}</span>
-                </h3>
-                <button onClick={closeProductFormModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-                <form onSubmit={showEditModal ? handleEditProduct : handleAddProduct} className="flex-1 space-y-3 overflow-y-auto p-3.5 sm:p-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Название товара</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={formData.name}
-                      onChange={e => {
-                        setIsCategoryManual(false);
-                        setFormData({...formData, name: e.target.value});
-                      }}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
-                      placeholder="Напр: iPhone 15 Pro Max"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Базовая единица</label>
-                    <select
-                      required
-                      value={formData.baseUnitName}
-                      onChange={(e) => {
-                        const nextBaseUnit = normalizeOcrBaseUnit(e.target.value);
-                        setFormData({
-                          ...formData,
-                          baseUnitName: nextBaseUnit,
-                          unit: nextBaseUnit,
-                        });
-                      }}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                    >
-                      <option value="шт">Шт</option>
-                      <option value="кг">Кг</option>
-                      <option value="литр">Литр</option>
-                      <option value="бутылка">Бутылка</option>
-                      <option value="флакон">Флакон</option>
-                    </select>
-                    <p className="mt-1 text-[11px] font-medium text-slate-400">
-                      Это основная единица учёта товара на складе.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
-                        <p className="text-xs font-medium text-slate-500">Новые товары по умолчанию создаются в коробках или мешках. Штуки считаются автоматически.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            packagingEnabled: !prev.packagingEnabled,
-                            packageName: prev.packageName || 'коробка',
-                            unitsPerPackage: prev.packagingEnabled ? '' : prev.unitsPerPackage,
-                          }))
-                        }
-                        className={clsx(
-                          'rounded-full border px-3 py-1.5 text-xs font-bold transition-all',
-                          formData.packagingEnabled
-                            ? 'border-amber-300 bg-amber-100 text-amber-800'
-                            : 'border-slate-200 bg-white text-slate-600'
-                        )}
-                      >
-                        {formData.packagingEnabled ? 'Коробки / мешки' : 'Только шт'}
-                      </button>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
+                    <div className="p-2 bg-violet-500 text-white rounded-xl">
+                      <Package size={20} />
                     </div>
-
-                    {formData.packagingEnabled && (
-                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Тип упаковки</label>
-                          <select
-                            value={formData.packageName}
-                            onChange={(e) => setFormData({ ...formData, packageName: normalizeOcrPackageName(e.target.value) || 'коробка' })}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                          >
-                            <option value="коробка">Коробка</option>
-                            <option value="мешок">Мешок</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">
-                            Сколько шт в {formData.packageName === 'мешок' ? 'мешке' : 'коробке'}
-                          </label>
-                          <input
-                            type="number"
-                            min="2"
-                            step="1"
-                            required={formData.packagingEnabled}
-                            value={formData.unitsPerPackage}
-                            onChange={(e) => setFormData({ ...formData, unitsPerPackage: e.target.value })}
-                            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                            placeholder="Напр: 24"
-                          />
-                        </div>
-                        <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700">
-                          1 {formData.packageName || 'коробка'} = {Number(formData.unitsPerPackage || 0) || '...'} {normalizeDisplayBaseUnit(formData.baseUnitName || 'шт')}
-                        </div>
-                        <div className="sm:col-span-2 text-[11px] font-medium text-slate-500">
-                          При пополнении этот товар будет удобно добавляться в {formData.packageName === 'мешок' ? 'мешках' : 'коробках'}, а ниже система сама покажет итог в штуках.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Категория</label>
-                    <input
-                      list="product-categories"
-                      required
-                      value={categoryInput}
-                      onChange={(e) => {
-                        const nextValue = e.target.value;
-                        const matchedCategory = visibleCategories.find(
-                          (category) => String(category?.name || '').trim().toLowerCase() === nextValue.trim().toLowerCase()
-                        );
-
-                        setIsCategoryManual(Boolean(nextValue.trim()));
-                        setCategoryInput(nextValue);
-                        setFormData({
-                          ...formData,
-                          categoryId: matchedCategory?.id ? String(matchedCategory.id) : '',
-                        });
-                      }}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                      placeholder="Выберите или введите категорию"
-                    />
-                    <datalist id="product-categories">
-                      {visibleCategories.map((category) => (
-                        <option key={category.id} value={category.name} />
-                      ))}
-                    </datalist>
-                    <p className="mt-1 text-[11px] font-medium text-slate-400">
-                      Можно выбрать из списка или сразу ввести новую категорию здесь же.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Склад по умолчанию</label>
-                    <select 
-                      required
-                      value={formData.warehouseId}
-                      onChange={e => setFormData({...formData, warehouseId: e.target.value})}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                    >
-                      <option value="">Выберите склад</option>
-                      {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </div>
-                  {isAdmin && (
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Себестоимость (TJS)</label>
-                      <input 
-                        type="number" 
-                        step="0.01"
+                    <span>{showEditModal ? 'Редактировать товар' : 'Новый товар'}</span>
+                  </h3>
+                  <button onClick={closeProductFormModal} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+                <form onSubmit={showEditModal ? handleEditProduct : handleAddProduct} className="flex-1 space-y-3 overflow-y-auto p-3.5 sm:p-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Название товара</label>
+                      <input
+                        type="text"
                         required
-                        value={formData.costPrice}
-                        onChange={e => setFormData({...formData, costPrice: e.target.value})}
-                        onBlur={e => setFormData({...formData, costPrice: formatPriceInput(e.target.value)})}
-                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
+                        value={formData.name}
+                        onChange={e => {
+                          setIsCategoryManual(false);
+                          setFormData({ ...formData, name: e.target.value });
+                        }}
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        placeholder="Напр: iPhone 15 Pro Max"
                       />
-                      {!showEditModal && (
-                        <p className="mt-2 text-xs font-medium text-slate-400">
-                          Введите себестоимость вручную.
-                        </p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Базовая единица</label>
+                      <select
+                        required
+                        value={formData.baseUnitName}
+                        onChange={(e) => {
+                          const nextBaseUnit = normalizeOcrBaseUnit(e.target.value);
+                          setFormData({
+                            ...formData,
+                            baseUnitName: nextBaseUnit,
+                            unit: nextBaseUnit,
+                          });
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                      >
+                        <option value="шт">Шт</option>
+                        <option value="кг">Кг</option>
+                        <option value="литр">Литр</option>
+                        <option value="бутылка">Бутылка</option>
+                        <option value="флакон">Флакон</option>
+                      </select>
+                      <p className="mt-1 text-[11px] font-medium text-slate-400">
+                        Это основная единица учёта товара на складе.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
+                          <p className="text-xs font-medium text-slate-500">Новые товары по умолчанию создаются в коробках или мешках. Штуки считаются автоматически.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              packagingEnabled: !prev.packagingEnabled,
+                              packageName: prev.packageName || 'коробка',
+                              unitsPerPackage: prev.packagingEnabled ? '' : prev.unitsPerPackage,
+                            }))
+                          }
+                          className={clsx(
+                            'rounded-full border px-3 py-1.5 text-xs font-bold transition-all',
+                            formData.packagingEnabled
+                              ? 'border-amber-300 bg-amber-100 text-amber-800'
+                              : 'border-slate-200 bg-white text-slate-600'
+                          )}
+                        >
+                          {formData.packagingEnabled ? 'Коробки / мешки' : 'Только шт'}
+                        </button>
+                      </div>
+
+                      {formData.packagingEnabled && (
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">Тип упаковки</label>
+                            <select
+                              value={formData.packageName}
+                              onChange={(e) => setFormData({ ...formData, packageName: normalizeOcrPackageName(e.target.value) || 'коробка' })}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                            >
+                              <option value="коробка">Коробка</option>
+                              <option value="мешок">Мешок</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-700">
+                              Сколько шт в {formData.packageName === 'мешок' ? 'мешке' : 'коробке'}
+                            </label>
+                            <input
+                              type="number"
+                              min="2"
+                              step="1"
+                              required={formData.packagingEnabled}
+                              value={formData.unitsPerPackage}
+                              onChange={(e) => setFormData({ ...formData, unitsPerPackage: e.target.value })}
+                              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                              placeholder="Напр: 24"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700">
+                            1 {formData.packageName || 'коробка'} = {Number(formData.unitsPerPackage || 0) || '...'} {normalizeDisplayBaseUnit(formData.baseUnitName || 'шт')}
+                          </div>
+                          <div className="sm:col-span-2 text-[11px] font-medium text-slate-500">
+                            При пополнении этот товар будет удобно добавляться в {formData.packageName === 'мешок' ? 'мешках' : 'коробках'}, а ниже система сама покажет итог в штуках.
+                          </div>
+                        </div>
                       )}
                     </div>
-                  )}
-                  {isAdmin && showEditModal && (
                     <div>
-                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Расходы %</label>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Категория</label>
+                      <input
+                        list="product-categories"
+                        required
+                        value={categoryInput}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          const matchedCategory = visibleCategories.find(
+                            (category) => String(category?.name || '').trim().toLowerCase() === nextValue.trim().toLowerCase()
+                          );
+
+                          setIsCategoryManual(Boolean(nextValue.trim()));
+                          setCategoryInput(nextValue);
+                          setFormData({
+                            ...formData,
+                            categoryId: matchedCategory?.id ? String(matchedCategory.id) : '',
+                          });
+                        }}
+                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        placeholder="Выберите или введите категорию"
+                      />
+                      <datalist id="product-categories">
+                        {visibleCategories.map((category) => (
+                          <option key={category.id} value={category.name} />
+                        ))}
+                      </datalist>
+                      <p className="mt-1 text-[11px] font-medium text-slate-400">
+                        Можно выбрать из списка или сразу ввести новую категорию здесь же.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Склад по умолчанию</label>
+                      <select
+                        required
+                        value={formData.warehouseId}
+                        onChange={e => setFormData({ ...formData, warehouseId: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                      >
+                        <option value="">Выберите склад</option>
+                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    {isAdmin && (
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Себестоимость (TJS)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={formData.costPrice}
+                          onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
+                          onBlur={e => setFormData({ ...formData, costPrice: formatPriceInput(e.target.value) })}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        />
+                        {!showEditModal && (
+                          <p className="mt-2 text-xs font-medium text-slate-400">
+                            Введите себестоимость вручную.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {isAdmin && showEditModal && (
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Расходы %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.expensePercent}
+                          onChange={e => setFormData({ ...formData, expensePercent: e.target.value })}
+                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Цена продажи (TJS)</label>
                       <input
                         type="number"
                         step="0.01"
-                        min="0"
-                        value={formData.expensePercent}
-                        onChange={e => setFormData({...formData, expensePercent: e.target.value})}
+                        required
+                        value={formData.sellingPrice}
+                        onChange={e => setFormData({ ...formData, sellingPrice: e.target.value })}
+                        onBlur={e => setFormData({ ...formData, sellingPrice: formatPriceInput(e.target.value) })}
                         className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
                       />
                     </div>
-                  )}
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Цена продажи (TJS)</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      required
-                      value={formData.sellingPrice}
-                      onChange={e => setFormData({...formData, sellingPrice: e.target.value})}
-                      onBlur={e => setFormData({...formData, sellingPrice: formatPriceInput(e.target.value)})}
-                      className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
-                    />
-                  </div>
-                  {!showEditModal && (
-                    <>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Начальный остаток</label>
-                        <input 
-                          type="number" 
-                          required
-                          value={formData.initialStock}
-                          onChange={e => setFormData({...formData, initialStock: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Мин. остаток</label>
-                        <input 
-                          type="number" 
-                          required
-                          value={formData.minStock}
-                          onChange={e => setFormData({...formData, minStock: e.target.value})}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm" 
-                        />
-                      </div>
-                    </>
-                  )}
-                  <div className="md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Фото товара</label>
-                    <div className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-sky-600">
-                        {isPhotoUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                        <span>{isPhotoUploading ? 'Загрузка...' : 'Выбрать фото'}</span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={handlePhotoUpload}
-                          disabled={isPhotoUploading}
-                        />
-                      </label>
-                      {formData.photoUrl && (
-                        <div className="flex items-center gap-3">
-                          <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                            <img
-                              src={resolveMediaUrl(formData.photoUrl, formData.name || 'preview')}
-                              alt="Фото товара"
-                              className="h-full w-full object-cover"
-                              referrerPolicy="no-referrer"
-                              onError={(event) => handleBrokenImage(event, formData.name || 'preview')}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setFormData((prev) => ({ ...prev, photoUrl: '' }))}
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition-all hover:bg-white"
-                          >
-                            Убрать фото
-                          </button>
+                    {!showEditModal && (
+                      <>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Начальный остаток</label>
+                          <input
+                            type="number"
+                            required
+                            value={formData.initialStock}
+                            onChange={e => setFormData({ ...formData, initialStock: e.target.value })}
+                            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold outline-none transition-all focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                          />
                         </div>
-                      )}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Мин. остаток</label>
+                          <input
+                            type="number"
+                            required
+                            value={formData.minStock}
+                            onChange={e => setFormData({ ...formData, minStock: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-bold text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Фото товара</label>
+                      <div className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-sky-600">
+                          {isPhotoUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                          <span>{isPhotoUploading ? 'Загрузка...' : 'Выбрать фото'}</span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handlePhotoUpload}
+                            disabled={isPhotoUploading}
+                          />
+                        </label>
+                        {formData.photoUrl && (
+                          <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                              <img
+                                src={resolveMediaUrl(formData.photoUrl, formData.name || 'preview')}
+                                alt="Фото товара"
+                                className="h-full w-full object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(event) => handleBrokenImage(event, formData.name || 'preview')}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, photoUrl: '' }))}
+                              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 transition-all hover:bg-white"
+                            >
+                              Убрать фото
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
-                  <button type="button" onClick={closeProductFormModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
-                  <button type="submit" className="px-8 py-2 bg-violet-500 text-white rounded-xl font-bold shadow-xl shadow-violet-500/20 hover:bg-violet-600 transition-all active:scale-95 text-sm">
-                    {showEditModal ? 'Сохранить' : 'Создать'}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
+                    <button type="button" onClick={closeProductFormModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
+                    <button type="submit" className="px-8 py-2 bg-violet-500 text-white rounded-xl font-bold shadow-xl shadow-violet-500/20 hover:bg-violet-600 transition-all active:scale-95 text-sm">
+                      {showEditModal ? 'Сохранить' : 'Создать'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <AnimatePresence>
-        {showTransferModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeTransferModal}
+        <AnimatePresence>
+          {showTransferModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeTransferModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
             >
-              <div className="border-b border-slate-100 bg-amber-50/50 p-4 sm:p-5">
-                <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
-                  <div className="p-2 bg-amber-600 text-white rounded-xl">
-                    <ArrowRightLeft size={20} />
-                  </div>
-                  <span>Перенос товара</span>
-                </h3>
-                <p className="text-slate-500 mt-1 font-bold text-sm">{selectedProduct?.name}</p>
-              </div>
-              <form onSubmit={handleTransfer} className="space-y-4 p-4 sm:p-5">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Из склада</label>
-                    <select 
-                      required
-                      value={transferData.fromWarehouseId}
-                      onChange={e => setTransferData({ ...transferData, fromWarehouseId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
-                    >
-                      <option value="">Выберите склад</option>
-                      {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">В склад</label>
-                    <select 
-                      required
-                      value={transferData.toWarehouseId}
-                      onChange={e => setTransferData({ ...transferData, toWarehouseId: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
-                    >
-                      <option value="">Выберите склад</option>
-                      {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </div>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2.5rem]"
+              >
+                <div className="border-b border-slate-100 bg-amber-50/50 p-4 sm:p-5">
+                  <h3 className="text-lg font-black text-slate-900 flex items-center space-x-3">
+                    <div className="p-2 bg-amber-600 text-white rounded-xl">
+                      <ArrowRightLeft size={20} />
+                    </div>
+                    <span>Перенос товара</span>
+                  </h3>
+                  <p className="text-slate-500 mt-1 font-bold text-sm">{selectedProduct?.name}</p>
+                </div>
+                <form onSubmit={handleTransfer} className="space-y-4 p-4 sm:p-5">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Из склада</label>
+                      <select
+                        required
+                        value={transferData.fromWarehouseId}
+                        onChange={e => setTransferData({ ...transferData, fromWarehouseId: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
+                      >
+                        <option value="">Выберите склад</option>
+                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">В склад</label>
+                      <select
+                        required
+                        value={transferData.toWarehouseId}
+                        onChange={e => setTransferData({ ...transferData, toWarehouseId: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm appearance-none bg-white"
+                      >
+                        <option value="">Выберите склад</option>
+                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Количество</label>
                       {selectedTransferPackaging && transferUnitsPerPackage > 0 ? (
@@ -2332,21 +2382,21 @@ export default function ProductsView() {
                               Доступно: {formatCountWithUnit(Number(availableTransferStock || 0), normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт'))}
                             </p>
                           )}
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             required
                             min="1"
                             placeholder="Введите количество"
                             value={transferData.quantity}
                             onChange={e => setTransferData({ ...transferData, quantity: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm" 
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all font-bold text-sm"
                           />
                         </>
                       )}
                     </div>
-                </div>
-                <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
-                  <button type="button" onClick={closeTransferModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
+                  </div>
+                  <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
+                    <button type="button" onClick={closeTransferModal} className="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-all text-sm">Отмена</button>
                     <button
                       type="submit"
                       disabled={
@@ -2359,712 +2409,713 @@ export default function ProductsView() {
                     </button>
                   </div>
                 </form>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <AnimatePresence>
-        {showRestockModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeRestockModal}
+        <AnimatePresence>
+          {showRestockModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeRestockModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[28rem] overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
             >
-              <div className="border-b border-slate-100 bg-emerald-50/50 p-4 sm:p-6">
-                <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
-                  <div className="rounded-2xl bg-emerald-600 p-2.5 text-white">
-                    <PlusCircle size={20} />
-                  </div>
-                  <span>Пополнение товара</span>
-                </h3>
-                <p className="mt-2 text-sm font-bold text-slate-500">{selectedProduct?.name}</p>
-              </div>
-              <form onSubmit={handleRestock} className="space-y-5 p-4 sm:p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Склад</label>
-                    <select 
-                      required
-                      value={restockData.warehouseId}
-                      onChange={e => setRestockData({ ...restockData, warehouseId: e.target.value })}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    >
-                      <option value="">Выберите склад</option>
-                      {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {selectedRestockPackaging ? (
-                      <>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[28rem] overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
+              >
+                <div className="border-b border-slate-100 bg-emerald-50/50 p-4 sm:p-6">
+                  <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
+                    <div className="rounded-2xl bg-emerald-600 p-2.5 text-white">
+                      <PlusCircle size={20} />
+                    </div>
+                    <span>Пополнение товара</span>
+                  </h3>
+                  <p className="mt-2 text-sm font-bold text-slate-500">{selectedProduct?.name}</p>
+                </div>
+                <form onSubmit={handleRestock} className="space-y-5 p-4 sm:p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Склад</label>
+                      <select
+                        required
+                        value={restockData.warehouseId}
+                        onChange={e => setRestockData({ ...restockData, warehouseId: e.target.value })}
+                        className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      >
+                        <option value="">Выберите склад</option>
+                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {selectedRestockPackaging ? (
+                        <>
+                          <div>
+                            <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
+                            <select
+                              value={restockData.selectedPackagingId}
+                              onChange={e =>
+                                setRestockData((prev) => ({
+                                  ...prev,
+                                  selectedPackagingId: e.target.value,
+                                  packageQuantityInput: '',
+                                  quantity: '',
+                                }))
+                              }
+                              className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                            >
+                              {restockPackagings.map((packaging) => (
+                                <option key={packaging.id} value={packaging.id}>
+                                  {packaging.packageName} • {packaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-2 text-xs font-medium text-slate-400">
+                              Пополнение идёт упаковками. Штуки считаются автоматически ниже.
+                            </p>
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">
+                              Сколько {selectedRestockPackaging.packageName === 'мешок' ? 'мешков' : 'коробок'}
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              value={restockData.packageQuantityInput}
+                              placeholder={selectedRestockPackaging.packageName === 'мешок' ? 'Введите количество мешков' : 'Введите количество коробок'}
+                              onChange={e =>
+                                setRestockData((prev) => ({
+                                  ...prev,
+                                  packageQuantityInput: e.target.value,
+                                  quantity: String(
+                                    Math.max(0, Math.floor(Number(e.target.value || 0) || 0)) *
+                                    (selectedRestockPackaging.unitsPerPackage || 0)
+                                  ),
+                                }))
+                              }
+                              className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                            />
+                            <p className="mt-2 text-xs font-medium text-slate-400">
+                              1 {formatCountWithUnit(1, selectedRestockPackaging.packageName).replace(/^1\s+/, '')} = {selectedRestockPackaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                            </p>
+                            <p className="mt-1 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                              Итого в штуках: {totalRestockUnits} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
                         <div>
-                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Упаковка</label>
-                          <select
-                            value={restockData.selectedPackagingId}
-                            onChange={e =>
-                              setRestockData((prev) => ({
-                                ...prev,
-                                selectedPackagingId: e.target.value,
-                                packageQuantityInput: '',
-                                quantity: '',
-                              }))
-                            }
-                            className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                          >
-                            {restockPackagings.map((packaging) => (
-                              <option key={packaging.id} value={packaging.id}>
-                                {packaging.packageName} • {packaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="mt-2 text-xs font-medium text-slate-400">
-                            Пополнение идёт упаковками. Штуки считаются автоматически ниже.
-                          </p>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">
-                            Сколько {selectedRestockPackaging.packageName === 'мешок' ? 'мешков' : 'коробок'}
-                          </label>
+                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Количество</label>
                           <input
                             type="number"
-                            min="1"
                             required
-                            value={restockData.packageQuantityInput}
-                            placeholder={selectedRestockPackaging.packageName === 'мешок' ? 'Введите количество мешков' : 'Введите количество коробок'}
-                          onChange={e =>
-                            setRestockData((prev) => ({
-                              ...prev,
-                              packageQuantityInput: e.target.value,
-                              quantity: String(
-                                Math.max(0, Math.floor(Number(e.target.value || 0) || 0)) *
-                                  (selectedRestockPackaging.unitsPerPackage || 0)
-                              ),
-                            }))
-                          }
+                            value={restockData.quantity}
+                            onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                      )}
+                      {isAdmin && (
+                        <div>
+                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена закупки</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            required
+                            value={restockData.costPrice}
+                            onChange={e => setRestockData((prev) => ({ ...prev, costPrice: e.target.value }))}
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                           />
                           <p className="mt-2 text-xs font-medium text-slate-400">
-                            1 {formatCountWithUnit(1, selectedRestockPackaging.packageName).replace(/^1\s+/, '')} = {selectedRestockPackaging.unitsPerPackage} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
-                          </p>
-                          <p className="mt-1 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-                            Итого в штуках: {totalRestockUnits} {normalizeDisplayBaseUnit(selectedProduct?.unit || 'шт')}
+                            Закупка за 1 шт без расходов.
                           </p>
                         </div>
-                      </>
-                    ) : (
+                      )}
                       <div>
-                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Количество</label>
-                        <input 
-                          type="number" 
-                          required
-                          value={restockData.quantity}
-                          onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
-                        />
-                      </div>
-                    )}
-                    {isAdmin && (
-                      <div>
-                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена закупки</label>
-                        <input 
-                          type="number" 
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена продажи</label>
+                        <input
+                          type="number"
                           step="0.01"
                           required
-                          value={restockData.costPrice}
-                          onChange={e => setRestockData((prev) => ({ ...prev, costPrice: e.target.value }))}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
+                          value={restockData.sellingPrice}
+                          onChange={e => setRestockData({ ...restockData, sellingPrice: e.target.value })}
+                          onBlur={e => setRestockData({ ...restockData, sellingPrice: formatPriceInput(e.target.value) })}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
                         <p className="mt-2 text-xs font-medium text-slate-400">
-                          Закупка за 1 шт без расходов.
+                          Новая цена продажи для этой поставки.
                         </p>
                       </div>
-                    )}
+                    </div>
                     <div>
-                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Цена продажи</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        value={restockData.sellingPrice}
-                        onChange={e => setRestockData({ ...restockData, sellingPrice: e.target.value })}
-                        onBlur={e => setRestockData({ ...restockData, sellingPrice: formatPriceInput(e.target.value) })}
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                      <p className="mt-2 text-xs font-medium text-slate-400">
-                        Новая цена продажи для этой поставки.
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Причина / Комментарий</label>
-                    <input 
-                      type="text" 
-                      value={restockData.reason}
-                      onChange={e => setRestockData({ ...restockData, reason: e.target.value })}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
-                      placeholder="Напр: Новая поставка"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0">
-                  <button type="button" onClick={closeRestockModal} className="rounded-2xl px-6 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" className="rounded-2xl bg-emerald-600 px-8 py-3 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-95">Пополнить</button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showWriteOffModal && selectedWriteOffProduct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeWriteOffModal}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-2 backdrop-blur-md sm:items-center sm:p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-3xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:max-h-[88vh] sm:rounded-[2rem]"
-            >
-              <div className="border-b border-amber-100 bg-[linear-gradient(135deg,#fff8eb_0%,#ffffff_58%,#fff4db_100%)] px-4 py-4 sm:px-6 sm:py-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">
-                      <Scissors size={12} />
-                      <span>Списание</span>
-                    </div>
-                    <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Списание товара</h3>
-                    <p className="mt-1 text-sm font-medium text-slate-500">
-                      Быстрая складская операция по выбранному товару.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeWriteOffModal}
-                    className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmitWriteOff} className="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Товар</p>
-                    <p className="mt-2 text-[14px] font-bold leading-tight text-slate-900">
-                      {selectedWriteOffProduct ? formatProductName(selectedWriteOffProduct.name) : 'Не выбран'}
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Склад</p>
-                    <p className="mt-2 text-[14px] font-bold text-slate-900">
-                      {selectedWriteOffProduct?.warehouse?.name || warehouses.find((warehouse) => warehouse.id === selectedWriteOffProduct?.warehouseId)?.name || '---'}
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] border border-amber-200 bg-[linear-gradient(135deg,#fff8e8_0%,#fffdf8_100%)] px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Остаток</p>
-                    <p className="mt-2 whitespace-pre-line text-[15px] font-black text-amber-900">
-                      {selectedWriteOffProduct ? getStockBreakdown(selectedWriteOffProduct).primary : '0'}
-                    </p>
-                    {selectedWriteOffProduct && getStockBreakdown(selectedWriteOffProduct).secondary && (
-                      <p className="mt-1 text-[11px] font-medium text-amber-700">
-                        {getStockBreakdown(selectedWriteOffProduct).secondary}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
-                  <section className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество</label>
-                      <span className="text-[11px] font-semibold text-slate-400">Только целое число</span>
-                    </div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
-                      <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3">
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          required
-                          value={writeOffData.quantity}
-                          onChange={(event) => {
-                            const digitsOnly = event.target.value.replace(/[^\d]/g, '');
-                            setWriteOffData((prev) => ({ ...prev, quantity: digitsOnly }));
-                          }}
-                          className="w-full bg-transparent text-[34px] font-black tracking-tight text-slate-900 outline-none"
-                        />
-                        <p className="mt-1 text-[11px] font-medium text-slate-400">Количество к списанию</p>
-                      </div>
-                      <div className="rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Доступно</p>
-                        <div className="mt-2 text-[34px] leading-none font-black text-slate-900">
-                          {Number(selectedWriteOffProduct.stock || 0)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {[1, 5, 10].map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => handleSetWriteOffQuantity(value)}
-                          className={clsx(
-                            'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
-                            Number(writeOffData.quantity || 0) === value
-                              ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
-                              : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
-                          )}
-                        >
-                          {value}
-                        </button>
-                      ))}
-                      {selectedWriteOffPackaging && Number(selectedWriteOffPackaging.unitsPerPackage || 0) > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffPackaging.unitsPerPackage || 0))}
-                          className={clsx(
-                            'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
-                            Number(writeOffData.quantity || 0) === Number(selectedWriteOffPackaging.unitsPerPackage || 0)
-                              ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
-                              : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
-                          )}
-                        >
-                          1 {selectedWriteOffPackaging.packageName}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffProduct?.stock || 0))}
-                        className={clsx(
-                          'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
-                          Number(writeOffData.quantity || 0) === Number(selectedWriteOffProduct?.stock || 0)
-                            ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
-                            : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
-                        )}
-                      >
-                        Всё
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className="rounded-[24px] border border-slate-200 bg-white p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина списания</label>
-                      <span className="text-[11px] font-semibold text-slate-400">Выбери готовый вариант или введи свой</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {writeOffReasonPresets.map((reason) => {
-                        const isSelected = normalizedWriteOffReason === reason.toLowerCase();
-                        return (
-                          <button
-                            key={reason}
-                            type="button"
-                            onClick={() => setWriteOffData((prev) => ({ ...prev, reason: reason.toLowerCase() }))}
-                            className={clsx(
-                              'rounded-[18px] border px-3 py-3 text-left text-[13px] font-bold transition-all duration-150',
-                              isSelected
-                                ? 'border-amber-400 bg-[linear-gradient(135deg,#fff6d9_0%,#ffe6b3_100%)] text-amber-800 shadow-[0_10px_24px_rgba(245,158,11,0.18)]'
-                                : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
-                            )}
-                          >
-                            {reason}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 transition-all focus-within:border-amber-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-amber-500/10">
+                      <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Причина / Комментарий</label>
                       <input
                         type="text"
-                        required
-                        value={writeOffData.reason}
-                        onChange={(event) => setWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
-                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
-                        placeholder="Своя причина"
+                        value={restockData.reason}
+                        onChange={e => setRestockData({ ...restockData, reason: e.target.value })}
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        placeholder="Напр: Новая поставка"
                       />
-                      {isCustomWriteOffReason && (
-                        <p className="mt-1 text-[11px] font-medium text-amber-700">Используется пользовательская причина</p>
-                      )}
                     </div>
-                  </section>
-                </div>
-
-                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeWriteOffModal}
-                    className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-2xl bg-[linear-gradient(135deg,#f59e0b_0%,#ea580c_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(234,88,12,0.28)] transition-all hover:-translate-y-px hover:brightness-105 active:scale-[0.98]"
-                  >
-                    Подтвердить списание
-                  </button>
-                </div>
-              </form>
+                  </div>
+                  <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0">
+                    <button type="button" onClick={closeRestockModal} className="rounded-2xl px-6 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                    <button type="submit" className="rounded-2xl bg-emerald-600 px-8 py-3 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-95">Пополнить</button>
+                  </div>
+                </form>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <AnimatePresence>
-        {ocrResults && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setOcrResults(null)}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-sm sm:items-center sm:p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[96vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
+        <AnimatePresence>
+          {showWriteOffModal && selectedWriteOffProduct && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeWriteOffModal}
+              className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-2 backdrop-blur-md sm:items-center sm:p-4"
             >
-              <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Результаты сканирования</h3>
-                  </div>
-                  <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Курс USD ($)</p>
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          value={usdRate}
-                          onChange={(e) => setUsdRate(e.target.value)}
-                          className="w-24 bg-transparent text-left font-black text-sky-600 outline-none"
-                        />
-                        <DollarSign className="text-sky-300" size={18} />
+              <motion.div
+                initial={{ scale: 0.96, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-3xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:max-h-[88vh] sm:rounded-[2rem]"
+              >
+                <div className="border-b border-amber-100 bg-[linear-gradient(135deg,#fff8eb_0%,#ffffff_58%,#fff4db_100%)] px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">
+                        <Scissors size={12} />
+                        <span>Списание</span>
                       </div>
+                      <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Списание товара</h3>
+                      <p className="mt-1 text-sm font-medium text-slate-500">
+                        Быстрая складская операция по выбранному товару.
+                      </p>
                     </div>
-                    <div className="rounded-2xl border border-violet-100 bg-white px-4 py-3 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Общие расходы %</p>
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={scanExpensePercent}
-                          onChange={(e) => setScanExpensePercent(e.target.value)}
-                          className="w-20 bg-transparent text-left font-black text-violet-600 outline-none"
-                        />
-                        <span className="text-sm font-black text-slate-300">%</span>
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={closeWriteOffModal}
+                      className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-8">
-                <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
-                      <p className="mt-2 text-sm font-medium text-slate-600">
-                        Количество и закупка пересчитываются автоматически. Измените только то, что нужно перед добавлением на склад.
+
+                <form onSubmit={handleSubmitWriteOff} className="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Товар</p>
+                      <p className="mt-2 text-[14px] font-bold leading-tight text-slate-900">
+                        {selectedWriteOffProduct ? formatProductName(selectedWriteOffProduct.name) : 'Не выбран'}
                       </p>
-                      {invalidOcrRowsCount > 0 && (
-                        <p className="mt-3 text-sm font-bold text-rose-600">
-                          Проверьте проблемные строки: {invalidOcrRowsCount}. Они подсвечены красным и не дадут завершить импорт.
+                    </div>
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Склад</p>
+                      <p className="mt-2 text-[14px] font-bold text-slate-900">
+                        {selectedWriteOffProduct?.warehouse?.name || warehouses.find((warehouse) => warehouse.id === selectedWriteOffProduct?.warehouseId)?.name || '---'}
+                      </p>
+                    </div>
+                    <div className="rounded-[22px] border border-amber-200 bg-[linear-gradient(135deg,#fff8e8_0%,#fffdf8_100%)] px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Остаток</p>
+                      <p className="mt-2 whitespace-pre-line text-[15px] font-black text-amber-900">
+                        {selectedWriteOffProduct ? getStockBreakdown(selectedWriteOffProduct).primary : '0'}
+                      </p>
+                      {selectedWriteOffProduct && getStockBreakdown(selectedWriteOffProduct).secondary && (
+                        <p className="mt-1 text-[11px] font-medium text-amber-700">
+                          {getStockBreakdown(selectedWriteOffProduct).secondary}
                         </p>
                       )}
-                      {problematicOcrRows.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {problematicOcrRows.map((row) => (
-                            <button
-                              key={`problem-row-${row.lineIndex}`}
-                              type="button"
-                              onClick={() => jumpToOcrLine(row.lineIndex)}
-                              className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 ring-1 ring-rose-200"
-                              title={row.reason}
-                            >
-                              Строка {row.lineIndex}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Позиции</span>
-                      <span className="rounded-xl bg-sky-500 px-2.5 py-1 text-sm font-black text-white">
-                        {ocrImportedCount + ocrResults.filter((entry) => entry.enabled !== false).length}/{ocrOriginalCount || ocrResults.length}
-                      </span>
-                      {ocrImportedCount > 0 && (
-                        <span className="rounded-xl bg-emerald-500 px-2.5 py-1 text-sm font-black text-white">
-                          Добавлено: {ocrImportedCount}
-                        </span>
-                      )}
-                      {ocrResults.filter((entry) => entry.enabled !== false).length > 0 && (
-                        <span className="rounded-xl bg-slate-500 px-2.5 py-1 text-sm font-black text-white">
-                          Осталось: {ocrResults.filter((entry) => entry.enabled !== false).length}
-                        </span>
-                      )}
-                      {invalidOcrRowsCount > 0 && (
-                        <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-sm font-black text-white">
-                          Ошибки: {invalidOcrRowsCount}
-                        </span>
-                      )}
-                      {invalidOcrRowsCount > 0 && (
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+                    <section className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество</label>
+                        <span className="text-[11px] font-semibold text-slate-400">Только целое число</span>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
+                        <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3">
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            required
+                            value={writeOffData.quantity}
+                            onChange={(event) => {
+                              const digitsOnly = event.target.value.replace(/[^\d]/g, '');
+                              setWriteOffData((prev) => ({ ...prev, quantity: digitsOnly }));
+                            }}
+                            className="w-full bg-transparent text-[34px] font-black tracking-tight text-slate-900 outline-none"
+                          />
+                          <p className="mt-1 text-[11px] font-medium text-slate-400">Количество к списанию</p>
+                        </div>
+                        <div className="rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-center">
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Доступно</p>
+                          <div className="mt-2 text-[34px] leading-none font-black text-slate-900">
+                            {Number(selectedWriteOffProduct.stock || 0)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {[1, 5, 10].map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => handleSetWriteOffQuantity(value)}
+                            className={clsx(
+                              'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                              Number(writeOffData.quantity || 0) === value
+                                ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                                : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                            )}
+                          >
+                            {value}
+                          </button>
+                        ))}
+                        {selectedWriteOffPackaging && Number(selectedWriteOffPackaging.unitsPerPackage || 0) > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffPackaging.unitsPerPackage || 0))}
+                            className={clsx(
+                              'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                              Number(writeOffData.quantity || 0) === Number(selectedWriteOffPackaging.unitsPerPackage || 0)
+                                ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                                : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                            )}
+                          >
+                            1 {selectedWriteOffPackaging.packageName}
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setShowOnlyProblematicOcrRows((prev) => !prev)}
+                          onClick={() => handleSetWriteOffQuantity(Number(selectedWriteOffProduct?.stock || 0))}
                           className={clsx(
-                            'rounded-xl px-3 py-1.5 text-xs font-black transition-all',
-                            showOnlyProblematicOcrRows
-                              ? 'bg-rose-600 text-white'
-                              : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
+                            'rounded-full border px-3.5 py-2 text-[12px] font-bold transition-all duration-150',
+                            Number(writeOffData.quantity || 0) === Number(selectedWriteOffProduct?.stock || 0)
+                              ? 'border-amber-400 bg-[linear-gradient(135deg,#fff3c8_0%,#ffe8b2_100%)] text-amber-800 shadow-[0_8px_20px_rgba(245,158,11,0.18)]'
+                              : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
                           )}
                         >
-                          {showOnlyProblematicOcrRows ? 'Показать все строки' : 'Только проблемные'}
+                          Всё
                         </button>
-                      )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-[24px] border border-slate-200 bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина списания</label>
+                        <span className="text-[11px] font-semibold text-slate-400">Выбери готовый вариант или введи свой</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {writeOffReasonPresets.map((reason) => {
+                          const isSelected = normalizedWriteOffReason === reason.toLowerCase();
+                          return (
+                            <button
+                              key={reason}
+                              type="button"
+                              onClick={() => setWriteOffData((prev) => ({ ...prev, reason: reason.toLowerCase() }))}
+                              className={clsx(
+                                'rounded-[18px] border px-3 py-3 text-left text-[13px] font-bold transition-all duration-150',
+                                isSelected
+                                  ? 'border-amber-400 bg-[linear-gradient(135deg,#fff6d9_0%,#ffe6b3_100%)] text-amber-800 shadow-[0_10px_24px_rgba(245,158,11,0.18)]'
+                                  : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:-translate-y-px hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700'
+                              )}
+                            >
+                              {reason}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 transition-all focus-within:border-amber-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-amber-500/10">
+                        <input
+                          type="text"
+                          required
+                          value={writeOffData.reason}
+                          onChange={(event) => setWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
+                          className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                          placeholder="Своя причина"
+                        />
+                        {isCustomWriteOffReason && (
+                          <p className="mt-1 text-[11px] font-medium text-amber-700">Используется пользовательская причина</p>
+                        )}
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={closeWriteOffModal}
+                      className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[linear-gradient(135deg,#f59e0b_0%,#ea580c_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(234,88,12,0.28)] transition-all hover:-translate-y-px hover:brightness-105 active:scale-[0.98]"
+                    >
+                      Подтвердить списание
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {ocrResults && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOcrResults(null)}
+              className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={(e) => e.stopPropagation()}
+                className="flex max-h-[96vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
+              >
+                <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-8">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Результаты сканирования</h3>
+                    </div>
+                    <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Курс USD ($)</p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={usdRate}
+                            onChange={(e) => setUsdRate(e.target.value)}
+                            className="w-24 bg-transparent text-left font-black text-sky-600 outline-none"
+                          />
+                          <DollarSign className="text-sky-300" size={18} />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-violet-100 bg-white px-4 py-3 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Общие расходы %</p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={scanExpensePercent}
+                            onChange={(e) => setScanExpensePercent(e.target.value)}
+                            className="w-20 bg-transparent text-left font-black text-violet-600 outline-none"
+                          />
+                          <span className="text-sm font-black text-slate-300">%</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="hidden grid-cols-12 gap-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:grid">
-                  <div className="col-span-4">Товар</div>
-                  <div className="col-span-2 text-center">Кол-во</div>
-                  <div className="col-span-2 text-right">Закупка</div>
-                  <div className="col-span-2 text-right">Наша закупка</div>
-                  <div className="col-span-2 text-right">Цена продажи</div>
-                </div>
-                {visibleOcrResults.map((item, i) => {
-                  const validationReason = getOcrProblemReason(item, usdRate, scanExpensePercent);
-                  const sourceIndex = ocrResults.findIndex((entry) => entry === item);
+                <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-8">
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-sky-600">Авторасчёт по накладной</p>
+                        <p className="mt-2 text-sm font-medium text-slate-600">
+                          Количество и закупка пересчитываются автоматически. Измените только то, что нужно перед добавлением на склад.
+                        </p>
+                        {invalidOcrRowsCount > 0 && (
+                          <p className="mt-3 text-sm font-bold text-rose-600">
+                            Проверьте проблемные строки: {invalidOcrRowsCount}. Они подсвечены красным и не дадут завершить импорт.
+                          </p>
+                        )}
+                        {problematicOcrRows.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {problematicOcrRows.map((row) => (
+                              <button
+                                key={`problem-row-${row.lineIndex}`}
+                                type="button"
+                                onClick={() => jumpToOcrLine(row.lineIndex)}
+                                className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-black text-rose-700 ring-1 ring-rose-200"
+                                title={row.reason}
+                              >
+                                Строка {row.lineIndex}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 self-start rounded-2xl border border-sky-200 bg-white px-3 py-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Позиции</span>
+                        <span className="rounded-xl bg-sky-500 px-2.5 py-1 text-sm font-black text-white">
+                          {ocrImportedCount + ocrResults.filter((entry) => entry.enabled !== false).length}/{ocrOriginalCount || ocrResults.length}
+                        </span>
+                        {ocrImportedCount > 0 && (
+                          <span className="rounded-xl bg-emerald-500 px-2.5 py-1 text-sm font-black text-white">
+                            Добавлено: {ocrImportedCount}
+                          </span>
+                        )}
+                        {ocrResults.filter((entry) => entry.enabled !== false).length > 0 && (
+                          <span className="rounded-xl bg-slate-500 px-2.5 py-1 text-sm font-black text-white">
+                            Осталось: {ocrResults.filter((entry) => entry.enabled !== false).length}
+                          </span>
+                        )}
+                        {invalidOcrRowsCount > 0 && (
+                          <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-sm font-black text-white">
+                            Ошибки: {invalidOcrRowsCount}
+                          </span>
+                        )}
+                        {invalidOcrRowsCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowOnlyProblematicOcrRows((prev) => !prev)}
+                            className={clsx(
+                              'rounded-xl px-3 py-1.5 text-xs font-black transition-all',
+                              showOnlyProblematicOcrRows
+                                ? 'bg-rose-600 text-white'
+                                : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
+                            )}
+                          >
+                            {showOnlyProblematicOcrRows ? 'Показать все строки' : 'Только проблемные'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hidden grid-cols-12 gap-4 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:grid">
+                    <div className="col-span-4">Товар</div>
+                    <div className="col-span-2 text-center">Кол-во</div>
+                    <div className="col-span-2 text-right">Закупка</div>
+                    <div className="col-span-2 text-right">Наша закупка</div>
+                    <div className="col-span-2 text-right">Цена продажи</div>
+                  </div>
+                  {visibleOcrResults.map((item, i) => {
+                    const validationReason = getOcrProblemReason(item, usdRate, scanExpensePercent);
+                    const sourceIndex = ocrResults.findIndex((entry) => entry === item);
 
-                  return (
-                  <div
-                    key={`${item.lineIndex || sourceIndex || i}-${sourceIndex}`}
-                    ref={(node) => {
-                      ocrRowRefs.current[Number(item.lineIndex || sourceIndex || i)] = node;
-                    }}
-                    className={clsx(
-                    "grid grid-cols-1 gap-4 rounded-[28px] border p-4 transition-colors sm:grid-cols-12 sm:items-center sm:p-5",
-                    item.enabled === false
-                      ? "bg-slate-100 opacity-65"
-                      : highlightedOcrLine === Number(item.lineIndex || sourceIndex || i)
-                        ? "border-rose-400 bg-rose-100 shadow-lg shadow-rose-200/60 ring-2 ring-rose-300"
-                      : validationReason
-                        ? "border-rose-200 bg-rose-50 hover:bg-rose-100/60"
-                        : "bg-sky-50 hover:bg-sky-100/50"
-                  )}
-                  >
-                    <div className="sm:col-span-4">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
+                    return (
+                      <div
+                        key={`${item.lineIndex || sourceIndex || i}-${sourceIndex}`}
+                        ref={(node) => {
+                          ocrRowRefs.current[Number(item.lineIndex || sourceIndex || i)] = node;
+                        }}
+                        className={clsx(
+                          "grid grid-cols-1 gap-4 rounded-[28px] border p-4 transition-colors sm:grid-cols-12 sm:items-center sm:p-5",
+                          item.enabled === false
+                            ? "bg-slate-100 opacity-65"
+                            : highlightedOcrLine === Number(item.lineIndex || sourceIndex || i)
+                              ? "border-rose-400 bg-rose-100 shadow-lg shadow-rose-200/60 ring-2 ring-rose-300"
+                              : validationReason
+                                ? "border-rose-200 bg-rose-50 hover:bg-rose-100/60"
+                                : "bg-sky-50 hover:bg-sky-100/50"
+                        )}
+                      >
+                        <div className="sm:col-span-4">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sky-500">
+                              <input
+                                type="checkbox"
+                                checked={item.enabled !== false}
+                                onChange={(e) => {
+                                  const newResults = [...ocrResults];
+                                  if (sourceIndex >= 0) {
+                                    newResults[sourceIndex].enabled = e.target.checked;
+                                    if (e.target.checked) {
+                                      newResults[sourceIndex].serverError = '';
+                                    }
+                                  }
+                                  setOcrResults(newResults);
+                                }}
+                                className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                              />
+                              Добавить строку #{item.lineIndex || i + 1}
+                            </label>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {validationReason && item.enabled !== false && (
+                                <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+                                  Проблема
+                                </span>
+                              )}
+                              <span className="shrink-0 rounded-xl bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 ring-1 ring-sky-100">
+                                Строка {item.lineIndex || i + 1}
+                              </span>
+                            </div>
+                          </div>
                           <input
-                            type="checkbox"
-                            checked={item.enabled !== false}
+                            type="text"
+                            value={item.name || ''}
                             onChange={(e) => {
                               const newResults = [...ocrResults];
                               if (sourceIndex >= 0) {
-                                newResults[sourceIndex].enabled = e.target.checked;
-                                if (e.target.checked) {
-                                  newResults[sourceIndex].serverError = '';
-                                }
+                                newResults[sourceIndex].name = e.target.value;
+                                newResults[sourceIndex].serverError = '';
                               }
                               setOcrResults(newResults);
                             }}
-                            className="h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-sky-500"
                           />
-                          Добавить строку #{item.lineIndex || i + 1}
-                        </label>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {validationReason && item.enabled !== false && (
-                            <span className="rounded-xl bg-rose-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-                              Проблема
-                            </span>
+                          {item.rawName && item.rawName !== item.name && (
+                            <p className="mt-1 text-[10px] font-bold text-slate-400">
+                              OCR: {formatProductName(item.rawName)}
+                            </p>
                           )}
-                          <span className="shrink-0 rounded-xl bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 ring-1 ring-sky-100">
-                            Строка {item.lineIndex || i + 1}
-                          </span>
+                          {validationReason && item.enabled !== false && (
+                            <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200">
+                              Нужно проверить: {validationReason}
+                            </p>
+                          )}
+                          {item.rawQuantity && (
+                            <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>
+                          )}
+                          {item.lineTotal > 0 && (
+                            <p className="mt-1 text-[10px] font-bold text-slate-400">
+                              Сумма строки: {formatDollar(item.lineTotal)} / ≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}
+                            </p>
+                          )}
+                          {item.note && <p className="mt-1 text-[10px] text-slate-500">{item.note}</p>}
+                        </div>
+                        <div className="sm:col-span-2 sm:text-center">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Кол-во</p>
+                          <div className="flex items-center justify-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.packageCount || ''}
+                              onChange={(e) => {
+                                const newResults = [...ocrResults];
+                                if (sourceIndex >= 0) {
+                                  newResults[sourceIndex].packageCount = Number(e.target.value || 0);
+                                  newResults[sourceIndex].serverError = '';
+                                }
+                                setOcrResults(newResults);
+                              }}
+                              className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
+                            />
+                            <span className="text-xs font-black text-slate-400">x</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.unitsPerPackage || ''}
+                              onChange={(e) => {
+                                const newResults = [...ocrResults];
+                                if (sourceIndex >= 0) {
+                                  newResults[sourceIndex].unitsPerPackage = Number(e.target.value || 0);
+                                  newResults[sourceIndex].serverError = '';
+                                }
+                                setOcrResults(newResults);
+                              }}
+                              className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
+                            />
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-500">
+                            = {getOcrResolvedQuantity(item)} шт
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400">итог для склада</p>
+                          {item.price > 0 && item.packageCount > 0 && (
+                            <p className="mt-1 text-[10px] font-bold text-slate-400">
+                              {formatDollar(item.price)} x {item.packageCount} = {formatDollar(calculateLineTotal(item.packageCount, item.price))}
+                            </p>
+                          )}
+                        </div>
+                        <div className="sm:col-span-2 sm:text-right">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Закупка</p>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.price || ''}
+                            onChange={(e) => {
+                              const newResults = [...ocrResults];
+                              if (sourceIndex >= 0) {
+                                newResults[sourceIndex].price = Number(e.target.value || 0);
+                                newResults[sourceIndex].serverError = '';
+                              }
+                              setOcrResults(newResults);
+                            }}
+                            className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-right text-sm font-black text-slate-900 outline-none focus:border-sky-500"
+                          />
+                          <p className="mt-1 text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))} / упаковка</p>
+                        </div>
+                        <div className="sm:col-span-2 sm:text-right">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Наша закупка</p>
+                          {(() => {
+                            const quantity = getOcrResolvedQuantity(item);
+                            const baseCostPerPiece =
+                              item.lineTotal > 0 && quantity > 0
+                                ? calculateUnitCostFromLineTotal(item.lineTotal * parseFloat(usdRate || '0'), quantity)
+                                : item.unitsPerPackage > 0
+                                  ? calculateUnitCostFromPackage(item.price * parseFloat(usdRate || '0'), item.unitsPerPackage)
+                                  : calculateUnitCostFromLineTotal(item.price * parseFloat(usdRate || '0'), quantity);
+                            const expensePercent = Math.max(0, Number(scanExpensePercent || 0));
+                            const effectiveCostPerPiece = calculateEffectiveCost(baseCostPerPiece, expensePercent);
+
+                            return (
+                              <>
+                                <p className="font-black text-slate-900">
+                                  {formatMoney(effectiveCostPerPiece)}
+                                </p>
+                                <p className="mt-1 text-[10px] font-bold text-slate-400">
+                                  база: {formatMoney(baseCostPerPiece)}
+                                </p>
+                                <p className="mt-2 text-[10px] font-bold text-slate-400">
+                                  расходы: {toFixedNumber(expensePercent)}%
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                        <div className="sm:col-span-2 sm:text-right">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Цена продажи</p>
+                          <input
+                            type="number"
+                            placeholder="Укажите цену"
+                            value={item.sellingPrice}
+                            onChange={(e) => {
+                              const newResults = [...ocrResults];
+                              if (sourceIndex >= 0) {
+                                newResults[sourceIndex].sellingPrice = e.target.value;
+                                newResults[sourceIndex].serverError = '';
+                              }
+                              setOcrResults(newResults);
+                            }}
+                            className="w-full text-right bg-white px-4 py-2 rounded-xl border border-sky-200 focus:border-sky-500 outline-none font-black text-emerald-600"
+                          />
                         </div>
                       </div>
-                      <input
-                        type="text"
-                        value={item.name || ''}
-                        onChange={(e) => {
-                          const newResults = [...ocrResults];
-                          if (sourceIndex >= 0) {
-                            newResults[sourceIndex].name = e.target.value;
-                            newResults[sourceIndex].serverError = '';
-                          }
-                          setOcrResults(newResults);
-                        }}
-                        className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-sky-500"
-                      />
-                      {item.rawName && item.rawName !== item.name && (
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          OCR: {formatProductName(item.rawName)}
-                        </p>
-                      )}
-                      {validationReason && item.enabled !== false && (
-                        <p className="mt-2 rounded-xl bg-white/80 px-3 py-2 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200">
-                          Нужно проверить: {validationReason}
-                        </p>
-                      )}
-                      {item.rawQuantity && (
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">Из накладной: {item.rawQuantity}</p>
-                      )}
-                      {item.lineTotal > 0 && (
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          Сумма строки: {formatDollar(item.lineTotal)} / ≈ {formatMoney(item.lineTotal * parseFloat(usdRate || '0'))}
-                        </p>
-                      )}
-                      {item.note && <p className="mt-1 text-[10px] text-slate-500">{item.note}</p>}
+                    )
+                  })}
+                  {showOnlyProblematicOcrRows && visibleOcrResults.length === 0 && (
+                    <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 text-center text-sm font-bold text-emerald-700">
+                      Проблемных строк не осталось. Можно добавить все товары на склад.
                     </div>
-                    <div className="sm:col-span-2 sm:text-center">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Кол-во</p>
-                      <div className="flex items-center justify-center gap-1">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.packageCount || ''}
-                          onChange={(e) => {
-                            const newResults = [...ocrResults];
-                            if (sourceIndex >= 0) {
-                              newResults[sourceIndex].packageCount = Number(e.target.value || 0);
-                              newResults[sourceIndex].serverError = '';
-                            }
-                            setOcrResults(newResults);
-                          }}
-                          className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
-                        />
-                        <span className="text-xs font-black text-slate-400">x</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.unitsPerPackage || ''}
-                          onChange={(e) => {
-                            const newResults = [...ocrResults];
-                            if (sourceIndex >= 0) {
-                              newResults[sourceIndex].unitsPerPackage = Number(e.target.value || 0);
-                              newResults[sourceIndex].serverError = '';
-                            }
-                            setOcrResults(newResults);
-                          }}
-                          className="w-16 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs font-black text-sky-700 outline-none focus:border-sky-500"
-                        />
-                      </div>
-                      <p className="text-[10px] font-bold text-slate-500">
-                        = {getOcrResolvedQuantity(item)} шт
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400">итог для склада</p>
-                      {item.price > 0 && item.packageCount > 0 && (
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          {formatDollar(item.price)} x {item.packageCount} = {formatDollar(calculateLineTotal(item.packageCount, item.price))}
-                        </p>
-                      )}
-                    </div>
-                    <div className="sm:col-span-2 sm:text-right">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Закупка</p>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.price || ''}
-                        onChange={(e) => {
-                          const newResults = [...ocrResults];
-                          if (sourceIndex >= 0) {
-                            newResults[sourceIndex].price = Number(e.target.value || 0);
-                            newResults[sourceIndex].serverError = '';
-                          }
-                          setOcrResults(newResults);
-                        }}
-                        className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-right text-sm font-black text-slate-900 outline-none focus:border-sky-500"
-                      />
-                      <p className="mt-1 text-[10px] font-bold text-slate-400">≈ {formatMoney(item.price * parseFloat(usdRate || '0'))} / упаковка</p>
-                    </div>
-                    <div className="sm:col-span-2 sm:text-right">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Наша закупка</p>
-                      {(() => {
-                        const quantity = getOcrResolvedQuantity(item);
-                        const baseCostPerPiece =
-                          item.lineTotal > 0 && quantity > 0
-                            ? calculateUnitCostFromLineTotal(item.lineTotal * parseFloat(usdRate || '0'), quantity)
-                            : item.unitsPerPackage > 0
-                              ? calculateUnitCostFromPackage(item.price * parseFloat(usdRate || '0'), item.unitsPerPackage)
-                              : calculateUnitCostFromLineTotal(item.price * parseFloat(usdRate || '0'), quantity);
-                        const expensePercent = Math.max(0, Number(scanExpensePercent || 0));
-                        const effectiveCostPerPiece = calculateEffectiveCost(baseCostPerPiece, expensePercent);
-
-                        return (
-                          <>
-                            <p className="font-black text-slate-900">
-                              {formatMoney(effectiveCostPerPiece)}
-                            </p>
-                            <p className="mt-1 text-[10px] font-bold text-slate-400">
-                              база: {formatMoney(baseCostPerPiece)}
-                            </p>
-                            <p className="mt-2 text-[10px] font-bold text-slate-400">
-                              расходы: {toFixedNumber(expensePercent)}%
-                            </p>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <div className="sm:col-span-2 sm:text-right">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 sm:hidden">Цена продажи</p>
-                      <input 
-                        type="number"
-                        placeholder="Укажите цену"
-                        value={item.sellingPrice}
-                        onChange={(e) => {
-                          const newResults = [...ocrResults];
-                          if (sourceIndex >= 0) {
-                            newResults[sourceIndex].sellingPrice = e.target.value;
-                            newResults[sourceIndex].serverError = '';
-                          }
-                          setOcrResults(newResults);
-                        }}
-                        className="w-full text-right bg-white px-4 py-2 rounded-xl border border-sky-200 focus:border-sky-500 outline-none font-black text-emerald-600"
-                      />
-                    </div>
-                  </div>
-                )})}
-                {showOnlyProblematicOcrRows && visibleOcrResults.length === 0 && (
-                  <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 text-center text-sm font-bold text-emerald-700">
-                    Проблемных строк не осталось. Можно добавить все товары на склад.
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-sky-50/60 p-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:p-8">
-                <button onClick={closeOcrResultsModal} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
-                <button 
-                  onClick={handleAddOcrToStock}
-                  disabled={isLoading}
-                  className="px-10 py-4 bg-sky-500 text-white rounded-2xl font-bold shadow-xl shadow-sky-500/20 hover:bg-sky-600 transition-all disabled:opacity-50 flex items-center space-x-2"
-                >
-                  {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Package size={20} />}
-                  <span>Добавить всё на склад</span>
-                </button>
-              </div>
+                  )}
+                </div>
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-sky-50/60 p-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:p-8">
+                  <button onClick={closeOcrResultsModal} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-200 transition-all">Отмена</button>
+                  <button
+                    onClick={handleAddOcrToStock}
+                    disabled={isLoading}
+                    className="px-10 py-4 bg-sky-500 text-white rounded-2xl font-bold shadow-xl shadow-sky-500/20 hover:bg-sky-600 transition-all disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Package size={20} />}
+                    <span>Добавить всё на склад</span>
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
         <React.Suspense fallback={null}>
           <ProductHistoryModal
@@ -3089,89 +3140,89 @@ export default function ProductsView() {
             canManage={isAdmin}
             onDeleteBatch={handleDeleteBatch}
           />
-      </React.Suspense>
+        </React.Suspense>
 
-      <AnimatePresence>
-        {showMergeModal && selectedProduct && (
-          <motion.div
-            onClick={closeMergeModal}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          >
+        <AnimatePresence>
+          {showMergeModal && selectedProduct && (
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
+              onClick={closeMergeModal}
+              className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-fuchsia-50/50 p-4 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-fuchsia-600 p-3 text-white">
-                    <GitMerge size={20} />
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-2xl overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 bg-fuchsia-50/50 p-4 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl bg-fuchsia-600 p-3 text-white">
+                      <GitMerge size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900">Объединить дубликаты</h3>
+                      <p className="text-sm text-slate-500">Выберите основной товар, в который нужно перенести остатки и историю.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-900">Объединить дубликаты</h3>
-                    <p className="text-sm text-slate-500">Выберите основной товар, в который нужно перенести остатки и историю.</p>
+                  <button onClick={closeMergeModal} className="text-slate-400 transition-colors hover:text-slate-600">
+                    <X size={22} />
+                  </button>
+                </div>
+
+                <div className="space-y-5 p-4 sm:p-6">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Объединяемый товар</p>
+                    <p className="mt-2 text-base font-semibold text-slate-900">{formatProductName(selectedProduct.name)}</p>
+                    <p className="mt-1 text-sm text-slate-500">Остаток: {selectedProduct.stock} {selectedProduct.unit}</p>
                   </div>
-                </div>
-                <button onClick={closeMergeModal} className="text-slate-400 transition-colors hover:text-slate-600">
-                  <X size={22} />
-                </button>
-              </div>
 
-              <div className="space-y-5 p-4 sm:p-6">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Объединяемый товар</p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{formatProductName(selectedProduct.name)}</p>
-                  <p className="mt-1 text-sm text-slate-500">Остаток: {selectedProduct.stock} {selectedProduct.unit}</p>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Основной товар</label>
+                    <select
+                      value={mergeTargetId}
+                      onChange={(e) => setMergeTargetId(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-fuchsia-300 focus:bg-white"
+                    >
+                      {getMergeCandidates(selectedProduct).map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {formatProductName(candidate.name)} • {candidate.stock} {candidate.unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="text-sm text-slate-500">
+                    Партии, остатки, история движения, цены и позиции продаж будут перенесены в выбранный основной товар.
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Основной товар</label>
-                  <select
-                    value={mergeTargetId}
-                    onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-fuchsia-300 focus:bg-white"
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end sm:p-6">
+                  <button
+                    onClick={closeMergeModal}
+                    className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                   >
-                    {getMergeCandidates(selectedProduct).map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {formatProductName(candidate.name)} • {candidate.stock} {candidate.unit}
-                      </option>
-                    ))}
-                  </select>
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleMergeProduct}
+                    className="rounded-2xl bg-fuchsia-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-fuchsia-700"
+                  >
+                    Объединить
+                  </button>
                 </div>
-
-                <p className="text-sm text-slate-500">
-                  Партии, остатки, история движения, цены и позиции продаж будут перенесены в выбранный основной товар.
-                </p>
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end sm:p-6">
-                <button
-                  onClick={closeMergeModal}
-                  className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleMergeProduct}
-                  className="rounded-2xl bg-fuchsia-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-fuchsia-700"
-                >
-                  Объединить
-                </button>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
         <React.Suspense fallback={null}>
-          <ConfirmationModal 
+          <ConfirmationModal
             isOpen={showDeleteConfirm}
             onClose={closeDeleteConfirm}
             onConfirm={handleConfirmDeleteProduct}
             title="Удалить товар навсегда?"
-              message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
+            message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
           />
         </React.Suspense>
 
@@ -3188,700 +3239,709 @@ export default function ProductsView() {
           />
         </React.Suspense>
 
-      <AnimatePresence>
-        {showReturnWriteOffModal && selectedHistoryTransaction && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeReturnWriteOffModal}
-            className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          >
+        <AnimatePresence>
+          {showReturnWriteOffModal && selectedHistoryTransaction && (
             <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:rounded-[2rem]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeReturnWriteOffModal}
+              className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
             >
-              <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#eefcf6_0%,#ffffff_58%,#f3fbff_100%)] px-4 py-4 sm:px-6 sm:py-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">
-                      <RotateCcw size={12} />
-                      <span>Возврат списания</span>
-                    </div>
-                    <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Вернуть товар на склад</h3>
-                    <p className="mt-1 text-sm font-medium text-slate-500">Используйте это, если списание было введено ошибочно.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeReturnWriteOffModal}
-                    className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmitReturnWriteOff} className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Списание</p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{new Date(selectedHistoryTransaction.createdAt).toLocaleString('ru-RU')}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Доступно вернуть</p>
-                    <p className="mt-2 text-sm font-black text-emerald-900">{Math.abs(Number(selectedHistoryTransaction.qtyChange || 0))}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество возврата</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={returnWriteOffData.quantity}
-                    onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
-                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-2xl font-black text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                  <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина возврата</label>
-                  <input
-                    type="text"
-                    value={returnWriteOffData.reason}
-                    onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
-                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                    placeholder="Ошибка ввода"
-                  />
-                </div>
-
-                <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  Возврат восстановит остаток на складе и приход по этому списанию.
-                </div>
-
-                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeReturnWriteOffModal}
-                    className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-2xl bg-[linear-gradient(135deg,#10b981_0%,#0f766e_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(16,185,129,0.24)] transition-all hover:-translate-y-px hover:brightness-105"
-                  >
-                    Вернуть на склад
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex w-full flex-col gap-3 lg:max-w-4xl lg:flex-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
-              <input 
-                type="text" 
-                placeholder="Поиск по названию..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <div className="relative w-full">
-                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
-                <select
-                  value={selectedWarehouseId}
-                  onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                  disabled={!isAdmin}
-                  className="w-full appearance-none rounded-2xl border border-violet-100 bg-violet-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
-                >
-                  <option value="">Все склады</option>
-                  {warehouses.map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={exportStockReport}
-                disabled={!filteredProducts.length}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              <motion.div
+                initial={{ scale: 0.96, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-xl overflow-hidden rounded-t-[2rem] bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)] sm:rounded-[2rem]"
               >
-                <FileText size={16} />
-                <span>Скачать остаток PDF</span>
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3.5 py-2 text-[11px] font-semibold text-emerald-700">
-              Товаров: {filteredProducts.length}
-            </div>
-            {duplicateProductsCount > 0 ? (
-              <>
-                <div className="rounded-full border border-amber-100 bg-amber-50 px-3.5 py-2 text-[11px] font-semibold text-amber-700">
-                  Дублей: {duplicateProductsCount}
+                <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#eefcf6_0%,#ffffff_58%,#f3fbff_100%)] px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">
+                        <RotateCcw size={12} />
+                        <span>Возврат списания</span>
+                      </div>
+                      <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">Вернуть товар на склад</h3>
+                      <p className="mt-1 text-sm font-medium text-slate-500">Используйте это, если списание было введено ошибочно.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeReturnWriteOffModal}
+                      className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-400 transition-all hover:border-slate-200 hover:text-slate-600"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSubmitReturnWriteOff} className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Списание</p>
+                      <p className="mt-2 text-sm font-bold text-slate-900">{new Date(selectedHistoryTransaction.createdAt).toLocaleString('ru-RU')}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Доступно вернуть</p>
+                      <p className="mt-2 text-sm font-black text-emerald-900">{Math.abs(Number(selectedHistoryTransaction.qtyChange || 0))}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Количество возврата</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      required
+                      value={returnWriteOffData.quantity}
+                      onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, quantity: event.target.value.replace(/[^\d]/g, '') }))}
+                      className="mt-3 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-2xl font-black text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Причина возврата</label>
+                    <input
+                      type="text"
+                      value={returnWriteOffData.reason}
+                      onChange={(event) => setReturnWriteOffData((prev) => ({ ...prev, reason: event.target.value }))}
+                      className="mt-3 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      placeholder="Ошибка ввода"
+                    />
+                  </div>
+
+                  <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    Возврат восстановит остаток на складе и приход по этому списанию.
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={closeReturnWriteOffModal}
+                      className="rounded-2xl px-5 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[linear-gradient(135deg,#10b981_0%,#0f766e_100%)] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(16,185,129,0.24)] transition-all hover:-translate-y-px hover:brightness-105"
+                    >
+                      Вернуть на склад
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-col gap-3 lg:max-w-4xl lg:flex-1">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Поиск по названию..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="relative w-full">
+                  <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
+                  <select
+                    value={selectedWarehouseId}
+                    onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                    disabled={!isAdmin}
+                    className="w-full appearance-none rounded-2xl border border-violet-100 bg-violet-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
+                  >
+                    <option value="">Все склады</option>
+                    {warehouses.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   type="button"
-                  onClick={handleMergeExactDuplicates}
-                  disabled={isMergingDuplicates}
-                  className="rounded-full bg-fuchsia-600 px-3.5 py-2 text-[11px] font-semibold text-white transition-all hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={exportStockReport}
+                  disabled={!filteredProducts.length}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  {isMergingDuplicates ? 'Объединение...' : 'Объединить дубликаты'}
+                  <FileText size={16} />
+                  <span>Скачать остаток PDF</span>
                 </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="space-y-3 p-3 md:hidden">
-          {paginatedProducts.map((product, index) => (
-            <div key={`mobile-${product.id ?? product.name}-${index}`} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-              <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                  {product.photoUrl ? (
-                    <img
-                      src={resolveMediaUrl(product.photoUrl, product.id)}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                      onError={(event) => handleBrokenImage(event, product.id)}
-                    />
-                  ) : (
-                    <ImageIcon className="text-slate-300" size={18} />
-                  )}
+                <button
+                  type="button"
+                  onClick={exportPriceList}
+                  disabled={!filteredProducts.length}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 transition-all hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  <DollarSign size={16} />
+                  <span>Скачать прайс</span>
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="rounded-full border border-emerald-100 bg-emerald-50 px-3.5 py-2 text-[11px] font-semibold text-emerald-700">
+                Товаров: {filteredProducts.length}
+              </div>
+              {duplicateProductsCount > 0 ? (
+                <>
+                  <div className="rounded-full border border-amber-100 bg-amber-50 px-3.5 py-2 text-[11px] font-semibold text-amber-700">
+                    Дублей: {duplicateProductsCount}
                   </div>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="min-w-0 break-words text-[16px] font-semibold leading-5 text-slate-900">
-                        {formatProductName(product.name)}
-                      </p>
-                      <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
-                        #{(currentPage - 1) * pageSize + index + 1}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-xl border border-violet-100 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700">
-                        {product.category?.name || 'Без категории'}
-                      </span>
-                      <span className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                        {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
-                      </span>
-                      {getDuplicateHintCount(product) > 0 && (
-                        <button
-                          onClick={() => handleOpenMergeModal(product)}
-                          className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
-                        >
-                          Дубликат
-                        </button>
+                  <button
+                    type="button"
+                    onClick={handleMergeExactDuplicates}
+                    disabled={isMergingDuplicates}
+                    className="rounded-full bg-fuchsia-600 px-3.5 py-2 text-[11px] font-semibold text-white transition-all hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isMergingDuplicates ? 'Объединение...' : 'Объединить дубликаты'}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3 p-3 md:hidden">
+            {paginatedProducts.map((product, index) => (
+              <div key={`mobile-${product.id ?? product.name}-${index}`} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                      {product.photoUrl ? (
+                        <img
+                          src={resolveMediaUrl(product.photoUrl, product.id)}
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => handleBrokenImage(event, product.id)}
+                        />
+                      ) : (
+                        <ImageIcon className="text-slate-300" size={18} />
                       )}
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-4">
-                <div className={clsx(
-                  "rounded-[22px] border px-4 py-3.5",
-                  product.stock <= product.minStock ? "border-rose-200 bg-rose-50/70" : "border-emerald-100 bg-emerald-50/60"
-                )}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={clsx(
-                          "text-[10px] font-semibold uppercase tracking-[0.18em]",
-                          product.stock <= product.minStock ? "text-rose-500" : "text-emerald-600"
-                        )}>
-                          Остаток
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 break-words text-[16px] font-semibold leading-5 text-slate-900">
+                          {formatProductName(product.name)}
                         </p>
-                        <span className={clsx(
-                          "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                          product.stock <= product.minStock ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-                        )}>
-                          {product.stock <= product.minStock ? 'Низкий' : 'В норме'}
+                        <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+                          #{(currentPage - 1) * pageSize + index + 1}
                         </span>
                       </div>
-                      <p className={clsx(
-                        "mt-1 whitespace-pre-line break-words text-[17px] font-semibold leading-5",
-                        product.stock <= product.minStock ? "text-rose-700" : "text-slate-900"
-                      )}>
-                        {getStockBreakdown(product).primary}
-                      </p>
-                      {getStockBreakdown(product).secondary && (
-                        <p className={clsx(
-                          "mt-1 break-words text-[11px] font-medium",
-                          product.stock <= product.minStock ? "text-rose-500" : "text-slate-500"
-                        )}>
-                          {getStockBreakdown(product).secondary}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-xl border border-violet-100 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700">
+                          {product.category?.name || 'Без категории'}
+                        </span>
+                        <span className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                          {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
+                        </span>
+                        {getDuplicateHintCount(product) > 0 && (
+                          <button
+                            onClick={() => handleOpenMergeModal(product)}
+                            className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
+                          >
+                            Дубликат
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className={clsx(
-                      "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
-                      product.stock <= product.minStock ? "bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.12)]" : "bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
-                    )} />
                   </div>
                 </div>
+
+                <div className="space-y-3 p-4">
+                  <div className={clsx(
+                    "rounded-[22px] border px-4 py-3.5",
+                    product.stock <= product.minStock ? "border-rose-200 bg-rose-50/70" : "border-emerald-100 bg-emerald-50/60"
+                  )}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={clsx(
+                            "text-[10px] font-semibold uppercase tracking-[0.18em]",
+                            product.stock <= product.minStock ? "text-rose-500" : "text-emerald-600"
+                          )}>
+                            Остаток
+                          </p>
+                          <span className={clsx(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            product.stock <= product.minStock ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                          )}>
+                            {product.stock <= product.minStock ? 'Низкий' : 'В норме'}
+                          </span>
+                        </div>
+                        <p className={clsx(
+                          "mt-1 whitespace-pre-line break-words text-[17px] font-semibold leading-5",
+                          product.stock <= product.minStock ? "text-rose-700" : "text-slate-900"
+                        )}>
+                          {getStockBreakdown(product).primary}
+                        </p>
+                        {getStockBreakdown(product).secondary && (
+                          <p className={clsx(
+                            "mt-1 break-words text-[11px] font-medium",
+                            product.stock <= product.minStock ? "text-rose-500" : "text-slate-500"
+                          )}>
+                            {getStockBreakdown(product).secondary}
+                          </p>
+                        )}
+                      </div>
+                      <div className={clsx(
+                        "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
+                        product.stock <= product.minStock ? "bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.12)]" : "bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
+                      )} />
+                    </div>
+                  </div>
 
                   <div className={clsx(
                     "grid gap-3",
                     isAdmin ? "grid-cols-4" : "grid-cols-2"
                   )}>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
-                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                      {isAggregateMode ? '-' : formatMoney(product.sellingPrice)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Приход</p>
-                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                      {product.totalIncoming} <span className="text-[10px] uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
-                    </p>
-                  </div>
-                  {isAdmin && (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажа</p>
                       <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                        {isAggregateMode ? '-' : formatMoney(product.costPrice)}
+                        {isAggregateMode ? '-' : formatMoney(product.sellingPrice)}
                       </p>
                     </div>
-                  )}
-                  {isAdmin && (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Рентабельность</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Приход</p>
                       <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                        {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
+                        {product.totalIncoming} <span className="text-[10px] uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
                       </p>
-                      {!isAggregateMode && (
-                        <span className={clsx('mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
-                          {getProductEfficiencyMetrics(product).label}
-                        </span>
-                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {isAdmin && !isAggregateMode && (
-                <div className="border-t border-slate-100 p-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedMobileActionsId((current) =>
-                        current === Number(product.id) ? null : Number(product.id)
-                      )
-                    }
-                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-white"
-                  >
-                    <span>Действия</span>
-                    {expandedMobileActionsId === Number(product.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-
-                  {expandedMobileActionsId === Number(product.id) && (
-                    <div className="mt-3 max-h-[320px] overflow-y-auto rounded-[22px] border border-slate-200 bg-slate-50/80">
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setFormData(buildProductFormData(product));
-                          setCategoryInput(product.category?.name || '');
-                          setShowEditModal(true);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-violet-50 hover:text-violet-700"
-                      >
-                        <span>Изменить товар</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
-                          setSelectedProduct(product);
-                          setRestockData({
-                            ...restockData,
-                            warehouseId: product.warehouseId?.toString() || '',
-                            quantity: '',
-                            selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
-                            packageQuantityInput: '',
-                            costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                            sellingPrice: formatPriceInput(product.sellingPrice),
-                            reason: '',
-                          });
-                          setShowRestockModal(true);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-emerald-50 hover:text-emerald-700"
-                      >
-                        <span>Оформить приход</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleShowHistory(product);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-sky-50 hover:text-sky-700"
-                      >
-                        <span>Открыть историю</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleOpenWriteOffModal(product);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        disabled={Number(product.stock || 0) <= 0}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        <span>Списать товар</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleShowBatches(product);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-violet-50 hover:text-violet-700"
-                      >
-                        <span>Посмотреть партии</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
-                          setSelectedProduct(product);
-                          setTransferData({
-                            ...emptyTransferData,
-                            fromWarehouseId: product.warehouseId?.toString() || '',
-                            selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
-                          });
-                          setShowTransferModal(true);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-amber-50 hover:text-amber-700"
-                      >
-                        <span>Перенести товар</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setShowDeleteConfirm(true);
-                          setExpandedMobileActionsId(null);
-                        }}
-                        className="flex w-full items-center justify-between bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-rose-50 hover:text-rose-700"
-                      >
-                        <span>Удалить товар</span>
-                        <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                      </button>
-                    </div>
-                  )}
-                  </div>
-              )}
-            </div>
-          ))}
-          {displayProducts.length === 0 && !isLoading && (
-            <div className="rounded-[22px] border border-slate-200 bg-white px-5 py-12 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
-                <Package size={28} />
-              </div>
-              <p className="mt-4 text-lg font-black text-slate-900">Товары не найдены</p>
-              <p className="mt-1 text-sm text-slate-500">Измените поиск или выберите другой склад.</p>
-            </div>
-          )}
-        </div>
-
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={displayProducts.length}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          className="border-t-0 pt-0 md:hidden"
-        />
-
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <th className="px-5 py-3">№</th>
-                <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('name')}>
-                  <div className="flex items-center space-x-1.5">
-                    <span>Товар</span>
-                    {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                  </div>
-                </th>
-                {isAdmin && (
-                  <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('costPrice')}>
-                    <div className="flex items-center space-x-1.5">
-                      <span>Закупка</span>
-                      {sortConfig.key === 'costPrice' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                    </div>
-                  </th>
-                )}
-                <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('sellingPrice')}>
-                  <div className="flex items-center space-x-1.5">
-                    <span>Продажа</span>
-                    {sortConfig.key === 'sellingPrice' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                  </div>
-                </th>
-                <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('stock')}>
-                  <div className="flex items-center space-x-1.5">
-                    <span>Остаток</span>
-                    {sortConfig.key === 'stock' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                  </div>
-                </th>
-                <th className="px-5 py-3">Приход</th>
-                {isAdmin && <th className="px-5 py-3">Рентабельность</th>}
-                {isAdmin && <th className="px-5 py-3 text-right">Действия</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-                {paginatedProducts.map((product, index) => (
-                <tr key={product.id} className="group transition-all duration-300 hover:bg-slate-50/70">
-                  <td className="px-5 py-4 text-xs font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-transform duration-500 group-hover:scale-105">
-                        {product.photoUrl ? (
-                          <img
-                            src={resolveMediaUrl(product.photoUrl, product.id)}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                            onError={(event) => handleBrokenImage(event, product.id)}
-                          />
-                        ) : (
-                          <ImageIcon className="text-slate-300" size={16} />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <p className="text-xs font-medium text-slate-400">
-                          {product.category?.name || 'Без категории'}
-                          </p>
-                          {getDuplicateHintCount(product) > 0 && (
-                            <button
-                              onClick={() => handleOpenMergeModal(product)}
-                              className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700"
-                            >
-                              Дубликат
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-5 py-3">
-                      {selectedWarehouseId ? (
-                        <p className="text-xs font-medium text-slate-500">{formatMoney(product.costPrice)}</p>
-                      ) : (
-                        <span className="text-xs text-slate-300">-</span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-5 py-3">
-                    {selectedWarehouseId ? (
-                      <p className="text-sm font-semibold text-slate-900">{formatMoney(product.sellingPrice)}</p>
-                    ) : (
-                      <span className="text-xs text-slate-300">-</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center space-x-2">
-                      <div className={clsx(
-                        "w-1.5 h-1.5 rounded-full",
-                        product.stock <= product.minStock ? "bg-rose-600 animate-pulse" : "bg-emerald-500"
-                      )} />
-                      <div className={clsx(
-                        "min-w-0",
-                        product.stock <= product.minStock ? "text-rose-600" : "text-slate-900"
-                      )}>
-                        <p className="whitespace-pre-line text-sm font-semibold">
-                          {getStockBreakdown(product).primary}
+                    {isAdmin && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                          {isAggregateMode ? '-' : formatMoney(product.costPrice)}
                         </p>
-                        {getStockBreakdown(product).secondary && (
-                          <p className="text-[11px] font-medium text-slate-400">
-                            {getStockBreakdown(product).secondary}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <p className="text-xs font-medium text-slate-500">{product.totalIncoming} <span className="text-[10px] font-medium text-slate-400 uppercase">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span></p>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-5 py-3">
-                      {selectedWarehouseId ? (
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-slate-900">{formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}</p>
-                          <span className={clsx('inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
+                    )}
+                    {isAdmin && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Рентабельность</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                          {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
+                        </p>
+                        {!isAggregateMode && (
+                          <span className={clsx('mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
                             {getProductEfficiencyMetrics(product).label}
                           </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-300">-</span>
-                      )}
-                    </td>
-                  )}
-                  {isAdmin && <td className="px-5 py-3 text-right">
-                    {selectedWarehouseId ? (
-                    <div className="flex flex-col items-end space-y-1.5">
-                      <div className="flex items-center space-x-1.5">
-                        {isAdmin && (
-                          <button 
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setFormData(buildProductFormData(product));
-                              setCategoryInput(product.category?.name || '');
-                              setShowEditModal(true);
-                            }}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
-                            title="Редактировать"
-                          >
-                            <Edit size={14} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button 
-                            onClick={() => {
-                              const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
-                              setSelectedProduct(product);
-                              setRestockData({
-                                ...restockData,
-                                warehouseId: product.warehouseId?.toString() || '',
-                                quantity: '',
-                                selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
-                                packageQuantityInput: '',
-                                costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
-                                sellingPrice: formatPriceInput(product.sellingPrice),
-                                reason: '',
-                              });
-                              setShowRestockModal(true);
-                            }}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600" 
-                            title="Пополнить"
-                          >
-                            <PlusCircle size={14} />
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => handleShowBatches(product)}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600" 
-                          title="Партии (FIFO)"
-                        >
-                          <Layers size={14} />
-                        </button>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <button 
-                          onClick={() => handleShowHistory(product)}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600" 
-                          title="История"
-                        >
-                          <History size={14} />
-                        </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleOpenWriteOffModal(product)}
-                            disabled={Number(product.stock || 0) <= 0}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
-                            title="Списать"
-                          >
-                            <Scissors size={14} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                            <button 
-                              onClick={() => {
-                                const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
-                                setSelectedProduct(product);
-                                setTransferData({
-                                  ...emptyTransferData,
-                                  fromWarehouseId: product.warehouseId?.toString() || '',
-                                  selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
-                                });
-                                setShowTransferModal(true);
-                              }}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600" 
-                            title="Перенос"
-                          >
-                            <ArrowRightLeft size={14} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button 
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setShowDeleteConfirm(true);
-                            }}
-                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600" 
-                            title="Удалить"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         )}
                       </div>
-                    </div>
-                    ) : (
-                      <span className="text-xs text-slate-300">-</span>
                     )}
-                  </td>}
-                </tr>
-              ))}
-               {displayProducts.length === 0 && !isLoading && (
-                <tr>
-                  <td colSpan={isAdmin ? 7 : 5} className="px-5 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
-                        <Package size={32} />
-                      </div>
-                      <div>
-                        <p className="text-xl font-black text-slate-900">Товары не найдены</p>
-                        <p className="text-slate-500 font-medium text-sm">Измените параметры поиска или выберите другой склад.</p>
-                      </div>
-                      <button 
-                        onClick={() => { resetForm(); setShowAddModal(true); }}
-                        className="rounded-2xl bg-violet-500 px-6 py-3 text-sm font-medium text-white transition-all hover:bg-violet-600"
-                      >
-                        Добавить товар
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
 
-        <div className="hidden md:block">
+                {isAdmin && !isAggregateMode && (
+                  <div className="border-t border-slate-100 p-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedMobileActionsId((current) =>
+                          current === Number(product.id) ? null : Number(product.id)
+                        )
+                      }
+                      className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-white"
+                    >
+                      <span>Действия</span>
+                      {expandedMobileActionsId === Number(product.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {expandedMobileActionsId === Number(product.id) && (
+                      <div className="mt-3 max-h-[320px] overflow-y-auto rounded-[22px] border border-slate-200 bg-slate-50/80">
+                        <button
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setFormData(buildProductFormData(product));
+                            setCategoryInput(product.category?.name || '');
+                            setShowEditModal(true);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-violet-50 hover:text-violet-700"
+                        >
+                          <span>Изменить товар</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                            setSelectedProduct(product);
+                            setRestockData({
+                              ...restockData,
+                              warehouseId: product.warehouseId?.toString() || '',
+                              quantity: '',
+                              selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                              packageQuantityInput: '',
+                              costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                              sellingPrice: formatPriceInput(product.sellingPrice),
+                              reason: '',
+                            });
+                            setShowRestockModal(true);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <span>Оформить приход</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleShowHistory(product);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-sky-50 hover:text-sky-700"
+                        >
+                          <span>Открыть историю</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleOpenWriteOffModal(product);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          disabled={Number(product.stock || 0) <= 0}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <span>Списать товар</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleShowBatches(product);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-violet-50 hover:text-violet-700"
+                        >
+                          <span>Посмотреть партии</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                            setSelectedProduct(product);
+                            setTransferData({
+                              ...emptyTransferData,
+                              fromWarehouseId: product.warehouseId?.toString() || '',
+                              selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                            });
+                            setShowTransferModal(true);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-amber-50 hover:text-amber-700"
+                        >
+                          <span>Перенести товар</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setShowDeleteConfirm(true);
+                            setExpandedMobileActionsId(null);
+                          }}
+                          className="flex w-full items-center justify-between bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all hover:bg-rose-50 hover:text-rose-700"
+                        >
+                          <span>Удалить товар</span>
+                          <ChevronDown size={14} className="-rotate-90 text-slate-300" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {displayProducts.length === 0 && !isLoading && (
+              <div className="rounded-[22px] border border-slate-200 bg-white px-5 py-12 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
+                  <Package size={28} />
+                </div>
+                <p className="mt-4 text-lg font-black text-slate-900">Товары не найдены</p>
+                <p className="mt-1 text-sm text-slate-500">Измените поиск или выберите другой склад.</p>
+              </div>
+            )}
+          </div>
+
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={displayProducts.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
-            className="border-t-0"
+            className="border-t-0 pt-0 md:hidden"
           />
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <th className="px-5 py-3">№</th>
+                  <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('name')}>
+                    <div className="flex items-center space-x-1.5">
+                      <span>Товар</span>
+                      {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                    </div>
+                  </th>
+                  {isAdmin && (
+                    <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('costPrice')}>
+                      <div className="flex items-center space-x-1.5">
+                        <span>Закупка</span>
+                        {sortConfig.key === 'costPrice' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                      </div>
+                    </th>
+                  )}
+                  <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('sellingPrice')}>
+                    <div className="flex items-center space-x-1.5">
+                      <span>Продажа</span>
+                      {sortConfig.key === 'sellingPrice' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                    </div>
+                  </th>
+                  <th className="px-5 py-3 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleSort('stock')}>
+                    <div className="flex items-center space-x-1.5">
+                      <span>Остаток</span>
+                      {sortConfig.key === 'stock' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                    </div>
+                  </th>
+                  <th className="px-5 py-3">Приход</th>
+                  {isAdmin && <th className="px-5 py-3">Рентабельность</th>}
+                  {isAdmin && <th className="px-5 py-3 text-right">Действия</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedProducts.map((product, index) => (
+                  <tr key={product.id} className="group transition-all duration-300 hover:bg-slate-50/70">
+                    <td className="px-5 py-4 text-xs font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-transform duration-500 group-hover:scale-105">
+                          {product.photoUrl ? (
+                            <img
+                              src={resolveMediaUrl(product.photoUrl, product.id)}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                              onError={(event) => handleBrokenImage(event, product.id)}
+                            />
+                          ) : (
+                            <ImageIcon className="text-slate-300" size={16} />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-xs font-medium text-slate-400">
+                              {product.category?.name || 'Без категории'}
+                            </p>
+                            {getDuplicateHintCount(product) > 0 && (
+                              <button
+                                onClick={() => handleOpenMergeModal(product)}
+                                className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700"
+                              >
+                                Дубликат
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-5 py-3">
+                        {selectedWarehouseId ? (
+                          <p className="text-xs font-medium text-slate-500">{formatMoney(product.costPrice)}</p>
+                        ) : (
+                          <span className="text-xs text-slate-300">-</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-5 py-3">
+                      {selectedWarehouseId ? (
+                        <p className="text-sm font-semibold text-slate-900">{formatMoney(product.sellingPrice)}</p>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center space-x-2">
+                        <div className={clsx(
+                          "w-1.5 h-1.5 rounded-full",
+                          product.stock <= product.minStock ? "bg-rose-600 animate-pulse" : "bg-emerald-500"
+                        )} />
+                        <div className={clsx(
+                          "min-w-0",
+                          product.stock <= product.minStock ? "text-rose-600" : "text-slate-900"
+                        )}>
+                          <p className="whitespace-pre-line text-sm font-semibold">
+                            {getStockBreakdown(product).primary}
+                          </p>
+                          {getStockBreakdown(product).secondary && (
+                            <p className="text-[11px] font-medium text-slate-400">
+                              {getStockBreakdown(product).secondary}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <p className="text-xs font-medium text-slate-500">{product.totalIncoming} <span className="text-[10px] font-medium text-slate-400 uppercase">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span></p>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-5 py-3">
+                        {selectedWarehouseId ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-slate-900">{formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}</p>
+                            <span className={clsx('inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
+                              {getProductEfficiencyMetrics(product).label}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-300">-</span>
+                        )}
+                      </td>
+                    )}
+                    {isAdmin && <td className="px-5 py-3 text-right">
+                      {selectedWarehouseId ? (
+                        <div className="flex flex-col items-end space-y-1.5">
+                          <div className="flex items-center space-x-1.5">
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setSelectedProduct(product);
+                                  setFormData(buildProductFormData(product));
+                                  setCategoryInput(product.category?.name || '');
+                                  setShowEditModal(true);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+                                title="Редактировать"
+                              >
+                                <Edit size={14} />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                                  setSelectedProduct(product);
+                                  setRestockData({
+                                    ...restockData,
+                                    warehouseId: product.warehouseId?.toString() || '',
+                                    quantity: '',
+                                    selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                                    packageQuantityInput: '',
+                                    costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
+                                    sellingPrice: formatPriceInput(product.sellingPrice),
+                                    reason: '',
+                                  });
+                                  setShowRestockModal(true);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
+                                title="Пополнить"
+                              >
+                                <PlusCircle size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleShowBatches(product)}
+                              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+                              title="Партии (FIFO)"
+                            >
+                              <Layers size={14} />
+                            </button>
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <button
+                              onClick={() => handleShowHistory(product)}
+                              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600"
+                              title="История"
+                            >
+                              <History size={14} />
+                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleOpenWriteOffModal(product)}
+                                disabled={Number(product.stock || 0) <= 0}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
+                                title="Списать"
+                              >
+                                <Scissors size={14} />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  const defaultPackaging = getDefaultPackaging(normalizePackagings(product));
+                                  setSelectedProduct(product);
+                                  setTransferData({
+                                    ...emptyTransferData,
+                                    fromWarehouseId: product.warehouseId?.toString() || '',
+                                    selectedPackagingId: defaultPackaging ? String(defaultPackaging.id) : '',
+                                  });
+                                  setShowTransferModal(true);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600"
+                                title="Перенос"
+                              >
+                                <ArrowRightLeft size={14} />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setSelectedProduct(product);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                                title="Удалить"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
+                    </td>}
+                  </tr>
+                ))}
+                {displayProducts.length === 0 && !isLoading && (
+                  <tr>
+                    <td colSpan={isAdmin ? 7 : 5} className="px-5 py-20 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
+                          <Package size={32} />
+                        </div>
+                        <div>
+                          <p className="text-xl font-black text-slate-900">Товары не найдены</p>
+                          <p className="text-slate-500 font-medium text-sm">Измените параметры поиска или выберите другой склад.</p>
+                        </div>
+                        <button
+                          onClick={() => { resetForm(); setShowAddModal(true); }}
+                          className="rounded-2xl bg-violet-500 px-6 py-3 text-sm font-medium text-white transition-all hover:bg-violet-600"
+                        >
+                          Добавить товар
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="hidden md:block">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={displayProducts.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              className="border-t-0"
+            />
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

@@ -27,9 +27,9 @@ export const mergeProduct = async (id: number, targetProductId: number) => {
   return response.data;
 };
 
-export const deleteProduct = async (id: number, options?: { force?: boolean }) => {
+export const deleteProduct = async (id: number, options: { force?: boolean } = {}) => {
   const response = await client.delete(`/products/${id}`, {
-    params: options?.force ? { force: 'true' } : undefined,
+    params: options.force ? { force: 'true' } : undefined,
   });
   return response.data;
 };
