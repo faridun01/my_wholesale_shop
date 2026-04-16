@@ -7,6 +7,7 @@ import { validateRequest } from '../middlewares/validation.middleware.js';
 import { commonReportsQuerySchema, transactionsQuerySchema } from '../schemas/reports.schemas.js';
 import {
   buildCancelledInvoiceWhere,
+  buildCreatedAtRange,
   buildInventoryWhere,
   buildInvoiceLineReportRows,
 } from './reports.helpers.js';
@@ -75,7 +76,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const { start, end } = req.query;
     const whereClause = buildCancelledInvoiceWhere({ warehouseId, start, end });
 
-    const [invoices, products, customers, warehouses, batches, writeoffTransactions] = await Promise.all([
+    const [invoices, products, customers, warehouses, batches, writeoffTransactions, expenses] = await Promise.all([
       prisma.invoice.findMany({
         where: whereClause,
         select: {
@@ -170,10 +171,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       prisma.expense.findMany({
         where: {
           warehouseId: warehouseId ?? undefined,
-          expenseDate: {
-            gte: start ? new Date(start as string) : undefined,
-            lte: end ? new Date(end as string) : undefined,
-          },
+          expenseDate: (start || end) ? buildCreatedAtRange({ start, end }) : undefined,
         },
         select: {
           amount: true,

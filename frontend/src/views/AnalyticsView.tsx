@@ -117,17 +117,17 @@ function getPeriodLabel(anchor: string, mode: PeriodMode) {
   const year = Number(yearRaw);
   const monthIndex = Math.max(0, Number(monthRaw || '1') - 1);
 
-  if (mode === 'year') return '\u0413\u043e\u0434 ' + year;
-  if (mode === 'quarter') return String(Math.floor(monthIndex / 3) + 1) + ' \u043a\u0432\u0430\u0440\u0442\u0430\u043b ' + year;
+  if (mode === 'year') return 'Год ' + year;
+  if (mode === 'quarter') return String(Math.floor(monthIndex / 3) + 1) + ' квартал ' + year;
 
   const labelDate = new Date(year, monthIndex, 1);
   return new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(labelDate);
 }
 
 function getQuickRangeLabel(mode: PeriodMode) {
-  if (mode === 'quarter') return '\u042d\u0442\u043e\u0442 \u043a\u0432\u0430\u0440\u0442\u0430\u043b';
-  if (mode === 'year') return '\u042d\u0442\u043e\u0442 \u0433\u043e\u0434';
-  return '\u042d\u0442\u043e\u0442 \u043c\u0435\u0441\u044f\u0446';
+  if (mode === 'quarter') return 'Этот квартал';
+  if (mode === 'year') return 'Этот год';
+  return 'Этот месяц';
 }
 
 function Panel({
@@ -225,7 +225,7 @@ function RankTable({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
-            {'\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445'}
+            Нет данных
           </div>
         )}
       </div>
@@ -281,7 +281,7 @@ function AnalyticsDataTable({
             ) : (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-slate-400">
-                  {'\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445'}
+                  Нет данных
                 </td>
               </tr>
             )}
@@ -354,7 +354,7 @@ export default function AnalyticsView() {
       .catch((error) => {
         console.error(error);
         if (!cancelled) {
-          toast.error('\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0443');
+          toast.error('Не удалось загрузить аналитику');
         }
       })
       .finally(() => {
@@ -428,48 +428,48 @@ export default function AnalyticsView() {
 
     if (margin > 0 && margin < 12) {
       items.push({
-        title: '\u041c\u0430\u0440\u0436\u0430 \u043d\u0438\u0437\u043a\u0430\u044f',
-        detail: '\u0421\u0440\u0435\u0434\u043d\u044f\u044f \u043c\u0430\u0440\u0436\u0430 ' + formatPercent(margin, 1) + '. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0446\u0435\u043d\u0443 \u0438 \u0441\u0435\u0431\u0435\u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c.',
+        title: 'Маржа низкая',
+        detail: 'Средняя маржа ' + formatPercent(margin, 1) + '. Проверьте цену и себестоимость.',
         tone: 'amber',
       });
     }
 
     if (debtShare >= 20) {
       items.push({
-        title: '\u0414\u043e\u043b\u0433\u0438 \u0432\u044b\u0441\u043e\u043a\u0438\u0435',
-        detail: '\u0414\u043e\u043b\u044f \u0434\u043e\u043b\u0433\u043e\u0432 ' + formatPercent(debtShare, 1) + ' \u043e\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0438. \u041d\u0443\u0436\u0435\u043d \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043e\u043f\u043b\u0430\u0442.',
+        title: 'Долги высокие',
+        detail: 'Доля долгов ' + formatPercent(debtShare, 1) + ' от выручки. Нужен контроль оплат.',
         tone: 'rose',
       });
     }
 
     if (topLossShare >= 3) {
       items.push({
-        title: '\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u044f \u0437\u0430\u043c\u0435\u0442\u043d\u044b\u0435',
-        detail: '\u041f\u043e\u0442\u0435\u0440\u0438 \u043f\u043e \u0433\u043b\u0430\u0432\u043d\u043e\u0439 \u043f\u0440\u0438\u0447\u0438\u043d\u0435 \u0443\u0436\u0435 ' + formatPercent(topLossShare, 1) + ' \u043e\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0438.',
+        title: 'Списания заметные',
+        detail: 'Потери по главной причине уже ' + formatPercent(topLossShare, 1) + ' от выручки.',
         tone: 'rose',
       });
     }
 
     if (topProduct && Number(topProduct.profit || 0) > 0) {
       items.push({
-        title: '\u041b\u0438\u0434\u0435\u0440 \u043f\u043e \u0442\u043e\u0432\u0430\u0440\u0443',
-        detail: topProduct.name + ' \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442 \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c \u043f\u0440\u0438\u0431\u044b\u043b\u0438. \u0414\u0435\u0440\u0436\u0438\u0442\u0435 \u0432 \u043d\u0430\u043b\u0438\u0447\u0438\u0438.',
+        title: 'Лидер по товару',
+        detail: topProduct.name + ' приносит максимум прибыли. Держите в наличии.',
         tone: 'emerald',
       });
     }
 
     if (topCustomer && topDebtor && topCustomer.name === topDebtor.name) {
       items.push({
-        title: '\u041a\u0440\u0443\u043f\u043d\u044b\u0439 \u043a\u043b\u0438\u0435\u043d\u0442 \u0432 \u0434\u043e\u043b\u0433\u0435',
-        detail: topDebtor.name + ' \u0434\u0430\u0451\u0442 \u043e\u0431\u043e\u0440\u043e\u0442 \u0438 \u043e\u0434\u043d\u043e\u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u0434\u0435\u0440\u0436\u0438\u0442 \u0441\u0430\u043c\u044b\u0439 \u0431\u043e\u043b\u044c\u0448\u043e\u0439 \u0434\u043e\u043b\u0433.',
+        title: 'Крупный клиент в долге',
+        detail: topDebtor.name + ' даёт оборот и одновременно держит самый большой долг.',
         tone: 'sky',
       });
     }
 
     if (!items.length) {
       items.push({
-        title: '\u0421\u0438\u0442\u0443\u0430\u0446\u0438\u044f \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u0430',
-        detail: '\u041a\u0440\u0438\u0442\u0438\u0447\u043d\u044b\u0445 \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0438\u0439 \u043f\u043e \u043f\u0440\u0438\u0431\u044b\u043b\u0438, \u0434\u043e\u043b\u0433\u0430\u043c \u0438 \u0441\u043f\u0438\u0441\u0430\u043d\u0438\u044f\u043c \u043d\u0435 \u0432\u0438\u0434\u043d\u043e.',
+        title: 'Ситуация стабильна',
+        detail: 'Критичных отклонений по прибыли, долгам и списаниям не видно.',
         tone: 'emerald',
       });
     }
@@ -478,9 +478,9 @@ export default function AnalyticsView() {
   }, [summary, topCustomer, topDebtor, topProduct, topWriteoffReason]);
 
   const sections: Array<{ key: SectionKey; label: string }> = [
-    { key: 'overview', label: '\u0413\u043b\u0430\u0432\u043d\u043e\u0435' },
-    { key: 'products', label: '\u0422\u043e\u0432\u0430\u0440\u044b' },
-    { key: 'staff', label: '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438' },
+    { key: 'overview', label: 'Главное' },
+    { key: 'products', label: 'Товары' },
+    { key: 'staff', label: 'Сотрудники' },
   ];
 
   return (
@@ -491,28 +491,28 @@ export default function AnalyticsView() {
             <div className="border-b border-slate-200/80 px-6 py-6 xl:border-b-0 xl:border-r">
               <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white">
                 <BarChart3 size={14} />
-                {'\u0410\u0434\u043c\u0438\u043d \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430'}
+                Админ аналитика
               </div>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">{'\u0410\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 CRM'}</h1>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">Аналитика CRM</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                {'\u0413\u043b\u0430\u0432\u043d\u044b\u0435 \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u0438 \u0431\u0438\u0437\u043d\u0435\u0441\u0430 \u0432 \u0430\u043a\u043a\u0443\u0440\u0430\u0442\u043d\u043e\u043c \u0444\u043e\u0440\u043c\u0430\u0442\u0435: \u0441\u0430\u043c\u044b\u0435 \u043f\u0440\u043e\u0434\u0430\u0432\u0430\u0435\u043c\u044b\u0435 \u0442\u043e\u0432\u0430\u0440\u044b, \u0442\u043e\u0432\u0430\u0440\u044b \u043f\u043e \u044d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u0438 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432.'}
+                Главные показатели бизнеса в аккуратном формате: самые продаваемые товары, товары по эффективности прибыли и результат сотрудников.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{'\u041f\u0435\u0440\u0438\u043e\u0434'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Период</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{periodLabel}</p>
                   <p className="mt-1 text-xs text-slate-500">{dateRange.start} - {dateRange.end}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{'\u041f\u0440\u043e\u0434\u0430\u0436\u0438'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажи</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{formatCount(summary?.totalSalesCount || 0)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{'\u0412\u0441\u0435\u0433\u043e \u043d\u0430\u043a\u043b\u0430\u0434\u043d\u044b\u0445 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Всего накладных за период</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{'\u0410\u0441\u0441\u043e\u0440\u0442\u0438\u043c\u0435\u043d\u0442'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Ассортимент</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{formatCount(summary?.totalProducts || 0)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{'\u0422\u043e\u0432\u0430\u0440\u043e\u0432 \u0432 \u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0438'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Товаров в движении</p>
                 </div>
               </div>
             </div>
