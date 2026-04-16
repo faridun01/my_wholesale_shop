@@ -94,7 +94,8 @@ export class StockService {
     invoiceItemId: number,
     quantityToReturn?: number,
     specificBatchId?: number,
-    tx?: any
+    tx?: any,
+    shouldUpdateCache = true
   ) {
     const client = tx || prisma;
     const whereClause: any = { invoiceItemId };
@@ -143,9 +144,11 @@ export class StockService {
       remainingToReturn -= amountToReturnToThisBatch;
     }
 
-    const item = await client.invoiceItem.findUnique({ where: { id: invoiceItemId } });
-    if (item) {
-      await this.updateProductStockCache(item.productId, client);
+    if (shouldUpdateCache) {
+      const item = await client.invoiceItem.findUnique({ where: { id: invoiceItemId } });
+      if (item) {
+        await this.updateProductStockCache(item.productId, client);
+      }
     }
   }
 
