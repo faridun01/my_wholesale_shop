@@ -33,11 +33,12 @@ import {
   Scissors,
   X,
   History,
+  Tag,
+  FileText,
   DollarSign,
   Layers,
   GitMerge,
   Image as ImageIcon,
-  FileText,
   RotateCcw,
   AlertTriangle,
 } from 'lucide-react';
@@ -3349,7 +3350,7 @@ export default function ProductsView() {
                   className="w-full rounded-2xl border border-sky-100 bg-sky-50 py-3 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-sky-300 focus:bg-white"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <div className="relative w-full">
                   <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={16} />
                   <select
@@ -3379,7 +3380,7 @@ export default function ProductsView() {
                   disabled={!filteredProducts.length}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 transition-all hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  <DollarSign size={16} />
+                  <Tag size={16} />
                   <span>Скачать прайс</span>
                 </button>
               </div>

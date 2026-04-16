@@ -13,6 +13,7 @@ import ocrRoutes from './routes/ocr.routes.js'
 import settingsRoutes from './routes/settings.routes.js';
 import reminderRoutes from './routes/reminders.routes.js';
 import paymentRoutes from './routes/payments.routes.js';
+import expenseRoutes from './routes/expenses.routes.js';
 import { authenticate } from './middlewares/auth.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +37,7 @@ app.use('/api/ocr', authenticate, ocrRoutes)
 app.use('/api/settings', authenticate, settingsRoutes);
 app.use('/api/reminders', authenticate, reminderRoutes);
 app.use('/api/payments', authenticate, paymentRoutes);
+app.use('/api/expenses', authenticate, expenseRoutes);
 
 import multer from 'multer';
 const upload = multer({ dest: 'uploads/' });
