@@ -21,7 +21,7 @@ ENV HOST=0.0.0.0
 ENV PORT=3001
 
 COPY package*.json ./
-RUN npm install && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/dist ./dist

@@ -70,7 +70,7 @@ type AnalyticsPayload = {
 };
 
 type PeriodMode = 'month' | 'quarter' | 'year';
-type SectionKey = 'overview' | 'products' | 'staff' | 'customers' | 'warehouses' | 'losses' | 'actions';
+type SectionKey = 'overview' | 'products' | 'staff';
 
 function formatDateInputValue(date: Date) {
   const year = date.getFullYear();

@@ -127,8 +127,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           },
         },
       }),
-      prisma.product.findMany({ where: { active: true, warehouseId: warehouseId ?? undefined } }),
-      prisma.customer.findMany({ where: { active: true, city: access.isAdmin ? undefined : (access.city ?? '__no_city__') } }),
+      prisma.product.count({ where: { active: true, warehouseId: warehouseId ?? undefined } }),
+      prisma.customer.count({ where: { active: true, city: access.isAdmin ? undefined : (access.city ?? '__no_city__') } }),
       prisma.warehouse.findMany({ where: access.isAdmin ? { active: true } : { active: true, id: access.warehouseId ?? -1, city: access.city ?? undefined } }),
       prisma.productBatch.findMany({
         where: {
@@ -343,8 +343,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         totalCost: isAdmin ? totalCost : null,
         totalExpenses: isAdmin ? totalExpenses : null,
         totalSalesCount,
-        totalCustomers: customers.length,
-        totalProducts: products.length,
+        totalCustomers: customers,
+        totalProducts: products,
         totalDebts,
         stockValuation: isAdmin ? stockValuation : null,
         margin: isAdmin ? (totalRevenue > 0 ? ((totalProfit - totalExpenses) / totalRevenue) * 100 : 0) : null,
