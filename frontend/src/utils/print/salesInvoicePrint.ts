@@ -150,39 +150,42 @@ export function printSalesInvoice({
 
     return 0;
   };
-  const getLineTotalAfterLineDiscount = (item: any) => {
-    return getItemBaseUnits(item) * getDiscountedUnitPrice(item);
+  const invoiceDiscountPercent = Math.max(0, Number(invoice?.discount || 0));
+  const getLineTotalAfterFinalDiscount = (item: any) => {
+    const lineTotalBeforeGlobal = roundMoneyValue(getItemBaseUnits(item) * getDiscountedUnitPrice(item));
+    if (invoiceDiscountPercent > 0) {
+      return roundMoneyValue(lineTotalBeforeGlobal * (1 - invoiceDiscountPercent / 100));
+    }
+    return lineTotalBeforeGlobal;
+  };
+  const getFinalUnitPrice = (item: any) => {
+    const qty = getItemBaseUnits(item);
+    if (qty > 0) {
+      return getLineTotalAfterFinalDiscount(item) / qty;
+    }
+    return getDiscountedUnitPrice(item);
   };
   const hasLineDiscount = (item: any) => {
     const originalUnitPrice = Number(getUnitPrice(item));
-    const discountedUnitPrice = Number(getDiscountedUnitPrice(item));
+    const finalUnitPrice = Number(getFinalUnitPrice(item));
 
-    if (!Number.isFinite(originalUnitPrice) || !Number.isFinite(discountedUnitPrice)) {
+    if (!Number.isFinite(originalUnitPrice) || !Number.isFinite(finalUnitPrice)) {
       return false;
     }
 
-    return originalUnitPrice - discountedUnitPrice > 0.0001;
+    return originalUnitPrice - finalUnitPrice > 0.0001;
   };
   const hasLineDiscountItems = invoiceItems.some(hasLineDiscount);
-  const hasPriceAfterDiscountColumn = hasLineDiscountItems;
+  const hasPriceAfterDiscountColumn = hasLineDiscountItems || invoiceDiscountPercent > 0;
   const subtotalBeforeDiscountFromItems = roundMoneyValue(
     invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item) * getUnitPrice(item), 0),
   );
-  const subtotalAfterLineDiscountFromItems = roundMoneyValue(
-    invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalAfterLineDiscount(item), 0),
-  );
-  const lineDiscountAmountFromItems = roundMoneyValue(
-    Math.max(0, subtotalBeforeDiscountFromItems - subtotalAfterLineDiscountFromItems),
-  );
-  const invoiceDiscountPercent = Math.max(0, Number(invoice?.discount || 0));
-  const invoiceDiscountAmountFromItems = roundMoneyValue(
-    subtotalAfterLineDiscountFromItems * (invoiceDiscountPercent / 100),
+  const netAmountFromItems = roundMoneyValue(
+    invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalAfterFinalDiscount(item), 0),
   );
   const subtotalBeforeDiscount = invoiceItems.length > 0 ? subtotalBeforeDiscountFromItems : fallbackSubtotal;
-  const totalDiscountAmount = invoiceItems.length > 0
-    ? roundMoneyValue(lineDiscountAmountFromItems + invoiceDiscountAmountFromItems)
-    : fallbackDiscountAmount;
-  const amountAfterDiscount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - totalDiscountAmount));
+  const amountAfterDiscount = invoiceItems.length > 0 ? netAmountFromItems : roundMoneyValue(fallbackSubtotal - fallbackDiscountAmount);
+  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - amountAfterDiscount));
   const returnedAmount = Math.max(0, Number(invoice.returnedAmount || 0));
   const finalTotalAmount = roundMoneyValue(Math.max(0, amountAfterDiscount - returnedAmount));
   const paidAmount = Math.max(0, Number(invoice.paidAmount || 0));
@@ -226,9 +229,9 @@ export function printSalesInvoice({
               <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getDisplayPrice(item)))}</td>
               <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getUnitPrice(item)))}</td>
               ${hasPriceAfterDiscountColumn 
-                ? `<td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getDiscountedUnitPrice(item)))}</td>` 
+                ? `<td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getFinalUnitPrice(item)))}</td>` 
                 : ''}
-              <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getLineTotalAfterLineDiscount(item)))}</td>
+              <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getLineTotalAfterFinalDiscount(item)))}</td>
             </tr>
           `,
         )

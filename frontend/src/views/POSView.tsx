@@ -21,7 +21,7 @@ import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatMoney, roundMoney, ceilMoney } from '../utils/format';
+import { formatMoney, roundMoney, ceilMoney, toFixedNumber } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
@@ -963,7 +963,11 @@ export default function POSView() {
   const balance = paid - total;
 
   const handleCheckout = async () => {
-    if (!cart.length) return;
+    if (paid > total + 0.01) {
+      toast.error(`Сумма оплаты не может превышать сумму накладной (${toFixedNumber(total)})`);
+      return;
+    }
+
     if (!customerId) {
       toast.error('Сначала выберите клиента');
       return;

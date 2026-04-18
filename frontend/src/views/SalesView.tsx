@@ -332,6 +332,14 @@ export default function SalesView() {
       toast.error('Сумма оплаты должна быть больше нуля');
       return;
     }
+
+    const currentBalance = getInvoiceBalance(selectedInvoice);
+    const EPSILON = 0.01;
+    if (normalizedAmount > currentBalance + EPSILON) {
+      toast.error(`Сумма оплаты не может превышать остаток долга (${toFixedNumber(currentBalance)})`);
+      return;
+    }
+
     setIsPaying(true);
     try {
       await client.post('/payments', {
