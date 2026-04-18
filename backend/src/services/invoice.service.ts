@@ -263,6 +263,21 @@ export class InvoiceService {
           where: { id: invoiceItem.id },
           data: { costPrice: avgCost }
         });
+
+        // Record Inventory Transaction
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: item.productId,
+            warehouseId,
+            userId,
+            qtyChange: -quantity,
+            type: 'outgoing',
+            reason: `Invoice #${invoice.id}`,
+            referenceId: invoice.id,
+            costAtTime: avgCost,
+            sellingAtTime: sellingPrice
+          }
+        });
       }
 
       // 4. Record Payment if any
@@ -367,7 +382,7 @@ export class InvoiceService {
     }[];
     discount?: number;
   }) {
-    const { customerId, items, isAdmin = false } = data;
+    const { customerId, userId, items, isAdmin = false } = data;
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('Invoice must contain at least one item');
@@ -493,18 +508,18 @@ export class InvoiceService {
         await StockService.deallocateStock(existingItem.id, undefined, undefined, tx, false);
       }
 
-      if ((Array.isArray(invoice.returns) && invoice.returns.length > 0) || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON) {
-        await tx.return.deleteMany({
-          where: { invoiceId },
-        });
+      await tx.return.deleteMany({
+        where: { invoiceId },
+      });
 
-        await tx.inventoryTransaction.deleteMany({
-          where: {
-            type: 'return',
-            referenceId: invoiceId,
-          },
-        });
-      }
+      await tx.inventoryTransaction.deleteMany({
+        where: {
+          referenceId: invoiceId,
+          type: { in: ['outgoing', 'return'] }
+        },
+      });
+
+
 
       await tx.invoiceItem.deleteMany({
         where: { invoiceId },
@@ -559,6 +574,21 @@ export class InvoiceService {
           where: { id: invoiceItem.id },
           data: { costPrice: avgCost },
         });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: Number(item.productId),
+            warehouseId: Number(invoice.warehouseId),
+            userId,
+            qtyChange: -quantity,
+            type: 'outgoing',
+            reason: `Updated Invoice #${invoiceId}`,
+            referenceId: invoiceId,
+            costAtTime: avgCost,
+            sellingAtTime: sellingPrice
+          }
+        });
+
 
         affectedProductIds.add(Number(item.productId));
       }
@@ -750,10 +780,13 @@ export class InvoiceService {
       });
 
       if (!invoice) throw new Error('Invoice not found');
-      if (invoice.status === 'paid') throw new Error('Cannot return items for a fully paid invoice');
-      if (invoice.cancelled) throw new Error('Нельзя оформить возврат по отменённой накладной');
+      if (invoice.cancelled) {
+        throw new Error('Нельзя оформить возврат по отмененной накладной');
+      }
 
       let totalRefundValue = 0;
+
+
       const affectedProductIds = new Set<number>();
       let processedReturnCount = 0;
 
@@ -822,6 +855,27 @@ export class InvoiceService {
 
       for (const productId of affectedProductIds) {
         await StockService.updateProductStockCache(productId, tx);
+      }
+
+      // Record Inventory Transactions for Returns
+      for (const returnItem of items) {
+        const originalItem = invoice.items.find((i: any) => Number(i.id) === Number(returnItem.invoiceItemId));
+        if (originalItem) {
+          const qty = Number(returnItem.quantity);
+          await tx.inventoryTransaction.create({
+            data: {
+              productId: originalItem.productId,
+              warehouseId: invoice.warehouseId,
+              userId,
+              qtyChange: qty,
+              type: 'return',
+              reason: reason || `Return from Invoice #${invoiceId}`,
+              referenceId: invoiceId,
+              costAtTime: originalItem.costPrice,
+              sellingAtTime: originalItem.sellingPrice
+            }
+          });
+        }
       }
 
       // 5. Create Return record

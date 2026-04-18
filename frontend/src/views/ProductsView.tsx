@@ -1428,7 +1428,7 @@ export default function ProductsView() {
     const quantity = Number(String(returnWriteOffData.quantity || '').trim());
     const reason = String(returnWriteOffData.reason || '').trim();
 
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       toast.error('Введите целое количество для возврата');
       return;
     }
@@ -1510,7 +1510,7 @@ export default function ProductsView() {
     const reason = String(writeOffData.reason || '').trim();
     const availableStock = Number(selectedWriteOffProduct.stock || 0);
 
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       toast.error('Введите целое количество для списания');
       return;
     }
@@ -1551,7 +1551,7 @@ export default function ProductsView() {
     }
 
     const availableStock = Number(selectedWriteOffProduct.stock || 0);
-    const nextValue = Math.max(1, Math.min(Math.floor(value), Math.floor(availableStock)));
+    const nextValue = Math.max(0, Math.min(value, availableStock));
     setWriteOffData((prev) => ({ ...prev, quantity: String(nextValue) }));
   };
 
@@ -2495,7 +2495,7 @@ export default function ProductsView() {
                                   ...prev,
                                   packageQuantityInput: e.target.value,
                                   quantity: String(
-                                    Math.max(0, Math.floor(Number(e.target.value || 0) || 0)) *
+                                    (Number(e.target.value || 0) || 0) *
                                     (selectedRestockPackaging.unitsPerPackage || 0)
                                   ),
                                 }))
@@ -2516,6 +2516,7 @@ export default function ProductsView() {
                           <input
                             type="number"
                             required
+                            step="0.01"
                             value={restockData.quantity}
                             onChange={e => setRestockData({ ...restockData, quantity: e.target.value })}
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
@@ -2650,13 +2651,12 @@ export default function ProductsView() {
                         <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3">
                           <input
                             type="number"
-                            min="1"
-                            step="1"
+                            min="0.01"
+                            step="0.01"
                             required
                             value={writeOffData.quantity}
                             onChange={(event) => {
-                              const digitsOnly = event.target.value.replace(/[^\d]/g, '');
-                              setWriteOffData((prev) => ({ ...prev, quantity: digitsOnly }));
+                              setWriteOffData((prev) => ({ ...prev, quantity: event.target.value }));
                             }}
                             className="w-full bg-transparent text-[34px] font-black tracking-tight text-slate-900 outline-none"
                           />

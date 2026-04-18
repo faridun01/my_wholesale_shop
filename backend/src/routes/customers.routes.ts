@@ -63,8 +63,7 @@ const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: nu
 };
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
-  const balance = Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
-  return balance > PAYMENT_EPSILON ? balance : 0;
+  return Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
 };
 
 const getCustomerSegment = (params: {
@@ -93,7 +92,7 @@ const mapCustomerWithTotals = (customer: any) => {
   const invoices = Array.isArray(customer.invoices) ? customer.invoices : [];
   const totalInvoiced = invoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
   const totalPaid = invoices.reduce(
-    (sum: number, invoice: any) => sum + Math.min(Number(invoice.paidAmount || 0), Number(invoice.netAmount || 0)),
+    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
     0,
   );
   const balance = invoices.reduce((sum: number, invoice: any) => sum + getInvoiceBalance(invoice), 0);
@@ -110,12 +109,12 @@ const mapCustomerWithTotals = (customer: any) => {
   });
   const paidInvoicedTotal = paidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
   const paidCollectedTotal = paidInvoices.reduce(
-    (sum: number, invoice: any) => sum + Math.min(Number(invoice.paidAmount || 0), Number(invoice.netAmount || 0)),
+    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
     0,
   );
   const partialInvoicedTotal = partialInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
   const partialCollectedTotal = partialInvoices.reduce(
-    (sum: number, invoice: any) => sum + Math.min(Number(invoice.paidAmount || 0), Number(invoice.netAmount || 0)),
+    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
     0,
   );
   const unpaidInvoicedTotal = unpaidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);

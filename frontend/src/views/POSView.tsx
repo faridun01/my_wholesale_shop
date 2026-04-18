@@ -1,4 +1,4 @@
-﻿import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Banknote,
@@ -132,7 +132,7 @@ const normalizeDisplayBaseUnit = (value: string) => {
 };
 
 const formatStockAmount = (stock: number, packaging: PackagingOption | null, baseUnitName: string) => {
-  const normalizedStock = Math.max(0, Math.floor(Number(stock) || 0));
+  const normalizedStock = Math.max(0, Number(stock) || 0);
   const normalizedBaseUnit = normalizeDisplayBaseUnit(baseUnitName || '\u0448\u0442');
 
   if (!packaging || Number(packaging.unitsPerPackage || 0) <= 1) {
@@ -170,7 +170,7 @@ const getProductStockParts = (product: any, fallbackBaseUnitName?: string) => {
   const baseUnitName = normalizeDisplayBaseUnit(
     String(product?.baseUnitName || product?.unit || fallbackBaseUnitName || defaultPackaging?.baseUnitName || '\u0448\u0442'),
   );
-  const stock = Math.max(0, Math.floor(Number(product?.stock || 0)));
+  const stock = Math.max(0, Number(product?.stock || 0));
 
   if (!defaultPackaging || Number(defaultPackaging.unitsPerPackage || 0) <= 1) {
     return {
@@ -264,7 +264,7 @@ export default function POSView() {
 
   const getAvailableStockForCartItem = (item: CartItem) => {
     const currentProduct = products.find((product) => product.id === item.id);
-    return Math.max(0, Math.floor(Number(currentProduct?.stock ?? item.stock ?? 0) || 0));
+    return Math.max(0, Number(currentProduct?.stock ?? item.stock ?? 0) || 0);
   };
 
   const warnStockOverflow = (item: CartItem, availableStock: number) => {
@@ -299,7 +299,7 @@ export default function POSView() {
     const unitsPerPackage = packaging?.unitsPerPackage || 0;
     const availableStock = getAvailableStockForCartItem(merged as CartItem);
     let packageQuantity = Math.max(0, Math.floor(Number(merged.packageQuantity || 0)));
-    let extraUnitQuantity = Math.max(0, Math.floor(Number(merged.extraUnitQuantity || 0)));
+    let extraUnitQuantity = Math.max(0, Number(merged.extraUnitQuantity || 0));
 
     if (!packaging) {
       packageQuantity = 0;
@@ -779,11 +779,9 @@ export default function POSView() {
         const unitsPerPackage = Number(packaging?.unitsPerPackage || 0);
         const parsedPackageQuantity = Math.max(0, Math.floor(Number(value) || 0));
         const maxByStock = unitsPerPackage > 0
-          ? Math.floor(
-              Math.max(0, getAvailableStockForCartItem(item) - Math.max(0, Number(item.extraUnitQuantity || 0))) / unitsPerPackage,
-            )
+          ? Math.max(0, (getAvailableStockForCartItem(item) - Math.max(0, Number(item.extraUnitQuantity || 0))) / unitsPerPackage)
           : 0;
-        const nextPackageQuantity = Math.min(parsedPackageQuantity, Math.max(0, maxByStock));
+        const nextPackageQuantity = Math.min(parsedPackageQuantity, Math.floor(Math.max(0, maxByStock)));
         const attemptedTotal = parsedPackageQuantity * unitsPerPackage + Math.max(0, Number(item.extraUnitQuantity || 0));
         const availableStock = getAvailableStockForCartItem(item);
         if (attemptedTotal > availableStock) {
@@ -1492,6 +1490,7 @@ export default function POSView() {
                               <input
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={item.extraUnitQuantityInput ?? String(item.extraUnitQuantity)}
                                 onChange={(e) => updateExtraUnitQuantityInput(item.id, e.target.value)}
                                 onBlur={() => commitExtraUnitQuantityInput(item.id)}
@@ -1554,10 +1553,11 @@ export default function POSView() {
                       placeholder="Скидка %"
                       className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-xs text-slate-700 outline-none transition-all focus:border-amber-300 focus:bg-white"
                     />
-                    <input
-                      type="number"
-                      value={paidAmount}
-                      min={0}
+                        <input
+                          type="number"
+                          value={paidAmount}
+                          min={0}
+                          step="0.01"
                       onChange={(e) => {
                         const value = e.target.value;
                         setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));

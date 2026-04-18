@@ -512,12 +512,7 @@ export default function SalesView() {
   }
 
   function getInvoiceBalance(invoice: any) {
-    const balance = getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.paidAmount || 0));
-    if (balance <= PAYMENT_EPSILON) {
-      return 0;
-    }
-
-    return balance;
+    return getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.paidAmount || 0));
   }
 
   const canEditInvoice = (invoice: any) => {
@@ -701,7 +696,8 @@ export default function SalesView() {
     const packaging = getEditItemPackaging(item);
     const unitsPerPackage = Number(packaging?.unitsPerPackage || 0);
     const packageQuantity = Math.max(0, Math.floor(Number(item.packageQuantityInput || 0) || 0));
-    const extraUnitQuantity = Math.max(0, Math.floor(Number(item.extraUnitQuantityInput || 0) || 0));
+    const extraUnitQuantity = Math.max(0, Number(item.extraUnitQuantityInput || 0) || 0);
+
     const totalUnits = packaging && unitsPerPackage > 0 ? packageQuantity * unitsPerPackage + extraUnitQuantity : extraUnitQuantity;
 
     return {
@@ -1120,7 +1116,7 @@ export default function SalesView() {
     getInvoiceBalance(invoice) <= PAYMENT_EPSILON;
 
   const isReturnActionDisabled = (invoice: any) =>
-    Boolean(invoice?.cancelled) || isInvoicePaidInFull(invoice) || !hasReturnableItems(invoice);
+    Boolean(invoice?.cancelled) || !hasReturnableItems(invoice);
 
   const applyInvoiceToHistory = (updatedInvoice: any) => {
     if (!updatedInvoice?.id) {
@@ -2198,7 +2194,7 @@ export default function SalesView() {
                                       type="number"
                                       min="0"
                                       max={itemMaxAllowedQuantity}
-                                      step="1"
+                                      step="0.01"
                                       value={item.extraUnitQuantityInput}
                                       onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { extraUnitQuantityInput: e.target.value })}
                                       placeholder="+ шт"
@@ -2551,7 +2547,7 @@ export default function SalesView() {
                                   <input 
                                     type="number" 
                                     min="0"
-                                    step="1"
+                                    step="0.01"
                                     max={inputMax}
                                     value={item.returnQty}
                                     onChange={(e) => {

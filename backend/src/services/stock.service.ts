@@ -9,10 +9,14 @@ function toNumber(value: any, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function toInt(value: any, fallback = 0): number {
-  const n = Math.round(toNumber(value, fallback));
-  return Number.isFinite(n) ? n : fallback;
+/**
+ * Rounds a quantity to standard precision (2 decimal places)
+ */
+function roundQty(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
+
+
 
 export class StockService {
   /**
@@ -26,7 +30,7 @@ export class StockService {
     tx?: any
   ) {
     const client = tx || prisma;
-    const requiredQty = toInt(quantity, 0);
+    const requiredQty = roundQty(toNumber(quantity, 0));
 
     if (requiredQty <= 0) {
       throw new Error('Количество для списания должно быть больше 0');
@@ -60,7 +64,7 @@ export class StockService {
     for (const batch of batches) {
       if (remainingToAllocate <= 0) break;
 
-      const batchRemaining = toInt(batch.remainingQuantity, 0);
+      const batchRemaining = roundQty(toNumber(batch.remainingQuantity, 0));
       const takeFromBatch = Math.min(batchRemaining, remainingToAllocate);
       totalCost += takeFromBatch * Number(batch.costPrice || 0);
 
@@ -116,13 +120,13 @@ export class StockService {
 
     let remainingToReturn =
       quantityToReturn != null
-        ? toInt(quantityToReturn, 0)
+        ? roundQty(toNumber(quantityToReturn, 0))
         : allocations.reduce((sum: number, a: any) => sum + Number(a.quantity || 0), 0);
 
     for (const allocation of allocations) {
       if (remainingToReturn <= 0) break;
 
-      const allocQty = toInt(allocation.quantity, 0);
+      const allocQty = roundQty(toNumber(allocation.quantity, 0));
       const amountToReturnToThisBatch = Math.min(allocQty, remainingToReturn);
 
       await client.productBatch.update({
@@ -162,7 +166,7 @@ export class StockService {
     quantity: number,
     userId: number
   ) {
-    const transferQty = toInt(quantity, 0);
+    const transferQty = roundQty(toNumber(quantity, 0));
 
     if (transferQty <= 0) {
       throw new Error('Количество для переноса должно быть больше 0');
@@ -194,7 +198,7 @@ export class StockService {
       for (const batch of sourceBatches) {
         if (remainingToTransfer <= 0) break;
 
-        const batchRemaining = toInt(batch.remainingQuantity, 0);
+        const batchRemaining = roundQty(toNumber(batch.remainingQuantity, 0));
         const takeFromBatch = Math.min(batchRemaining, remainingToTransfer);
 
         await tx.productBatch.update({
@@ -256,7 +260,7 @@ export class StockService {
     userId: number,
     reason?: string
   ) {
-    const normalizedQty = toInt(quantity, 0);
+    const normalizedQty = roundQty(toNumber(quantity, 0));
     const normalizedCost = round2(toNumber(costPrice, 0));
     const normalizedReason = String(reason || 'Stock Arrival').trim();
 
