@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 import { 
   Plus, 
@@ -53,6 +53,7 @@ type EditInvoiceItem = {
   selectedPackagingId: number | '';
   packageQuantityInput: string;
   extraUnitQuantityInput: string;
+  discount: string;
   isNew?: boolean;
 };
 
@@ -160,6 +161,7 @@ export default function SalesView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [editCustomerId, setEditCustomerId] = useState<number | ''>('');
+  const [editDiscount, setEditDiscount] = useState<string>('0');
   const [editInvoiceItems, setEditInvoiceItems] = useState<EditInvoiceItem[]>([]);
   const [editProducts, setEditProducts] = useState<any[]>([]);
   const [editInvoiceSearch, setEditInvoiceSearch] = useState('');
@@ -181,6 +183,7 @@ export default function SalesView() {
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditCustomerId('');
+    setEditDiscount('0');
     setEditInvoiceItems([]);
     setEditProducts([]);
     setEditInvoiceSearch('');
@@ -659,6 +662,7 @@ export default function SalesView() {
       selectedPackagingId: usePackaging ? Number(selectedPackaging?.id || '') : '',
       packageQuantityInput: isEmpty ? '' : String(packageQuantity),
       extraUnitQuantityInput: isEmpty ? '' : String(extraUnitQuantity),
+      discount: item?.discount !== undefined ? String(item.discount) : '',
       isNew: isEmpty,
     };
   };
@@ -826,6 +830,7 @@ export default function SalesView() {
       selectedPackagingId: usePackaging ? Number(defaultPackaging?.id || '') : '',
       packageQuantityInput: usePackaging ? '1' : '0',
       extraUnitQuantityInput: usePackaging ? '0' : '1',
+      discount: '0',
       isNew: false,
     });
   };
@@ -859,21 +864,24 @@ export default function SalesView() {
       editInvoiceItems.reduce((sum, item) => {
         const quantity = Number(item.quantity);
         const sellingPrice = Number(item.sellingPrice);
+        const itemDiscount = Number(item.discount || 0);
         if (!Number.isFinite(quantity) || !Number.isFinite(sellingPrice) || quantity <= 0 || sellingPrice < 0) {
           return sum;
         }
-        return sum + quantity * sellingPrice;
+        const itemTotal = quantity * sellingPrice;
+        const itemDiscounted = itemTotal * (1 - (Number.isFinite(itemDiscount) ? itemDiscount : 0) / 100);
+        return sum + itemDiscounted;
       }, 0),
     [editInvoiceItems],
   );
 
   const editInvoiceDiscountAmount = React.useMemo(() => {
-    const discountPercent = Number(selectedInvoice?.discount || 0);
+    const discountPercent = Number(editDiscount || 0);
     if (!Number.isFinite(discountPercent) || discountPercent <= 0) {
       return 0;
     }
     return editInvoiceSubtotal * (discountPercent / 100);
-  }, [editInvoiceSubtotal, selectedInvoice?.discount]);
+  }, [editInvoiceSubtotal, editDiscount]);
 
   const editInvoiceTaxAmount = React.useMemo(() => {
     const taxAmount = Number(selectedInvoice?.tax || 0);
@@ -899,6 +907,7 @@ export default function SalesView() {
       const products = await getProducts(Number(res.data.warehouseId));
       setSelectedInvoice(res.data);
       setEditCustomerId(res.data.customerId || '');
+      setEditDiscount(String(res.data.discount || 0));
       setEditProducts(Array.isArray(products) ? products : []);
       setEditInvoiceItems(
         Array.isArray(res.data.items) && res.data.items.length
@@ -919,27 +928,6 @@ export default function SalesView() {
 
   const handleUpdateInvoice = async () => {
     if (!selectedInvoice) return;
-
-    if (!isEditItemsDirty) {
-      setIsSavingEdit(true);
-      try {
-        const res = await client.put(`/invoices/${selectedInvoice.id}`, {
-          customerId: editCustomerId || null,
-        });
-        const updatedInvoice = res.data;
-        setSelectedInvoice(updatedInvoice);
-        applyInvoiceToHistory(updatedInvoice);
-        toast.success('Клиент изменен только для текущей накладной');
-        closeEditModal();
-        await refreshSelectedInvoice(selectedInvoice.id);
-        await fetchInvoices();
-      } catch (err: any) {
-        toast.error(err.response?.data?.error || 'Ошибка при смене клиента');
-      } finally {
-        setIsSavingEdit(false);
-      }
-      return;
-    }
 
     if (editInvoiceItems.length === 0) {
       toast.error('Добавьте хотя бы один товар в накладную');
@@ -981,6 +969,7 @@ export default function SalesView() {
           productName: product.name,
           rawName: product.rawName || null,
           brand: product.brand || null,
+          discount: Number(item.discount || 0),
         };
       });
     } catch (error: any) {
@@ -1023,13 +1012,22 @@ export default function SalesView() {
       const res = await client.put(`/invoices/${selectedInvoice.id}`, {
         customerId: editCustomerId || null,
         items: payloadItems,
+        discount: Number(editDiscount || 0),
       });
       const updatedInvoice = res.data;
+      
+      // Update the main invoices list in-place for immediate feedback
+      setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? {
+        ...updatedInvoice,
+        customer_name: updatedInvoice.customer_name || inv.customer_name,
+        staff_name: updatedInvoice.staff_name || inv.staff_name
+      } : inv));
+      
       setSelectedInvoice(updatedInvoice);
-      applyInvoiceToHistory(updatedInvoice);
       toast.success('Накладная обновлена');
       closeEditModal();
-      await refreshSelectedInvoice(selectedInvoice.id);
+      
+      // Still fetch in background to be 100% sure
       await fetchInvoices();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при обновлении продажи');
@@ -2226,7 +2224,7 @@ export default function SalesView() {
                             </div>
                           </div>
 
-                          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                          <div className="mt-3 grid gap-2 sm:grid-cols-4">
                             <div className="rounded-2xl bg-slate-50 px-4 py-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Кол-во</p>
                               <p className="mt-1 text-sm font-bold text-slate-900">
@@ -2255,7 +2253,21 @@ export default function SalesView() {
                                 step="0.01"
                                 value={item.sellingPrice}
                                 onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { sellingPrice: e.target.value })}
-                                placeholder="Цена продажи"
+                                placeholder="Цена"
+                                disabled={!selectedProduct}
+                                className="mt-1 w-full rounded-xl border border-white bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
+                              />
+                            </div>
+                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Скидка %</p>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={item.discount}
+                                onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { discount: e.target.value })}
+                                placeholder="%"
                                 disabled={!selectedProduct}
                                 className="mt-1 w-full rounded-xl border border-white bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-8 focus:ring-violet-500/5"
                               />
@@ -2263,7 +2275,11 @@ export default function SalesView() {
                             <div className="rounded-2xl bg-violet-50 px-4 py-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-500">Итого</p>
                               <p className="mt-1 text-sm font-black text-violet-700">
-                                {formatMoney(Math.max(0, Number(item.quantity || 0)) * Math.max(0, Number(item.sellingPrice || 0)))}
+                                {formatMoney(
+                                  Math.max(0, Number(item.quantity || 0)) * 
+                                  Math.max(0, Number(item.sellingPrice || 0)) * 
+                                  (1 - (Math.max(0, Number(item.discount || 0)) / 100))
+                                )}
                               </p>
                             </div>
                           </div>
@@ -2292,7 +2308,7 @@ export default function SalesView() {
                   </div>
 
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-4">
                       <div className="rounded-2xl bg-white px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Товаров</p>
                         <p className="mt-1 text-lg font-black text-slate-900">{editInvoiceItems.length}</p>
@@ -2301,24 +2317,34 @@ export default function SalesView() {
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Сумма</p>
                         <p className="mt-1 text-lg font-black text-slate-900">{formatMoney(editInvoiceSubtotal)}</p>
                       </div>
+                      <div className="rounded-2xl bg-white px-4 py-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Скидка %</p>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editDiscount}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEditDiscount(value === '' ? '' : String(Math.max(0, Math.min(100, Number(value) || 0))));
+                          }}
+                          className="mt-1 w-full text-lg font-black text-violet-600 outline-none transition-all"
+                          placeholder="0"
+                        />
+                      </div>
                       <div className="rounded-2xl bg-violet-600 px-4 py-3 text-white">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-100">Итого</p>
                         <p className="mt-1 text-lg font-black">{formatMoney(editInvoiceNetAmount)}</p>
                       </div>
                     </div>
-                    {Number(selectedInvoice?.discount || 0) > 0 ? (
-                      <p className="mt-3 text-sm text-slate-500">
-                        Скидка {Number(selectedInvoice.discount || 0)}%: -{formatMoney(editInvoiceDiscountAmount)}
-                      </p>
-                    ) : null}
-                    {Number(selectedInvoice?.tax || 0) > 0 ? (
-                      <p className="mt-1 text-sm text-slate-500">
-                        Налог: +{formatMoney(editInvoiceTaxAmount)}
-                      </p>
-                    ) : null}
                   </div>
-                </div>
-              </div>
+                  {Number(selectedInvoice?.tax || 0) > 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">
+                      Налог: +{formatMoney(editInvoiceTaxAmount)}
+                    </p>
+                  ) : null}
+                </div> {/* container of summary and list (space-y-4 line 2004) */}
+              </div> {/* scrollable area (line 1985) */}
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-8">
                 <button

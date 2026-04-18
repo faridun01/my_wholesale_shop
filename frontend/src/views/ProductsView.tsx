@@ -3516,9 +3516,16 @@ export default function ProductsView() {
                     {isAdmin && (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
-                        <p className="mt-1 break-words text-sm font-semibold text-slate-900">
-                          {isAggregateMode ? '-' : formatMoney(product.costPrice)}
-                        </p>
+                        <div className="mt-1 flex flex-col">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {isAggregateMode ? '-' : formatMoney(product.costPrice)}
+                          </p>
+                          {!isAggregateMode && product.priceHistory && product.priceHistory.length > 1 && (
+                            <p className="text-[10px] font-medium text-slate-400">
+                              Посл: <span className="line-through decoration-slate-300">{formatMoney(product.priceHistory[1].costPrice)}</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                     {isAdmin && (
@@ -3750,7 +3757,14 @@ export default function ProductsView() {
                     {isAdmin && (
                       <td className="px-5 py-3">
                         {selectedWarehouseId ? (
-                          <p className="text-xs font-medium text-slate-500">{formatMoney(product.costPrice)}</p>
+                          <div className="flex flex-col">
+                            <p className="text-xs font-semibold text-slate-900">{formatMoney(product.costPrice)}</p>
+                            {product.priceHistory && product.priceHistory.length > 1 && (
+                              <p className="text-[10px] font-medium text-slate-400">
+                                Посл: <span className="line-through decoration-slate-300">{formatMoney(product.priceHistory[1].costPrice)}</span>
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-300">-</span>
                         )}

@@ -157,6 +157,10 @@ router.get('/', async (req, res, next) => {
             where: { active: true },
             orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
           },
+          priceHistory: {
+            take: 2,
+            orderBy: { createdAt: 'desc' }
+          },
           batches: warehouseId ? {
             where: { warehouseId: Number(warehouseId) }
           } : false

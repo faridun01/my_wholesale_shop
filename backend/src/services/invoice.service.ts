@@ -1,4 +1,4 @@
-﻿import prisma from '../db/prisma.js';
+import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
 import { normalizeMoney, roundMoney } from '../utils/money.js';
@@ -72,7 +72,7 @@ function buildCurrentInvoiceItemSnapshot(item: any) {
     packageQuantity,
     extraUnitQuantity,
     returnedQty: 0,
-    totalPrice: roundMoney(remainingBaseUnits * Number(item?.sellingPrice || 0)),
+    totalPrice: roundMoney(remainingBaseUnits * Number(item?.sellingPrice || 0) * (1 - (Number(item?.discount || 0) / 100))),
   };
 }
 
@@ -98,6 +98,7 @@ export class InvoiceService {
       productName?: string | null;
       rawName?: string | null;
       brand?: string | null;
+      discount?: number;
     }[];
     discount?: number;
     tax?: number;
@@ -166,11 +167,14 @@ export class InvoiceService {
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
+        const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
 
-        totalAmount += roundMoney(quantity * sellingPrice);
+        const itemTotal = roundMoney(quantity * sellingPrice);
+        const itemDiscountedTotal = roundMoney(itemTotal * (1 - itemDiscount / 100));
+        totalAmount += itemDiscountedTotal;
       }
 
       totalAmount = roundMoney(totalAmount);
@@ -246,7 +250,8 @@ export class InvoiceService {
             rawNameSnapshot: item.rawName || product.rawName || null,
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
-            totalPrice: roundMoney(quantity * sellingPrice),
+            discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
+            totalPrice: roundMoney(quantity * sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100))),
           },
         });
 
@@ -274,7 +279,10 @@ export class InvoiceService {
       }
 
       return invoice;
-    }, TRANSACTION_OPTIONS);
+    }, {
+      maxWait: 10000,
+      timeout: 120000,
+    });
   }
 
   static async reassignCustomer(invoiceId: number, customerId: number) {
@@ -331,7 +339,10 @@ export class InvoiceService {
           items: true,
         },
       });
-      }, TRANSACTION_OPTIONS);
+    }, {
+      maxWait: 10000,
+      timeout: 120000,
+    });
   }
 
   static async updateInvoice(invoiceId: number, data: {
@@ -352,7 +363,9 @@ export class InvoiceService {
       productName?: string | null;
       rawName?: string | null;
       brand?: string | null;
+      discount?: number;
     }[];
+    discount?: number;
   }) {
     const { customerId, items, isAdmin = false } = data;
 
@@ -398,9 +411,14 @@ export class InvoiceService {
         throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
       }
 
-      const customer = await tx.customer.findUnique({ where: { id: customerId } });
-      if (!customer) {
-        throw new Error('Customer not found');
+      let customer: any = null;
+      if (customerId) {
+        customer = await tx.customer.findUnique({ where: { id: customerId } });
+        if (!customer) {
+          throw new Error('Customer not found');
+        }
+      } else {
+        customer = { name: 'Anonymous', phone: null, city: null, addressLine: null };
       }
 
       const productIds = [...new Set(items.map((item) => Number(item.productId)))];
@@ -453,16 +471,19 @@ export class InvoiceService {
       for (const item of items) {
         const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
+        const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
 
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
 
-        totalAmount += roundMoney(quantity * sellingPrice);
+        const itemTotal = roundMoney(quantity * sellingPrice);
+        const itemDiscountedTotal = roundMoney(itemTotal * (1 - itemDiscount / 100));
+        totalAmount += itemDiscountedTotal;
       }
 
       totalAmount = roundMoney(totalAmount);
-      const normalizedDiscount = normalizeMoney(normalizeNonNegativeNumber(Number(invoice.discount || 0), 'Discount'), 'Discount');
+      const normalizedDiscount = normalizeMoney(normalizeNonNegativeNumber(Number(data.discount !== undefined ? data.discount : invoice.discount || 0), 'Discount'), 'Discount');
       const normalizedTax = normalizeMoney(normalizeNonNegativeNumber(Number(invoice.tax || 0), 'Tax'), 'Tax');
       const netAmount = roundMoney(totalAmount - (totalAmount * normalizedDiscount / 100) + normalizedTax);
       const affectedProductIds = new Set<number>();
@@ -528,7 +549,8 @@ export class InvoiceService {
             rawNameSnapshot: item.rawName || product.rawName || null,
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
-            totalPrice: roundMoney(quantity * sellingPrice),
+            discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
+            totalPrice: roundMoney(quantity * sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100))),
           },
         });
 
@@ -553,13 +575,17 @@ export class InvoiceService {
           customerPhoneSnapshot: customer.phone || null,
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
+          discount: normalizedDiscount,
           netAmount,
           returnedAmount: 0,
           cancelled: isAdmin ? false : invoice.cancelled,
           status: getInvoiceStatus(Number(invoice.paidAmount || 0), Number(netAmount)),
         },
       });
-    }, TRANSACTION_OPTIONS);
+    }, {
+      maxWait: 10000,
+      timeout: 120000,
+    });
 
     return this.getInvoiceDetails(invoiceId);
   }
@@ -777,7 +803,16 @@ export class InvoiceService {
         });
 
         // 4. Calculate refund value
-        totalRefundValue += roundMoney(Number(originalItem.sellingPrice) * normalizedQuantity);
+        const itemDiscount = Number(originalItem.discount || 0);
+        const globalDiscount = Number(invoice.discount || 0);
+        
+        // Value after item discount
+        const discountedUnitPrice = Number(originalItem.sellingPrice) * (1 - itemDiscount / 100);
+        // Value after global discount
+        const finalUnitPrice = discountedUnitPrice * (1 - globalDiscount / 100);
+        
+        const lineRefundValue = roundMoney(finalUnitPrice * normalizedQuantity);
+        totalRefundValue += lineRefundValue;
         processedReturnCount += 1;
       }
 
@@ -796,12 +831,11 @@ export class InvoiceService {
           customerId: invoice.customerId,
           userId,
           reason,
-          totalValue: totalRefundValue
+          totalValue: roundMoney(totalRefundValue)
         }
       });
 
       // 6. Update invoice returned amount and net amount
-      // We subtract the return from the net amount to reduce debt
       totalRefundValue = roundMoney(totalRefundValue);
       const newReturnedAmount = roundMoney(Number(invoice.returnedAmount) + totalRefundValue);
       const newNetAmount = roundMoney(Number(invoice.netAmount) - totalRefundValue);

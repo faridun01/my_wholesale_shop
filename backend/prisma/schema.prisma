@@ -342,6 +342,7 @@ model InvoiceItem {
   brandSnapshot String? @map("brand_snapshot")
   sellingPrice Decimal  @db.Decimal(12, 2) @map("selling_price")
   costPrice    Decimal  @default(0) @db.Decimal(12, 2) @map("cost_price")
+  discount     Float    @default(0)
   totalPrice   Decimal  @db.Decimal(12, 2) @map("total_price")
   returnedQty  Float    @default(0) @map("returned_qty")
 

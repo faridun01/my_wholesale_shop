@@ -50,7 +50,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
         return {
           ...inv,
-          customer_name: inv.customer.name,
+          customer_name: inv.customerNameSnapshot || inv.customer.name,
           staff_name: inv.user.username,
           totalProfit: String(req.user?.role || '').toUpperCase() === 'ADMIN' ? totalProfit : undefined,
         };
@@ -148,6 +148,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           userId: req.user!.id,
           isAdmin: access.isAdmin,
           items: req.body.items,
+          discount: req.body.discount !== undefined ? Number(req.body.discount) : undefined,
         })
       : await InvoiceService.reassignCustomer(invoiceId, customerId);
     res.json(invoice);
