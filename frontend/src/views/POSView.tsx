@@ -21,7 +21,7 @@ import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatMoney, roundMoney } from '../utils/format';
+import { formatMoney, roundMoney, ceilMoney } from '../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../utils/media';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
@@ -939,18 +939,15 @@ export default function POSView() {
     return overflowCartItem ? getCartOverflowMessage(overflowCartItem) : null;
   }, [cart, products]);
 
-  const getLineSubtotal = (item: CartItem) => roundMoney(Number(item.sellingPrice || 0) * Number(item.quantity || 0));
-  const getLineDiscountAmount = (item: CartItem) =>
-    roundMoney(getLineSubtotal(item) * (clampDiscountPercent(item.lineDiscountPercent || 0) / 100));
-  const getLineTotal = (item: CartItem) => roundMoney(getLineSubtotal(item) - getLineDiscountAmount(item));
   const getDiscountedUnitPrice = (item: CartItem) => {
-    const quantity = Number(item.quantity || 0);
-    if (quantity <= 0) {
-      return roundMoney(Number(item.sellingPrice || 0));
-    }
-
-    return roundMoney(getLineTotal(item) / quantity);
+    const sellingPrice = Number(item.sellingPrice || 0);
+    const itemDiscount = clampDiscountPercent(item.lineDiscountPercent || 0);
+    const unitPriceAfterDiscount = sellingPrice * (1 - itemDiscount / 100);
+    return ceilMoney(unitPriceAfterDiscount);
   };
+  const getLineTotal = (item: CartItem) => roundMoney(Number(item.quantity || 0) * getDiscountedUnitPrice(item));
+  const getLineSubtotal = (item: CartItem) => roundMoney(Number(item.sellingPrice || 0) * Number(item.quantity || 0));
+  const getLineDiscountAmount = (item: CartItem) => roundMoney(getLineSubtotal(item) - getLineTotal(item));
 
   const subtotal = normalizeMoneyValue(roundMoney(cart.reduce((sum, item) => sum + getLineSubtotal(item), 0)));
   const lineDiscountAmount = normalizeMoneyValue(
@@ -1014,7 +1011,8 @@ export default function POSView() {
           packageName: getCartPackaging(item)?.packageName || null,
           baseUnitName: item.baseUnitName,
           unitsPerPackage: getCartPackaging(item)?.unitsPerPackage || null,
-          sellingPrice: getDiscountedUnitPrice(item),
+          sellingPrice: Number(item.sellingPrice || 0),
+          discount: Number(item.lineDiscountPercent || 0),
         })),
         discount: Number(normalizedDiscount),
         paidAmount: paid,

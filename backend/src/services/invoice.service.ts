@@ -1,7 +1,7 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
-import { normalizeMoney, roundMoney } from '../utils/money.js';
+import { normalizeMoney, roundMoney, ceilMoney } from '../utils/money.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -172,9 +172,9 @@ export class InvoiceService {
           throw new Error('Item quantity must be greater than zero');
         }
 
-        const itemTotal = roundMoney(quantity * sellingPrice);
-        const itemDiscountedTotal = roundMoney(itemTotal * (1 - itemDiscount / 100));
-        totalAmount += itemDiscountedTotal;
+        const unitPriceAfterDiscount = sellingPrice * (1 - itemDiscount / 100);
+        const unitPriceRounded = ceilMoney(unitPriceAfterDiscount);
+        totalAmount += quantity * unitPriceRounded;
       }
 
       totalAmount = roundMoney(totalAmount);
@@ -251,7 +251,7 @@ export class InvoiceService {
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
             discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
-            totalPrice: roundMoney(quantity * sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100))),
+            totalPrice: roundMoney(quantity * ceilMoney(sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100)))),
           },
         });
 
@@ -492,9 +492,9 @@ export class InvoiceService {
           throw new Error('Item quantity must be greater than zero');
         }
 
-        const itemTotal = roundMoney(quantity * sellingPrice);
-        const itemDiscountedTotal = roundMoney(itemTotal * (1 - itemDiscount / 100));
-        totalAmount += itemDiscountedTotal;
+        const unitPriceAfterDiscount = sellingPrice * (1 - itemDiscount / 100);
+        const unitPriceRounded = ceilMoney(unitPriceAfterDiscount);
+        totalAmount += quantity * unitPriceRounded;
       }
 
       totalAmount = roundMoney(totalAmount);
@@ -565,7 +565,7 @@ export class InvoiceService {
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
             discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
-            totalPrice: roundMoney(quantity * sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100))),
+            totalPrice: roundMoney(quantity * ceilMoney(sellingPrice * (1 - (normalizeNonNegativeNumber(item.discount || 0, 'Item discount') / 100)))),
           },
         });
 

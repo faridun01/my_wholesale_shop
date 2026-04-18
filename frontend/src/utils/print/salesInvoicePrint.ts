@@ -1,4 +1,4 @@
-import { formatMoney } from '../format';
+import { formatMoney, roundMoney, ceilMoney } from '../format';
 import { formatProductName } from '../productName';
 
 const escapeHtml = (value: unknown) =>
@@ -20,7 +20,7 @@ const normalizeAddressLine = (value: unknown) =>
     .trim();
 
 const formatMoneyWithoutCurrency = (value: unknown) => formatMoney(value, '').trim();
-const roundMoneyValue = (value: number) => Number(value.toFixed(2));
+const roundMoneyValue = (value: number) => roundMoney(value);
 
 const splitAddressLines = (value: unknown) => {
   const parts = normalizeAddressLine(value)
@@ -115,14 +115,21 @@ export function printSalesInvoice({
     }
 
     const currentPrice = getCurrentUnitPrice(item);
-    const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? 0);
+    const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
     if (Number.isFinite(lineDiscountPercent) && lineDiscountPercent > 0 && lineDiscountPercent < 100) {
-      return currentPrice / (1 - lineDiscountPercent / 100);
+      return currentPrice; // Wait, if currentPrice is ALREADY discounted in DB, then Original is current / (1 - d/100)
     }
 
     return currentPrice;
   };
-  const getDiscountedUnitPrice = (item: any) => getCurrentUnitPrice(item);
+  const getDiscountedUnitPrice = (item: any) => {
+    const originalPrice = getUnitPrice(item);
+    const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
+    if (lineDiscountPercent > 0) {
+      return ceilMoney(originalPrice * (1 - lineDiscountPercent / 100));
+    }
+    return getCurrentUnitPrice(item);
+  };
   const getItemBaseUnits = (item: any) => {
     const totalBaseUnits = Number(item?.totalBaseUnits);
     if (Number.isFinite(totalBaseUnits) && totalBaseUnits > 0) {
@@ -144,11 +151,6 @@ export function printSalesInvoice({
     return 0;
   };
   const getLineTotalAfterLineDiscount = (item: any) => {
-    const storedLineTotal = Number(item?.totalPrice);
-    if (Number.isFinite(storedLineTotal) && storedLineTotal >= 0) {
-      return storedLineTotal;
-    }
-
     return getItemBaseUnits(item) * getDiscountedUnitPrice(item);
   };
   const hasLineDiscount = (item: any) => {
@@ -183,6 +185,8 @@ export function printSalesInvoice({
   const amountAfterDiscount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - totalDiscountAmount));
   const returnedAmount = Math.max(0, Number(invoice.returnedAmount || 0));
   const finalTotalAmount = roundMoneyValue(Math.max(0, amountAfterDiscount - returnedAmount));
+  const paidAmount = Math.max(0, Number(invoice.paidAmount || 0));
+  const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - paidAmount));
   const discountLabel = 'Скидка';
 
   const getQuantityLabel = (item: any) => {
@@ -221,7 +225,9 @@ export function printSalesInvoice({
                 .join('')}</td>
               <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getDisplayPrice(item)))}</td>
               <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getUnitPrice(item)))}</td>
-              ${hasPriceAfterDiscountColumn ? `<td class="num-cell">${hasLineDiscount(item) ? escapeHtml(formatMoneyWithoutCurrency(getDiscountedUnitPrice(item))) : '—'}</td>` : ''}
+              ${hasPriceAfterDiscountColumn 
+                ? `<td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getDiscountedUnitPrice(item)))}</td>` 
+                : ''}
               <td class="num-cell">${escapeHtml(formatMoneyWithoutCurrency(getLineTotalAfterLineDiscount(item)))}</td>
             </tr>
           `,
@@ -339,7 +345,8 @@ export function printSalesInvoice({
             <div class="summary-row"><span>${escapeHtml(discountLabel)}</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(totalDiscountAmount))}</strong></div>
             <div class="summary-row"><span>Сумма после скидки</span><strong>${escapeHtml(formatMoneyWithoutCurrency(amountAfterDiscount))}</strong></div>
             ${returnedAmount > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(returnedAmount))}</strong></div>` : ''}
-            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoneyWithoutCurrency(finalTotalAmount))}</span></div>
+            ${paidAmount > 0 ? `<div class="summary-row"><span>Оплачено</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(paidAmount))}</strong></div>` : ''}
+            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoneyWithoutCurrency(paidAmount > 0 ? balanceDue : finalTotalAmount))}</span></div>
           </div>
         </div>
       </body>

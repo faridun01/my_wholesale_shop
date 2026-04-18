@@ -27,7 +27,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatCount, formatMoney, toFixedNumber } from '../utils/format';
+import { formatCount, formatMoney, toFixedNumber, roundMoney, ceilMoney } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import { getCustomers } from '../api/customers.api';
@@ -645,10 +645,10 @@ export default function SalesView() {
       quantity: String(totalUnits),
       sellingPrice:
         item?.sellingPrice !== undefined && item?.sellingPrice !== null
-          ? toFixedNumber(Number(item.sellingPrice))
+          ? String(toFixedNumber(Number(item.sellingPrice)))
           : isEmpty
             ? ''
-            : toFixedNumber(Number(product?.sellingPrice || 0)),
+            : String(toFixedNumber(Number(product?.sellingPrice || 0))),
       unit: baseUnitName,
       baseUnitName,
       packagings: existingPackaging && !packagings.some((entry: any) => Number(entry.id) === Number(existingPackaging.id))
@@ -819,7 +819,7 @@ export default function SalesView() {
     updateNormalizedEditInvoiceItem(itemKey, {
       productSearch: formatProductName(product.name),
       productId: Number(product.id),
-      sellingPrice: toFixedNumber(Number(product.sellingPrice || 0)),
+      sellingPrice: String(toFixedNumber(Number(product.sellingPrice || 0))),
       unit: normalizeDisplayBaseUnit(product.baseUnitName || product.unit || 'шт'),
       baseUnitName: normalizeDisplayBaseUnit(product.baseUnitName || product.unit || 'шт'),
       packagings,
@@ -864,8 +864,8 @@ export default function SalesView() {
         if (!Number.isFinite(quantity) || !Number.isFinite(sellingPrice) || quantity <= 0 || sellingPrice < 0) {
           return sum;
         }
-        const itemTotal = quantity * sellingPrice;
-        const itemDiscounted = itemTotal * (1 - (Number.isFinite(itemDiscount) ? itemDiscount : 0) / 100);
+        const unitPriceRounded = ceilMoney(sellingPrice * (1 - (Number.isFinite(itemDiscount) ? itemDiscount : 0) / 100));
+        const itemDiscounted = quantity * unitPriceRounded;
         return sum + itemDiscounted;
       }, 0),
     [editInvoiceItems],
@@ -876,7 +876,7 @@ export default function SalesView() {
     if (!Number.isFinite(discountPercent) || discountPercent <= 0) {
       return 0;
     }
-    return editInvoiceSubtotal * (discountPercent / 100);
+    return roundMoney(editInvoiceSubtotal * (discountPercent / 100));
   }, [editInvoiceSubtotal, editDiscount]);
 
   const editInvoiceTaxAmount = React.useMemo(() => {
@@ -888,7 +888,7 @@ export default function SalesView() {
   }, [selectedInvoice?.tax]);
 
   const editInvoiceNetAmount = React.useMemo(
-    () => Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount + editInvoiceTaxAmount),
+    () => roundMoney(Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount + editInvoiceTaxAmount)),
     [editInvoiceDiscountAmount, editInvoiceSubtotal, editInvoiceTaxAmount],
   );
 
@@ -1430,7 +1430,7 @@ export default function SalesView() {
                     onClick={() => {
                       if (paymentDisabled) return;
                       setSelectedInvoice(inv);
-                      setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
+                      setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
                       setShowPaymentModal(true);
                     }}
                     disabled={paymentDisabled}
@@ -1551,7 +1551,7 @@ export default function SalesView() {
                             e.stopPropagation();
                             if (paymentDisabled) return;
                             setSelectedInvoice(inv);
-                            setPaymentAmount(toFixedNumber(getInvoiceBalance(inv)));
+                            setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
                             setShowPaymentModal(true);
                           }}
                           disabled={paymentDisabled}
@@ -1889,7 +1889,7 @@ export default function SalesView() {
                 <button
                     onClick={() => {
                       if (isPaymentActionDisabled(selectedInvoice)) return;
-                      setPaymentAmount(toFixedNumber(getInvoiceBalance(selectedInvoice)));
+                      setPaymentAmount(String(toFixedNumber(getInvoiceBalance(selectedInvoice))));
                       setShowPaymentModal(true);
                     }}
                     disabled={isPaymentActionDisabled(selectedInvoice)}
@@ -2271,11 +2271,12 @@ export default function SalesView() {
                             <div className="rounded-2xl bg-violet-50 px-4 py-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-500">Итого</p>
                               <p className="mt-1 text-sm font-black text-violet-700">
-                                {formatMoney(
-                                  Math.max(0, Number(item.quantity || 0)) * 
-                                  Math.max(0, Number(item.sellingPrice || 0)) * 
-                                  (1 - (Math.max(0, Number(item.discount || 0)) / 100))
-                                )}
+                                {(() => {
+                                  const q = Math.max(0, Number(item.quantity || 0));
+                                  const p = Math.max(0, Number(item.sellingPrice || 0));
+                                  const d = Math.max(0, Number(item.discount || 0));
+                                  return formatMoney(q * ceilMoney(p * (1 - d / 100)));
+                                })()}
                               </p>
                             </div>
                           </div>

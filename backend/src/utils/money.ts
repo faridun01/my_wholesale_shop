@@ -7,6 +7,16 @@ export const roundMoney = (value: unknown, digits = 2) => {
   return Number(numeric.toFixed(digits));
 };
 
+export const ceilMoney = (value: unknown, digits = 2) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  const factor = Math.pow(10, digits);
+  return Math.ceil(numeric * factor) / factor;
+};
+
 export const normalizeMoney = (value: unknown, fieldName: string, options?: { allowZero?: boolean }) => {
   const normalized = roundMoney(value);
   const allowZero = options?.allowZero ?? true;

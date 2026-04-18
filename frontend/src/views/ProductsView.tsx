@@ -153,13 +153,13 @@ const normalizeDisplayBaseUnit = (value: string) => {
   return normalized;
 };
 
-const formatPriceInput = (value: unknown) => {
+const formatPriceInput = (value: unknown): string => {
   if (value === '' || value === null || value === undefined) {
     return '';
   }
 
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? toFixedNumber(numeric) : '';
+  return Number.isFinite(numeric) ? String(toFixedNumber(numeric)) : '';
 };
 
 type PackagingOption = {
@@ -3533,7 +3533,7 @@ export default function ProductsView() {
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
                         <div className="mt-1 flex flex-col">
                           {isAggregateMode ? (
-                             <p className="text-sm font-semibold text-slate-900">-</p>
+                            <p className="text-sm font-semibold text-slate-900">-</p>
                           ) : (
                             <>
                               <p className="text-sm font-semibold text-slate-900">
