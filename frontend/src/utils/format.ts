@@ -24,8 +24,9 @@ export function roundMoney(value: unknown, digits = 2) {
   return Number(numeric.toFixed(digits));
 }
 
-export function formatMoney(value: unknown, currency = 'TJS') {
-  return `${formatDecimal(value)} ${currency}`;
+export function formatMoney(value: unknown, currency = '') {
+  const formatted = formatDecimal(value);
+  return currency ? `${formatted} ${currency}` : formatted;
 }
 
 export function formatDollar(value: unknown) {

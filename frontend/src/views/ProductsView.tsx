@@ -526,6 +526,7 @@ export default function ProductsView() {
     packageQuantityInput: '',
     costPrice: '',
     sellingPrice: '',
+    expensePercent: '0',
     reason: '',
   });
   const [writeOffData, setWriteOffData] = useState({
@@ -566,6 +567,7 @@ export default function ProductsView() {
     packageQuantityInput: '',
     costPrice: '',
     sellingPrice: '',
+    expensePercent: '0',
     reason: '',
   };
 
@@ -913,7 +915,7 @@ export default function ProductsView() {
         costPrice: roundMoney(restockData.costPrice),
         purchaseCostPrice: roundMoney(restockData.costPrice),
         sellingPrice: roundMoney(restockData.sellingPrice || 0),
-        expensePercent: 0,
+        expensePercent: Number(restockData.expensePercent || 0),
         reason: restockData.reason
       });
       toast.success('Товар успешно пополнен!');
@@ -2161,7 +2163,7 @@ export default function ProductsView() {
                     </div>
                     {isAdmin && (
                       <div>
-                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Себестоимость (TJS)</label>
+                        <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Себестоимость</label>
                         <input
                           type="number"
                           step="0.01"
@@ -2178,7 +2180,7 @@ export default function ProductsView() {
                         )}
                       </div>
                     )}
-                    {isAdmin && showEditModal && (
+                    {isAdmin && (showAddModal || showEditModal) && (
                       <div>
                         <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Расходы %</label>
                         <input
@@ -2192,7 +2194,7 @@ export default function ProductsView() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Цена продажи (TJS)</label>
+                      <label className="block text-[10px] font-black text-slate-700 mb-1 uppercase tracking-widest">Цена продажи</label>
                       <input
                         type="number"
                         step="0.01"
@@ -2428,9 +2430,9 @@ export default function ProductsView() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[28rem] overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:rounded-[2rem]"
+                className="flex max-h-[92vh] w-full max-w-[28rem] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-[2rem]"
               >
-                <div className="border-b border-slate-100 bg-emerald-50/50 p-4 sm:p-6">
+                <div className="flex-shrink-0 border-b border-slate-100 bg-emerald-50/50 p-4 sm:p-6">
                   <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
                     <div className="rounded-2xl bg-emerald-600 p-2.5 text-white">
                       <PlusCircle size={20} />
@@ -2439,8 +2441,8 @@ export default function ProductsView() {
                   </h3>
                   <p className="mt-2 text-sm font-bold text-slate-500">{selectedProduct?.name}</p>
                 </div>
-                <form onSubmit={handleRestock} className="space-y-5 p-4 sm:p-6">
-                  <div className="space-y-4">
+                <form onSubmit={handleRestock} className="flex min-h-0 flex-col overflow-y-auto p-4 sm:p-6">
+                  <div className="flex-1 space-y-5">
                     <div>
                       <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Склад</label>
                       <select
@@ -2537,6 +2539,19 @@ export default function ProductsView() {
                           <p className="mt-2 text-xs font-medium text-slate-400">
                             Закупка за 1 шт без расходов.
                           </p>
+                        </div>
+                      )}
+                      {isAdmin && (
+                        <div>
+                          <label className="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-700">Расходы %</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={restockData.expensePercent}
+                            onChange={(e) => setRestockData((prev) => ({ ...prev, expensePercent: e.target.value }))}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 font-bold outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
                         </div>
                       )}
                       <div>
@@ -3517,13 +3532,26 @@ export default function ProductsView() {
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
                         <div className="mt-1 flex flex-col">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {isAggregateMode ? '-' : formatMoney(product.costPrice)}
-                          </p>
-                          {!isAggregateMode && product.priceHistory && product.priceHistory.length > 1 && (
-                            <p className="text-[10px] font-medium text-slate-400">
-                              Посл: <span className="line-through decoration-slate-300">{formatMoney(product.priceHistory[1].costPrice)}</span>
-                            </p>
+                          {isAggregateMode ? (
+                             <p className="text-sm font-semibold text-slate-900">-</p>
+                          ) : (
+                            <>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {(() => {
+                                  const activeBatches = (product.batches || [])
+                                    .filter((b: any) => Number(b.remainingQuantity) > 0)
+                                    .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                                  const currentBatch = activeBatches[0];
+                                  if (currentBatch) {
+                                    return formatMoney(currentBatch.costPrice);
+                                  }
+                                  return formatMoney(product.costPrice);
+                                })()}
+                              </p>
+                              <p className="text-[10px] font-medium text-slate-400">
+                                Посл: {formatMoney(product.costPrice)}
+                              </p>
+                            </>
                           )}
                         </div>
                       </div>
@@ -3586,6 +3614,7 @@ export default function ProductsView() {
                               packageQuantityInput: '',
                               costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
                               sellingPrice: formatPriceInput(product.sellingPrice),
+                              expensePercent: String(product.expensePercent ?? 0),
                               reason: '',
                             });
                             setShowRestockModal(true);
@@ -3758,12 +3787,21 @@ export default function ProductsView() {
                       <td className="px-5 py-3">
                         {selectedWarehouseId ? (
                           <div className="flex flex-col">
-                            <p className="text-xs font-semibold text-slate-900">{formatMoney(product.costPrice)}</p>
-                            {product.priceHistory && product.priceHistory.length > 1 && (
-                              <p className="text-[10px] font-medium text-slate-400">
-                                Посл: <span className="line-through decoration-slate-300">{formatMoney(product.priceHistory[1].costPrice)}</span>
-                              </p>
-                            )}
+                            <p className="text-xs font-semibold text-slate-900">
+                              {(() => {
+                                const activeBatches = (product.batches || [])
+                                  .filter((b: any) => Number(b.remainingQuantity) > 0)
+                                  .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                                const currentBatch = activeBatches[0];
+                                if (currentBatch) {
+                                  return formatMoney(currentBatch.costPrice);
+                                }
+                                return formatMoney(product.costPrice);
+                              })()}
+                            </p>
+                            <p className="text-[10px] font-medium text-slate-400">
+                              Посл: {formatMoney(product.costPrice)}
+                            </p>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-300">-</span>
@@ -3846,6 +3884,7 @@ export default function ProductsView() {
                                     packageQuantityInput: '',
                                     costPrice: formatPriceInput(product.purchaseCostPrice ?? product.costPrice),
                                     sellingPrice: formatPriceInput(product.sellingPrice),
+                                    expensePercent: String(product.expensePercent ?? 0),
                                     reason: '',
                                   });
                                   setShowRestockModal(true);
