@@ -17,6 +17,13 @@ import { roundMoney } from '../utils/money.js';
 
 const router = Router();
 const StockSvc = StockService as any;
+const isCorrectionWriteOffReason = (reason: unknown) => {
+  const nativeCheck = StockSvc?.isCorrectionWriteOffReason;
+  if (typeof nativeCheck === 'function') {
+    return Boolean(nativeCheck.call(StockSvc, reason));
+  }
+  return true;
+};
 
 const normalizeProductFamilyName = (value: string | null | undefined) =>
   normalizeProductName(String(value || '')).name
@@ -1179,7 +1186,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
           t.type === 'adjustment' &&
           Number(t.qtyChange || 0) < 0 &&
           String(t.reason || '').includes('Списание') &&
-          StockSvc.isCorrectionWriteOffReason(t.reason) &&
+          isCorrectionWriteOffReason(t.reason) &&
           returnedQty <= 0,
         canReturnWriteOff:
           access.isAdmin &&
