@@ -14,7 +14,10 @@ export const ceilMoney = (value: unknown, digits = 2) => {
 export const formatMoney = (value: unknown, currency = '') => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return `0 ${currency}`.trim();
-  const formatted = new Intl.NumberFormat('ru-RU').format(roundMoney(numeric));
+  const formatted = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(roundMoney(numeric));
   return `${formatted} ${currency}`.trim();
 };
 
