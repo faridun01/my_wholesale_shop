@@ -1,7 +1,8 @@
 const USER_KEY = 'user';
+const TOKEN_KEY = 'token';
 
 export function getAuthToken() {
-  return null;
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
 }
 
 export function getTokenPayload() {
@@ -17,9 +18,15 @@ export function hasStoredSession() {
 }
 
 export function setAuthSession(_token: string | null, user: unknown) {
+  if (_token) {
+    sessionStorage.setItem(TOKEN_KEY, _token);
+    localStorage.setItem(TOKEN_KEY, _token);
+  } else {
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+  }
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(USER_KEY, JSON.stringify(user));
-  localStorage.removeItem('token');
 }
 
 export function updateStoredUser(user: unknown) {
@@ -29,6 +36,8 @@ export function updateStoredUser(user: unknown) {
 
 export function clearAuthSession() {
   sessionStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('token');
   localStorage.removeItem(USER_KEY);
 }

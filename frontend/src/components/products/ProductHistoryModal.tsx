@@ -195,7 +195,7 @@ export default function ProductHistoryModal({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[94vh] w-full max-w-[60rem] flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2rem]"
+            className="flex max-h-[94vh] w-full max-w-240 flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-4xl"
           >
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 p-5 sm:p-6">
               <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
@@ -269,12 +269,12 @@ export default function ProductHistoryModal({
                       </div>
                       <div className="rounded-2xl bg-white px-3 py-3">
                         <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Пользователь</p>
-                        <p className="mt-1 break-words text-sm font-medium text-slate-900">{t.username || '---'}</p>
+                        <p className="mt-1 wrap-break-word text-sm font-medium text-slate-900">{t.username || '---'}</p>
                       </div>
                     </div>
                     <div className="mt-3 rounded-2xl bg-white px-3 py-3">
                       <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Причина</p>
-                      <p className="mt-1 break-words text-sm text-slate-600">{t.reason || '---'}</p>
+                      <p className="mt-1 wrap-break-word text-sm text-slate-600">{t.reason || '---'}</p>
                       {Number(t.returnedQty || 0) > 0 && (
                         <p className="mt-2 text-xs font-semibold text-emerald-700">Возвращено на склад: {Math.abs(Number(t.returnedQty || 0))}</p>
                       )}
@@ -355,14 +355,14 @@ export default function ProductHistoryModal({
                       <td className="py-3 pr-3 align-top font-black">
                         <div className="whitespace-pre-line">{getQuantityBreakdown(t.qtyChange ?? 0, product)}</div>
                       </td>
-                      <td className="py-3 pr-3 align-top break-words text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
-                      <td className="py-3 pr-3 align-top break-words italic text-slate-500">
+                      <td className="py-3 pr-3 align-top wrap-break-word text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
+                      <td className="py-3 pr-3 align-top wrap-break-word italic text-slate-500">
                         <div>{t.reason || '---'}</div>
                         {Number(t.returnedQty || 0) > 0 && (
                           <div className="mt-1 text-[11px] font-semibold not-italic text-emerald-700">Возвращено: {Math.abs(Number(t.returnedQty || 0))}</div>
                         )}
                       </td>
-                      <td className="py-3 pr-3 align-top break-words text-slate-500">{t.username || '---'}</td>
+                      <td className="py-3 pr-3 align-top wrap-break-word text-slate-500">{t.username || '---'}</td>
                       <td className="py-3 align-top text-right">
                         {t.canReverseIncoming && onReverseIncoming ? (
                           <button
