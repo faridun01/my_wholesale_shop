@@ -55,6 +55,7 @@ interface StatementItem {
   id: number;
   product?: { name?: string };
   quantity: number;
+  totalPrice?: number;
   totalBaseUnits?: number;
   packageQuantity?: number;
   extraUnitQuantity?: number;
@@ -73,6 +74,7 @@ interface StatementInvoice {
   createdAt: string;
   totalAmount: number;
   discount: number;
+  tax?: number;
   netAmount: number;
   paidAmount: number;
   returnedAmount: number;
@@ -317,10 +319,25 @@ export default function CustomerView() {
     setIsInvoiceDetailsOpen(true);
   };
 
-  const getInvoiceSubtotal = (invoice: StatementInvoice) =>
-    Array.isArray(invoice?.items)
-      ? invoice.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.sellingPrice || 0), 0)
-      : Number(invoice?.totalAmount || 0);
+  const getInvoiceSubtotal = (invoice: StatementInvoice) => {
+    const storedTotal = Math.max(0, Number(invoice?.totalAmount || 0));
+    if (storedTotal > PAYMENT_EPSILON) {
+      return storedTotal;
+    }
+
+    const itemsSubtotal = Array.isArray(invoice?.items)
+      ? invoice.items.reduce((sum, item) => {
+          const storedLineTotal = Number(item?.totalPrice || 0);
+          if (storedLineTotal > PAYMENT_EPSILON) {
+            return sum + storedLineTotal;
+          }
+
+          return sum + Number(item.quantity || 0) * Number(item.sellingPrice || 0);
+        }, 0)
+      : 0;
+
+    return itemsSubtotal;
+  };
 
   const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
     const subtotal = getInvoiceSubtotal(invoice);
@@ -329,15 +346,16 @@ export default function CustomerView() {
   };
 
   const getInvoiceNetAmount = (invoice: StatementInvoice) => {
-    const subtotal = getInvoiceSubtotal(invoice);
-    const discountAmount = getInvoiceDiscountAmount(invoice);
-    const returnedAmount = Number(invoice?.returnedAmount || 0);
-    const calculatedNet = subtotal - discountAmount - returnedAmount;
-    const storedNet = Number(invoice?.netAmount || 0);
-
-    if (Math.abs(calculatedNet - storedNet) <= PAYMENT_EPSILON) {
+    const storedNet = Math.max(0, Number(invoice?.netAmount || 0));
+    if (storedNet > PAYMENT_EPSILON) {
       return storedNet;
     }
+
+    const subtotal = getInvoiceSubtotal(invoice);
+    const discountAmount = getInvoiceDiscountAmount(invoice);
+    const taxAmount = Math.max(0, Number(invoice?.tax || 0));
+    const returnedAmount = Number(invoice?.returnedAmount || 0);
+    const calculatedNet = subtotal - discountAmount + taxAmount - returnedAmount;
 
     return Math.max(0, calculatedNet);
   };
@@ -532,7 +550,7 @@ export default function CustomerView() {
               </button>
             </div>
 
-            <div className="flex flex-wrap gap-2 rounded-[24px] bg-slate-100 p-2">
+            <div className="flex flex-wrap gap-2 rounded-3xl bg-slate-100 p-2">
               <NavLink to="/customers" end className={sectionTabClassName}>
                 База клиентов
               </NavLink>

@@ -32,6 +32,7 @@ type StatementInvoice = {
   createdAt: string;
   totalAmount: number;
   discount: number;
+  tax?: number;
   netAmount: number;
   paidAmount: number;
   returnedAmount: number;
@@ -317,20 +318,25 @@ export default function CustomerDebtsView() {
   }, [isAdmin, paginatedCustomers]);
 
   const getInvoiceSubtotal = (invoice: StatementInvoice) => {
-    const storedTotal = Number(invoice?.totalAmount || 0);
+    const storedTotal = Math.max(0, Number(invoice?.totalAmount || 0));
+    if (storedTotal > PAYMENT_EPSILON) {
+      return storedTotal;
+    }
+
     const itemsSubtotal = Array.isArray(invoice?.items)
       ? invoice.items.reduce((sum: number, item: any) => {
+          const storedLineTotal = Number(item?.totalPrice || 0);
+          if (storedLineTotal > PAYMENT_EPSILON) {
+            return sum + storedLineTotal;
+          }
+
           const quantity = Number(item?.quantity || 0);
-          const price = Number(item?.sellingPrice ?? item?.totalPrice ?? 0);
+          const price = Number(item?.sellingPrice || 0);
           return sum + quantity * price;
         }, 0)
       : 0;
 
-    if (itemsSubtotal > PAYMENT_EPSILON) {
-      return itemsSubtotal;
-    }
-
-    return storedTotal;
+    return itemsSubtotal;
   };
 
   const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
@@ -347,8 +353,9 @@ export default function CustomerDebtsView() {
 
     const subtotal = getInvoiceSubtotal(invoice);
     const discountAmount = getInvoiceDiscountAmount(invoice);
+    const taxAmount = Math.max(0, Number(invoice?.tax || 0));
     const returnedAmount = Number(invoice?.returnedAmount || 0);
-    const calculatedNet = subtotal - discountAmount - returnedAmount;
+    const calculatedNet = subtotal - discountAmount + taxAmount - returnedAmount;
 
     return Math.max(0, calculatedNet);
   };
