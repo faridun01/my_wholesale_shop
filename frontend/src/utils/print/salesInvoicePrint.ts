@@ -63,7 +63,7 @@ export function printSalesInvoice({
   invoice,
   subtotal,
   discountAmount,
-  netAmount: _netAmount,
+  netAmount: providedNetAmount,
 }: SalesInvoicePrintOptions) {
   if (typeof window === 'undefined' || !invoice) {
     return { ok: false, reason: 'invalid' as const };
@@ -87,6 +87,7 @@ export function printSalesInvoice({
   const invoiceItems = Array.isArray(invoice.items) ? invoice.items : [];
   const fallbackSubtotal = Math.max(0, Number(subtotal || 0));
   const fallbackDiscountAmount = Math.max(0, Number(discountAmount || 0));
+  const storedInvoiceNetAmount = Math.max(0, Number(providedNetAmount || invoice?.netAmount || 0));
 
   const getDisplayPrice = (item: any) => {
     const sellingPricePerUnit = Number(item.sellingPrice || 0);
@@ -109,15 +110,10 @@ export function printSalesInvoice({
       return explicitOriginalPrice;
     }
 
-    const snapshotProductPrice = Number(item?.product?.sellingPrice);
-    if (Number.isFinite(snapshotProductPrice) && snapshotProductPrice > 0) {
-      return snapshotProductPrice;
-    }
-
     const currentPrice = getCurrentUnitPrice(item);
     const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
     if (Number.isFinite(lineDiscountPercent) && lineDiscountPercent > 0 && lineDiscountPercent < 100) {
-      return currentPrice; // Wait, if currentPrice is ALREADY discounted in DB, then Original is current / (1 - d/100)
+      return currentPrice;
     }
 
     return currentPrice;
@@ -184,10 +180,15 @@ export function printSalesInvoice({
     invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalAfterFinalDiscount(item), 0),
   );
   const subtotalBeforeDiscount = invoiceItems.length > 0 ? subtotalBeforeDiscountFromItems : fallbackSubtotal;
-  const amountAfterDiscount = invoiceItems.length > 0 ? netAmountFromItems : roundMoneyValue(fallbackSubtotal - fallbackDiscountAmount);
-  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - amountAfterDiscount));
   const returnedAmount = Math.max(0, Number(invoice.returnedAmount || 0));
-  const finalTotalAmount = roundMoneyValue(Math.max(0, amountAfterDiscount - returnedAmount));
+  const computedAmountAfterDiscount = invoiceItems.length > 0
+    ? netAmountFromItems
+    : roundMoneyValue(fallbackSubtotal - fallbackDiscountAmount);
+  const finalTotalAmount = storedInvoiceNetAmount > 0
+    ? storedInvoiceNetAmount
+    : roundMoneyValue(Math.max(0, computedAmountAfterDiscount - returnedAmount));
+  const amountAfterDiscount = roundMoneyValue(finalTotalAmount + returnedAmount);
+  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - amountAfterDiscount));
   const paidAmount = Math.max(0, Number(invoice.paidAmount || 0));
   const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - paidAmount));
   const discountLabel = 'Скидка';
@@ -349,7 +350,8 @@ export function printSalesInvoice({
             <div class="summary-row"><span>Сумма после скидки</span><strong>${escapeHtml(formatMoneyWithoutCurrency(amountAfterDiscount))}</strong></div>
             ${returnedAmount > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(returnedAmount))}</strong></div>` : ''}
             ${paidAmount > 0 ? `<div class="summary-row"><span>Оплачено</span><strong>-${escapeHtml(formatMoneyWithoutCurrency(paidAmount))}</strong></div>` : ''}
-            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoneyWithoutCurrency(paidAmount > 0 ? balanceDue : finalTotalAmount))}</span></div>
+            ${paidAmount > 0 ? `<div class="summary-row"><span>Остаток</span><strong>${escapeHtml(formatMoneyWithoutCurrency(balanceDue))}</strong></div>` : ''}
+            <div class="summary-row total"><span>Итого</span><span>${escapeHtml(formatMoneyWithoutCurrency(finalTotalAmount))}</span></div>
           </div>
         </div>
       </body>
