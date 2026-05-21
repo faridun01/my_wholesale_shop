@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   AlertTriangle,
+  Banknote,
   BarChart3,
   Boxes,
   Briefcase,
@@ -12,12 +13,12 @@ import {
   TrendingUp,
   Users,
   Warehouse,
-  Banknote,
 } from 'lucide-react';
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -53,6 +54,8 @@ type NamedMetric = {
   quantity?: number;
   value?: number;
   operations?: number;
+  profitPerUnit?: number;
+  profitMargin?: number;
 };
 
 type AnalyticsPayload = {
@@ -70,7 +73,7 @@ type AnalyticsPayload = {
 };
 
 type PeriodMode = 'month' | 'quarter' | 'year';
-type SectionKey = 'overview' | 'products' | 'staff';
+type SectionKey = 'overview' | 'products' | 'staff' | 'customers' | 'writeoffs';
 
 function formatDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -84,27 +87,30 @@ function getMonthAnchor(date: Date) {
 }
 
 function getMonthRange(year: number, monthIndex: number) {
-  const start = new Date(year, monthIndex, 1);
-  const end = new Date(year, monthIndex + 1, 0);
-  return { start: formatDateInputValue(start), end: formatDateInputValue(end) };
+  return {
+    start: formatDateInputValue(new Date(year, monthIndex, 1)),
+    end: formatDateInputValue(new Date(year, monthIndex + 1, 0)),
+  };
 }
 
 function getQuarterRange(year: number, monthIndex: number) {
   const quarterStartMonth = Math.floor(monthIndex / 3) * 3;
-  const start = new Date(year, quarterStartMonth, 1);
-  const end = new Date(year, quarterStartMonth + 3, 0);
-  return { start: formatDateInputValue(start), end: formatDateInputValue(end) };
+  return {
+    start: formatDateInputValue(new Date(year, quarterStartMonth, 1)),
+    end: formatDateInputValue(new Date(year, quarterStartMonth + 3, 0)),
+  };
 }
 
 function getYearRange(year: number) {
-  const start = new Date(year, 0, 1);
-  const end = new Date(year, 12, 0);
-  return { start: formatDateInputValue(start), end: formatDateInputValue(end) };
+  return {
+    start: formatDateInputValue(new Date(year, 0, 1)),
+    end: formatDateInputValue(new Date(year, 12, 0)),
+  };
 }
 
 function getRangeFromAnchor(anchor: string, mode: PeriodMode) {
   const [yearRaw, monthRaw] = anchor.split('-');
-  const year = Number(yearRaw);
+  const year = Number(yearRaw) || new Date().getFullYear();
   const monthIndex = Math.max(0, Number(monthRaw || '1') - 1);
 
   if (mode === 'quarter') return getQuarterRange(year, monthIndex);
@@ -114,20 +120,35 @@ function getRangeFromAnchor(anchor: string, mode: PeriodMode) {
 
 function getPeriodLabel(anchor: string, mode: PeriodMode) {
   const [yearRaw, monthRaw] = anchor.split('-');
-  const year = Number(yearRaw);
+  const year = Number(yearRaw) || new Date().getFullYear();
   const monthIndex = Math.max(0, Number(monthRaw || '1') - 1);
 
-  if (mode === 'year') return 'Год ' + year;
-  if (mode === 'quarter') return String(Math.floor(monthIndex / 3) + 1) + ' квартал ' + year;
+  if (mode === 'year') return `Год ${year}`;
+  if (mode === 'quarter') return `${Math.floor(monthIndex / 3) + 1} квартал ${year}`;
 
-  const labelDate = new Date(year, monthIndex, 1);
-  return new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(labelDate);
+  return new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(new Date(year, monthIndex, 1));
 }
 
 function getQuickRangeLabel(mode: PeriodMode) {
   if (mode === 'quarter') return 'Этот квартал';
   if (mode === 'year') return 'Этот год';
   return 'Этот месяц';
+}
+
+function sortByNumber<T extends NamedMetric>(rows: T[], key: keyof T, fallback?: keyof T) {
+  return [...rows].sort((a, b) => {
+    const primary = Number(b[key] || 0) - Number(a[key] || 0);
+    if (primary !== 0 || !fallback) return primary;
+    return Number(b[fallback] || 0) - Number(a[fallback] || 0);
+  });
+}
+
+function EmptyState({ label = 'Нет данных за выбранный период' }: { label?: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+      {label}
+    </div>
+  );
 }
 
 function Panel({
@@ -161,24 +182,48 @@ function MetricCard({
   label: string;
   value: string;
   help: string;
-  tone?: 'slate' | 'emerald' | 'amber' | 'sky';
+  tone?: 'slate' | 'emerald' | 'amber' | 'sky' | 'rose';
 }) {
   const toneMap = {
     slate: 'border-slate-200 bg-white',
     emerald: 'border-emerald-100 bg-gradient-to-br from-emerald-50 to-white',
     amber: 'border-amber-100 bg-gradient-to-br from-amber-50 to-white',
     sky: 'border-sky-100 bg-gradient-to-br from-sky-50 to-white',
+    rose: 'border-rose-100 bg-gradient-to-br from-rose-50 to-white',
   } as const;
 
   return (
     <article className={`rounded-[26px] border p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.35)] ${toneMap[tone]}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="rounded-2xl bg-white/90 p-2.5 shadow-sm">{icon}</div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+        <p className="text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
       </div>
       <p className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
       <p className="mt-2 text-sm text-slate-500">{help}</p>
     </article>
+  );
+}
+
+function LeaderInsight({
+  icon,
+  title,
+  value,
+  meta,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  meta: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+        {icon}
+        <span>{title}</span>
+      </div>
+      <p className="mt-2 truncate text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-1 text-xs text-slate-500">{meta}</p>
+    </div>
   );
 }
 
@@ -224,9 +269,7 @@ function RankTable({
             </article>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
-            Нет данных
-          </div>
+          <EmptyState />
         )}
       </div>
     </section>
@@ -242,7 +285,13 @@ function AnalyticsDataTable({
   title: string;
   hint: string;
   rows: NamedMetric[];
-  columns: Array<{ key: string; label: string; align?: 'left' | 'right'; className?: string; render: (row: NamedMetric, index: number) => React.ReactNode }>;
+  columns: Array<{
+    key: string;
+    label: string;
+    align?: 'left' | 'right';
+    className?: string;
+    render: (row: NamedMetric, index: number) => React.ReactNode;
+  }>;
 }) {
   return (
     <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.32)]">
@@ -281,7 +330,7 @@ function AnalyticsDataTable({
             ) : (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-slate-400">
-                  Нет данных
+                  Нет данных за выбранный период
                 </td>
               </tr>
             )}
@@ -292,25 +341,27 @@ function AnalyticsDataTable({
   );
 }
 
-function LeaderInsight({
-  icon,
-  title,
-  value,
-  meta,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  meta: string;
-}) {
+function AnalyticsChart({ rows }: { rows: AnalyticsPayload['chartData'] }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-      <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-        {icon}
-        <span>{title}</span>
-      </div>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{meta}</p>
+    <div className="h-[320px] rounded-[26px] border border-slate-200 bg-white p-4">
+      {rows.length ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => formatMoney(value)} />
+            <RechartsTooltip
+              formatter={(value, name) => [formatMoney(value), name === 'sales' ? 'Выручка' : 'Прибыль']}
+              labelFormatter={(label) => `Период: ${label}`}
+            />
+            <Legend formatter={(value) => (value === 'sales' ? 'Выручка' : 'Прибыль')} />
+            <Bar dataKey="sales" fill="#0284c7" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="profit" fill="#059669" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex h-full items-center justify-center text-sm text-slate-400">Нет данных для графика</div>
+      )}
     </div>
   );
 }
@@ -347,20 +398,17 @@ export default function AnalyticsView() {
       end: dateRange.end,
     })
       .then((response) => {
-        if (!cancelled) {
-          setData(response);
-        }
+        if (!cancelled) setData(response);
       })
       .catch((error) => {
         console.error(error);
         if (!cancelled) {
+          setData(null);
           toast.error('Не удалось загрузить аналитику');
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       });
 
     return () => {
@@ -375,12 +423,12 @@ export default function AnalyticsView() {
   const topWriteoffReason = data?.writeoffReasons?.[0] || null;
   const topCustomer = data?.customerPerformance?.[0] || null;
   const topDebtor = data?.customerDebts?.[0] || null;
+
   const topSellingProducts = useMemo(
-    () =>
-      [...(data?.productPerformance || [])]
-        .sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0) || Number(b.revenue || 0) - Number(a.revenue || 0)),
+    () => sortByNumber(data?.productPerformance || [], 'quantity', 'revenue'),
     [data?.productPerformance]
   );
+
   const productEfficiencyRows = useMemo(
     () =>
       (data?.productPerformance || [])
@@ -388,37 +436,27 @@ export default function AnalyticsView() {
           const quantity = Number(row.quantity || 0);
           const revenue = Number(row.revenue || 0);
           const profit = Number(row.profit || 0);
-          const profitPerUnit = quantity > 0 ? profit / quantity : 0;
-          const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
-
           return {
             ...row,
             quantity,
             revenue,
             profit,
-            profitPerUnit,
-            profitMargin,
+            profitPerUnit: quantity > 0 ? profit / quantity : 0,
+            profitMargin: revenue > 0 ? (profit / revenue) * 100 : 0,
           };
         })
-        .filter((row) => row.profit > 0 && row.quantity > 0)
-        .sort((a, b) => {
-          if (b.profitPerUnit !== a.profitPerUnit) {
-            return b.profitPerUnit - a.profitPerUnit;
-          }
-          return b.profit - a.profit;
-        }),
+        .filter((row) => Number(row.quantity || 0) > 0)
+        .sort((a, b) => Number(b.profitPerUnit || 0) - Number(a.profitPerUnit || 0) || Number(b.profit || 0) - Number(a.profit || 0)),
     [data?.productPerformance]
   );
-  const staffSalesLeaders = useMemo(
-    () =>
-      [...(data?.staffPerformance || [])]
-        .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0) || Number(b.profit || 0) - Number(a.profit || 0)),
-    [data?.staffPerformance]
-  );
+
+  const staffSalesLeaders = useMemo(() => sortByNumber(data?.staffPerformance || [], 'revenue', 'profit'), [data?.staffPerformance]);
+  const staffProfitLeaders = useMemo(() => sortByNumber(data?.staffPerformance || [], 'profit', 'revenue'), [data?.staffPerformance]);
+  const customerRevenueLeaders = useMemo(() => sortByNumber(data?.customerPerformance || [], 'revenue', 'debt'), [data?.customerPerformance]);
+  const customerDebtLeaders = useMemo(() => sortByNumber(data?.customerDebts || [], 'debt', 'revenue'), [data?.customerDebts]);
 
   const actionItems = useMemo(() => {
     const items: Array<{ title: string; detail: string; tone: 'rose' | 'amber' | 'sky' | 'emerald' }> = [];
-
     const margin = Number(summary?.margin || 0);
     const debts = Number(summary?.totalDebts || 0);
     const revenue = Number(summary?.totalRevenue || 0);
@@ -429,7 +467,7 @@ export default function AnalyticsView() {
     if (margin > 0 && margin < 12) {
       items.push({
         title: 'Маржа низкая',
-        detail: 'Средняя маржа ' + formatPercent(margin, 1) + '. Проверьте цену и себестоимость.',
+        detail: `Средняя маржа ${formatPercent(margin, 1)}. Проверьте цену и себестоимость товаров.`,
         tone: 'amber',
       });
     }
@@ -437,7 +475,7 @@ export default function AnalyticsView() {
     if (debtShare >= 20) {
       items.push({
         title: 'Долги высокие',
-        detail: 'Доля долгов ' + formatPercent(debtShare, 1) + ' от выручки. Нужен контроль оплат.',
+        detail: `Доля долгов ${formatPercent(debtShare, 1)} от выручки. Нужен контроль оплат.`,
         tone: 'rose',
       });
     }
@@ -445,7 +483,7 @@ export default function AnalyticsView() {
     if (topLossShare >= 3) {
       items.push({
         title: 'Списания заметные',
-        detail: 'Потери по главной причине уже ' + formatPercent(topLossShare, 1) + ' от выручки.',
+        detail: `Потери по главной причине уже ${formatPercent(topLossShare, 1)} от выручки.`,
         tone: 'rose',
       });
     }
@@ -453,7 +491,7 @@ export default function AnalyticsView() {
     if (topProduct && Number(topProduct.profit || 0) > 0) {
       items.push({
         title: 'Лидер по товару',
-        detail: topProduct.name + ' приносит максимум прибыли. Держите в наличии.',
+        detail: `${topProduct.name} приносит максимум прибыли. Держите его в наличии.`,
         tone: 'emerald',
       });
     }
@@ -461,7 +499,7 @@ export default function AnalyticsView() {
     if (topCustomer && topDebtor && topCustomer.name === topDebtor.name) {
       items.push({
         title: 'Крупный клиент в долге',
-        detail: topDebtor.name + ' даёт оборот и одновременно держит самый большой долг.',
+        detail: `${topDebtor.name} дает оборот и одновременно держит самый большой долг.`,
         tone: 'sky',
       });
     }
@@ -481,6 +519,24 @@ export default function AnalyticsView() {
     { key: 'overview', label: 'Главное' },
     { key: 'products', label: 'Товары' },
     { key: 'staff', label: 'Сотрудники' },
+    { key: 'customers', label: 'Клиенты' },
+    { key: 'writeoffs', label: 'Списания' },
+  ];
+
+  const commonProductColumns = [
+    { key: 'rank', label: '№', render: (_: NamedMetric, index: number) => index + 1, className: 'w-14' },
+    { key: 'name', label: 'Товар', render: (row: NamedMetric) => row.name || '-' },
+    { key: 'quantity', label: 'Продано', render: (row: NamedMetric) => formatCount(row.quantity || 0), align: 'right' as const },
+    { key: 'revenue', label: 'Выручка', render: (row: NamedMetric) => formatMoney(row.revenue || 0), align: 'right' as const },
+    { key: 'profit', label: 'Прибыль', render: (row: NamedMetric) => formatMoney(row.profit || 0), align: 'right' as const },
+  ];
+
+  const commonStaffColumns = [
+    { key: 'rank', label: '№', render: (_: NamedMetric, index: number) => index + 1, className: 'w-14' },
+    { key: 'name', label: 'Сотрудник', render: (row: NamedMetric) => row.name || '-' },
+    { key: 'invoices', label: 'Накладные', render: (row: NamedMetric) => formatCount(row.invoices || 0), align: 'right' as const },
+    { key: 'revenue', label: 'Выручка', render: (row: NamedMetric) => formatMoney(row.revenue || 0), align: 'right' as const },
+    { key: 'profit', label: 'Прибыль', render: (row: NamedMetric) => formatMoney(row.profit || 0), align: 'right' as const },
   ];
 
   return (
@@ -495,24 +551,28 @@ export default function AnalyticsView() {
               </div>
               <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">Аналитика CRM</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                Главные показатели бизнеса в аккуратном формате: самые продаваемые товары, товары по эффективности прибыли и результат сотрудников.
+                Полная картина бизнеса: выручка, прибыль, расходы, склады, товары, сотрудники, клиенты, долги и списания за выбранный период.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Период</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{periodLabel}</p>
-                  <p className="mt-1 text-xs text-slate-500">{dateRange.start} - {dateRange.end}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {dateRange.start} - {dateRange.end}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Продажи</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{formatCount(summary?.totalSalesCount || 0)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Всего накладных за период</p>
+                  <p className="mt-1 text-xs text-slate-500">Накладных за период</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Ассортимент</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{formatCount(summary?.totalProducts || 0)}</p>
-                  <p className="mt-1 text-xs text-slate-500">Товаров в движении</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Склад</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {selectedWarehouseId ? warehouses.find((item) => String(item.id) === selectedWarehouseId)?.name || 'Выбранный склад' : 'Все склады'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Фильтр применяется ко всем блокам</p>
                 </div>
               </div>
             </div>
@@ -521,7 +581,7 @@ export default function AnalyticsView() {
               <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <CalendarRange size={16} className="text-slate-500" />
-                  {'Управление периодом'}
+                  Управление периодом
                 </div>
 
                 <div className="mt-4 inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1">
@@ -551,7 +611,7 @@ export default function AnalyticsView() {
                       onChange={(event) => setSelectedWarehouseId(event.target.value)}
                       className="w-full appearance-none bg-transparent text-[13px] text-slate-700 outline-none"
                     >
-                      <option value="">{'\u0412\u0441\u0435 \u0441\u043a\u043b\u0430\u0434\u044b'}</option>
+                      <option value="">Все склады</option>
                       {warehouses.map((warehouse) => (
                         <option key={warehouse.id} value={warehouse.id}>
                           {warehouse.name}
@@ -561,19 +621,21 @@ export default function AnalyticsView() {
                   </div>
 
                   <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                    <span className="text-[13px] text-slate-400">{'\u0411\u0430\u0437\u0430'}</span>
+                    <span className="text-[13px] text-slate-400">База</span>
                     <input
                       type="month"
                       value={periodAnchor}
-                      onChange={(event) => setPeriodAnchor(event.target.value)}
+                      onChange={(event) => setPeriodAnchor(event.target.value || defaultAnchor)}
                       className="w-full bg-transparent text-[13px] text-slate-700 outline-none"
                     />
                   </div>
 
                   <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">{'\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Активный диапазон</p>
                     <p className="mt-2 text-sm font-semibold">{getQuickRangeLabel(periodMode)}</p>
-                    <p className="mt-1 text-xs text-slate-300">{dateRange.start} - {dateRange.end}</p>
+                    <p className="mt-1 text-xs text-slate-300">
+                      {dateRange.start} - {dateRange.end}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -582,15 +644,15 @@ export default function AnalyticsView() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <MetricCard icon={<DollarSign size={18} className="text-emerald-700" />} label={'\u0412\u044b\u0440\u0443\u0447\u043a\u0430'} value={formatMoney(summary?.totalRevenue || 0)} help={'\u041e\u0431\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442.'} tone="emerald" />
-          <MetricCard icon={<TrendingUp size={18} className="text-sky-700" />} label={'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c'} value={formatMoney(summary?.netProfit || 0)} help={'\u0414\u043e\u0445\u043e\u0434 \u0437\u0430 \u0432\u044b\u0447\u0435\u0442\u043e\u043c \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432.'} tone="sky" />
-          <MetricCard icon={<Banknote size={18} className="text-rose-700" />} label={'\u0420\u0430\u0441\u0445\u043e\u0434\u044b'} value={formatMoney(summary?.totalExpenses || 0)} help={'\u0410\u0440\u0435\u043d\u0434\u0430, \u0437/\u043f \u0438 \u0434\u0440.'} tone="amber" />
-          <MetricCard icon={<Boxes size={18} className="text-amber-700" />} label={'\u041c\u0430\u0440\u0436\u0430 (\u0447\u0438\u0441\u0442.)'} value={formatPercent(summary?.margin || 0, 1)} help={'\u0420\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0431\u0438\u0437\u043d\u0435\u0441\u0430.'} tone="amber" />
-          <MetricCard icon={<Package size={18} className="text-slate-700" />} label={'\u0414\u043e\u043b\u0433\u0438'} value={formatMoney(summary?.totalDebts || 0)} help={'\u041d\u0435\u043e\u043f\u043b\u0430\u0447\u0435\u043d\u043d\u044b\u0435 \u0441\u0443\u043c\u043c\u044b.'} tone="slate" />
+          <MetricCard icon={<DollarSign size={18} className="text-emerald-700" />} label="Выручка" value={formatMoney(summary?.totalRevenue || 0)} help="Оборот за период." tone="emerald" />
+          <MetricCard icon={<TrendingUp size={18} className="text-sky-700" />} label="Чистая прибыль" value={formatMoney(summary?.netProfit || 0)} help="Прибыль минус расходы." tone="sky" />
+          <MetricCard icon={<Banknote size={18} className="text-rose-700" />} label="Расходы" value={formatMoney(summary?.totalExpenses || 0)} help="Расходы за период." tone="rose" />
+          <MetricCard icon={<Boxes size={18} className="text-amber-700" />} label="Маржа" value={formatPercent(summary?.margin || 0, 1)} help="Рентабельность продаж." tone="amber" />
+          <MetricCard icon={<Package size={18} className="text-slate-700" />} label="Долги" value={formatMoney(summary?.totalDebts || 0)} help="Неоплаченная сумма." tone="slate" />
         </section>
 
         <section className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_14px_36px_-24px_rgba(15,23,42,0.35)]">
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-5">
             {sections.map((section) => (
               <button
                 key={section.key}
@@ -606,111 +668,113 @@ export default function AnalyticsView() {
           </div>
         </section>
 
-        {activeSection === 'overview' ? (
-          <Panel title={'\u0413\u043b\u0430\u0432\u043d\u0430\u044f \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430'} description={'\u0422\u0440\u0438 \u0433\u043b\u0430\u0432\u043d\u044b\u0445 \u043f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b\u0430 \u0434\u043b\u044f \u0430\u0434\u043c\u0438\u043d\u0430 \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435.'}>
-            {isLoading ? (
-              <div className="py-16 text-center text-sm text-slate-400">{'\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438...'}</div>
-            ) : (
-              <div className="space-y-4">
-                <AnalyticsDataTable
-                  title={'\u0421\u0430\u043c\u044b\u0435 \u043f\u0440\u043e\u0434\u0430\u0432\u0430\u0435\u043c\u044b\u0435 \u0442\u043e\u0432\u0430\u0440\u044b'}
-                  hint={'\u0421\u043f\u0438\u0441\u043e\u043a \u043e\u0442\u0441\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d \u043f\u043e \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0443 \u043f\u0440\u043e\u0434\u0430\u0436.'}
-                  rows={topSellingProducts}
-                  columns={[
-                    { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                    { key: 'name', label: '\u0422\u043e\u0432\u0430\u0440', render: (row) => row.name || '-' },
-                    { key: 'quantity', label: '\u041f\u0440\u043e\u0434\u0430\u043d\u043e', render: (row) => formatCount(row.quantity || 0), align: 'right' },
-                    { key: 'revenue', label: '\u0412\u044b\u0440\u0443\u0447\u043a\u0430', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
-                    { key: 'profit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
-                  ]}
-                />
-                <AnalyticsDataTable
-                  title={'\u0422\u043e\u0432\u0430\u0440\u044b \u043f\u043e \u0440\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438'}
-                  hint={'\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442, \u043a\u0430\u043a\u0438\u0435 \u0442\u043e\u0432\u0430\u0440\u044b \u0434\u0430\u044e\u0442 \u043b\u0443\u0447\u0448\u0443\u044e \u043e\u0442\u0434\u0430\u0447\u0443 \u043f\u043e \u043f\u0440\u0438\u0431\u044b\u043b\u0438.'}
-                  rows={productEfficiencyRows}
-                  columns={[
-                    { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                    { key: 'name', label: '\u0422\u043e\u0432\u0430\u0440', render: (row) => row.name || '-' },
-                    { key: 'profitMargin', label: '\u0420\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c', render: (row) => formatPercent((row as NamedMetric & { profitMargin?: number }).profitMargin || 0, 1), align: 'right' },
-                    { key: 'profitPerUnit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0437\u0430 1 \u0448\u0442', render: (row) => formatMoney((row as NamedMetric & { profitPerUnit?: number }).profitPerUnit || 0), align: 'right' },
-                    { key: 'profit', label: '\u041e\u0431\u0449\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
-                  ]}
-                />
-                <AnalyticsDataTable
-                  title={'\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432'}
-                  hint={'\u041a\u0442\u043e \u0434\u0435\u043b\u0430\u0435\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u043f\u0440\u043e\u0434\u0430\u0436 \u0438 \u043a\u0442\u043e \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u043f\u0440\u0438\u0431\u044b\u043b\u0438.'}
-                  rows={staffSalesLeaders}
-                  columns={[
-                    { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                    { key: 'name', label: '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a', render: (row) => row.name || '-' },
-                    { key: 'invoices', label: '\u041d\u0430\u043a\u043b\u0430\u0434\u043d\u044b\u0435', render: (row) => formatCount(row.invoices || 0), align: 'right' },
-                    { key: 'revenue', label: '\u0412\u044b\u0440\u0443\u0447\u043a\u0430', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
-                    { key: 'profit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
-                  ]}
-                />
-              </div>
-            )}
+        {isLoading ? (
+          <Panel title="Загрузка аналитики" description="Собираем данные по продажам, товарам, сотрудникам и списаниям.">
+            <div className="py-16 text-center text-sm text-slate-400">Загрузка аналитики...</div>
           </Panel>
         ) : null}
 
-        {activeSection === 'products' ? (
-          <Panel title={'\u0410\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u043f\u043e \u0442\u043e\u0432\u0430\u0440\u0430\u043c'} description={'\u041e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u043f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b\u044b \u043f\u043e \u043f\u0440\u043e\u0434\u0430\u0436\u0430\u043c \u0438 \u043f\u043e \u044d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u043f\u0440\u0438\u0431\u044b\u043b\u0438.'}>
+        {!isLoading && activeSection === 'overview' ? (
+          <Panel title="Главная аналитика" description="Ключевые показатели и быстрые выводы по выбранному периоду.">
+            <div className="space-y-5">
+              <AnalyticsChart rows={data?.chartData || []} />
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <LeaderInsight icon={<Package size={16} />} title="Товар-лидер" value={topProduct?.name || '-'} meta={topProduct ? formatMoney(topProduct.profit || 0) : 'Нет данных'} />
+                <LeaderInsight icon={<Briefcase size={16} />} title="Сотрудник-лидер" value={topStaff?.name || '-'} meta={topStaff ? formatMoney(topStaff.revenue || 0) : 'Нет данных'} />
+                <LeaderInsight icon={<Building2 size={16} />} title="Склад-лидер" value={topWarehouse?.name || '-'} meta={topWarehouse ? formatMoney(topWarehouse.sales || 0) : 'Нет данных'} />
+                <LeaderInsight icon={<AlertTriangle size={16} />} title="Главная причина списаний" value={topWriteoffReason?.name || '-'} meta={topWriteoffReason ? formatMoney(topWriteoffReason.value || 0) : 'Нет данных'} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <RankTable title="Склады по выручке" hint="Сравнение складов за период." rows={sortByNumber(data?.warehousePerformance || [], 'sales', 'profit')} primaryLabel="Выручка" primaryValue={(row) => formatMoney(row.sales || 0)} secondaryValue={(row) => `Прибыль: ${formatMoney(row.profit || 0)}`} />
+                  <RankTable title="Клиенты по обороту" hint="Кто дал больше всего продаж." rows={customerRevenueLeaders} primaryLabel="Оборот" primaryValue={(row) => formatMoney(row.revenue || 0)} secondaryValue={(row) => `Накладные: ${formatCount(row.invoices || 0)}`} />
+                </div>
+
+                <section className="rounded-[26px] border border-slate-200 bg-slate-50/70 p-4">
+                  <h3 className="text-base font-semibold text-slate-900">Что требует внимания</h3>
+                  <div className="mt-4 space-y-3">
+                    {actionItems.map((item) => (
+                      <div key={item.title} className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                        <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                        <p className="mt-1 text-sm leading-5 text-slate-500">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
+        {!isLoading && activeSection === 'products' ? (
+          <Panel title="Аналитика по товарам" description="Продажи, прибыль и эффективность ассортимента.">
             <div className="space-y-4">
+              <AnalyticsDataTable title="Самые продаваемые товары" hint="Сортировка по количеству проданных единиц." rows={topSellingProducts} columns={commonProductColumns} />
               <AnalyticsDataTable
-                title={'\u041f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b: \u0441\u0430\u043c\u044b\u0435 \u043f\u0440\u043e\u0434\u0430\u0432\u0430\u0435\u043c\u044b\u0435 \u0442\u043e\u0432\u0430\u0440\u044b'}
-                hint={'\u0422\u043e\u0432\u0430\u0440\u044b \u043e\u0442\u0441\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u044b \u043f\u043e \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0443 \u043f\u0440\u043e\u0434\u0430\u043d\u043d\u044b\u0445 \u0435\u0434\u0438\u043d\u0438\u0446.'}
-                rows={topSellingProducts}
-                columns={[
-                  { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                  { key: 'name', label: '\u0422\u043e\u0432\u0430\u0440', render: (row) => row.name || '-' },
-                  { key: 'quantity', label: '\u041f\u0440\u043e\u0434\u0430\u043d\u043e', render: (row) => formatCount(row.quantity || 0), align: 'right' },
-                  { key: 'revenue', label: '\u0412\u044b\u0440\u0443\u0447\u043a\u0430', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
-                  { key: 'profit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
-                ]}
-              />
-              <AnalyticsDataTable
-                title={'\u041f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b: \u0442\u043e\u0432\u0430\u0440\u044b \u043f\u043e \u0440\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438'}
-                hint={'\u0414\u0430\u0436\u0435 \u0435\u0441\u043b\u0438 \u0442\u043e\u0432\u0430\u0440 \u043f\u0440\u043e\u0434\u0430\u0451\u0442\u0441\u044f \u0440\u0435\u0436\u0435, \u0437\u0434\u0435\u0441\u044c \u0432\u0438\u0434\u043d\u043e, \u043d\u0430\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u043e\u043d \u0432\u044b\u0433\u043e\u0434\u0435\u043d.'}
+                title="Товары по рентабельности"
+                hint="Показывает прибыль на единицу и маржу товара."
                 rows={productEfficiencyRows}
                 columns={[
-                  { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                  { key: 'name', label: '\u0422\u043e\u0432\u0430\u0440', render: (row) => row.name || '-' },
-                  { key: 'profitMargin', label: '\u0420\u0435\u043d\u0442\u0430\u0431\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c', render: (row) => formatPercent((row as NamedMetric & { profitMargin?: number }).profitMargin || 0, 1), align: 'right' },
-                  { key: 'profitPerUnit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0437\u0430 1 \u0448\u0442', render: (row) => formatMoney((row as NamedMetric & { profitPerUnit?: number }).profitPerUnit || 0), align: 'right' },
-                  { key: 'quantity', label: '\u041f\u0440\u043e\u0434\u0430\u043d\u043e', render: (row) => formatCount(row.quantity || 0), align: 'right' },
+                  { key: 'rank', label: '№', render: (_, index) => index + 1, className: 'w-14' },
+                  { key: 'name', label: 'Товар', render: (row) => row.name || '-' },
+                  { key: 'profitMargin', label: 'Маржа', render: (row) => formatPercent(row.profitMargin || 0, 1), align: 'right' },
+                  { key: 'profitPerUnit', label: 'Прибыль / шт', render: (row) => formatMoney(row.profitPerUnit || 0), align: 'right' },
+                  { key: 'profit', label: 'Общая прибыль', render: (row) => formatMoney(row.profit || 0), align: 'right' },
                 ]}
               />
             </div>
           </Panel>
         ) : null}
 
-        {activeSection === 'staff' ? (
-          <Panel title={'\u0410\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u043f\u043e \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430\u043c'} description={'\u041e\u0442\u0434\u0435\u043b\u044c\u043d\u043e \u0432\u0438\u0434\u043d\u043e, \u043a\u0442\u043e \u043f\u0440\u043e\u0434\u0430\u0451\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u0438 \u043a\u0442\u043e \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442 \u0431\u043e\u043b\u044c\u0448\u0435 \u043f\u0440\u0438\u0431\u044b\u043b\u0438.'}>
+        {!isLoading && activeSection === 'staff' ? (
+          <Panel title="Аналитика по сотрудникам" description="Кто продает больше и кто приносит больше прибыли.">
+            <div className="space-y-4">
+              <AnalyticsDataTable title="Сотрудники по продажам" hint="Рейтинг по общей выручке и количеству накладных." rows={staffSalesLeaders} columns={commonStaffColumns} />
+              <AnalyticsDataTable title="Сотрудники по прибыли" hint="Рейтинг по прибыли, затем по выручке." rows={staffProfitLeaders} columns={commonStaffColumns} />
+            </div>
+          </Panel>
+        ) : null}
+
+        {!isLoading && activeSection === 'customers' ? (
+          <Panel title="Аналитика по клиентам" description="Оборот клиентов и контроль дебиторской задолженности.">
             <div className="space-y-4">
               <AnalyticsDataTable
-                title={'\u041f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b: \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438 \u043f\u043e \u043f\u0440\u043e\u0434\u0430\u0436\u0430\u043c'}
-                hint={'\u0420\u0435\u0439\u0442\u0438\u043d\u0433 \u043f\u043e \u043e\u0431\u0449\u0435\u0439 \u0432\u044b\u0440\u0443\u0447\u043a\u0435 \u0438 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0443 \u043d\u0430\u043a\u043b\u0430\u0434\u043d\u044b\u0445.'}
-                rows={staffSalesLeaders}
+                title="Клиенты по обороту"
+                hint="Клиенты, которые купили больше всего за выбранный период."
+                rows={customerRevenueLeaders}
                 columns={[
-                  { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                  { key: 'name', label: '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a', render: (row) => row.name || '-' },
-                  { key: 'invoices', label: '\u041d\u0430\u043a\u043b\u0430\u0434\u043d\u044b\u0435', render: (row) => formatCount(row.invoices || 0), align: 'right' },
-                  { key: 'revenue', label: '\u0412\u044b\u0440\u0443\u0447\u043a\u0430', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
-                  { key: 'profit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
+                  { key: 'rank', label: '№', render: (_, index) => index + 1, className: 'w-14' },
+                  { key: 'name', label: 'Клиент', render: (row) => row.name || '-' },
+                  { key: 'invoices', label: 'Накладные', render: (row) => formatCount(row.invoices || 0), align: 'right' },
+                  { key: 'revenue', label: 'Оборот', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
+                  { key: 'debt', label: 'Долг', render: (row) => formatMoney(row.debt || 0), align: 'right' },
                 ]}
               />
               <AnalyticsDataTable
-                title={'\u041f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b: \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438 \u043f\u043e \u043f\u0440\u0438\u0431\u044b\u043b\u0438'}
-                hint={'\u041a\u0442\u043e \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438 \u043d\u0430\u0438\u0431\u043e\u043b\u044c\u0448\u0443\u044e \u043f\u0440\u0438\u0431\u044b\u043b\u044c.'}
-                rows={[...(data?.staffPerformance || [])].sort((a, b) => Number(b.profit || 0) - Number(a.profit || 0) || Number(b.revenue || 0) - Number(a.revenue || 0))}
+                title="Клиенты с долгами"
+                hint="Дебиторская задолженность по выбранному периоду."
+                rows={customerDebtLeaders}
                 columns={[
-                  { key: 'rank', label: '\u2116', render: (_, index) => index + 1, className: 'w-14' },
-                  { key: 'name', label: '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a', render: (row) => row.name || '-' },
-                  { key: 'profit', label: '\u041f\u0440\u0438\u0431\u044b\u043b\u044c', render: (row) => formatMoney(row.profit || 0), align: 'right' },
-                  { key: 'revenue', label: '\u0412\u044b\u0440\u0443\u0447\u043a\u0430', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
-                  { key: 'invoices', label: '\u041d\u0430\u043a\u043b\u0430\u0434\u043d\u044b\u0435', render: (row) => formatCount(row.invoices || 0), align: 'right' },
+                  { key: 'rank', label: '№', render: (_, index) => index + 1, className: 'w-14' },
+                  { key: 'name', label: 'Клиент', render: (row) => row.name || '-' },
+                  { key: 'debt', label: 'Долг', render: (row) => formatMoney(row.debt || 0), align: 'right' },
+                  { key: 'revenue', label: 'Оборот', render: (row) => formatMoney(row.revenue || 0), align: 'right' },
+                  { key: 'invoices', label: 'Накладные', render: (row) => formatCount(row.invoices || 0), align: 'right' },
                 ]}
               />
+            </div>
+          </Panel>
+        ) : null}
+
+        {!isLoading && activeSection === 'writeoffs' ? (
+          <Panel title="Аналитика списаний" description="Причины, товары, сотрудники и склады, где возникли потери.">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <RankTable title="Причины списаний" hint="Главные источники потерь." rows={data?.writeoffReasons || []} primaryLabel="Сумма" primaryValue={(row) => formatMoney(row.value || 0)} secondaryValue={(row) => `Количество: ${formatCount(row.quantity || 0)}, операций: ${formatCount(row.operations || 0)}`} />
+              <RankTable title="Товары в списаниях" hint="Какие товары списывались чаще всего." rows={data?.writeoffByProduct || []} primaryLabel="Сумма" primaryValue={(row) => formatMoney(row.value || 0)} secondaryValue={(row) => `Количество: ${formatCount(row.quantity || 0)}`} />
+              <RankTable title="Сотрудники по списаниям" hint="Кто проводил операции списания." rows={data?.writeoffByStaff || []} primaryLabel="Сумма" primaryValue={(row) => formatMoney(row.value || 0)} secondaryValue={(row) => `Операций: ${formatCount(row.operations || 0)}`} />
+              <RankTable title="Склады по списаниям" hint="Где возникали списания." rows={data?.writeoffByWarehouse || []} primaryLabel="Сумма" primaryValue={(row) => formatMoney(row.value || 0)} secondaryValue={(row) => `Количество: ${formatCount(row.quantity || 0)}`} />
             </div>
           </Panel>
         ) : null}

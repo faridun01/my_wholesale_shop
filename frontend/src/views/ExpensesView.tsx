@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Banknote, CalendarDays, Pencil, Plus, Search, Trash2, Wallet, Warehouse, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { addExpensePayment, createExpense, deleteExpense, getExpenses, updateExpense } from '../api/expenses.api';
+import { addExpensePayment, cancelExpensePayment, createExpense, deleteExpense, getExpenses, updateExpense } from '../api/expenses.api';
 import { getWarehouses } from '../api/warehouses.api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
@@ -20,6 +20,15 @@ type ExpenseRow = {
   warehouse?: { id: number; name: string };
   user?: { id: number; username: string };
   userId?: number;
+  payments?: Array<{
+    id: number;
+    amount: number;
+    paymentDate: string;
+    method?: string;
+    note?: string | null;
+    staff_name?: string;
+    user?: { id: number; username: string };
+  }>;
 };
 
 const categories = ['Аренда', 'Зарплата', 'Доставка', 'Транспорт', 'Коммунальные', 'Ремонт', 'Прочее'];
@@ -31,6 +40,7 @@ const buildExpenseFormState = (expense?: Partial<ExpenseRow> | null, preferredWa
   category: String(expense?.category || 'Прочее') || 'Прочее',
   amount: expense ? String(roundMoney(expense.amount || 0)) : '',
   paidAmount: expense ? String(roundMoney(expense.paidAmount || 0)) : '',
+  paymentDate: todayValue,
   expenseDate: expense ? String(expense.expenseDate || '').slice(0, 10) || todayValue : todayValue,
   note: String(expense?.note || ''),
 });
@@ -51,17 +61,20 @@ export default function ExpensesView() {
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingExpenseId, setPayingExpenseId] = useState<number | null>(null);
+  const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(null);
   const [selectedExpenseForPayment, setSelectedExpenseForPayment] = useState<ExpenseRow | null>(null);
   const [selectedExpenseForDelete, setSelectedExpenseForDelete] = useState<ExpenseRow | null>(null);
   const [selectedExpenseForEdit, setSelectedExpenseForEdit] = useState<ExpenseRow | null>(null);
   const [isUpdatingExpense, setIsUpdatingExpense] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [expensePaymentDate, setExpensePaymentDate] = useState(todayValue);
   const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState({
     title: '',
     category: 'Прочее',
     amount: '',
     paidAmount: '',
+    paymentDate: todayValue,
     expenseDate: todayValue,
     note: '',
   });
@@ -155,6 +168,7 @@ export default function ExpensesView() {
   const closePaymentModal = () => {
     setSelectedExpenseForPayment(null);
     setPaymentAmount('');
+    setExpensePaymentDate(todayValue);
   };
 
   const closeEditModal = () => {
@@ -199,6 +213,7 @@ export default function ExpensesView() {
         category: form.category,
         amount: Number(form.amount),
         paidAmount: Number(form.paidAmount || 0),
+        paymentDate: form.paymentDate || todayValue,
         expenseDate: form.expenseDate,
         note: form.note.trim(),
       });
@@ -208,6 +223,7 @@ export default function ExpensesView() {
         category: 'Прочее',
         amount: '',
         paidAmount: '',
+        paymentDate: todayValue,
         expenseDate: todayValue,
         note: '',
       });
@@ -228,6 +244,7 @@ export default function ExpensesView() {
 
     setSelectedExpenseForPayment(expense);
     setPaymentAmount(String(roundMoney(remaining)));
+    setExpensePaymentDate(todayValue);
   };
 
   const openEditModal = (expense: ExpenseRow) => {
@@ -255,7 +272,10 @@ export default function ExpensesView() {
 
     setPayingExpenseId(selectedExpenseForPayment.id);
     try {
-      await addExpensePayment(selectedExpenseForPayment.id, amount);
+      await addExpensePayment(selectedExpenseForPayment.id, {
+        amount,
+        paymentDate: expensePaymentDate || todayValue,
+      });
       toast.success('Оплата расхода сохранена');
       closePaymentModal();
       await fetchExpenses(selectedWarehouseId);
@@ -267,6 +287,25 @@ export default function ExpensesView() {
       }
     } finally {
       setPayingExpenseId(null);
+    }
+  };
+
+  const handleCancelExpensePayment = async (expense: ExpenseRow, payment: NonNullable<ExpenseRow['payments']>[number]) => {
+    if (!payment?.id) return;
+
+    if (!window.confirm(`Отменить оплату ${formatMoney(payment.amount || 0)}? Остаток расхода будет пересчитан.`)) {
+      return;
+    }
+
+    setCancellingPaymentId(Number(payment.id));
+    try {
+      await cancelExpensePayment(expense.id, payment.id);
+      toast.success('Оплата расхода отменена');
+      await fetchExpenses(selectedWarehouseId);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Ошибка при отмене оплаты расхода');
+    } finally {
+      setCancellingPaymentId(null);
     }
   };
 
@@ -460,6 +499,24 @@ export default function ExpensesView() {
                   </div>
                 </div>
 
+                {Number(form.paidAmount || 0) > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-600">Дата оплаты</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3 py-3">
+                      <CalendarDays size={16} className="text-emerald-500" />
+                      <input
+                        type="date"
+                        value={form.paymentDate}
+                        onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
+                        className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                      />
+                    </div>
+                    {form.expenseDate && form.paymentDate && form.paymentDate < form.expenseDate ? (
+                      <p className="text-xs font-semibold text-emerald-600">Оплата будет отмечена как аванс.</p>
+                    ) : null}
+                  </div>
+                )}
+
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Остаток к оплате</p>
                   <p className="mt-1 text-lg font-semibold text-slate-900">
@@ -588,6 +645,37 @@ export default function ExpensesView() {
 
                       {expense.note ? <p className="mt-3 text-sm leading-5 text-slate-500">{expense.note}</p> : null}
 
+                      {Array.isArray(expense.payments) && expense.payments.length > 0 ? (
+                        <div className="mt-3 space-y-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600">История оплат</p>
+                          {expense.payments.map((payment) => {
+                            const paymentDate = String(payment.paymentDate || '').slice(0, 10);
+                            const expenseDate = String(expense.expenseDate || '').slice(0, 10);
+                            const isAdvance = paymentDate && expenseDate && paymentDate < expenseDate;
+
+                            return (
+                              <div key={payment.id} className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs">
+                                <div>
+                                  <p className="font-bold text-emerald-700">{formatMoney(payment.amount)}</p>
+                                  <p className="text-slate-500">
+                                    {new Date(payment.paymentDate).toLocaleDateString('ru-RU')}
+                                    {isAdvance ? ' · аванс' : ''}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCancelExpensePayment(expense, payment)}
+                                  disabled={cancellingPaymentId === Number(payment.id)}
+                                  className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-bold text-rose-600 disabled:opacity-50"
+                                >
+                                  {cancellingPaymentId === Number(payment.id) ? '...' : 'Отменить'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
                       <div className="mt-4 grid grid-cols-2 gap-3">
                         <div className="rounded-2xl bg-slate-50 px-3 py-3">
                           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
@@ -679,6 +767,35 @@ export default function ExpensesView() {
                           <td className="px-2 py-3">
                             <div className="font-medium leading-4 text-slate-900">{expense.title}</div>
                             {expense.note ? <div className="mt-1 text-[11px] leading-4 text-slate-400">{expense.note}</div> : null}
+                            {Array.isArray(expense.payments) && expense.payments.length > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {expense.payments.slice(0, 3).map((payment) => {
+                                  const paymentDate = String(payment.paymentDate || '').slice(0, 10);
+                                  const expenseDate = String(expense.expenseDate || '').slice(0, 10);
+                                  const isAdvance = paymentDate && expenseDate && paymentDate < expenseDate;
+
+                                  return (
+                                    <div key={payment.id} className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2 py-1 text-[11px]">
+                                      <span className="truncate font-semibold text-emerald-700">
+                                        {formatMoney(payment.amount)} · {new Date(payment.paymentDate).toLocaleDateString('ru-RU')}
+                                        {isAdvance ? ' · аванс' : ''}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleCancelExpensePayment(expense, payment)}
+                                        disabled={cancellingPaymentId === Number(payment.id)}
+                                        className="shrink-0 rounded-md bg-white px-1.5 py-0.5 font-bold text-rose-600 disabled:opacity-50"
+                                      >
+                                        {cancellingPaymentId === Number(payment.id) ? '...' : 'x'}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                                {expense.payments.length > 3 ? (
+                                  <div className="text-[11px] text-slate-400">Еще оплат: {expense.payments.length - 3}</div>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </td>
                           <td className="whitespace-nowrap px-2 py-3">{expense.category}</td>
                           <td className="px-2 py-3 leading-4">{expense.warehouse?.name || '-'}</td>
@@ -806,6 +923,19 @@ export default function ExpensesView() {
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 text-2xl font-black text-slate-900 outline-none transition-all focus:border-emerald-400 focus:ring-8 focus:ring-emerald-500/5"
                   placeholder="0.00"
                 />
+                <label className="ml-1 mt-4 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Дата оплаты</label>
+                <div className="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <CalendarDays size={16} className="text-emerald-500" />
+                  <input
+                    type="date"
+                    value={expensePaymentDate}
+                    onChange={(event) => setExpensePaymentDate(event.target.value)}
+                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
+                  />
+                </div>
+                {expensePaymentDate && String(selectedExpenseForPayment.expenseDate || '').slice(0, 10) && expensePaymentDate < String(selectedExpenseForPayment.expenseDate || '').slice(0, 10) ? (
+                  <p className="mt-2 text-xs font-bold text-emerald-600">Это аванс: оплата раньше даты расхода.</p>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -952,9 +1082,10 @@ export default function ExpensesView() {
                     min={0}
                     step="0.01"
                     value={editForm.paidAmount}
-                    onChange={(event) => setEditForm({ ...editForm, paidAmount: event.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                    readOnly
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
                   />
+                  <p className="text-xs text-slate-400">Оплата меняется через историю оплат: внесите или отмените конкретный платеж.</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 lg:col-span-2">

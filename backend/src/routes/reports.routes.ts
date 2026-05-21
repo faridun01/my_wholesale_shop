@@ -436,7 +436,7 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
   try {
     const access = await getAccessContext(req);
     if (!access.isAdmin) {
-      return res.status(403).json({ error: '?????? ????????. ?????? ??? ???????????????.' });
+      return res.status(403).json({ error: 'Доступ запрещен. Только для администратора.' });
     }
 
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);

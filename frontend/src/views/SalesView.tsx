@@ -172,6 +172,7 @@ export default function SalesView() {
   const [isPaying, setIsPaying] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(null);
   const [isEditItemsDirty, setIsEditItemsDirty] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -356,6 +357,27 @@ export default function SalesView() {
       toast.error('Ошибка при приёме оплаты');
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const handleCancelPayment = async (payment: any) => {
+    if (!selectedInvoice || !payment?.id) return;
+
+    const amountLabel = formatMoney(payment.amount || 0);
+    if (!window.confirm(`Отменить оплату ${amountLabel}? Долг по накладной будет пересчитан.`)) {
+      return;
+    }
+
+    setCancellingPaymentId(Number(payment.id));
+    try {
+      await client.delete(`/payments/${payment.id}`);
+      toast.success('Оплата отменена');
+      await refreshSelectedInvoice(selectedInvoice.id);
+      await fetchInvoices();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Ошибка при отмене оплаты');
+    } finally {
+      setCancellingPaymentId(null);
     }
   };
 
@@ -1848,6 +1870,7 @@ export default function SalesView() {
                             <th className="px-6 py-4">Дата</th>
                             <th className="px-6 py-4">Сумма</th>
                             <th className="px-6 py-4">Сотрудник</th>
+                            <th className="px-6 py-4 text-right">Действие</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -1856,6 +1879,17 @@ export default function SalesView() {
                               <td className="px-6 py-4 font-bold text-slate-500">{new Date(p.createdAt).toLocaleString('ru-RU')}</td>
                               <td className="px-6 py-4 font-black text-emerald-600">{formatMoney(p.amount)}</td>
                               <td className="px-6 py-4 text-slate-500">{p.staff_name}</td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCancelPayment(p)}
+                                  disabled={cancellingPaymentId === Number(p.id)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <X size={14} />
+                                  {cancellingPaymentId === Number(p.id) ? 'Отмена...' : 'Отменить'}
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>

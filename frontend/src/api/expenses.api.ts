@@ -33,8 +33,17 @@ export const updateExpense = async (id: number, data: any) => {
   }
 };
 
-export const addExpensePayment = async (id: number, amount: number) => {
-  const response = await client.post(`/expenses/${id}/payments`, { amount });
+export const addExpensePayment = async (
+  id: number,
+  data: number | { amount: number; paymentDate?: string; method?: string; note?: string },
+) => {
+  const payload = typeof data === 'number' ? { amount: data } : data;
+  const response = await client.post(`/expenses/${id}/payments`, payload);
+  return response.data;
+};
+
+export const cancelExpensePayment = async (expenseId: number, paymentId: number) => {
+  const response = await client.delete(`/expenses/${expenseId}/payments/${paymentId}`);
   return response.data;
 };
 

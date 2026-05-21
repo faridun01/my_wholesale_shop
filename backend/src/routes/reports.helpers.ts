@@ -20,9 +20,22 @@ type BuildRowsOptions = {
   netSalesKey: 'total_sales' | 'net_sales';
 };
 
+const parseReportDate = (value: unknown, endOfDay = false) => {
+  if (!value) return undefined;
+
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return undefined;
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date;
+};
+
 export const buildCreatedAtRange = ({ start, end }: DateRangeInput) => ({
-  gte: start ? new Date(String(start)) : undefined,
-  lte: end ? new Date(String(end)) : undefined,
+  gte: parseReportDate(start),
+  lte: parseReportDate(end, true),
 });
 
 export const buildCancelledInvoiceWhere = (options: {
@@ -96,4 +109,3 @@ export const buildInvoiceLineReportRows = ({
       })
       .filter(Boolean)
   );
-
