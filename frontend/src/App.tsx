@@ -16,7 +16,6 @@ const CustomerDebtsView = React.lazy(() => import('./views/CustomerDebtsView'));
 const SettingsView = React.lazy(() => import('./views/SettingsView'));
 const CatalogView = React.lazy(() => import('./views/CatalogView'));
 const ReportsView = React.lazy(() => import('./views/ReportsView'));
-const AnalyticsView = React.lazy(() => import('./views/AnalyticsView'));
 const ExpensesView = React.lazy(() => import('./views/ExpensesView'));
 const RemindersView = React.lazy(() => import('./views/RemindersView'));
 const HistoryView = React.lazy(() => import('./views/HistoryView'));
@@ -193,11 +192,7 @@ export default function App() {
           />
           <Route
             path="/analytics"
-            element={
-              <AdminRoute>
-                <AnalyticsView />
-              </AdminRoute>
-            }
+            element={<Navigate to="/" replace />}
           />
           <Route
             path="/reports"

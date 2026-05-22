@@ -645,37 +645,6 @@ export default function ExpensesView() {
 
                       {expense.note ? <p className="mt-3 text-sm leading-5 text-slate-500">{expense.note}</p> : null}
 
-                      {Array.isArray(expense.payments) && expense.payments.length > 0 ? (
-                        <div className="mt-3 space-y-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600">История оплат</p>
-                          {expense.payments.map((payment) => {
-                            const paymentDate = String(payment.paymentDate || '').slice(0, 10);
-                            const expenseDate = String(expense.expenseDate || '').slice(0, 10);
-                            const isAdvance = paymentDate && expenseDate && paymentDate < expenseDate;
-
-                            return (
-                              <div key={payment.id} className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs">
-                                <div>
-                                  <p className="font-bold text-emerald-700">{formatMoney(payment.amount)}</p>
-                                  <p className="text-slate-500">
-                                    {new Date(payment.paymentDate).toLocaleDateString('ru-RU')}
-                                    {isAdvance ? ' · аванс' : ''}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleCancelExpensePayment(expense, payment)}
-                                  disabled={cancellingPaymentId === Number(payment.id)}
-                                  className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-bold text-rose-600 disabled:opacity-50"
-                                >
-                                  {cancellingPaymentId === Number(payment.id) ? '...' : 'Отменить'}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-
                       <div className="mt-4 grid grid-cols-2 gap-3">
                         <div className="rounded-2xl bg-slate-50 px-3 py-3">
                           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
@@ -716,10 +685,10 @@ export default function ExpensesView() {
                             type="button"
                             onClick={() => openPaymentModal(expense)}
                             disabled={payingExpenseId === expense.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-semibold text-emerald-700 disabled:opacity-50"
+                            className="inline-flex h-11 w-11 items-center justify-center justify-self-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 disabled:opacity-50"
+                            aria-label="Оплатить"
                           >
-                            <Wallet size={14} />
-                            <span>{payingExpenseId === expense.id ? '...' : 'Оплатить'}</span>
+                            <Wallet size={16} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
                           </button>
                         ) : null}
                         <button
@@ -767,35 +736,6 @@ export default function ExpensesView() {
                           <td className="px-2 py-3">
                             <div className="font-medium leading-4 text-slate-900">{expense.title}</div>
                             {expense.note ? <div className="mt-1 text-[11px] leading-4 text-slate-400">{expense.note}</div> : null}
-                            {Array.isArray(expense.payments) && expense.payments.length > 0 ? (
-                              <div className="mt-2 space-y-1">
-                                {expense.payments.slice(0, 3).map((payment) => {
-                                  const paymentDate = String(payment.paymentDate || '').slice(0, 10);
-                                  const expenseDate = String(expense.expenseDate || '').slice(0, 10);
-                                  const isAdvance = paymentDate && expenseDate && paymentDate < expenseDate;
-
-                                  return (
-                                    <div key={payment.id} className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-2 py-1 text-[11px]">
-                                      <span className="truncate font-semibold text-emerald-700">
-                                        {formatMoney(payment.amount)} · {new Date(payment.paymentDate).toLocaleDateString('ru-RU')}
-                                        {isAdvance ? ' · аванс' : ''}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleCancelExpensePayment(expense, payment)}
-                                        disabled={cancellingPaymentId === Number(payment.id)}
-                                        className="shrink-0 rounded-md bg-white px-1.5 py-0.5 font-bold text-rose-600 disabled:opacity-50"
-                                      >
-                                        {cancellingPaymentId === Number(payment.id) ? '...' : 'x'}
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                                {expense.payments.length > 3 ? (
-                                  <div className="text-[11px] text-slate-400">Еще оплат: {expense.payments.length - 3}</div>
-                                ) : null}
-                              </div>
-                            ) : null}
                           </td>
                           <td className="whitespace-nowrap px-2 py-3">{expense.category}</td>
                           <td className="px-2 py-3 leading-4">{expense.warehouse?.name || '-'}</td>
@@ -823,11 +763,10 @@ export default function ExpensesView() {
                                 <button
                                   onClick={() => openPaymentModal(expense)}
                                   disabled={payingExpenseId === expense.id}
-                                  className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 text-[11px] text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                                  title="Внести оплату"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                                  aria-label="Внести оплату"
                                 >
-                                  <Wallet size={13} />
-                                  <span className="font-medium">{payingExpenseId === expense.id ? '...' : 'Оплатить'}</span>
+                                  <Wallet size={14} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
                                 </button>
                               ) : null}
                               {(isAdmin || expense.user?.id === user.id) && (

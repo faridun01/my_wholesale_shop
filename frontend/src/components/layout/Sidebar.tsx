@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   History,
   LayoutDashboard,
-  LineChart,
   LogOut,
   Package,
   Settings,
@@ -41,7 +40,6 @@ const navItems: NavItem[] = [
   { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
   { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
   { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
-  { to: '/analytics', icon: LineChart, label: 'Аналитика', section: 'Система' },
   { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
   { to: '/settings', icon: Settings, label: 'Настройки', section: 'Система' },
 ];

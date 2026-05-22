@@ -1109,6 +1109,31 @@ export default function SalesView() {
   const hasReturnableItems = (invoice: any) =>
     Array.isArray(invoice?.items) && invoice.items.some((item: any) => getReturnItemRemainingUnits(item) > PAYMENT_EPSILON);
 
+  const getInvoiceReturnedAmount = (invoice: any) => {
+    const storedReturned = Math.max(0, Number(invoice?.returnedAmount || 0));
+    if (storedReturned > PAYMENT_EPSILON) {
+      return storedReturned;
+    }
+
+    if (Array.isArray(invoice?.returns)) {
+      return invoice.returns.reduce((sum: number, item: any) => sum + Math.max(0, Number(item?.totalValue || 0)), 0);
+    }
+
+    return 0;
+  };
+
+  const getInvoiceReturnedItems = (invoice: any) =>
+    Array.isArray(invoice?.items)
+      ? invoice.items.filter((item: any) => Number(item?.returnedQty || 0) > PAYMENT_EPSILON)
+      : [];
+
+  const hasInvoiceReturns = (invoice: any) =>
+    getInvoiceReturnedAmount(invoice) > PAYMENT_EPSILON ||
+    (Array.isArray(invoice?.returns) && invoice.returns.length > 0) ||
+    getInvoiceReturnedItems(invoice).length > 0;
+
+  const getInvoiceItemReturnedQty = (item: any) => Math.max(0, Number(item?.returnedQty || 0));
+
   const getReturnItemDisplayName = (item: any) =>
     formatProductName(item?.product_name || item?.productNameSnapshot || item?.product?.name || 'Товар без названия');
 
@@ -1423,6 +1448,9 @@ export default function SalesView() {
           {paginatedInvoices.map((inv) => {
             const paymentDisabled = isPaymentActionDisabled(inv);
             const returnDisabled = isReturnActionDisabled(inv);
+            const returnedAmount = getInvoiceReturnedAmount(inv);
+            const returnedItemsCount = getInvoiceReturnedItems(inv).length;
+            const hasReturns = hasInvoiceReturns(inv);
 
             return (
             <div key={`mobile-invoice-${inv.id}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -1433,7 +1461,15 @@ export default function SalesView() {
                   <p className="mt-2 break-words text-sm text-slate-700">{inv.customer_name}</p>
                   <p className="mt-1 text-xs text-slate-400">{inv.staff_name}</p>
                 </div>
-                <div className="shrink-0">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}
+                  {hasReturns && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                      <RotateCcw size={12} />
+                      Возврат
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1454,6 +1490,20 @@ export default function SalesView() {
                   <p className="mt-1 break-words text-sm text-slate-900">{inv.warehouse?.name || '---'}</p>
                 </div>
               </div>
+
+              {hasReturns && (
+                <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">Возврат оформлен</p>
+                      <p className="mt-1 text-xs text-amber-700">
+                        {returnedItemsCount > 0 ? `Позиций: ${formatCount(returnedItemsCount)}` : 'Подробности в деталях'}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-black text-rose-600">-{formatMoney(returnedAmount)}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
@@ -1544,6 +1594,7 @@ export default function SalesView() {
                 <th className="px-4 py-3">{renderSortLabel("Дата", "createdAt")}</th>
                 <th className="px-4 py-3">{renderSortLabel("Клиент", "customer_name")}</th>
                 <th className="px-4 py-3">{renderSortLabel("Сумма", "netAmount")}</th>
+                <th className="px-4 py-3">Возврат</th>
                 <th className="px-4 py-3">{renderSortLabel("Оплачено", "paidAmount")}</th>
                 <th className="px-4 py-3">{renderSortLabel("Остаток", "balance")}</th>
                 <th className="px-4 py-3">{renderSortLabel("Статус", "status")}</th>
@@ -1555,6 +1606,9 @@ export default function SalesView() {
               {paginatedInvoices.map((inv) => {
                 const paymentDisabled = isPaymentActionDisabled(inv);
                 const returnDisabled = isReturnActionDisabled(inv);
+                const returnedAmount = getInvoiceReturnedAmount(inv);
+                const returnedItemsCount = getInvoiceReturnedItems(inv).length;
+                const hasReturns = hasInvoiceReturns(inv);
 
                 return (
                 <tr
@@ -1568,6 +1622,18 @@ export default function SalesView() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-700">{inv.customer_name}</td>
                   <td className="px-4 py-3 text-sm text-slate-700">{formatMoney(getInvoiceNetAmount(inv))}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {hasReturns ? (
+                      <div className="inline-flex flex-col rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2">
+                        <span className="font-black text-rose-600">-{formatMoney(returnedAmount)}</span>
+                        <span className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                          {returnedItemsCount > 0 ? `${formatCount(returnedItemsCount)} поз.` : 'возврат'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-emerald-500">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
                   <td className="px-4 py-3 text-sm text-rose-500">{formatMoney(getInvoiceBalance(inv))}</td>
                   <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
@@ -1665,7 +1731,7 @@ export default function SalesView() {
               )})}
               {sortedInvoices.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="px-8 py-20 text-center">
+                  <td colSpan={isAdmin ? 10 : 9} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center justify-center space-y-6">
                       <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
                         <Receipt size={48} />
@@ -1755,6 +1821,8 @@ export default function SalesView() {
                     <div className="space-y-3 p-3 md:hidden">
                       {selectedInvoice.items.map((item: any) => {
                         const quantityInfo = getInvoiceItemQuantityParts(item);
+                        const returnedQty = getInvoiceItemReturnedQty(item);
+                        const remainingQty = getReturnItemRemainingUnits(item);
 
                         return (
                           <div key={`mobile-item-${item.id}`} className="rounded-2xl bg-slate-50 p-3">
@@ -1776,6 +1844,12 @@ export default function SalesView() {
                                 <p className="mt-1 font-black text-slate-900">{formatMoney(item.totalPrice)}</p>
                               </div>
                             </div>
+                            {returnedQty > PAYMENT_EPSILON && (
+                              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">
+                                <span>Возвращено: {formatCount(returnedQty)} {normalizeDisplayBaseUnit(item?.unit || item?.baseUnitNameSnapshot || item?.baseUnitName || 'шт')}</span>
+                                <span className="text-slate-400">Осталось: {formatCount(remainingQty)}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1792,6 +1866,8 @@ export default function SalesView() {
                       <tbody className="divide-y divide-slate-50">
                         {selectedInvoice.items.map((item: any) => {
                           const quantityInfo = getInvoiceItemQuantityParts(item);
+                          const returnedQty = getInvoiceItemReturnedQty(item);
+                          const remainingQty = getReturnItemRemainingUnits(item);
 
                           return (
                             <tr key={item.id}>
@@ -1811,6 +1887,12 @@ export default function SalesView() {
                                 <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{quantityInfo.primary}</p>
                                 {quantityInfo.secondary && (
                                   <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">{quantityInfo.secondary}</p>
+                                )}
+                                {returnedQty > PAYMENT_EPSILON && (
+                                  <div className="mt-2 inline-flex flex-col rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-1.5">
+                                    <span className="text-[10px] font-black text-amber-700">Возвращено: {formatCount(returnedQty)}</span>
+                                    <span className="text-[10px] text-slate-500">Осталось: {formatCount(remainingQty)}</span>
+                                  </div>
                                 )}
                               </td>
                               <td className="px-6 py-4 font-bold text-slate-500">{formatMoney(item.sellingPrice)}</td>
@@ -1863,8 +1945,8 @@ export default function SalesView() {
                 {selectedInvoice.payments && selectedInvoice.payments.length > 0 && (
                   <div className="space-y-4">
                     <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2">История платежей</h4>
-                    <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
-                      <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto rounded-3xl border border-slate-100 bg-white">
+                      <table className="min-w-[760px] w-full text-left text-sm">
                         <thead>
                           <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                             <th className="px-6 py-4">Дата</th>
@@ -1898,11 +1980,40 @@ export default function SalesView() {
                   </div>
                 )}
 
+                {getInvoiceReturnedItems(selectedInvoice).length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="ml-2 text-sm font-black uppercase tracking-widest text-slate-400">Возвращенные товары</h4>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {getInvoiceReturnedItems(selectedInvoice).map((item: any) => {
+                        const returnedQty = getInvoiceItemReturnedQty(item);
+                        const remainingQty = getReturnItemRemainingUnits(item);
+                        const unitName = normalizeDisplayBaseUnit(item?.unit || item?.baseUnitNameSnapshot || item?.baseUnitName || 'шт');
+
+                        return (
+                          <div key={`returned-item-${item.id}`} className="rounded-3xl border border-amber-100 bg-amber-50 p-4">
+                            <p className="break-words text-sm font-black text-slate-900">{getReturnItemDisplayName(item)}</p>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div className="rounded-2xl bg-white px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-600">Возвращено</p>
+                                <p className="mt-1 font-black text-rose-600">{formatCount(returnedQty)} {unitName}</p>
+                              </div>
+                              <div className="rounded-2xl bg-white px-3 py-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Осталось</p>
+                                <p className="mt-1 font-black text-slate-700">{formatCount(remainingQty)} {unitName}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {selectedInvoice.returns && selectedInvoice.returns.length > 0 && (
                   <div className="space-y-4">
                     <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2">История возвратов</h4>
-                    <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
-                      <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto rounded-3xl border border-slate-100 bg-white">
+                      <table className="min-w-[760px] w-full text-left text-sm">
                         <thead>
                           <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                             <th className="px-6 py-4">Дата</th>
@@ -1916,7 +2027,7 @@ export default function SalesView() {
                             <tr key={r.id}>
                               <td className="px-6 py-4 font-bold text-slate-500">{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
                               <td className="px-6 py-4 font-black text-rose-600">-{formatMoney(r.totalValue)}</td>
-                              <td className="px-6 py-4 text-slate-500 italic">{r.reason}</td>
+                              <td className="max-w-[320px] break-words px-6 py-4 italic text-slate-500">{r.reason || 'Без причины'}</td>
                               <td className="px-6 py-4 text-slate-500">{r.staff_name}</td>
                             </tr>
                           ))}
@@ -2499,7 +2610,7 @@ export default function SalesView() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
+              className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4 sm:p-8">
                 <div className="flex items-center space-x-4">
@@ -2521,18 +2632,18 @@ export default function SalesView() {
 
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Выберите товары для возврата</h4>
-                  <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden">
-                    <table className="w-full table-fixed text-left text-sm">
+                  <div className="overflow-x-auto rounded-3xl border border-slate-100 bg-white">
+                    <table className="w-full min-w-[680px] table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[38%]" />
-                        <col className="w-[40%]" />
-                        <col className="w-[22%]" />
+                        <col className="w-[36%]" />
+                        <col className="w-[30%]" />
+                        <col className="w-[34%]" />
                       </colgroup>
                       <thead>
                         <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                          <th className="px-6 py-4">Товар</th>
-                          <th className="px-6 py-4">Продано</th>
-                          <th className="px-6 py-4">Возврат</th>
+                          <th className="px-4 py-4 sm:px-5">Товар</th>
+                          <th className="px-4 py-4 sm:px-5">Продано</th>
+                          <th className="px-4 py-4 sm:px-5">Возврат</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -2550,7 +2661,7 @@ export default function SalesView() {
 
                           return (
                             <tr key={item.id}>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4 align-top sm:px-5">
                                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                                   {itemMeta}
                                 </p>
@@ -2558,7 +2669,7 @@ export default function SalesView() {
                                   {getReturnItemDisplayName(item)}
                                 </p>
                               </td>
-                              <td className="whitespace-nowrap px-6 py-4 text-[11px] text-slate-500">
+                              <td className="px-4 py-4 align-top text-[11px] text-slate-500 sm:px-5">
                                 <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{quantityInfo.primary}</p>
                                 {quantityInfo.secondary && (
                                   <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">{quantityInfo.secondary}</p>
@@ -2567,8 +2678,8 @@ export default function SalesView() {
                                   Доступно: {packaging ? `${maxPackages} ${packaging.packageName} или ` : ''}{formatCount(remainingUnits)} {packaging?.baseUnitName || 'шт'}
                                 </p>
                               </td>
-                              <td className="px-6 py-4">
-                                <div className="flex flex-col gap-2 sm:flex-row">
+                              <td className="px-4 py-4 align-top sm:px-5">
+                                <div className="grid min-w-0 grid-cols-1 gap-2">
                                   {packaging ? (
                                     <select
                                       value={item.returnMode}
@@ -2581,7 +2692,7 @@ export default function SalesView() {
                                         };
                                         setReturnItems(newItems);
                                       }}
-                                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+                                      className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
                                     >
                                       <option value="package">{packaging.packageName}</option>
                                       <option value="unit">{packaging.baseUnitName}</option>
@@ -2602,7 +2713,7 @@ export default function SalesView() {
                                       setReturnItems(newItems);
                                     }}
                                     placeholder={item.returnMode === 'package' ? 'Кол-во коробок' : 'Кол-во шт'}
-                                    className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-black text-center outline-none focus:ring-2 focus:ring-amber-500"
+                                    className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center font-black outline-none focus:ring-2 focus:ring-amber-500"
                                   />
                                 </div>
                               </td>
