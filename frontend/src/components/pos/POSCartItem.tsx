@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { Trash2, Plus, Minus } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
 
@@ -80,10 +80,22 @@ export default function POSCartItem({
   const itemWeightKg = getProductUnitWeightKg(item) * Math.max(0, Number(item.quantity || 0));
   const isPackageSale = Boolean(item.selectedPackagingId);
 
+  const handleStepPackageQuantity = (delta: number) => {
+    const currentVal = Math.max(0, Number(item.packageQuantityInput ?? item.packageQuantity) || 0);
+    const newVal = Math.max(0, currentVal + delta);
+    updatePackageQuantityInput(item.id, String(newVal));
+  };
+
+  const handleStepExtraUnitQuantity = (delta: number) => {
+    const currentVal = Math.max(0, Number(item.extraUnitQuantityInput ?? item.extraUnitQuantity) || 0);
+    const newVal = Math.max(0, currentVal + delta);
+    updateExtraUnitQuantityInput(item.id, String(newVal));
+  };
+
   return (
-    <div className="border-b border-[#d5dde6] py-2 last:border-b-0 even:bg-[#fbfcfd]">
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-[#c8a64a] bg-[#fff7d6] text-xs font-semibold text-[#7a5a00]">
+    <div className="border-b border-[#d5dde6] py-2.5 last:border-b-0 even:bg-[#fbfcfd]">
+      <div className="flex items-start gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#c8a64a] bg-[#fff7d6] text-xs font-semibold text-[#7a5a00]">
           {index + 1}
         </div>
 
@@ -95,20 +107,20 @@ export default function POSCartItem({
             >
               {formatProductName(item.name)}
             </p>
-            <p className="mt-1 text-[10px] leading-4 text-slate-500">
+            <p className="mt-0.5 text-[10px] leading-4 text-slate-500">
               Доступно: <span className="font-semibold text-[#48627f]">{stockSummary.availableLabel}</span>
             </p>
           </div>
 
-          <div className="mt-2 space-y-2 md:mt-3 md:space-y-3">
-            <div className="flex items-start justify-between gap-2 rounded border border-[#d5dde6] bg-[#f7f9fb] px-2 py-2">
+          <div className="mt-2 space-y-2">
+            <div className="flex items-start justify-between gap-2 rounded-xl border border-[#d5dde6] bg-[#f7f9fb] px-2.5 py-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-semibold uppercase tracking-normal text-[#48627f]">Расчет</p>
-                <p className="mt-1 text-[10px] font-medium text-slate-500">
+                <p className="mt-0.5 text-[10px] font-medium text-slate-500">
                   {formatMoney(item.sellingPrice)} x {item.quantity} {item.baseUnitName}
                 </p>
                 {itemWeightKg > 0 ? (
-                  <p className="mt-1 text-[10px] font-semibold text-[#7a5a00]">
+                  <p className="mt-0.5 text-[10px] font-semibold text-[#7a5a00]">
                     Масса/объем: {formatWeightKg(itemWeightKg)}
                   </p>
                 ) : null}
@@ -126,7 +138,8 @@ export default function POSCartItem({
                 </div>
                 <button
                   onClick={() => removeFromCart(item.id)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-transparent text-[#7b8794] transition-colors hover:border-[#d89aa2] hover:bg-[#fff0f1] hover:text-[#8a1f2d]"
+                  title="Удалить из корзины"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#7b8794] transition-colors hover:border-[#d89aa2] hover:bg-[#fff0f1] hover:text-[#8a1f2d]"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -134,14 +147,14 @@ export default function POSCartItem({
             </div>
 
             {isCartExpanded ? (
-              <div className="grid gap-2 md:grid-cols-[240px_96px_96px_96px]">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_80px]">
                 <label className="min-w-0">
                   <span className="mb-1 block text-[10px] font-semibold text-[#48627f]">Упаковка</span>
                   <select
                     value={item.selectedPackagingId || ''}
                     onChange={(e) => updateSelectedPackaging(item.id, e.target.value)}
                     title="Выберите коробку или продажу поштучно"
-                    className="h-9 w-full rounded border border-[#9fb7d5] bg-white px-2 text-xs text-[#1f2933] outline-none transition-colors focus:border-[#4f7fb8]"
+                    className="h-9 w-full rounded-xl border border-[#9fb7d5] bg-white px-2 text-xs text-[#1f2933] outline-none transition-colors focus:border-[#4f7fb8]"
                   >
                     <option value="">Только {item.baseUnitName}</option>
                     {(Array.isArray(item.packagings) ? item.packagings : []).map((packaging) => {
@@ -156,36 +169,72 @@ export default function POSCartItem({
                   </select>
                 </label>
 
-                <label>
-                  <span className="mb-1 block text-[10px] font-semibold text-[#48627f]">Коробок</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={item.packageQuantityInput ?? String(item.packageQuantity)}
-                    onChange={(e) => updatePackageQuantityInput(item.id, e.target.value)}
-                    onBlur={() => commitPackageQuantityInput(item.id)}
-                    disabled={!item.selectedPackagingId}
-                    placeholder="Упак."
-                    title="Количество выбранных упаковок"
-                    className="h-9 w-full rounded border border-[#9fb7d5] bg-white px-2 text-center text-xs text-[#1f2933] outline-none transition-colors focus:border-[#4f7fb8] disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </label>
+                <div>
+                  <span className="mb-1 block text-[10px] font-semibold text-[#48627f]">Упаковок</span>
+                  <div className="flex h-9 items-center rounded-xl border border-[#9fb7d5] bg-white">
+                    <button
+                      type="button"
+                      onClick={() => handleStepPackageQuantity(-1)}
+                      disabled={!item.selectedPackagingId}
+                      className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-slate-900 disabled:opacity-30"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <input
+                      type="number"
+                      min={0}
+                      value={item.packageQuantityInput ?? String(item.packageQuantity)}
+                      onChange={(e) => updatePackageQuantityInput(item.id, e.target.value)}
+                      onBlur={() => commitPackageQuantityInput(item.id)}
+                      disabled={!item.selectedPackagingId}
+                      placeholder="0"
+                      title="Количество выбранных упаковок"
+                      className="h-full w-12 text-center text-xs font-semibold text-[#1f2933] outline-none disabled:bg-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleStepPackageQuantity(1)}
+                      disabled={!item.selectedPackagingId}
+                      className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-slate-900 disabled:opacity-30"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
 
-                <label>
+                <div>
                   <span className="mb-1 block text-[10px] font-semibold text-[#48627f]">{item.baseUnitName}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={item.extraUnitQuantityInput ?? String(item.extraUnitQuantity)}
-                    onChange={(e) => updateExtraUnitQuantityInput(item.id, e.target.value)}
-                    onBlur={() => commitExtraUnitQuantityInput(item.id)}
-                    disabled={isPackageSale}
-                    placeholder={`+ ${item.baseUnitName}`}
-                    title="Дополнительное количество поштучно"
-                    className="h-9 w-full rounded border border-[#9fb7d5] bg-white px-2 text-center text-xs text-[#1f2933] outline-none transition-colors focus:border-[#4f7fb8] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70"
-                  />
-                </label>
+                  <div className="flex h-9 items-center rounded-xl border border-[#9fb7d5] bg-white">
+                    <button
+                      type="button"
+                      onClick={() => handleStepExtraUnitQuantity(-1)}
+                      disabled={isPackageSale}
+                      className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-slate-900 disabled:opacity-30"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={item.extraUnitQuantityInput ?? String(item.extraUnitQuantity)}
+                      onChange={(e) => updateExtraUnitQuantityInput(item.id, e.target.value)}
+                      onBlur={() => commitExtraUnitQuantityInput(item.id)}
+                      disabled={isPackageSale}
+                      placeholder="0"
+                      title="Дополнительное количество поштучно"
+                      className="h-full w-12 text-center text-xs font-semibold text-[#1f2933] outline-none disabled:bg-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleStepExtraUnitQuantity(1)}
+                      disabled={isPackageSale}
+                      className="flex h-full w-8 items-center justify-center text-slate-500 hover:text-slate-900 disabled:opacity-30"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
 
                 <label>
                   <span className="mb-1 block text-[10px] font-semibold text-[#7a5a00]">Скидка %</span>
@@ -198,17 +247,17 @@ export default function POSCartItem({
                     onBlur={() => commitLineDiscountInput(item.id)}
                     placeholder="%"
                     title="Процент скидки на этот товар"
-                    className="h-9 w-full rounded border border-[#d6c07a] bg-white px-2 text-center text-xs text-[#1f2933] outline-none transition-colors focus:border-[#b08a28]"
+                    className="h-9 w-full rounded-xl border border-[#d6c07a] bg-white px-2 text-center text-xs text-[#1f2933] outline-none transition-colors focus:border-[#b08a28]"
                   />
                 </label>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2 md:grid-cols-[minmax(0,1.2fr)_88px_96px]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <select
                     value={item.selectedPackagingId || ''}
                     onChange={(e) => updateSelectedPackaging(item.id, e.target.value)}
-                    className="min-w-0 rounded border border-[#9fb7d5] bg-white px-2 py-1.5 text-xs text-[#1f2933] outline-none"
+                    className="min-w-0 flex-1 rounded-xl border border-[#9fb7d5] bg-white px-2 py-1 text-xs text-[#1f2933] outline-none"
                   >
                     <option value="">Только {item.baseUnitName}</option>
                     {(Array.isArray(item.packagings) ? item.packagings : []).map((packaging) => {
@@ -222,31 +271,35 @@ export default function POSCartItem({
                     })}
                   </select>
 
-                  {isPackageSale ? (
+                  <div className="flex h-8 shrink-0 items-center rounded-xl border border-[#9fb7d5] bg-white">
+                    <button
+                      type="button"
+                      onClick={() => isPackageSale ? handleStepPackageQuantity(-1) : handleStepExtraUnitQuantity(-1)}
+                      className="flex h-full w-6 items-center justify-center text-slate-500 hover:text-slate-900"
+                    >
+                      <Minus size={11} />
+                    </button>
                     <input
                       type="number"
                       min={0}
-                      value={item.packageQuantityInput ?? String(item.packageQuantity)}
-                      onChange={(e) => updatePackageQuantityInput(item.id, e.target.value)}
-                      onBlur={() => commitPackageQuantityInput(item.id)}
-                      placeholder="Упак."
-                      className="min-w-0 rounded border border-[#9fb7d5] bg-white px-1.5 py-1.5 text-center text-xs text-[#1f2933] outline-none"
+                      step={isPackageSale ? "1" : "0.01"}
+                      value={isPackageSale ? (item.packageQuantityInput ?? String(item.packageQuantity)) : (item.extraUnitQuantityInput ?? String(item.extraUnitQuantity))}
+                      onChange={(e) => isPackageSale ? updatePackageQuantityInput(item.id, e.target.value) : updateExtraUnitQuantityInput(item.id, e.target.value)}
+                      onBlur={() => isPackageSale ? commitPackageQuantityInput(item.id) : commitExtraUnitQuantityInput(item.id)}
+                      placeholder="0"
+                      className="h-full w-10 text-center text-xs font-semibold text-[#1f2933] outline-none"
                     />
-                  ) : (
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.extraUnitQuantityInput ?? String(item.extraUnitQuantity)}
-                      onChange={(e) => updateExtraUnitQuantityInput(item.id, e.target.value)}
-                      onBlur={() => commitExtraUnitQuantityInput(item.id)}
-                      placeholder={item.baseUnitName}
-                      className="min-w-0 rounded border border-[#9fb7d5] bg-white px-1.5 py-1.5 text-center text-xs text-[#1f2933] outline-none"
-                    />
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => isPackageSale ? handleStepPackageQuantity(1) : handleStepExtraUnitQuantity(1)}
+                      className="flex h-full w-6 items-center justify-center text-slate-500 hover:text-slate-900"
+                    >
+                      <Plus size={11} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-[86px] justify-end gap-2 md:grid-cols-[140px]">
+                <div className="w-16 shrink-0">
                   <input
                     type="number"
                     min={0}
@@ -255,10 +308,10 @@ export default function POSCartItem({
                     onChange={(e) => updateLineDiscountInput(item.id, e.target.value)}
                     onBlur={() => commitLineDiscountInput(item.id)}
                     placeholder="%"
-                    className="min-w-0 rounded border border-[#d6c07a] bg-white px-2 py-1.5 text-center text-xs text-[#1f2933] outline-none"
+                    className="h-8 w-full rounded-xl border border-[#d6c07a] bg-white px-1.5 text-center text-xs text-[#1f2933] outline-none"
                   />
                 </div>
-              </>
+              </div>
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
@@ -268,7 +321,7 @@ export default function POSCartItem({
                   : `Поштучно: ${item.extraUnitQuantity}`}
               </span>
               <span>
-                Итого: {item.quantity} шт
+                Итого: <strong className="text-slate-700">{item.quantity} шт</strong>
               </span>
             </div>
           </div>

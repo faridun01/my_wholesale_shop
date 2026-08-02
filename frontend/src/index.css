@@ -33,6 +33,7 @@
 
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -40,11 +41,11 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    @apply bg-slate-300/60 rounded-full;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    @apply bg-slate-400/80;
   }
 }
 
@@ -62,7 +63,7 @@
   }
 
   .app-surface {
-    @apply overflow-hidden rounded-[28px] border border-white bg-white shadow-sm;
+    @apply overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-sm transition-all;
   }
 
   .app-surface-header {
@@ -70,13 +71,13 @@
   }
 
   .app-control {
-    @apply min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-all;
+    @apply min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20;
   }
 
   .btn-primary {
-    @apply px-6 py-2.5 rounded-xl text-white transition-all active:scale-95;
+    @apply px-5 py-2.5 rounded-xl font-medium text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
     background: var(--color-shopify-green);
-    box-shadow: 0 8px 24px rgba(0, 128, 96, 0.18);
+    box-shadow: 0 4px 14px rgba(0, 128, 96, 0.22);
   }
 
   .btn-primary:hover {
@@ -84,9 +85,21 @@
   }
   
   .card {
-    @apply bg-white overflow-hidden;
-    border-radius: 24px;
+    @apply bg-white overflow-hidden transition-all duration-200;
+    border-radius: 20px;
     border: 1px solid var(--color-shopify-border);
-    box-shadow: 0 1px 0 rgba(22, 29, 37, 0.04), 0 8px 24px rgba(22, 29, 37, 0.04);
+    box-shadow: 0 1px 2px rgba(22, 29, 37, 0.03), 0 4px 16px rgba(22, 29, 37, 0.03);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
+
