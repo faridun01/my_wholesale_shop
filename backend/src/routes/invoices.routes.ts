@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { InvoiceService } from '../services/invoice.service.js';
+import { AuditService } from '../services/audit.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
@@ -176,7 +177,18 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
     }
 
     const userId = req.user!.id;
-    const result = await InvoiceService.cancelInvoice(Number(req.params.id), userId, { force: true });
+    const invoiceId = Number(req.params.id);
+    const result = await InvoiceService.cancelInvoice(invoiceId, userId, { force: true });
+    
+    await AuditService.log({
+      userId,
+      action: 'CANCEL_INVOICE',
+      entity: 'Invoice',
+      entityId: invoiceId,
+      ipAddress: req.ip,
+      details: { forced: true },
+    });
+
     res.json(result);
   } catch (error) {
     next(error);

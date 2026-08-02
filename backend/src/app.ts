@@ -60,11 +60,15 @@ app.use('/api/expenses', authenticate, expenseRoutes);
 app.use('/api/customer-orders', authenticate, customerOrderRoutes);
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
-import multer from 'multer';
-const upload = multer({ dest: 'uploads/' });
-app.post('/api/upload', authenticate, upload.single('photo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ photoUrl: `/uploads/${req.file.filename}` });
+import { uploadImage } from './middlewares/upload.middleware.js';
+app.post('/api/upload', authenticate, (req, res, next) => {
+  uploadImage.single('photo')(req, res, (err: any) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Ошибка загрузки файла' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    res.json({ photoUrl: `/uploads/${req.file.filename}` });
+  });
 });
 
 // Error Handling Middleware

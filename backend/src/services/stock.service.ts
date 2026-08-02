@@ -43,16 +43,30 @@ export class StockService {
     let remainingToAllocate = requiredQty;
     let totalCost = 0;
 
-    const batches = await client.productBatch.findMany({
-      where: {
-        productId,
-        warehouseId,
-        remainingQuantity: { gt: 0 },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+    let batches: any[] = [];
+    if (typeof client.$queryRaw === 'function') {
+      try {
+        batches = await client.$queryRaw`
+          SELECT id, product_id as "productId", warehouse_id as "warehouseId", 
+                 remaining_quantity as "remainingQuantity", cost_price as "costPrice"
+          FROM product_batches
+          WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} AND remaining_quantity > 0
+          ORDER BY created_at ASC
+          FOR UPDATE
+        `;
+      } catch (e) {
+        // Fallback for non-PostgreSQL / mock environments
+        batches = await client.productBatch.findMany({
+          where: { productId, warehouseId, remainingQuantity: { gt: 0 } },
+          orderBy: { createdAt: 'asc' },
+        });
+      }
+    } else {
+      batches = await client.productBatch.findMany({
+        where: { productId, warehouseId, remainingQuantity: { gt: 0 } },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
 
     const totalAvailable = batches.reduce(
       (sum: number, b: any) => sum + Number(b.remainingQuantity || 0),

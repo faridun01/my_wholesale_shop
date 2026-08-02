@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import prisma from '../db/prisma.js';
 import { ReminderService } from './reminder.service.js';
 
@@ -80,98 +80,63 @@ const withMockedReminderRepo = async (
   }
 };
 
-const tests: Array<{ name: string; run: () => Promise<void> }> = [
-  {
-    name: 'getReminders limits non-admin access to own reminders',
-    run: async () => {
-      await withMockedReminderRepo(
-        [
-          { id: 1, userId: 10, title: 'mine', dueDate: new Date(), isCompleted: false },
-          { id: 2, userId: 20, title: 'other', dueDate: new Date(), isCompleted: false },
-        ],
-        async (repo) => {
-          const result = await ReminderService.getReminders({ userId: 10, isAdmin: false });
-          assert.equal(result.length, 1);
-          assert.equal(result[0].id, 1);
-          assert.deepEqual(repo.calls.findMany[0].where, { userId: 10 });
-        }
-      );
-    },
-  },
-  {
-    name: 'updateReminderForActor denies access to foreign reminder for non-admin',
-    run: async () => {
-      await withMockedReminderRepo(
-        [{ id: 2, userId: 20, title: 'other', dueDate: new Date(), isCompleted: false }],
-        async (repo) => {
-          await assert.rejects(
-            ReminderService.updateReminderForActor(
-              2,
-              { userId: 10, isAdmin: false },
-              { title: 'hacked' }
-            ),
-            (error: any) => error?.status === 404
-          );
-          assert.equal(repo.calls.update.length, 0);
-        }
-      );
-    },
-  },
-  {
-    name: 'updateReminderForActor allows owner and updates reminder',
-    run: async () => {
-      await withMockedReminderRepo(
-        [{ id: 1, userId: 10, title: 'mine', dueDate: new Date(), isCompleted: false }],
-        async (repo) => {
-          const result = await ReminderService.updateReminderForActor(
-            1,
+describe('ReminderService', () => {
+  it('getReminders limits non-admin access to own reminders', async () => {
+    await withMockedReminderRepo(
+      [
+        { id: 1, userId: 10, title: 'mine', dueDate: new Date(), isCompleted: false },
+        { id: 2, userId: 20, title: 'other', dueDate: new Date(), isCompleted: false },
+      ],
+      async (repo) => {
+        const result = await ReminderService.getReminders({ userId: 10, isAdmin: false });
+        expect(result.length).toBe(1);
+        expect(result[0].id).toBe(1);
+        expect(repo.calls.findMany[0].where).toEqual({ userId: 10 });
+      }
+    );
+  });
+
+  it('updateReminderForActor denies access to foreign reminder for non-admin', async () => {
+    await withMockedReminderRepo(
+      [{ id: 2, userId: 20, title: 'other', dueDate: new Date(), isCompleted: false }],
+      async (repo) => {
+        await expect(
+          ReminderService.updateReminderForActor(
+            2,
             { userId: 10, isAdmin: false },
-            { title: 'updated title' }
-          );
-          assert.equal(result.title, 'updated title');
-          assert.equal(repo.calls.update.length, 1);
-        }
-      );
-    },
-  },
-  {
-    name: 'completeReminderForActor allows admin to complete any reminder',
-    run: async () => {
-      await withMockedReminderRepo(
-        [{ id: 5, userId: 99, title: 'other', dueDate: new Date(), isCompleted: false }],
-        async () => {
-          const result = await ReminderService.completeReminderForActor(5, {
-            userId: 1,
-            isAdmin: true,
-          });
-          assert.equal(result.isCompleted, true);
-        }
-      );
-    },
-  },
-];
+            { title: 'hacked' }
+          )
+        ).rejects.toMatchObject({ status: 404 });
+        expect(repo.calls.update.length).toBe(0);
+      }
+    );
+  });
 
-const main = async () => {
-  let failed = 0;
+  it('updateReminderForActor allows owner and updates reminder', async () => {
+    await withMockedReminderRepo(
+      [{ id: 1, userId: 10, title: 'mine', dueDate: new Date(), isCompleted: false }],
+      async (repo) => {
+        const result = await ReminderService.updateReminderForActor(
+          1,
+          { userId: 10, isAdmin: false },
+          { title: 'updated title' }
+        );
+        expect(result.title).toBe('updated title');
+        expect(repo.calls.update.length).toBe(1);
+      }
+    );
+  });
 
-  for (const testCase of tests) {
-    try {
-      await testCase.run();
-      console.log(`PASS: ${testCase.name}`);
-    } catch (error) {
-      failed += 1;
-      console.error(`FAIL: ${testCase.name}`);
-      console.error(error);
-    }
-  }
-
-  if (failed > 0) {
-    process.exitCode = 1;
-    throw new Error(`${failed} reminder access test(s) failed`);
-  }
-
-  console.log(`All reminder access tests passed: ${tests.length}`);
-};
-
-await main();
-
+  it('completeReminderForActor allows admin to complete any reminder', async () => {
+    await withMockedReminderRepo(
+      [{ id: 5, userId: 99, title: 'other', dueDate: new Date(), isCompleted: false }],
+      async () => {
+        const result = await ReminderService.completeReminderForActor(5, {
+          userId: 1,
+          isAdmin: true,
+        });
+        expect(result.isCompleted).toBe(true);
+      }
+    );
+  });
+});

@@ -45,7 +45,18 @@ docker compose down
 docker compose down -v
 ```
 
-## Notes
+## 5) Database Backup
 
-- Backend runs Prisma migrations on container start.
-- Frontend is served by nginx and proxies `/api` to backend.
+Run database backup locally or via Docker:
+
+```bash
+# Linux/macOS:
+./backend/scripts/backup.sh
+
+# Windows PowerShell:
+.\backend\scripts\backup.ps1
+
+# Docker container dump:
+docker compose exec postgres pg_dump -U postgres wholesale_shop | gzip > ./backups/backup_$(date +%Y%m%d).sql.gz
+```
+

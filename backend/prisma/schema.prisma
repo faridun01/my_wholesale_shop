@@ -542,7 +542,6 @@ model Setting {
   id    Int    @id @default(autoincrement())
   key   String @unique
   value String
-
   @@map("settings")
 }
 
@@ -564,4 +563,20 @@ model Reminder {
   @@index([dueDate])
   @@index([referenceId])
   @@map("reminders")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String
+  entity    String
+  entityId  Int?     @map("entity_id")
+  details   String?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
 }

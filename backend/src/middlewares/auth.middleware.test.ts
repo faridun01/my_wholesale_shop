@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 
 type MockResponse = {
   statusCode: number;
@@ -24,54 +24,26 @@ const createMockResponse = (): MockResponse => {
   return res;
 };
 
-const tests: Array<{ name: string; run: () => Promise<void> }> = [
-  {
-    name: 'authenticate returns 401 for malformed cookie without throwing',
-    run: async () => {
-      process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
-      const { authenticate } = await import('./auth.middleware.js');
+describe('Auth Middleware', () => {
+  it('authenticate returns 401 for malformed cookie without throwing', async () => {
+    process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+    const { authenticate } = await import('./auth.middleware.js');
 
-      const req = {
-        headers: {
-          cookie: 'auth_token=%E0%A4%A',
-        },
-      } as any;
-      const res = createMockResponse();
-      let nextCalled = false;
-      const next = () => {
-        nextCalled = true;
-      };
+    const req = {
+      headers: {
+        cookie: 'auth_token=%E0%A4%A',
+      },
+    } as any;
+    const res = createMockResponse();
+    let nextCalled = false;
+    const next = () => {
+      nextCalled = true;
+    };
 
-      await authenticate(req, res as any, next as any);
+    await authenticate(req, res as any, next as any);
 
-      assert.equal(nextCalled, false);
-      assert.equal(res.statusCode, 401);
-      assert.deepEqual(res.body, { error: 'Invalid token' });
-    },
-  },
-];
-
-const main = async () => {
-  let failed = 0;
-
-  for (const testCase of tests) {
-    try {
-      await testCase.run();
-      console.log(`PASS: ${testCase.name}`);
-    } catch (error) {
-      failed += 1;
-      console.error(`FAIL: ${testCase.name}`);
-      console.error(error);
-    }
-  }
-
-  if (failed > 0) {
-    process.exitCode = 1;
-    throw new Error(`${failed} auth middleware test(s) failed`);
-  }
-
-  console.log(`All auth middleware tests passed: ${tests.length}`);
-};
-
-await main();
-
+    expect(nextCalled).toBe(false);
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: 'Invalid token' });
+  });
+});
