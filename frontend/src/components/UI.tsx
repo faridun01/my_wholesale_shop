@@ -110,6 +110,7 @@ export interface CardProps {
   headerActions?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  variant?: 'default' | 'saas' | 'glass';
   className?: string;
   bodyClassName?: string;
 }
@@ -120,27 +121,32 @@ export const Card: React.FC<CardProps> = ({
   headerActions,
   children,
   footer,
+  variant = 'default',
   className,
   bodyClassName,
-}) => (
-  <div className={clsx('card', className)}>
-    {(title || headerActions) && (
-      <div className="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          {typeof title === 'string' ? (
-            <h3 className="text-base font-semibold text-slate-900 tracking-tight">{title}</h3>
-          ) : (
-            title
-          )}
-          {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+}) => {
+  const variantClass = variant === 'saas' ? 'modern-saas-card glow-slate' : variant === 'glass' ? 'glass-card shadow-sm' : 'card';
+
+  return (
+    <div className={clsx(variantClass, className)}>
+      {(title || headerActions) && (
+        <div className="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            {typeof title === 'string' ? (
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">{title}</h3>
+            ) : (
+              title
+            )}
+            {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+          </div>
+          {headerActions && <div className="flex items-center gap-2 mt-2 sm:mt-0">{headerActions}</div>}
         </div>
-        {headerActions && <div className="flex items-center gap-2 mt-2 sm:mt-0">{headerActions}</div>}
-      </div>
-    )}
-    <div className={clsx('p-5', bodyClassName)}>{children}</div>
-    {footer && <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">{footer}</div>}
-  </div>
-);
+      )}
+      <div className={clsx('p-5', bodyClassName)}>{children}</div>
+      {footer && <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">{footer}</div>}
+    </div>
+  );
+};
 
 /* ==========================================================================
    4. FORM CONTROLS (INPUT, SELECT, SEARCH)
