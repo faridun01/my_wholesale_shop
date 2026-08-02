@@ -81,8 +81,8 @@ export default function PaginationControls({
                 onClick={() => handlePageChange(pageNumber)}
                 className={
                   currentPage === pageNumber
-                    ? 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-2xl bg-slate-900 px-3 text-sm font-semibold text-white'
-                    : 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50'
+                    ? 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl bg-[#008060] px-3 text-sm font-semibold text-white shadow-xs'
+                    : 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50'
                 }
               >
                 {pageNumber}

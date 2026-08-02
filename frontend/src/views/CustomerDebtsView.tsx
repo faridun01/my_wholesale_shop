@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Printer, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -77,7 +77,7 @@ type SortMode = (typeof sortOptions)[number]['value'];
 const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
   [
     'inline-flex items-center rounded-2xl px-4 py-2 text-sm font-medium transition-all',
-    isActive ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100',
+    isActive ? 'bg-[#008060] text-white shadow-xs font-semibold' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60',
   ].join(' ');
 
 export default function CustomerDebtsView() {

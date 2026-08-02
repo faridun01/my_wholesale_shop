@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -24,9 +24,9 @@ import ChartSkeleton from '../components/charts/ChartSkeleton';
 const DashboardCharts = React.lazy(() => import('../components/charts/DashboardCharts'));
 
 const statusTone = (status: string) => {
-  if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'partial') return 'bg-amber-100 text-amber-700';
-  return 'bg-rose-100 text-rose-700';
+  if (status === 'paid') return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80';
+  if (status === 'partial') return 'bg-amber-50 text-amber-700 border border-amber-200/80';
+  return 'bg-rose-50 text-rose-700 border border-rose-200/80';
 };
 
 const statusLabel = (status: string) => {

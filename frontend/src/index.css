@@ -4,24 +4,26 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-shopify-green: #008060;
-  --color-shopify-green-dark: #006e52;
-  --color-shopify-bg: #f6f6f7;
-  --color-shopify-border: #e1e3e5;
-  --color-shopify-text: #202223;
-  --color-shopify-muted: #6d7175;
+  --color-primary: #008060;
+  --color-primary-hover: #006e52;
+  --color-primary-light: #e6f4f0;
+  --color-bg-main: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text-main: #0f172a;
+  --color-text-muted: #64748b;
 }
 
 @layer base {
   html {
     height: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply font-sans antialiased;
-    background: var(--color-shopify-bg);
-    color: var(--color-shopify-text);
-    selection-background-color: #b9f0dc;
+    @apply font-sans antialiased bg-slate-50 text-slate-900;
+    background-image: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 50%),
+                      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
     min-width: 320px;
     height: 100%;
     overflow: hidden;
@@ -31,6 +33,7 @@
     height: 100%;
   }
 
+  /* Custom subtle scrollbars */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -41,65 +44,84 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-300/60 rounded-full;
+    @apply bg-slate-300/70 rounded-full;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400/80;
+    @apply bg-slate-400;
   }
 }
 
 @layer components {
+  /* Layout Shell */
   .app-page-shell {
-    @apply w-full min-w-0 overflow-hidden rounded-[22px] border border-white/70 bg-[#f4f5fb] shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] lg:rounded-l-none lg:border-l-0;
+    @apply w-full min-w-0 overflow-hidden bg-slate-50/80;
   }
 
   .app-page-pad {
-    @apply p-3 sm:p-4 lg:p-5;
-  }
-
-  .app-page-inner {
-    @apply w-full min-w-0;
+    @apply p-3 sm:p-5 lg:p-6 space-y-6;
   }
 
   .app-surface {
-    @apply overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-sm transition-all;
+    @apply overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all duration-200;
   }
 
-  .app-surface-header {
-    @apply px-4 py-4 sm:px-5 sm:py-5;
-  }
-
+  /* Enhanced Form Controls */
   .app-control {
-    @apply min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20;
+    @apply min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
   }
 
+  /* Premium Gradient & Action Buttons */
   .btn-primary {
-    @apply px-5 py-2.5 rounded-xl font-medium text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
-    background: var(--color-shopify-green);
-    box-shadow: 0 4px 14px rgba(0, 128, 96, 0.22);
+    @apply inline-flex items-center justify-center gap-2 px-4.5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30;
   }
 
-  .btn-primary:hover {
-    background: var(--color-shopify-green-dark);
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-slate-700 bg-white hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none border border-slate-200/80 shadow-xs hover:border-slate-300;
   }
-  
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-destructive {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-xs;
+  }
+
+  /* Modern Card & Glassmorphic Tokens */
   .card {
-    @apply bg-white overflow-hidden transition-all duration-200;
-    border-radius: 20px;
-    border: 1px solid var(--color-shopify-border);
-    box-shadow: 0 1px 2px rgba(22, 29, 37, 0.03), 0 4px 16px rgba(22, 29, 37, 0.03);
+    @apply bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs transition-all duration-250 hover:border-slate-300/90 hover:shadow-md;
+  }
+
+  .modern-card {
+    @apply bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300;
+  }
+
+  .accent-border-top {
+    border-top: 3px solid #008060;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(241, 245, 249, 0.9);
+  }
+
+  .glass-header {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
   }
 
   .glass-panel {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.7);
   }
 
+  /* Touch Target */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
 }
-
