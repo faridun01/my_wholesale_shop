@@ -1,4 +1,5 @@
 import type React from 'react';
+import { clsx } from 'clsx';
 import {
   Banknote,
   Calendar,
@@ -121,31 +122,31 @@ const SalesInvoicesSection = ({
   );
 
   return (
-    <div className="mt-1 flex flex-col overflow-hidden rounded-md border border-[#b7c2ce] bg-white shadow-sm md:min-h-[760px]">
-      <div className="flex flex-col gap-3 border-b border-[#b7c2ce] bg-[#eef3f8] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-[#1f2933]">Накладные</h2>
-          <span className="inline-flex items-center rounded border border-[#9fb7d5] bg-white px-2.5 py-1 text-xs font-semibold text-[#23527c]">
+    <div className="flex flex-col overflow-hidden rounded-[28px] border border-white bg-white p-5 shadow-sm md:min-h-[760px]">
+      <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-slate-900">Накладные</h2>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
             {formatCount(invoicesCount)}
           </span>
         </div>
         <div className="relative flex-1 max-w-xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
             placeholder="Поиск по ID или клиенту..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded border border-[#9fb7d5] bg-white py-2.5 pl-11 pr-4 text-sm font-medium text-[#1f2933] outline-none transition-colors focus:border-[#4f81bd]"
+            className="w-full rounded-full border border-slate-200 bg-[#f4f5fb] py-3 pl-11 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
           />
         </div>
       </div>
 
-      <div className="grid gap-2 border-b border-[#b7c2ce] bg-[#f7f9fb] px-4 py-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-4 grid gap-2.5 rounded-2xl border border-slate-100 bg-[#f4f5fb]/50 p-3 md:grid-cols-2 xl:grid-cols-5">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="w-full rounded border border-[#9fb7d5] bg-white px-3 py-2 text-sm font-medium text-[#1f2933] outline-none transition-colors focus:border-[#4f81bd]"
+          className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300"
         >
           <option value="all">Все статусы</option>
           <option value="paid">Оплачено</option>
@@ -156,7 +157,7 @@ const SalesInvoicesSection = ({
         <select
           value={staffFilter}
           onChange={(e) => setStaffFilter(e.target.value)}
-          className="w-full rounded border border-[#9fb7d5] bg-white px-3 py-2 text-sm font-medium text-[#1f2933] outline-none transition-colors focus:border-[#4f81bd]"
+          className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300"
         >
           <option value="all">Все сотрудники</option>
           {staffOptions.map((staffName) => (
@@ -166,36 +167,36 @@ const SalesInvoicesSection = ({
           ))}
         </select>
 
-        <div className="flex items-center gap-2 rounded border border-[#9fb7d5] bg-white px-3 py-2">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5">
           <Calendar size={16} className="text-slate-400" />
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"
+            className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
           />
         </div>
 
-        <div className="flex items-center gap-2 rounded border border-[#9fb7d5] bg-white px-3 py-2">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5">
           <Calendar size={16} className="text-slate-400" />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"
+            className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
           />
         </div>
 
         <button
           type="button"
           onClick={clearInvoiceFilters}
-          className="rounded border border-[#9fb7d5] bg-white px-4 py-2 text-sm font-medium text-[#1f3f63] transition-colors hover:bg-[#eaf2fb]"
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
         >
           Сбросить фильтры
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 p-3 md:hidden">
+      <div className="flex-1 space-y-3 pt-3 md:hidden">
         {paginatedInvoices.map((inv) => {
           const paymentDisabled = isPaymentActionDisabled(inv);
           const returnDisabled = isReturnActionDisabled(inv);
@@ -204,18 +205,17 @@ const SalesInvoicesSection = ({
           const hasReturns = hasInvoiceReturns(inv);
 
           return (
-            <div key={`mobile-invoice-${inv.id}`} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={`mobile-invoice-${inv.id}`} className="rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 p-4 shadow-xs">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base text-slate-900">{isAdmin ? `Накладная #${inv.id}` : 'Накладная'}</p>
-                  <p className="mt-1 text-sm text-slate-500">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</p>
-                  <p className="mt-2 break-words text-sm text-slate-700">{inv.customer_name}</p>
-                  <p className="mt-1 text-xs text-slate-400">{inv.staff_name}</p>
+                  <p className="text-base font-semibold text-slate-900">Накладная</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-800">{inv.customer_name}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}
                   {hasReturns && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-700 border border-amber-200/80">
                       <RotateCcw size={12} />
                       Возврат
                     </span>
@@ -223,35 +223,35 @@ const SalesInvoicesSection = ({
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
-                  <p className="mt-1 break-words text-sm text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Сумма</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
-                  <p className="mt-1 break-words text-sm text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
+                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплачено</p>
+                  <p className="mt-0.5 text-sm font-semibold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                  <p className="mt-1 break-words text-sm text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
+                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Остаток</p>
+                  <p className="mt-0.5 text-sm font-semibold text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Склад</p>
-                  <p className="mt-1 break-words text-sm text-slate-900">{inv.warehouse?.name || '---'}</p>
+                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Склад</p>
+                  <p className="mt-0.5 text-sm font-medium text-slate-800">{inv.warehouse?.name || '---'}</p>
                 </div>
               </div>
 
               {hasReturns && (
-                <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3">
+                <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">Возврат оформлен</p>
-                      <p className="mt-1 text-xs text-amber-700">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Возврат оформлен</p>
+                      <p className="mt-0.5 text-xs text-amber-700">
                         {returnedItemsCount > 0 ? `Позиций: ${formatCount(returnedItemsCount)}` : 'Подробности в деталях'}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-black text-rose-600">-{formatMoney(returnedAmount)}</p>
+                    <p className="shrink-0 text-sm font-semibold text-rose-600">-{formatMoney(returnedAmount)}</p>
                   </div>
                 </div>
               )}
@@ -265,11 +265,12 @@ const SalesInvoicesSection = ({
                     setShowPaymentModal(true);
                   }}
                   disabled={paymentDisabled}
-                  className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                  className={clsx(
+                    'rounded-xl border px-3 py-2 text-xs font-semibold transition-colors',
                     paymentDisabled
                       ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  }`}
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                  )}
                 >
                   Оплата
                 </button>
@@ -278,11 +279,12 @@ const SalesInvoicesSection = ({
                     void openReturnInvoiceModal(inv);
                   }}
                   disabled={returnDisabled}
-                  className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                  className={clsx(
+                    'rounded-xl border px-3 py-2 text-xs font-semibold transition-colors',
                     returnDisabled
                       ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                      : 'border-amber-200 bg-amber-50 text-amber-700'
-                  }`}
+                      : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+                  )}
                 >
                   Возврат
                 </button>
@@ -293,30 +295,31 @@ const SalesInvoicesSection = ({
                   }}
                   disabled={!canEditInvoice(inv)}
                   title={getEditBlockedReason(inv)}
-                  className={`rounded-2xl border px-3 py-2 text-xs font-medium transition-all ${
+                  className={clsx(
+                    'rounded-xl border px-3 py-2 text-xs font-semibold transition-colors',
                     canEditInvoice(inv)
-                      ? 'border-violet-200 bg-violet-50 text-violet-700'
-                      : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                  }`}
+                      ? 'border-slate-200 bg-white text-slate-800 hover:bg-slate-900 hover:text-white'
+                      : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300',
+                  )}
                 >
                   Изменить
                 </button>
                 <button
                   onClick={() => fetchInvoiceDetails(inv.id)}
-                  className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-900 hover:text-white"
                 >
                   Детали
                 </button>
                 <button
                   onClick={() => handleQuickPrintInvoice(inv.id)}
-                  className="rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-900 hover:text-white"
                 >
                   Печать
                 </button>
                 {isAdmin && (
                   <button
                     onClick={() => handleDeleteInvoice(inv.id)}
-                    className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700"
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
                   >
                     Удалить
                   </button>
@@ -338,11 +341,10 @@ const SalesInvoicesSection = ({
         />
       </div>
 
-      <div className="hidden min-h-[560px] flex-1 overflow-x-auto md:block">
-        <table className="w-full border-collapse text-left text-[12px] [&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
+      <div className="hidden min-h-[560px] flex-1 overflow-x-auto pt-3 md:block">
+        <table className="w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-[#b7c2ce] bg-[#dbe5f1] text-[12px] font-semibold text-[#32465a]">
-              {isAdmin && <th className="px-4 py-3">{renderSortLabel('ID', 'id')}</th>}
+            <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
               <th className="px-4 py-3">{renderSortLabel('Дата', 'createdAt')}</th>
               <th className="px-4 py-3">{renderSortLabel('Клиент', 'customer_name')}</th>
               <th className="px-4 py-3">{renderSortLabel('Сумма', 'netAmount')}</th>
@@ -350,11 +352,10 @@ const SalesInvoicesSection = ({
               <th className="px-4 py-3">{renderSortLabel('Оплачено', 'paidAmount')}</th>
               <th className="px-4 py-3">{renderSortLabel('Остаток', 'balance')}</th>
               <th className="px-4 py-3">{renderSortLabel('Статус', 'status')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Сотрудник', 'staff_name')}</th>
-              <th className="px-2 py-2 text-center">Действия</th>
+              <th className="px-3 py-3 text-center">Действия</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#d5dde6]">
+          <tbody className="divide-y divide-slate-100">
             {paginatedInvoices.map((inv) => {
               const paymentDisabled = isPaymentActionDisabled(inv);
               const returnDisabled = isReturnActionDisabled(inv);
@@ -366,19 +367,18 @@ const SalesInvoicesSection = ({
                 <tr
                   key={inv.id}
                   onClick={() => fetchInvoiceDetails(inv.id)}
-                  className="cursor-pointer transition-colors even:bg-[#fbfcfd] hover:bg-[#fff8dc]"
+                  className="cursor-pointer transition-colors hover:bg-[#f4f5fb]"
                 >
-                  {isAdmin && <td className="px-2 py-2 text-sm font-semibold text-[#23527c]">#{inv.id}</td>}
-                  <td className="px-2 py-2 text-sm text-[#48627f]">
+                  <td className="px-4 py-3 text-slate-500">
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
-                  <td className="px-2 py-2 text-sm text-[#1f2933]">{inv.customer_name}</td>
-                  <td className="px-2 py-2 text-sm font-medium tabular-nums text-[#1f2933]">{formatMoney(getInvoiceNetAmount(inv))}</td>
-                  <td className="px-2 py-2 text-sm">
+                  <td className="px-4 py-3 font-medium text-slate-900">{inv.customer_name}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</td>
+                  <td className="px-4 py-3">
                     {hasReturns ? (
-                      <div className="inline-flex flex-col rounded border border-[#d6c07a] bg-[#fff8dc] px-2 py-1">
-                        <span className="font-semibold text-[#8a1f2d]">-{formatMoney(returnedAmount)}</span>
-                        <span className="mt-0.5 text-[10px] font-medium text-[#7a5a00]">
+                      <div className="inline-flex flex-col rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1">
+                        <span className="font-semibold text-rose-600">-{formatMoney(returnedAmount)}</span>
+                        <span className="text-[10px] font-medium text-amber-700">
                           {returnedItemsCount > 0 ? `${formatCount(returnedItemsCount)} поз.` : 'возврат'}
                         </span>
                       </div>
@@ -386,12 +386,11 @@ const SalesInvoicesSection = ({
                       <span className="text-slate-300">-</span>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-sm font-medium tabular-nums text-[#007a4d]">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
-                  <td className="px-2 py-2 text-sm font-medium tabular-nums text-[#8a1f2d]">{formatMoney(getInvoiceBalance(inv))}</td>
-                  <td className="px-2 py-2">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
-                  <td className="px-2 py-2 text-sm text-[#48627f]">{inv.staff_name}</td>
-                  <td className="px-2 py-2 text-center align-middle">
-                    <div className={`ml-auto grid gap-1 ${isAdmin ? 'w-[118px] grid-cols-3' : 'w-[78px] grid-cols-2'}`}>
+                  <td className="px-4 py-3 font-semibold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
+                  <td className="px-4 py-3 font-semibold text-rose-600">{formatMoney(getInvoiceBalance(inv))}</td>
+                  <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
+                  <td className="px-3 py-3 text-center align-middle">
+                    <div className="flex items-center justify-center gap-1">
                       {isAdmin && (
                         <>
                           <button
@@ -403,14 +402,15 @@ const SalesInvoicesSection = ({
                               setShowPaymentModal(true);
                             }}
                             disabled={paymentDisabled}
-                            className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+                            className={clsx(
+                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
                               paymentDisabled
-                                ? 'cursor-not-allowed border-[#d5dde6] bg-[#f7f9fb] text-slate-300'
-                                : 'border-[#9fb7d5] bg-white text-[#007a4d] hover:bg-[#effaf5]'
-                            }`}
+                                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                            )}
                             title="Принять оплату"
                           >
-                            <Banknote size={16} />
+                            <Banknote size={15} />
                           </button>
                           <button
                             onClick={(e) => {
@@ -418,14 +418,15 @@ const SalesInvoicesSection = ({
                               void openReturnInvoiceModal(inv);
                             }}
                             disabled={returnDisabled}
-                            className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+                            className={clsx(
+                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
                               returnDisabled
-                                ? 'cursor-not-allowed border-[#d5dde6] bg-[#f7f9fb] text-slate-300'
-                                : 'border-[#d6c07a] bg-white text-[#7a5a00] hover:bg-[#fff8dc]'
-                            }`}
+                                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+                            )}
                             title="Возврат"
                           >
-                            <RotateCcw size={16} />
+                            <RotateCcw size={15} />
                           </button>
                           <button
                             onClick={(e) => {
@@ -434,14 +435,15 @@ const SalesInvoicesSection = ({
                               openEditInvoiceModal(inv);
                             }}
                             disabled={!canEditInvoice(inv)}
-                            className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+                            className={clsx(
+                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
                               canEditInvoice(inv)
-                                ? 'border-[#9fb7d5] bg-white text-[#23527c] hover:bg-[#eaf2fb]'
-                                : 'cursor-not-allowed border-[#d5dde6] bg-[#f7f9fb] text-slate-300'
-                            }`}
+                                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
+                                : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300',
+                            )}
                             title={canEditInvoice(inv) ? 'Изменить продажу' : getEditBlockedReason(inv)}
                           >
-                            <Pencil size={16} />
+                            <Pencil size={15} />
                           </button>
                         </>
                       )}
@@ -450,20 +452,20 @@ const SalesInvoicesSection = ({
                           e.stopPropagation();
                           fetchInvoiceDetails(inv.id);
                         }}
-                        className="flex h-8 w-8 items-center justify-center rounded border border-[#9fb7d5] bg-white text-[#23527c] transition-colors hover:bg-[#eaf2fb]"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
                         title="Просмотр"
                       >
-                        <Eye size={16} />
+                        <Eye size={15} />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleQuickPrintInvoice(inv.id);
                         }}
-                        className="flex h-8 w-8 items-center justify-center rounded border border-[#9fb7d5] bg-white text-[#23527c] transition-colors hover:bg-[#eaf2fb]"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
                         title="Печать"
                       >
-                        <Printer size={16} />
+                        <Printer size={15} />
                       </button>
                       {isAdmin && (
                         <button
@@ -471,10 +473,10 @@ const SalesInvoicesSection = ({
                             e.stopPropagation();
                             handleDeleteInvoice(inv.id);
                           }}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-[#d89aa2] bg-white text-[#8a1f2d] transition-colors hover:bg-[#fff0f1]"
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100"
                           title="Удалить"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       )}
                     </div>
@@ -484,12 +486,13 @@ const SalesInvoicesSection = ({
             })}
             {sortedInvoicesLength === 0 && !isLoading && (
               <tr>
-                <td colSpan={isAdmin ? 10 : 9} className="px-8 py-20 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-6">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-300">
-                      <Receipt size={48} />
+                <td colSpan={8} className="px-8 py-20 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-400">
+                      <Receipt size={24} />
                     </div>
-                    <p className="text-slate-400 font-bold">Накладные не найдены</p>
+                    <p className="text-sm font-medium text-slate-700">Накладные не найдены</p>
+                    <p className="mt-1 text-xs text-slate-400">Попробуйте сбросить фильтры</p>
                   </div>
                 </td>
               </tr>

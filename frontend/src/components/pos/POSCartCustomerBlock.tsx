@@ -46,26 +46,26 @@ export default function POSCartCustomerBlock({
   setIsCustomerDropdownOpen,
 }: POSCartCustomerBlockProps) {
   return (
-    <div className={clsx('order-2 space-y-2 border-b border-[#b7c2ce] bg-[#f7f9fb] px-3 py-2.5 md:px-4 lg:order-0', isCartExpanded && 'lg:col-start-1 lg:row-start-2')}>
-      <div className="hidden rounded border border-[#c8a64a] bg-[#fff7d6] px-3 py-2 text-xs text-[#7a5a00] md:hidden">
+    <div className={clsx('order-2 space-y-3 border-b border-slate-100 bg-[#f4f5fb]/40 px-5 py-4 lg:order-0', isCartExpanded && 'lg:col-start-1 lg:row-start-2')}>
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xs md:hidden">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-medium">Сумма корзины</span>
+          <span className="font-medium text-slate-500">Сумма корзины</span>
           <span className="text-sm font-semibold text-slate-900">{formatMoney(total)}</span>
         </div>
         <div className="mt-1 flex items-center justify-between gap-3">
-          <span className="font-medium">Масса/объем</span>
-          <span className="text-sm font-semibold text-slate-900">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
+          <span className="font-medium text-slate-500">Масса/объем</span>
+          <span className="text-sm font-semibold text-emerald-600">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
         </div>
       </div>
 
       {cartOverflowMessage && (
-        <div className="rounded border border-[#d89aa2] bg-[#fff0f1] px-3 py-2 text-xs font-medium text-[#8a1f2d]">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
           {cartOverflowMessage}
         </div>
       )}
 
       <div className="relative">
-        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a5a00]" size={16} />
+        <User className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
         <input
           value={customerSearch}
           onChange={(e) => {
@@ -83,12 +83,12 @@ export default function POSCartCustomerBlock({
               setIsCustomerDropdownOpen(false);
             }, 150);
           }}
-          placeholder="Поиск клиента по имени"
+          placeholder="Поиск клиента по имени..."
           readOnly={isCustomerPortal}
-          className="w-full rounded border border-[#9fb7d5] bg-white py-2 pl-9 pr-3 text-xs text-[#1f2933] outline-none transition-colors focus:border-[#4f81bd]"
+          className="w-full rounded-2xl border border-slate-200 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
         />
         {isCustomerDropdownOpen && (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-60 overflow-y-auto rounded border border-[#9fb7d5] bg-white p-1 shadow-xl">
+          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-60 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl">
             {filteredCustomers.map((customer) => (
               <button
                 key={customer.id}
@@ -100,8 +100,8 @@ export default function POSCartCustomerBlock({
                   setIsCustomerDropdownOpen(false);
                 }}
                 className={clsx(
-                  'flex w-full rounded px-3 py-2 text-left text-xs transition-colors hover:bg-[#fff8dc]',
-                  customerId === customer.id ? 'border border-[#c8d2df] bg-white text-[#32465a]' : 'text-slate-700',
+                  'flex w-full rounded-xl px-3 py-2 text-left text-xs transition-colors hover:bg-[#f4f5fb]',
+                  customerId === customer.id ? 'bg-[#f4f5fb] font-semibold text-slate-900' : 'text-slate-700',
                 )}
               >
                 {customer.name}
@@ -115,8 +115,8 @@ export default function POSCartCustomerBlock({
       </div>
 
       {!customerId && (
-        <div className="rounded border border-[#c8a64a] bg-[#fff7d6] px-3 py-2 text-xs text-[#7a5a00]">
-          Выберите клиента, иначе оформить продажу нельзя.
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+          Выберите клиента для оформления продажи.
         </div>
       )}
     </div>

@@ -83,11 +83,12 @@ export default function POSCartItemsList({
       ))}
 
       {!cart.length && (
-        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-300">
-            <ShoppingCart size={28} />
+        <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-400">
+            <ShoppingCart size={24} />
           </div>
-          <p className="text-xs text-slate-500">Корзина пуста</p>
+          <p className="text-sm font-medium text-slate-700">Корзина пуста</p>
+          <p className="mt-1 text-xs text-slate-400">Добавьте товары из каталога</p>
         </div>
       )}
     </div>

@@ -65,12 +65,12 @@ export default function ProductsMobileList({
   onDeleteProduct,
 }: ProductsMobileListProps) {
   return (
-    <div className="space-y-2 p-2 md:hidden">
+    <div className="space-y-3 p-3 md:hidden">
       {products.map((product, index) => (
-        <div key={`mobile-${product.id ?? product.name}-${index}`} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-3">
+        <div key={`mobile-${product.id ?? product.name}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-xs">
+          <div className="border-b border-slate-100 bg-[#f4f5fb] p-3.5">
             <div className="flex items-start gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/70 bg-white">
                 {product.photoUrl ? (
                   <img
                     src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -80,23 +80,23 @@ export default function ProductsMobileList({
                     onError={(event) => handleBrokenImage(event, product.id)}
                   />
                 ) : (
-                  <ImageIcon className="text-slate-300" size={18} />
+                  <ImageIcon className="text-slate-400" size={18} />
                 )}
               </div>
-              <div className="min-w-0 flex-1 space-y-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 wrap-break-word text-[16px] font-semibold leading-5 text-slate-900">
+                  <p className="min-w-0 wrap-break-word text-sm font-semibold leading-snug text-slate-900">
                     {formatProductName(product.name)}
                   </p>
-                  <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                  <span className="shrink-0 rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] font-medium text-slate-600">
                     #{(currentPage - 1) * pageSize + index + 1}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-md border border-violet-100 bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-600">
                     {product.category?.name || 'Без категории'}
                   </span>
-                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500">
+                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-500">
                     {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
                   </span>
                   {getDuplicateHintCount(product) > 0 && (

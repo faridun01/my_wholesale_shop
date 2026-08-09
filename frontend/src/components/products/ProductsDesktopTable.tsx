@@ -78,50 +78,50 @@ export default function ProductsDesktopTable({
   onAddProduct,
 }: ProductsDesktopTableProps) {
   return (
-    <div className="hidden overflow-x-auto border-t border-slate-200 md:block">
-      <table className="w-full border-collapse text-left">
+    <div className="hidden overflow-x-auto md:block">
+      <table className="w-full border-collapse text-left text-xs">
         <thead>
-          <tr className="border-b border-slate-200 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            <th className="px-3 py-2.5">№</th>
-            <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-indigo-600" onClick={() => onSort('name')}>
+          <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
+            <th className="px-4 py-3">№</th>
+            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('name')}>
               <div className="flex items-center space-x-1.5">
                 <span>Товар</span>
                 <SortIcon sortConfig={sortConfig} sortKey="name" />
               </div>
             </th>
             {isAdmin && (
-              <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-indigo-600" onClick={() => onSort('costPrice')}>
+              <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('costPrice')}>
                 <div className="flex items-center space-x-1.5">
                   <span>Закупка</span>
                   <SortIcon sortConfig={sortConfig} sortKey="costPrice" />
                 </div>
               </th>
             )}
-            <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-indigo-600" onClick={() => onSort('sellingPrice')}>
+            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('sellingPrice')}>
               <div className="flex items-center space-x-1.5">
                 <span>Продажа</span>
                 <SortIcon sortConfig={sortConfig} sortKey="sellingPrice" />
               </div>
             </th>
-            <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-indigo-600" onClick={() => onSort('stock')}>
+            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('stock')}>
               <div className="flex items-center space-x-1.5">
                 <span>Остаток</span>
                 <SortIcon sortConfig={sortConfig} sortKey="stock" />
               </div>
             </th>
-            <th className="px-3 py-2.5">Приход</th>
-            {isAdmin && <th className="px-3 py-2.5">Рентабельность</th>}
-            {isAdmin && <th className="px-3 py-2.5 text-right">Действия</th>}
+            <th className="px-4 py-3">Приход</th>
+            {isAdmin && <th className="px-4 py-3">Рентабельность</th>}
+            {isAdmin && <th className="px-4 py-3 text-center">Действия</th>}
           </tr>
         </thead>
 
-        <tbody className="divide-y divide-slate-200 bg-white">
+        <tbody className="divide-y divide-slate-100 bg-white">
           {products.map((product, index) => (
-            <tr key={product.id} className="group transition-colors hover:bg-slate-50/80">
-              <td className="px-3 py-2.5 text-xs font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
-              <td className="px-3 py-2.5">
+            <tr key={product.id} className="transition-colors hover:bg-[#f4f5fb]">
+              <td className="px-4 py-3 font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
+              <td className="px-4 py-3">
                 <div className="flex items-center space-x-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/70 bg-[#f4f5fb]">
                     {product.photoUrl ? (
                       <img
                         src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -131,17 +131,17 @@ export default function ProductsDesktopTable({
                         onError={(event) => handleBrokenImage(event, product.id)}
                       />
                     ) : (
-                      <ImageIcon className="text-slate-300" size={16} />
+                      <ImageIcon className="text-slate-400" size={16} />
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
+                    <p className="font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
                     <div className="mt-1 flex items-center gap-2">
-                      <p className="text-xs font-medium text-slate-400">{product.category?.name || 'Без категории'}</p>
+                      <p className="text-[11px] text-slate-400">{product.category?.name || 'Без категории'}</p>
                       {getDuplicateHintCount(product) > 0 && (
                         <button
                           onClick={() => onOpenMergeModal(product)}
-                          className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700"
+                          className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700"
                         >
                           Дубликат
                         </button>
@@ -152,10 +152,10 @@ export default function ProductsDesktopTable({
               </td>
 
               {isAdmin && (
-                <td className="px-3 py-2.5">
+                <td className="px-4 py-3">
                   {selectedWarehouseId ? (
                     <div className="flex flex-col">
-                      <p className="text-xs font-semibold text-slate-900">
+                      <p className="font-semibold text-slate-900">
                         {(() => {
                           const activeBatches = (product.batches || [])
                             .filter((batch: any) => Number(batch.remainingQuantity) > 0)
@@ -164,126 +164,118 @@ export default function ProductsDesktopTable({
                           return formatMoney(currentBatch ? currentBatch.costPrice : product.costPrice);
                         })()}
                       </p>
-                      <p className="text-[10px] font-medium text-slate-400">Посл: {formatMoney(product.costPrice)}</p>
+                      <p className="text-[10px] text-slate-400">Посл: {formatMoney(product.costPrice)}</p>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-300">-</span>
+                    <span className="text-slate-300">-</span>
                   )}
                 </td>
               )}
 
-              <td className="px-3 py-2.5">
-                {selectedWarehouseId ? (
-                  <p className="text-sm font-semibold text-slate-900">{formatMoney(product.sellingPrice)}</p>
-                ) : (
-                  <span className="text-xs text-slate-300">-</span>
-                )}
+              <td className="px-4 py-3 font-semibold text-slate-900">
+                {selectedWarehouseId ? formatMoney(product.sellingPrice) : <span className="text-slate-300">-</span>}
               </td>
 
-              <td className="px-3 py-2.5">
+              <td className="px-4 py-3">
                 <div className="flex items-center space-x-2">
                   <div
                     className={clsx(
-                      'h-1.5 w-1.5 rounded-full',
-                      product.stock <= product.minStock ? 'animate-pulse bg-rose-600' : 'bg-emerald-500'
+                      'h-2 w-2 rounded-full',
+                      product.stock <= product.minStock ? 'animate-pulse bg-rose-500' : 'bg-emerald-500'
                     )}
                   />
-                  <div className={clsx('min-w-0', product.stock <= product.minStock ? 'text-rose-600' : 'text-slate-900')}>
-                    <p className="whitespace-pre-line text-sm font-semibold">{getStockBreakdown(product).primary}</p>
+                  <div className={clsx('min-w-0', product.stock <= product.minStock ? 'text-rose-600 font-medium' : 'text-slate-900 font-medium')}>
+                    <p className="whitespace-pre-line leading-tight">{getStockBreakdown(product).primary}</p>
                     {getStockBreakdown(product).secondary && (
-                      <p className="text-[11px] font-medium text-slate-400">{getStockBreakdown(product).secondary}</p>
+                      <p className="text-[10px] text-slate-400">{getStockBreakdown(product).secondary}</p>
                     )}
                   </div>
                 </div>
               </td>
 
-              <td className="px-3 py-2.5">
-                <p className="text-xs font-medium text-slate-500">
+              <td className="px-4 py-3 text-slate-500">
+                <p>
                   {product.totalIncoming}{' '}
-                  <span className="text-[10px] font-medium uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
+                  <span className="text-[10px] uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
                 </p>
               </td>
 
               {isAdmin && (
-                <td className="px-3 py-2.5">
+                <td className="px-4 py-3">
                   {selectedWarehouseId ? (
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-slate-900">
+                      <p className="font-semibold text-slate-900">
                         {formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
                       </p>
-                      <span className={clsx('inline-flex rounded-full border px-2 py-1 text-[10px] font-bold', getProductEfficiencyMetrics(product).className)}>
+                      <span className={clsx('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getProductEfficiencyMetrics(product).className)}>
                         {getProductEfficiencyMetrics(product).label}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-300">-</span>
+                    <span className="text-slate-300">-</span>
                   )}
                 </td>
               )}
 
               {isAdmin && (
-                <td className="px-3 py-2.5 text-right">
+                <td className="px-4 py-3 text-center align-middle">
                   {selectedWarehouseId ? (
-                    <div className="flex flex-col items-end space-y-1.5">
-                      <div className="flex items-center space-x-1.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => onEditProduct(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+                        title="Редактировать"
+                      >
+                        <Edit size={15} />
+                      </button>
+                      <button
+                        onClick={() => onRestockProduct(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+                        title="Пополнить"
+                      >
+                        <PlusCircle size={15} />
+                      </button>
+                      <button
+                        onClick={() => onShowBatches(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+                        title="Партии (FIFO)"
+                      >
+                        <Layers size={15} />
+                      </button>
+                      <button
+                        onClick={() => onShowHistory(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+                        title="История"
+                      >
+                        <History size={15} />
+                      </button>
+                      <button
+                        onClick={() => onOpenWriteOffModal(product)}
+                        disabled={Number(product.stock || 0) <= 0}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
+                        title="Списать"
+                      >
+                        <Scissors size={15} />
+                      </button>
+                      {canTransferProducts && (
                         <button
-                          onClick={() => onEditProduct(product)}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
-                          title="Редактировать"
+                          onClick={() => onTransferProduct(product)}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+                          title="Перенос"
                         >
-                          <Edit size={14} />
+                          <ArrowRightLeft size={15} />
                         </button>
-                        <button
-                          onClick={() => onRestockProduct(product)}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600"
-                          title="Пополнить"
-                        >
-                          <PlusCircle size={14} />
-                        </button>
-                        <button
-                          onClick={() => onShowBatches(product)}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
-                          title="Партии (FIFO)"
-                        >
-                          <Layers size={14} />
-                        </button>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <button
-                          onClick={() => onShowHistory(product)}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600"
-                          title="История"
-                        >
-                          <History size={14} />
-                        </button>
-                        <button
-                          onClick={() => onOpenWriteOffModal(product)}
-                          disabled={Number(product.stock || 0) <= 0}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
-                          title="Списать"
-                        >
-                          <Scissors size={14} />
-                        </button>
-                        {canTransferProducts && (
-                          <button
-                            onClick={() => onTransferProduct(product)}
-                            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600"
-                            title="Перенос"
-                          >
-                            <ArrowRightLeft size={14} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onDeleteProduct(product)}
-                          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-                          title="Удалить"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      )}
+                      <button
+                        onClick={() => onDeleteProduct(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100"
+                        title="Удалить"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-300">-</span>
+                    <span className="text-slate-300">-</span>
                   )}
                 </td>
               )}

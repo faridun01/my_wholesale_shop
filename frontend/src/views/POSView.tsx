@@ -1,4 +1,4 @@
-﻿import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -1176,7 +1176,6 @@ export default function POSView() {
 
     return [product.name, String(product.id)]
       .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(query));
   });
 
   const canAddProductFromList = (product: any) =>
@@ -1216,31 +1215,47 @@ export default function POSView() {
     .map((entry) => entry.customer);
 
   return (
-    <div className="min-h-screen w-full overflow-visible bg-[#e9edf2] text-[#1f2933] lg:h-screen lg:overflow-hidden">
-        <ConfirmationModal
-          isOpen={Boolean(pendingWarehouseId)}
-          onClose={closeWarehouseConfirm}
-          onConfirm={confirmWarehouseChange}
-          title="Сменить склад?"
-          message="При смене склада корзина, клиент и черновик продажи будут очищены. Подтвердите смену, если хотите начать продажу с другого склада."
-          confirmText="Сменить склад"
-          cancelText="Остаться здесь"
-          type="warning"
-        />
+    <div className="app-page-shell min-h-full font-sans">
+      <ConfirmationModal
+        isOpen={Boolean(pendingWarehouseId)}
+        onClose={closeWarehouseConfirm}
+        onConfirm={confirmWarehouseChange}
+        title="Сменить склад?"
+        message="При смене склада корзина, клиент и черновик продажи будут очищены. Подтвердите смену, если хотите начать продажу с другого склада."
+        confirmText="Сменить склад"
+        cancelText="Остаться здесь"
+        type="warning"
+      />
 
-      <div className="flex min-h-screen flex-col overflow-visible border border-[#b7c2ce] bg-[#f3f5f7] shadow-sm lg:h-full lg:min-h-0 lg:overflow-hidden lg:border-0">
-        <div className={clsx('flex min-h-0 flex-1 flex-col gap-3 px-3 py-3 md:px-4 md:py-4', activeTab === 'cart' && 'pb-28 lg:pb-4')}>
-          <div className="-mx-3 -mt-3 border-b border-[#b7c2ce] bg-[linear-gradient(180deg,#ffffff_0%,#dde5ee_100%)] px-4 py-3 md:-mx-4 md:-mt-4">
-            <h1 className="text-xl font-semibold tracking-normal text-[#1f2933] sm:text-2xl">POS Терминал</h1>
-            <p className="mt-0.5 text-xs text-[#5f6f7f]">Оформление продаж, выбор клиента и создание накладной.</p>
+      <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb] min-h-screen lg:min-h-full">
+        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">POS Терминал</h1>
+              <p className="mt-0.5 text-xs text-slate-500">Оформление продаж, выбор клиента и создание накладной.</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <div className="flex items-center gap-3 rounded-full bg-[#f4f5fb] pl-1 pr-4 py-1 border border-slate-200/60">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                  {(user.username || 'A').slice(0, 1).toUpperCase()}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-medium text-slate-900">{user.username || 'Admin'}</p>
+                  <p className="text-[10px] text-slate-400">{user.role || 'ADMIN'}</p>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div className="flex gap-2 rounded-md border border-[#b7c2ce] bg-[#eef3f8] px-2 py-2 lg:hidden">
+        <div className={clsx('space-y-4 px-5 py-5 min-h-0 flex-1 flex flex-col', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
+          <div className="grid grid-cols-2 gap-1.5 rounded-full bg-[#e8eaf2] p-1.5 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
-                'flex-1 rounded px-3 py-2 text-xs font-semibold uppercase tracking-normal transition-colors',
-                activeTab === 'products' ? posTheme.products.tab : 'border border-[#c8d2df] bg-white text-[#32465a]'
+                'rounded-full py-2 text-xs font-medium transition-all',
+                activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
               Товары
@@ -1248,8 +1263,8 @@ export default function POSView() {
             <button
               onClick={() => setActiveTab('cart')}
               className={clsx(
-                'flex-1 rounded px-3 py-2 text-xs font-semibold uppercase tracking-normal transition-colors',
-                activeTab === 'cart' ? posTheme.cart.tab : 'border border-[#c8d2df] bg-white text-[#32465a]'
+                'rounded-full py-2 text-xs font-medium transition-all',
+                activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
               Корзина {cart.length ? `(${cart.length})` : ''}
@@ -1258,7 +1273,7 @@ export default function POSView() {
 
           <div
             className={clsx(
-              'grid flex-1 items-stretch gap-3 overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden',
+              'grid flex-1 items-stretch gap-5 overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden',
               isCartExpanded ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[1.55fr_0.95fr]',
             )}
           >
@@ -1283,9 +1298,9 @@ export default function POSView() {
             <aside className={clsx(activeTab === 'cart' ? 'block min-h-0 overflow-visible lg:h-full lg:overflow-hidden' : 'hidden min-h-0 overflow-hidden lg:block lg:h-full')}>
               <div
                 className={clsx(
-                  'min-h-0 rounded-md border border-[#b7c2ce] bg-white shadow-sm lg:h-full',
+                  'min-h-0 rounded-[28px] border border-white bg-white shadow-sm lg:h-full',
                   isCartExpanded
-                    ? 'flex flex-col overflow-hidden lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:border-b-0'
+                    ? 'flex flex-col overflow-hidden lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_minmax(0,1fr)]'
                     : 'flex flex-col overflow-visible lg:overflow-hidden',
                 )}
               >
@@ -1359,20 +1374,20 @@ export default function POSView() {
       </div>
 
       {activeTab === 'cart' && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#b7c2ce] bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.14)] backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.1)] backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Итого к оплате</p>
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-xl font-black leading-none text-[#1f2933]">{formatMoney(total)}</span>
-                <span className="text-xs font-semibold text-emerald-700">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Итого к оплате</p>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-xl font-bold leading-none text-slate-900">{formatMoney(total)}</span>
+                <span className="text-xs font-semibold text-emerald-600">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
               </div>
               {totalDiscountAmount > 0 && (
-                <p className="mt-1 inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                <p className="mt-1 inline-flex rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-medium text-rose-700">
                   Скидка: -{formatMoney(totalDiscountAmount)}
                 </p>
               )}
-              <p className={clsx('mt-1 text-[11px] font-semibold', customerId ? 'text-slate-500' : 'text-amber-700')}>
+              <p className={clsx('mt-1 text-[11px] font-medium', customerId ? 'text-slate-500' : 'text-amber-600')}>
                 {customerId ? 'Клиент выбран' : 'Выберите клиента'}
               </p>
             </div>

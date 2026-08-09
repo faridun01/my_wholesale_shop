@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 import * as ProductsApi from '../api/products.api';
@@ -857,8 +857,8 @@ export default function ProductsView() {
   };
 
   return (
-    <div className="app-page-shell">
-      <div className="space-y-6">
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="space-y-5 overflow-hidden rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
         <ProductsPageHeader
           isAdmin={isAdmin}
           isScanning={isScanning}

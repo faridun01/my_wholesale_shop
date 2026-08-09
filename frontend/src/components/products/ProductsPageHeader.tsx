@@ -18,53 +18,48 @@ export default function ProductsPageHeader({
   onScanInvoice,
 }: ProductsPageHeaderProps) {
   return (
-    <div className="app-surface px-4 py-4 sm:px-6 sm:py-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">Товары</h1>
-          <p className="mt-1 max-w-xl text-sm font-medium text-slate-500">Управление ассортиментом, ценами и остатками.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          {isAdmin && (
-            <label
-              className={clsx(
-                'flex w-full items-center justify-center space-x-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all sm:w-auto',
-                selectedWarehouseId
-                  ? 'cursor-pointer border-sky-100 bg-sky-50 text-slate-700 hover:bg-white'
-                  : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-              )}
-            >
-              {isScanning ? (
-                <Loader2 size={16} className="animate-spin text-sky-600" />
-              ) : (
-                <Camera size={16} className={selectedWarehouseId ? 'text-sky-600' : 'text-slate-400'} />
-              )}
-              <span>{isScanning ? 'Чтение накладной...' : 'Загрузить накладную'}</span>
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*,application/pdf"
-                onChange={onScanInvoice}
-                disabled={isScanning || !selectedWarehouseId}
-              />
-            </label>
-          )}
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Товары</h1>
+        <p className="mt-0.5 text-xs text-slate-500">Управление ассортиментом, ценами и остатками.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {isAdmin && (
+          <label
+            className={clsx(
+              'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-900 hover:text-white',
+              !selectedWarehouseId && 'cursor-not-allowed opacity-50',
+            )}
+          >
+            {isScanning ? (
+              <Loader2 size={16} className="animate-spin text-slate-600" />
+            ) : (
+              <Camera size={16} />
+            )}
+            <span>{isScanning ? 'Чтение накладной...' : 'Загрузить накладную'}</span>
+            <input
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf"
+              onChange={onScanInvoice}
+              disabled={isScanning || !selectedWarehouseId}
+            />
+          </label>
+        )}
 
-          {isAdmin && (
-            <button
-              onClick={onAddProduct}
-              className={clsx(
-                'flex w-full items-center justify-center space-x-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all active:scale-95 sm:w-auto',
-                selectedWarehouseId
-                  ? 'bg-violet-500 text-white shadow-sm hover:bg-violet-600'
-                  : 'cursor-not-allowed bg-slate-200 text-slate-400'
-              )}
-            >
-              <Plus size={18} />
-              <span>Добавить</span>
-            </button>
-          )}
-        </div>
+        {isAdmin && (
+          <button
+            onClick={onAddProduct}
+            disabled={!selectedWarehouseId}
+            className={clsx(
+              'inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800',
+              !selectedWarehouseId && 'cursor-not-allowed opacity-50',
+            )}
+          >
+            <Plus size={16} />
+            <span>Добавить товар</span>
+          </button>
+        )}
       </div>
     </div>
   );
