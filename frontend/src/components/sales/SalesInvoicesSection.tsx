@@ -1,4 +1,4 @@
-import type React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import {
   Banknote,
@@ -7,12 +7,13 @@ import {
   ChevronUp,
   Eye,
   Filter,
+  MoreVertical,
+  Pencil,
   Printer,
   Receipt,
   RotateCcw,
   Search,
   Trash2,
-  Pencil,
 } from 'lucide-react';
 import PaginationControls from '../common/PaginationControls';
 import { formatCount, formatMoney, toFixedNumber } from '../../utils/format';
@@ -69,6 +70,185 @@ type SalesInvoicesSectionProps = {
   handleQuickPrintInvoice: (id: number) => Promise<void>;
   handleDeleteInvoice: (id: number) => Promise<void>;
 };
+
+function SalesRowActions({
+  inv,
+  isAdmin,
+  paymentDisabled,
+  returnDisabled,
+  canEditInvoice,
+  getEditBlockedReason,
+  setSelectedInvoice,
+  setPaymentAmount,
+  setShowPaymentModal,
+  openReturnInvoiceModal,
+  openEditInvoiceModal,
+  fetchInvoiceDetails,
+  handleQuickPrintInvoice,
+  handleDeleteInvoice,
+}: {
+  inv: any;
+  isAdmin: boolean;
+  paymentDisabled: boolean;
+  returnDisabled: boolean;
+  canEditInvoice: (inv: any) => boolean;
+  getEditBlockedReason: (inv: any) => string;
+  setSelectedInvoice: (inv: any) => void;
+  setPaymentAmount: (amt: string) => void;
+  setShowPaymentModal: (show: boolean) => void;
+  openReturnInvoiceModal: (inv: any) => void;
+  openEditInvoiceModal: (inv: any) => void;
+  fetchInvoiceDetails: (id: any) => void;
+  handleQuickPrintInvoice: (id: any) => void;
+  handleDeleteInvoice: (id: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const canEdit = canEditInvoice(inv);
+
+  return (
+    <div className="relative inline-flex items-center justify-center gap-1.5" ref={dropdownRef}>
+      {isAdmin && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (paymentDisabled) return;
+              setSelectedInvoice(inv);
+              setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
+              setShowPaymentModal(true);
+            }}
+            disabled={paymentDisabled}
+            className={clsx(
+              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              paymentDisabled
+                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white'
+            )}
+            title="Принять оплату"
+          >
+            <Banknote size={14} />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void openReturnInvoiceModal(inv);
+            }}
+            disabled={returnDisabled}
+            className={clsx(
+              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              returnDisabled
+                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'
+            )}
+            title="Возврат"
+          >
+            <RotateCcw size={14} />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!canEdit) return;
+              openEditInvoiceModal(inv);
+            }}
+            disabled={!canEdit}
+            className={clsx(
+              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              canEdit
+                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
+                : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+            )}
+            title={canEdit ? 'Изменить продажу' : getEditBlockedReason(inv)}
+          >
+            <Pencil size={14} />
+          </button>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={clsx(
+          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+          isOpen
+            ? 'border-slate-900 bg-slate-900 text-white'
+            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+        )}
+        title="Ещё действия"
+      >
+        <MoreVertical size={14} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl text-left">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+              fetchInvoiceDetails(inv.id);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+          >
+            <Eye size={14} className="text-slate-400" />
+            <span>Просмотр</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+              handleQuickPrintInvoice(inv.id);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+          >
+            <Printer size={14} className="text-slate-400" />
+            <span>Печать</span>
+          </button>
+
+          {isAdmin && (
+            <>
+              <div className="my-1 border-t border-slate-100" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  handleDeleteInvoice(inv.id);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <Trash2 size={14} className="text-rose-500" />
+                <span>Удалить</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SalesInvoicesSection = ({
   isAdmin,
@@ -390,96 +570,22 @@ const SalesInvoicesSection = ({
                   <td className="px-4 py-3 font-semibold text-rose-600">{formatMoney(getInvoiceBalance(inv))}</td>
                   <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
                   <td className="px-3 py-3 text-center align-middle">
-                    <div className="flex items-center justify-center gap-1">
-                      {isAdmin && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (paymentDisabled) return;
-                              setSelectedInvoice(inv);
-                              setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
-                              setShowPaymentModal(true);
-                            }}
-                            disabled={paymentDisabled}
-                            className={clsx(
-                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
-                              paymentDisabled
-                                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-                            )}
-                            title="Принять оплату"
-                          >
-                            <Banknote size={15} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void openReturnInvoiceModal(inv);
-                            }}
-                            disabled={returnDisabled}
-                            className={clsx(
-                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
-                              returnDisabled
-                                ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-                            )}
-                            title="Возврат"
-                          >
-                            <RotateCcw size={15} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!canEditInvoice(inv)) return;
-                              openEditInvoiceModal(inv);
-                            }}
-                            disabled={!canEditInvoice(inv)}
-                            className={clsx(
-                              'flex h-8 w-8 items-center justify-center rounded-xl border transition-colors',
-                              canEditInvoice(inv)
-                                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
-                                : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300',
-                            )}
-                            title={canEditInvoice(inv) ? 'Изменить продажу' : getEditBlockedReason(inv)}
-                          >
-                            <Pencil size={15} />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          fetchInvoiceDetails(inv.id);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                        title="Просмотр"
-                      >
-                        <Eye size={15} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuickPrintInvoice(inv.id);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                        title="Печать"
-                      >
-                        <Printer size={15} />
-                      </button>
-                      {isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteInvoice(inv.id);
-                          }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100"
-                          title="Удалить"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
+                    <SalesRowActions
+                      inv={inv}
+                      isAdmin={isAdmin}
+                      paymentDisabled={paymentDisabled}
+                      returnDisabled={returnDisabled}
+                      canEditInvoice={canEditInvoice}
+                      getEditBlockedReason={getEditBlockedReason}
+                      setSelectedInvoice={setSelectedInvoice}
+                      setPaymentAmount={setPaymentAmount}
+                      setShowPaymentModal={setShowPaymentModal}
+                      openReturnInvoiceModal={openReturnInvoiceModal}
+                      openEditInvoiceModal={openEditInvoiceModal}
+                      fetchInvoiceDetails={fetchInvoiceDetails}
+                      handleQuickPrintInvoice={handleQuickPrintInvoice}
+                      handleDeleteInvoice={handleDeleteInvoice}
+                    />
                   </td>
                 </tr>
               );

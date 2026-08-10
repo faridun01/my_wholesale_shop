@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
 import { Layers, Trash2, X } from 'lucide-react';
@@ -128,21 +128,25 @@ export default function ProductBatchesModal({
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.96, opacity: 0 }}
+            exit={{ scale: 0.95, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[94vh] w-full max-w-232 flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-4xl"
+            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-white bg-white shadow-2xl"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-violet-50/50 p-5 sm:p-6">
-              <h3 className="flex items-center space-x-3 text-xl font-black text-slate-900">
-                <div className="rounded-2xl bg-violet-500 p-2.5 text-white">
-                  <Layers size={20} />
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+              <h3 className="flex items-center space-x-3 text-base font-semibold text-slate-900">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-white">
+                  <Layers size={18} />
                 </div>
                 <span>Партии товара (FIFO): {selectedProduct.name}</span>
               </h3>
-              <button type="button" onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
-                <X size={24} />
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+              >
+                <X size={18} />
               </button>
             </div>
 

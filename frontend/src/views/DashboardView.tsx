@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  AlertCircle,
   AlertTriangle,
   Boxes,
+  CheckCircle2,
   ChevronRight,
+  Clock,
   Clock3,
   Package,
-  Store,
   Search,
   ShoppingBag,
+  Store,
   TrendingDown,
   TrendingUp,
   Users,
@@ -23,16 +26,36 @@ import ChartSkeleton from '../components/charts/ChartSkeleton';
 
 const DashboardCharts = React.lazy(() => import('../components/charts/DashboardCharts'));
 
-const statusTone = (status: string) => {
-  if (status === 'paid') return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80';
-  if (status === 'partial') return 'bg-amber-50 text-amber-700 border border-amber-200/80';
-  return 'bg-rose-50 text-rose-700 border border-rose-200/80';
-};
-
-const statusLabel = (status: string) => {
-  if (status === 'paid') return 'Оплачено';
-  if (status === 'partial') return 'Частично';
-  return 'Долг';
+const getDashboardStatusBadge = (status: string) => {
+  const normStatus = String(status || '').toLowerCase();
+  if (normStatus === 'paid') {
+    return (
+      <span
+        title="Оплачено"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200/80 bg-emerald-50 text-emerald-600 shadow-xs"
+      >
+        <CheckCircle2 size={15} />
+      </span>
+    );
+  }
+  if (normStatus === 'partial') {
+    return (
+      <span
+        title="Частично оплачено"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 text-amber-600 shadow-xs"
+      >
+        <Clock size={15} />
+      </span>
+    );
+  }
+  return (
+    <span
+      title="Не оплачено / Долг"
+      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200/80 bg-rose-50 text-rose-500 shadow-xs"
+    >
+      <AlertCircle size={15} />
+    </span>
+  );
 };
 
 const ringColors = ['#5b8def', '#7c6cf2', '#f3cb5d', '#5ec98f', '#ef6fae'];
@@ -440,9 +463,7 @@ export default function DashboardView() {
                 <p className="text-base font-semibold text-slate-900">Заказ #{sale.id}</p>
                 <p className="mt-1 text-sm text-slate-500">{sale.customer?.name || 'Клиент'}</p>
               </div>
-              <span className={card('shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium', statusTone(sale.status))}>
-                {statusLabel(sale.status)}
-              </span>
+              {getDashboardStatusBadge(sale.status)}
             </div>
             <div className="mt-4 rounded-2xl bg-white px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
@@ -474,9 +495,7 @@ export default function DashboardView() {
                 <td className="px-6 py-4 text-sm text-slate-900">{sale.customer?.name || 'Клиент'}</td>
                 <td className="px-6 py-4 text-sm text-slate-900">{formatMoney(sale.netAmount || 0)}</td>
                 <td className="px-6 py-4">
-                  <span className={card('rounded-xl px-3 py-1.5 text-sm', statusTone(sale.status))}>
-                    {statusLabel(sale.status)}
-                  </span>
+                  {getDashboardStatusBadge(sale.status)}
                 </td>
               </tr>
             ))}
@@ -800,17 +819,15 @@ export default function DashboardView() {
                         <div className="rounded-2xl bg-white px-3 py-3">
                           <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Статус</p>
                           <span
+                            title={outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}
                             className={card(
-                              'mt-1 inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs',
-                              outOfStock
-                                ? 'bg-rose-100 text-rose-700'
-                                : isCriticalLowStock
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : 'bg-amber-100 text-amber-700'
+                              'mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full border shadow-xs',
+                              outOfStock || isCriticalLowStock
+                                ? 'border-rose-200/80 bg-rose-50 text-rose-600'
+                                : 'border-amber-200/80 bg-amber-50 text-amber-600'
                             )}
                           >
-                            <AlertTriangle size={13} />
-                            <span>{outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}</span>
+                            <AlertTriangle size={15} />
                           </span>
                         </div>
                       </div>
@@ -857,17 +874,15 @@ export default function DashboardView() {
                           </td>
                           <td className="px-5 py-4">
                             <span
+                              title={outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}
                               className={card(
-                                'inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm',
-                                outOfStock
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : isCriticalLowStock
-                                    ? 'bg-rose-100 text-rose-700'
-                                    : 'bg-amber-100 text-amber-700'
+                                'inline-flex h-7 w-7 items-center justify-center rounded-full border shadow-xs',
+                                outOfStock || isCriticalLowStock
+                                  ? 'border-rose-200/80 bg-rose-50 text-rose-600'
+                                  : 'border-amber-200/80 bg-amber-50 text-amber-600'
                               )}
                             >
-                              <AlertTriangle size={14} />
-                              <span>{outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}</span>
+                              <AlertTriangle size={15} />
                             </span>
                           </td>
                         </tr>

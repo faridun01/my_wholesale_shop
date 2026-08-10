@@ -93,7 +93,7 @@ export default function POSCartItem({
   };
 
   return (
-    <div className="my-2 rounded-2xl border border-slate-100 bg-[#f4f5fb]/50 p-3.5 transition-colors hover:bg-[#f4f5fb]">
+    <div className="my-1.5 rounded-2xl border border-slate-200/60 bg-[#f4f5fb] p-2.5 transition-colors hover:bg-slate-100/70">
       <div className="flex items-start gap-2.5">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
           {index + 1}

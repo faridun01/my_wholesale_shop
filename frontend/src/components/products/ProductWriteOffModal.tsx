@@ -45,140 +45,95 @@ export default function ProductWriteOffModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/35 p-2 sm:items-center sm:p-3"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
     >
       <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
+        exit={{ scale: 0.95, opacity: 0 }}
         onClick={(event) => event.stopPropagation()}
-        className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-[#9fb7d5] bg-white shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white bg-white shadow-2xl"
       >
-        <div className="border-b border-[#b7c2ce] bg-[linear-gradient(180deg,#ffffff_0%,#dde5ee_100%)] px-4 py-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded border border-[#d6c07a] bg-[#fff8dc] px-2.5 py-1 text-xs font-semibold text-[#7a5a00]">
-                <Scissors size={12} />
-                <span>Списание</span>
-              </div>
-              <h3 className="mt-2 text-xl font-semibold text-[#1f2933]">Списание товара</h3>
-              <p className="mt-1 text-xs font-medium text-[#5f6f7f]">
-                Быстрая складская операция по выбранному товару.
-              </p>
+        <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-white">
+              <Scissors size={18} />
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded border border-[#9fb7d5] bg-white text-[#23527c] transition-colors hover:bg-[#eaf2fb]"
-            >
-              <X size={20} />
-            </button>
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">Списание товара</h3>
+              <p className="text-xs text-slate-500">{formatProductName(selectedProduct.name)}</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto bg-[#f3f5f7] p-3 sm:p-4">
+        <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto bg-[#f4f5fb]/40 p-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded border border-[#c8d2df] bg-white px-3 py-2">
-              <p className="text-[11px] font-semibold text-[#48627f]">Товар</p>
-              <p className="mt-1 text-sm font-semibold leading-tight text-[#1f2933]">
+            <div className="rounded-2xl border border-slate-200/60 bg-white p-3.5 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">Товар</p>
+              <p className="mt-1 text-xs font-semibold text-slate-900 truncate">
                 {formatProductName(selectedProduct.name)}
               </p>
             </div>
-            <div className="rounded border border-[#c8d2df] bg-white px-3 py-2">
-              <p className="text-[11px] font-semibold text-[#48627f]">Склад</p>
-              <p className="mt-1 text-sm font-semibold text-[#1f2933]">
+            <div className="rounded-2xl border border-slate-200/60 bg-white p-3.5 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">Склад</p>
+              <p className="mt-1 text-xs font-semibold text-slate-900 truncate">
                 {selectedProduct?.warehouse?.name || warehouses.find((warehouse) => warehouse.id === selectedProduct?.warehouseId)?.name || '---'}
               </p>
             </div>
-            <div className="rounded border border-[#d6c07a] bg-[#fff8dc] px-3 py-2">
-              <p className="text-[11px] font-semibold text-[#7a5a00]">Остаток</p>
-              <p className="mt-1 whitespace-pre-line text-sm font-bold text-[#1f2933]">
+            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50 p-3.5 shadow-xs">
+              <p className="text-[10px] uppercase tracking-wider text-emerald-600">Остаток</p>
+              <p className="mt-1 text-xs font-bold text-emerald-800">
                 {getStockBreakdown(selectedProduct).primary}
               </p>
-              {getStockBreakdown(selectedProduct).secondary && (
-                <p className="mt-1 text-[11px] font-medium text-[#7a5a00]">
-                  {getStockBreakdown(selectedProduct).secondary}
-                </p>
-              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
-            <section className="rounded border border-[#c8d2df] bg-white p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <label className="block text-sm font-semibold text-[#32465a]">Количество</label>
-                <span className="text-[11px] font-medium text-[#5f6f7f]">Введите число или выберите быстро</span>
-              </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
-                <div className="rounded border border-[#9fb7d5] bg-[#f7f9fb] px-3 py-2">
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    required
-                    value={writeOffData.quantity}
-                    onChange={(event) => setWriteOffData((prev: any) => ({ ...prev, quantity: event.target.value }))}
-                    className="w-full bg-transparent text-3xl font-bold tracking-normal text-[#1f2933] outline-none"
-                  />
-                  <p className="mt-1 text-[11px] font-medium text-[#5f6f7f]">Количество к списанию</p>
-                </div>
-                <div className="rounded border border-[#c8d2df] bg-white px-3 py-2 text-center">
-                  <p className="text-[11px] font-semibold text-[#48627f]">Доступно</p>
-                  <div className="mt-2 text-3xl font-bold leading-none text-[#1f2933]">{stock}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[1, 5, 10].map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => onSetQuantity(value)}
-                    className={clsx(
-                      'rounded border px-3 py-1.5 text-xs font-semibold transition-colors',
-                      Number(writeOffData.quantity || 0) === value
-                        ? 'border-[#8f6f18] bg-[#ffd966] text-[#1f2933]'
-                        : 'border-[#9fb7d5] bg-white text-[#1f3f63] hover:bg-[#eaf2fb]'
-                    )}
-                  >
-                    {value}
-                  </button>
-                ))}
-                {selectedPackaging && packageUnits > 1 && (
+          <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-xs space-y-4">
+            <section className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">Количество к списанию</label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={writeOffData.quantity}
+                  onChange={(event) => setWriteOffData((prev: any) => ({ ...prev, quantity: event.target.value }))}
+                  className="w-full rounded-full border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                  placeholder="0"
+                />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {[1, 5, 10].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => onSetQuantity(val)}
+                      className="rounded-full border border-slate-200 bg-[#f4f5fb] px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-900 hover:text-white transition-colors"
+                    >
+                      {val}
+                    </button>
+                  ))}
                   <button
                     type="button"
-                    onClick={() => onSetQuantity(packageUnits)}
-                    className={clsx(
-                      'rounded border px-3 py-1.5 text-xs font-semibold transition-colors',
-                      Number(writeOffData.quantity || 0) === packageUnits
-                        ? 'border-[#8f6f18] bg-[#ffd966] text-[#1f2933]'
-                        : 'border-[#9fb7d5] bg-white text-[#1f3f63] hover:bg-[#eaf2fb]'
-                    )}
+                    onClick={() => onSetQuantity(stock)}
+                    className="rounded-full border border-slate-200 bg-[#f4f5fb] px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-900 hover:text-white transition-colors"
                   >
-                    1 {selectedPackaging.packageName}
+                    Всё
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onSetQuantity(stock)}
-                  className={clsx(
-                    'rounded border px-3 py-1.5 text-xs font-semibold transition-colors',
-                    Number(writeOffData.quantity || 0) === stock
-                      ? 'border-[#8f6f18] bg-[#ffd966] text-[#1f2933]'
-                      : 'border-[#9fb7d5] bg-white text-[#1f3f63] hover:bg-[#eaf2fb]'
-                  )}
-                >
-                  Всё
-                </button>
+                </div>
               </div>
             </section>
 
-            <section className="rounded border border-[#c8d2df] bg-white p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <label className="block text-sm font-semibold text-[#32465a]">Причина списания</label>
-                <span className="text-[11px] font-medium text-[#5f6f7f]">Выберите вариант или введите свой</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+            <section className="space-y-3">
+              <p className="text-xs font-semibold text-slate-700">Причина списания</p>
+              <div className="flex flex-wrap gap-2">
                 {reasonPresets.map((reason) => {
                   const isSelected = normalizedReason === reason.toLowerCase();
                   return (
@@ -187,10 +142,10 @@ export default function ProductWriteOffModal({
                       type="button"
                       onClick={() => setWriteOffData((prev: any) => ({ ...prev, reason: reason.toLowerCase() }))}
                       className={clsx(
-                        'rounded border px-3 py-2 text-left text-sm font-medium transition-colors',
+                        'rounded-full px-4 py-1.5 text-xs font-semibold transition-all',
                         isSelected
-                          ? 'border-[#8f6f18] bg-[#ffd966] text-[#1f2933]'
-                          : 'border-[#9fb7d5] bg-[#f7f9fb] text-[#1f3f63] hover:bg-[#eaf2fb]'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'border border-slate-200 bg-[#f4f5fb] text-slate-700 hover:bg-slate-200/70'
                       )}
                     >
                       {reason}
@@ -198,33 +153,28 @@ export default function ProductWriteOffModal({
                   );
                 })}
               </div>
-              <div className="mt-3 rounded border border-[#9fb7d5] bg-white px-3 py-2 transition-colors focus-within:border-[#4f81bd]">
-                <input
-                  type="text"
-                  required
-                  value={writeOffData.reason}
-                  onChange={(event) => setWriteOffData((prev: any) => ({ ...prev, reason: event.target.value }))}
-                  className="w-full bg-transparent text-sm font-medium text-[#1f2933] outline-none"
-                  placeholder="Своя причина"
-                />
-                {isCustomReason && (
-                  <p className="mt-1 text-[11px] font-medium text-[#7a5a00]">Используется пользовательская причина</p>
-                )}
-              </div>
+              <input
+                type="text"
+                required
+                value={writeOffData.reason}
+                onChange={(event) => setWriteOffData((prev: any) => ({ ...prev, reason: event.target.value }))}
+                className="w-full rounded-full border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                placeholder="Своя причина"
+              />
             </section>
           </div>
 
-          <div className="-mx-3 -mb-3 flex flex-col-reverse gap-2 border-t border-[#b7c2ce] bg-[#eef3f8] px-4 py-3 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 rounded-2xl">
             <button
               type="button"
               onClick={onClose}
-              className="rounded border border-[#9fb7d5] bg-white px-6 py-2 text-sm font-medium text-[#1f3f63] transition-colors hover:bg-[#eaf2fb]"
+              className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             >
               Отмена
             </button>
             <button
               type="submit"
-              className="rounded border border-[#8f6f18] bg-[#ffd966] px-6 py-2 text-sm font-semibold text-[#1f2933] shadow-sm transition-colors hover:bg-[#f7c948]"
+              className="rounded-full bg-rose-600 px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-rose-700"
             >
               Подтвердить списание
             </button>

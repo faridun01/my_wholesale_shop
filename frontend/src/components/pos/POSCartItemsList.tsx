@@ -47,11 +47,12 @@ export default function POSCartItemsList({
     <div
       className={clsx(
         'order-1 px-3 md:px-4 lg:order-0',
+        'max-h-[380px] lg:max-h-[420px] overflow-y-auto pr-1',
+        '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300/70 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400',
         isCartExpanded
-          ? 'min-h-0 overflow-y-visible overscroll-contain lg:col-start-1 lg:row-start-3 lg:h-full lg:max-h-full lg:overflow-y-auto'
-          : 'min-h-0 overflow-y-visible overscroll-contain lg:flex-1 lg:overflow-y-auto',
+          ? 'min-h-0 lg:col-start-1 lg:row-start-3 lg:max-h-[600px]'
+          : '',
       )}
-      style={!isCartExpanded ? { maxHeight: undefined } : undefined}
     >
       <div className="hidden">
         Товары в корзине: {cart.length}

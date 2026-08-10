@@ -16,7 +16,8 @@ import {
   Clock,
   AlertCircle,
   RotateCcw,
-  Printer
+  Printer,
+  Ban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -207,11 +208,44 @@ export default function SalesView() {
   };
 
   const getStatusBadge = (status: string, cancelled: boolean) => {
-    if (cancelled) return <span className="rounded-full bg-rose-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-rose-500">Отменена</span>;
+    if (cancelled) {
+      return (
+        <span
+          title="Отменена"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500 shadow-xs"
+        >
+          <Ban size={15} />
+        </span>
+      );
+    }
     switch (status) {
-      case 'paid': return <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-500">Оплачено</span>;
-      case 'partial': return <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-500">Частично</span>;
-      default: return <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">Не оплачено</span>;
+      case 'paid':
+        return (
+          <span
+            title="Оплачено"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200/80 bg-emerald-50 text-emerald-600 shadow-xs"
+          >
+            <CheckCircle2 size={15} />
+          </span>
+        );
+      case 'partial':
+        return (
+          <span
+            title="Частично оплачено"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 text-amber-600 shadow-xs"
+          >
+            <Clock size={15} />
+          </span>
+        );
+      default:
+        return (
+          <span
+            title="Не оплачено"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200/80 bg-rose-50 text-rose-500 shadow-xs"
+          >
+            <AlertCircle size={15} />
+          </span>
+        );
     }
   };
 

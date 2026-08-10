@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCount, formatMoney } from '../../utils/format';
+import { formatProductName } from '../../utils/productName';
 
 type ReportType = 'sales' | 'profit' | 'returns' | 'writeoffs';
 
@@ -62,11 +63,12 @@ function PieTooltip({
   const item = payload[0]?.payload;
   const label = item?.name || payload[0]?.name || 'Без названия';
   const value = Number(item?.value ?? payload[0]?.value ?? 0);
+  const fullName = formatProductName(label);
 
   return (
-    <div className="max-w-[min(260px,calc(100vw-32px))] rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-      <p className="break-words text-xs font-medium leading-5 text-slate-700">{label}</p>
-      <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
+    <div className="max-w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl text-left">
+      <p className="break-words text-xs font-semibold leading-relaxed text-slate-900">{fullName}</p>
+      <p className="mt-1.5 text-xs font-bold text-slate-900">
         {reportType === 'returns' ? formatCount(value) : formatMoney(value)}
       </p>
     </div>
@@ -123,18 +125,27 @@ export default function ReportsCharts({
           </ResponsiveContainer>
         </div>
 
-        <div className="space-y-3">
-          {pieData.map((item, index) => (
-            <div key={item.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: pieColors[index % pieColors.length] }} />
-                <span className="truncate text-[13px] leading-5 text-slate-600">{item.name}</span>
+        <div className="space-y-2">
+          {pieData.map((item, index) => {
+            const fullName = formatProductName(item.name);
+            return (
+              <div
+                key={item.name}
+                className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm cursor-pointer rounded-xl p-1.5 transition-colors hover:bg-slate-50"
+                title={`${fullName} • ${reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}`}
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="h-3 w-3 shrink-0 rounded-full transition-transform group-hover:scale-110" style={{ backgroundColor: pieColors[index % pieColors.length] }} />
+                  <span className="break-words text-[13px] font-medium leading-5 text-slate-700 group-hover:text-slate-900">
+                    {fullName}
+                  </span>
+                </div>
+                <span className="whitespace-nowrap text-right font-semibold tabular-nums text-slate-900">
+                  {reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}
+                </span>
               </div>
-              <span className="whitespace-nowrap text-right font-medium tabular-nums text-slate-900">
-                {reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
 
           {!pieData.length && <div className="py-8 text-center text-sm text-slate-400">Нет данных для отображения</div>}
         </div>

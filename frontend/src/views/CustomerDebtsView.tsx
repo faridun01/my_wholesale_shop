@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Printer, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Printer, Search } from 'lucide-react';
+import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Badge, Card } from '../components/UI';
 import PaginationControls from '../components/common/PaginationControls';
@@ -691,7 +692,29 @@ export default function CustomerDebtsView() {
                           {customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString('ru-RU') : 'Нет покупок'}
                         </td>
                         <td className="py-3 px-4">
-                          {isAdmin ? <Badge variant={statusMeta.badgeVariant}>{statusMeta.label}</Badge> : <span className="text-slate-400">Скрыто</span>}
+                          {isAdmin ? (
+                            <span
+                              title={statusMeta.label}
+                              className={clsx(
+                                'inline-flex h-7 w-7 items-center justify-center rounded-full border shadow-xs',
+                                displayStatus === 'paid'
+                                  ? 'border-emerald-200/80 bg-emerald-50 text-emerald-600'
+                                  : displayStatus === 'partial'
+                                    ? 'border-amber-200/80 bg-amber-50 text-amber-600'
+                                    : 'border-rose-200/80 bg-rose-50 text-rose-500'
+                              )}
+                            >
+                              {displayStatus === 'paid' ? (
+                                <CheckCircle2 size={15} />
+                              ) : displayStatus === 'partial' ? (
+                                <Clock size={15} />
+                              ) : (
+                                <AlertCircle size={15} />
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">Скрыто</span>
+                          )}
                         </td>
                       </tr>
                     );

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRightLeft,
   ChevronDown,
@@ -6,6 +7,7 @@ import {
   History,
   Image as ImageIcon,
   Layers,
+  MoreVertical,
   PlusCircle,
   Scissors,
   Trash2,
@@ -42,6 +44,144 @@ interface ProductsDesktopTableProps {
   onTransferProduct: (product: any) => void;
   onDeleteProduct: (product: any) => void;
   onAddProduct: () => void;
+}
+
+function ProductRowActions({
+  product,
+  canTransferProducts,
+  onEditProduct,
+  onRestockProduct,
+  onShowBatches,
+  onShowHistory,
+  onOpenWriteOffModal,
+  onTransferProduct,
+  onDeleteProduct,
+}: {
+  product: any;
+  canTransferProducts: boolean;
+  onEditProduct: (product: any) => void;
+  onRestockProduct: (product: any) => void;
+  onShowBatches: (product: any) => void;
+  onShowHistory: (product: any) => void;
+  onOpenWriteOffModal: (product: any) => void;
+  onTransferProduct: (product: any) => void;
+  onDeleteProduct: (product: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative inline-flex items-center justify-center gap-1.5" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => onRestockProduct(product)}
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white"
+        title="Пополнить"
+      >
+        <PlusCircle size={14} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onEditProduct(product)}
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+        title="Редактировать"
+      >
+        <Edit size={14} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onOpenWriteOffModal(product)}
+        disabled={Number(product.stock || 0) <= 0}
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-500 hover:text-white disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
+        title="Списать"
+      >
+        <Scissors size={14} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={clsx(
+          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+          isOpen
+            ? 'border-slate-900 bg-slate-900 text-white'
+            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+        )}
+        title="Ещё действия"
+      >
+        <MoreVertical size={14} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl text-left">
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onShowBatches(product);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+          >
+            <Layers size={14} className="text-slate-400" />
+            <span>Партии (FIFO)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onShowHistory(product);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+          >
+            <History size={14} className="text-slate-400" />
+            <span>История</span>
+          </button>
+
+          {canTransferProducts && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onTransferProduct(product);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            >
+              <ArrowRightLeft size={14} className="text-slate-400" />
+              <span>Перенос</span>
+            </button>
+          )}
+
+          <div className="my-1 border-t border-slate-100" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onDeleteProduct(product);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <Trash2 size={14} className="text-rose-500" />
+            <span>Удалить</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const SortIcon = ({
@@ -220,60 +360,17 @@ export default function ProductsDesktopTable({
               {isAdmin && (
                 <td className="px-4 py-3 text-center align-middle">
                   {selectedWarehouseId ? (
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => onEditProduct(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                        title="Редактировать"
-                      >
-                        <Edit size={15} />
-                      </button>
-                      <button
-                        onClick={() => onRestockProduct(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
-                        title="Пополнить"
-                      >
-                        <PlusCircle size={15} />
-                      </button>
-                      <button
-                        onClick={() => onShowBatches(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                        title="Партии (FIFO)"
-                      >
-                        <Layers size={15} />
-                      </button>
-                      <button
-                        onClick={() => onShowHistory(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                        title="История"
-                      >
-                        <History size={15} />
-                      </button>
-                      <button
-                        onClick={() => onOpenWriteOffModal(product)}
-                        disabled={Number(product.stock || 0) <= 0}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
-                        title="Списать"
-                      >
-                        <Scissors size={15} />
-                      </button>
-                      {canTransferProducts && (
-                        <button
-                          onClick={() => onTransferProduct(product)}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                          title="Перенос"
-                        >
-                          <ArrowRightLeft size={15} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onDeleteProduct(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100"
-                        title="Удалить"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                    <ProductRowActions
+                      product={product}
+                      canTransferProducts={canTransferProducts}
+                      onEditProduct={onEditProduct}
+                      onRestockProduct={onRestockProduct}
+                      onShowBatches={onShowBatches}
+                      onShowHistory={onShowHistory}
+                      onOpenWriteOffModal={onOpenWriteOffModal}
+                      onTransferProduct={onTransferProduct}
+                      onDeleteProduct={onDeleteProduct}
+                    />
                   ) : (
                     <span className="text-slate-300">-</span>
                   )}
