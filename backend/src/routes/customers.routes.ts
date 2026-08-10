@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
-import { getAccessContext } from '../utils/access.js';
+import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { maskInvoiceFinancials } from '../utils/customerVisibility.js';
 import { DEFAULT_CUSTOMER_NAME, getCanonicalDefaultCustomer, isDefaultCustomerName, mergeDuplicateCustomers } from '../utils/defaultCustomer.js';
 import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
@@ -198,10 +198,12 @@ const mapCustomerWithTotals = (customer: any) => {
   };
 };
 
-const buildCustomerInvoiceStats = async (customerIds: number[]) => {
+const buildCustomerInvoiceStats = async (customerIds: number[], warehouseId?: number | null) => {
   if (!customerIds.length) {
     return new Map<number, any>();
   }
+
+  const warehouseFilter = warehouseId ? Prisma.sql`AND i.warehouse_id = ${warehouseId}` : Prisma.empty;
 
   const rows = await prisma.$queryRaw<Array<{
     customerId: number;
@@ -255,6 +257,7 @@ const buildCustomerInvoiceStats = async (customerIds: number[]) => {
     LEFT JOIN warehouses w ON w.id = i.warehouse_id
     WHERE i.cancelled = false
       AND i.customer_id IN (${Prisma.join(customerIds)})
+      ${warehouseFilter}
     GROUP BY i.customer_id
   `;
 
@@ -316,7 +319,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
     setPaginationHeaders(res, { page, limit, total });
 
-    const statsByCustomerId = await buildCustomerInvoiceStats(customers.map((customer) => customer.id));
+    const selectedWarehouseId = getScopedWarehouseId(access, req.query.warehouseId || req.query.warehouse_id);
+    const statsByCustomerId = await buildCustomerInvoiceStats(customers.map((customer) => customer.id), selectedWarehouseId);
     const mappedCustomers = customers.map((customer) =>
       mapCustomerWithTotals({
         ...customer,

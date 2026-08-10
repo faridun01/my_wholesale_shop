@@ -3,11 +3,18 @@ import { getCachedReference, invalidateReferenceCache } from './referenceCache';
 
 const CUSTOMERS_CACHE_KEY = 'customers';
 
-export const getCustomers = async (options?: { force?: boolean }) => {
+export const getCustomers = async (options?: { force?: boolean; warehouseId?: number | string | null }) => {
+  const warehouseId = options?.warehouseId ? String(options.warehouseId) : undefined;
+  const cacheKey = warehouseId ? `${CUSTOMERS_CACHE_KEY}_wh_${warehouseId}` : CUSTOMERS_CACHE_KEY;
+
   return getCachedReference(
-    CUSTOMERS_CACHE_KEY,
+    cacheKey,
     async () => {
-      const response = await client.get('/customers');
+      const response = await client.get('/customers', {
+        params: {
+          warehouseId: warehouseId || undefined,
+        },
+      });
       return response.data;
     },
     options,

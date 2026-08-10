@@ -159,7 +159,21 @@ export default function DashboardView() {
   const user = useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
   const defaultWarehouseId = getUserWarehouseId(user);
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(isAdmin ? '' : (defaultWarehouseId ? String(defaultWarehouseId) : ''));
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(() => {
+    const saved = localStorage.getItem('dashboard_selected_warehouse_id');
+    if (saved !== null) {
+      return saved;
+    }
+    if (!isAdmin && defaultWarehouseId) {
+      return String(defaultWarehouseId);
+    }
+    return '';
+  });
+
+  const handleWarehouseSelect = (id: string) => {
+    setSelectedWarehouseId(id);
+    localStorage.setItem('dashboard_selected_warehouse_id', id);
+  };
 
   const getWarehouseLabel = React.useCallback((item: any) => {
     const directName = item?.warehouse?.name || item?.warehouseName;
@@ -199,7 +213,9 @@ export default function DashboardView() {
         const filteredWarehouses = filterWarehousesForUser(items, user);
         setWarehouses(filteredWarehouses);
         if (filteredWarehouses.length === 1) {
-          setSelectedWarehouseId(String(filteredWarehouses[0].id));
+          const singleId = String(filteredWarehouses[0].id);
+          setSelectedWarehouseId(singleId);
+          localStorage.setItem('dashboard_selected_warehouse_id', singleId);
         }
       })
       .catch((error) => {
@@ -637,7 +653,7 @@ export default function DashboardView() {
                   <Store size={14} className="text-slate-400" />
                   <select
                     value={selectedWarehouseId}
-                    onChange={(event) => setSelectedWarehouseId(event.target.value)}
+                    onChange={(event) => handleWarehouseSelect(event.target.value)}
                     className="min-w-0 flex-1 bg-transparent pr-1 outline-none md:flex-none"
                   >
                     {isAdmin && <option value="">Все склады</option>}

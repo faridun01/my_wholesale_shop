@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Clock, Printer, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Printer, Search, Store } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Badge, Card } from '../components/UI';
 import PaginationControls from '../components/common/PaginationControls';
 import { getCustomerHistory, getCustomers } from '../api/customers.api';
+import { getWarehouses } from '../api/warehouses.api';
 import { formatCount, formatMoney, roundMoney } from '../utils/format';
-import { getCurrentUser, isAdminUser } from '../utils/userAccess';
+import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import {
   customerMatchesPaymentFilter,
   customerPaymentStatusMeta,
@@ -84,13 +85,30 @@ const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
 export default function CustomerDebtsView() {
   const user = useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
+  const defaultWarehouseId = getUserWarehouseId(user);
   const [customers, setCustomers] = useState<DebtCustomer[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(() => {
+    const saved = localStorage.getItem('dashboard_selected_warehouse_id');
+    if (saved !== null) {
+      return saved;
+    }
+    if (!isAdmin && defaultWarehouseId) {
+      return String(defaultWarehouseId);
+    }
+    return '';
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<DebtFilter>('all');
   const [sortBy, setSortBy] = useState<SortMode>('debt');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingInvoices, setIsExportingInvoices] = useState(false);
   const [customerHistories, setCustomerHistories] = useState<Record<number, StatementInvoice[]>>({});
+
+  const handleWarehouseSelect = (id: string) => {
+    setSelectedWarehouseId(id);
+    localStorage.setItem('dashboard_selected_warehouse_id', id);
+  };
 
   const formatMoneyByRole = (value: unknown) => {
     if (!isAdmin) {
@@ -100,9 +118,24 @@ export default function CustomerDebtsView() {
     return formatMoney(value);
   };
 
+  useEffect(() => {
+    getWarehouses()
+      .then((data) => {
+        const items = Array.isArray(data) ? data : [];
+        const filtered = filterWarehousesForUser(items, user);
+        setWarehouses(filtered);
+        if (filtered.length === 1) {
+          const singleId = String(filtered[0].id);
+          setSelectedWarehouseId(singleId);
+          localStorage.setItem('dashboard_selected_warehouse_id', singleId);
+        }
+      })
+      .catch(console.error);
+  }, [isAdmin, user]);
+
   const fetchCustomers = async () => {
     try {
-      const data = await getCustomers({ force: true });
+      const data = await getCustomers({ force: true, warehouseId: selectedWarehouseId });
       setCustomers(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Ошибка при загрузке клиентов');
@@ -111,7 +144,7 @@ export default function CustomerDebtsView() {
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [selectedWarehouseId]);
 
   useEffect(() => {
     const handleWindowFocus = () => {
@@ -120,7 +153,7 @@ export default function CustomerDebtsView() {
 
     window.addEventListener('focus', handleWindowFocus);
     return () => window.removeEventListener('focus', handleWindowFocus);
-  }, []);
+  }, [selectedWarehouseId]);
 
   const customersWithPurchases = useMemo(
     () => customers.filter((customer) => hasCustomerPurchases(customer)),
@@ -523,15 +556,34 @@ export default function CustomerDebtsView() {
               <p className="mt-1 text-xs text-amber-600 font-medium">Финансовые суммы и статусы оплаты скрыты для вашей роли.</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handlePrint}
-            disabled={isExportingInvoices || filteredCustomers.length === 0}
-            className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            <Printer size={15} />
-            <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {warehouses.length > 1 && (
+              <div className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs">
+                <Store size={15} className="text-slate-400" />
+                <select
+                  value={selectedWarehouseId}
+                  onChange={(e) => handleWarehouseSelect(e.target.value)}
+                  className="bg-transparent outline-none cursor-pointer"
+                >
+                  {isAdmin && <option value="">Все склады</option>}
+                  {warehouses.map((wh) => (
+                    <option key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={isExportingInvoices || filteredCustomers.length === 0}
+              className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Printer size={15} />
+              <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Sub Navigation Tabs */}
