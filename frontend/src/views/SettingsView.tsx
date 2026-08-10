@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, setDefaultWarehouse } from '../api/warehouses.api';
 import { 
@@ -460,34 +460,45 @@ export default function SettingsView() {
   return (
     <div className="app-page-shell">
       <div className="w-full pb-20">
-        <section className="rounded-[30px] border border-slate-200 bg-[#f8fafc] shadow-[0_18px_60px_-36px_rgba(15,23,42,0.28)]">
-          <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Настройки системы</p>
-              <h1 className="text-4xl font-medium tracking-tight text-slate-900">{currentTabMeta.title}</h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-500">{currentTabMeta.description}</p>
+        <section className="rounded-[32px] border border-white/80 bg-[#f8fafc] shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-slate-200/60 bg-white px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className={clsx('flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs', currentTabMeta.accent)}>
+                <currentTabMeta.icon size={26} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Настройки системы</p>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{currentTabMeta.title}</h1>
+                <p className="mt-1 text-sm text-slate-500">{currentTabMeta.description}</p>
+              </div>
             </div>
+
             {activeTab === 'general' && canManageSettings ? (
               <button
                 type="button"
                 onClick={() => (document.getElementById('company-profile-form') as HTMLFormElement | null)?.requestSubmit()}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition-all hover:bg-orange-600"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-95"
               >
-                <CheckCircle2 size={16} />
+                <CheckCircle2 size={18} />
                 <span>Сохранить изменения</span>
               </button>
             ) : null}
           </div>
 
-          <div className="grid gap-6 p-4 xl:items-start xl:grid-cols-[270px_minmax(0,1fr)] xl:p-6">
+          <div className="grid gap-6 p-4 xl:items-start xl:grid-cols-[280px_minmax(0,1fr)] xl:p-6">
             <aside className="self-start space-y-4 xl:sticky xl:top-6">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)]">
-                <div className="space-y-2">
-                  <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Разделы</p>
+              <div className="rounded-[28px] border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="space-y-1.5">
+                  <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Разделы настроек</p>
                   {canManageSettings && (
                     <button
                       onClick={() => setActiveTab('general')}
-                      className={`flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'general' ? tabTheme.general : 'text-slate-500 hover:bg-amber-50 hover:text-amber-700'}`}
+                      className={clsx(
+                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                        activeTab === 'general'
+                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                          : 'text-slate-600 hover:bg-amber-50/80 hover:text-amber-700',
+                      )}
                     >
                       <SettingsIcon size={18} />
                       <span>Профиль компании</span>
@@ -495,21 +506,38 @@ export default function SettingsView() {
                   )}
                   <button
                     onClick={() => setActiveTab('warehouses')}
-                    className={`flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'warehouses' ? tabTheme.warehouses : 'text-slate-500 hover:bg-sky-50 hover:text-sky-700'}`}
+                    className={clsx(
+                      'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                      activeTab === 'warehouses'
+                        ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                        : 'text-slate-600 hover:bg-sky-50/80 hover:text-sky-700',
+                    )}
                   >
                     <Warehouse size={18} />
                     <span>Склады и точки</span>
                   </button>
-                  <button
-                    onClick={() => setActiveTab('users')}
-                    className={`flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'users' ? tabTheme.users : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'}`}
-                  >
-                    <Users size={18} />
-                    <span>Пользователи и роли</span>
-                  </button>
+                  {canViewUsers && (
+                    <button
+                      onClick={() => setActiveTab('users')}
+                      className={clsx(
+                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                        activeTab === 'users'
+                          ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                          : 'text-slate-600 hover:bg-violet-50/80 hover:text-violet-700',
+                      )}
+                    >
+                      <Users size={18} />
+                      <span>Пользователи и роли</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveTab('profile')}
-                    className={`flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-semibold transition-all ${activeTab === 'profile' ? tabTheme.profile : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                    className={clsx(
+                      'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                      activeTab === 'profile'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                        : 'text-slate-600 hover:bg-emerald-50/80 hover:text-emerald-700',
+                    )}
                   >
                     <User size={18} />
                     <span>Профиль</span>
@@ -517,13 +545,13 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)]">
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Текущий раздел</p>
-                <div className={`mt-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${currentTabMeta.accent}`}>
+              <div className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Текущий раздел</p>
+                <div className={clsx('mt-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl border shadow-2xs', currentTabMeta.accent)}>
                   <currentTabMeta.icon size={22} />
                 </div>
-                <p className="mt-4 text-sm font-medium text-slate-900">{currentTabMeta.title}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">{currentTabMeta.description}</p>
+                <p className="mt-3 text-base font-bold text-slate-900">{currentTabMeta.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">{currentTabMeta.description}</p>
               </div>
             </aside>
 
