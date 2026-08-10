@@ -103,16 +103,16 @@ export default function POSProductList({
         )}
       </div>
 
-      <div className="mt-3 hidden grid-cols-[52px_minmax(0,1fr)_150px_110px_130px] rounded-2xl bg-[#f4f5fb] px-4 py-3 text-xs font-medium uppercase tracking-wider text-slate-500 md:grid">
+      <div className="mt-3 hidden grid-cols-[40px_minmax(0,1fr)_130px_100px_50px] rounded-2xl bg-[#f4f5fb] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 md:grid">
         <div className="text-center">№</div>
         <div>Товар</div>
         <div className="text-center">Остаток</div>
         <div className="text-center">Цена</div>
-        <div className="text-center">Действие</div>
+        <div className="text-center"></div>
       </div>
 
-      <div ref={productListRef} className="overflow-visible bg-white lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
-        <div className="space-y-3 p-3 md:hidden">
+      <div ref={productListRef} className="bg-white lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="space-y-2.5 p-2 md:hidden">
           {filteredProducts.map((product, index) => {
             const stockParts = getProductStockParts(product, product.unit);
 
@@ -121,49 +121,41 @@ export default function POSProductList({
                 key={`mobile-pos-${product.id}`}
                 onClick={() => handleAddFromList(product)}
                 className={clsx(
-                  'rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 p-3 shadow-xs transition-colors hover:bg-[#f4f5fb]',
+                  'rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-3 shadow-xs transition-colors hover:bg-slate-100/80',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/50',
                   canAddProductFromList(product) ? 'cursor-pointer' : '',
                 )}
               >
-                <div className="min-w-0">
-                  <p className="wrap-break-word text-sm font-semibold leading-5 text-slate-900" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {formatProductName(product.name)}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold leading-snug text-slate-900">
+                      {formatProductName(product.name)}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-900">{formatMoney(product.sellingPrice)}</span>
+                      <span className="text-[10px] text-slate-400">#{index + 1}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddFromList(product);
+                    }}
+                    disabled={!canAddProductFromList(product)}
+                    title="Добавить в корзину"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
 
-                <div className="mt-2.5 rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400">Остаток</p>
-                  <div className="mt-1 inline-flex flex-col rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-                    <span className="whitespace-nowrap text-xs font-semibold leading-4">{stockParts.primary}</span>
-                    {stockParts.secondary ? (
-                      <span className="whitespace-nowrap text-[10px] font-medium leading-3 text-emerald-600/90">{stockParts.secondary}</span>
-                    ) : null}
-                  </div>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-emerald-700">
+                  <span className="text-[11px] font-semibold">{stockParts.primary}</span>
+                  {stockParts.secondary ? (
+                    <span className="text-[10px] font-medium text-emerald-600">{stockParts.secondary}</span>
+                  ) : null}
                 </div>
-
-                <div className="mt-2.5 grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400">Цена</p>
-                    <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatMoney(product.sellingPrice)}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400">№</p>
-                    <p className="mt-0.5 text-sm font-semibold text-slate-600">#{index + 1}</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddFromList(product);
-                  }}
-                  disabled={!canAddProductFromList(product)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Plus size={15} />
-                  <span>Добавить</span>
-                </button>
               </div>
             );
           })}
@@ -178,39 +170,40 @@ export default function POSProductList({
                 key={product.id}
                 onClick={() => handleAddFromList(product)}
                 className={clsx(
-                  'grid grid-cols-[52px_minmax(0,1fr)_150px_110px_130px] items-center border-b border-slate-100 px-4 py-3 transition-colors hover:bg-[#f4f5fb]',
+                  'grid grid-cols-[40px_minmax(0,1fr)_130px_100px_50px] items-center border-b border-slate-100 px-4 py-2.5 transition-colors hover:bg-[#f4f5fb]',
                   highlightedProductId === Number(product.id) && 'bg-emerald-50/70',
                   canAddProductFromList(product) ? 'cursor-pointer' : '',
                 )}
               >
-                <div className="text-center text-xs font-semibold text-slate-400">{index + 1}</div>
+                <div className="text-center text-xs font-medium text-slate-400">{index + 1}</div>
 
                 <div className="min-w-0 pr-3">
-                  <p className="wrap-break-word text-sm font-medium text-slate-900">{formatProductName(product.name)}</p>
+                  <p className="truncate text-xs font-semibold text-slate-900">{formatProductName(product.name)}</p>
                 </div>
 
                 <div className="flex justify-center">
-                  <div className="inline-flex min-w-27 flex-col items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-center text-emerald-700">
-                    <span className="whitespace-nowrap text-xs font-semibold leading-4">{stockParts.primary}</span>
+                  <div className="inline-flex flex-col items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-center text-emerald-700">
+                    <span className="whitespace-nowrap text-[11px] font-semibold leading-tight">{stockParts.primary}</span>
                     {stockParts.secondary ? (
-                      <span className="whitespace-nowrap text-[10px] font-medium leading-3 text-emerald-600/90">{stockParts.secondary}</span>
+                      <span className="whitespace-nowrap text-[10px] font-medium leading-tight text-emerald-600/90">{stockParts.secondary}</span>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="text-center text-sm font-medium text-slate-900">{formatMoney(product.sellingPrice)}</div>
+                <div className="text-center text-xs font-bold text-slate-900">{formatMoney(product.sellingPrice)}</div>
 
-                <div className="text-center">
+                <div className="flex justify-center">
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAddFromList(product);
                     }}
                     disabled={!canAddProductFromList(product)}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-[#f4f5fb] px-3.5 py-1.5 text-xs font-medium text-slate-800 transition-colors hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Добавить в корзину"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100"
                   >
-                    <Plus size={14} />
-                    <span>Добавить</span>
+                    <Plus size={16} />
                   </button>
                 </div>
               </div>

@@ -1227,7 +1227,7 @@ export default function POSView() {
         type="warning"
       />
 
-      <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb] min-h-screen lg:min-h-full">
+      <div className="rounded-[28px] bg-[#f4f5fb] min-h-screen">
         <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -1249,7 +1249,7 @@ export default function POSView() {
           </div>
         </div>
 
-        <div className={clsx('space-y-4 px-5 py-5 min-h-0 flex-1 flex flex-col', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
+        <div className={clsx('space-y-4 px-5 py-5 flex-1 flex flex-col', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
           <div className="grid grid-cols-2 gap-1.5 rounded-full bg-[#e8eaf2] p-1.5 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
@@ -1273,11 +1273,11 @@ export default function POSView() {
 
           <div
             className={clsx(
-              'grid flex-1 items-stretch gap-5 overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden',
+              'grid flex-1 items-start gap-5',
               isCartExpanded ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[1.55fr_0.95fr]',
             )}
           >
-            <section className={clsx(activeTab === 'products' ? 'block overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden' : 'hidden overflow-visible lg:block lg:h-full lg:min-h-0 lg:overflow-hidden', isCartExpanded && 'lg:hidden')}>
+            <section className={clsx(activeTab === 'products' ? 'block' : 'hidden lg:block', isCartExpanded && 'lg:hidden')}>
               <POSProductList
                 filteredProducts={filteredProducts}
                 warehouses={warehouses}
@@ -1295,13 +1295,13 @@ export default function POSView() {
               />
             </section>
 
-            <aside className={clsx(activeTab === 'cart' ? 'block min-h-0 overflow-visible lg:h-full lg:overflow-hidden' : 'hidden min-h-0 overflow-hidden lg:block lg:h-full')}>
+            <aside className={clsx(activeTab === 'cart' ? 'block' : 'hidden lg:block')}>
               <div
                 className={clsx(
-                  'min-h-0 rounded-[28px] border border-white bg-white shadow-sm lg:h-full',
+                  'rounded-[28px] border border-white bg-white shadow-xs',
                   isCartExpanded
-                    ? 'flex flex-col overflow-hidden lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_minmax(0,1fr)]'
-                    : 'flex flex-col overflow-visible lg:overflow-hidden',
+                    ? 'flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_minmax(0,1fr)]'
+                    : 'flex flex-col',
                 )}
               >
                 <POSCartHeader

@@ -39,8 +39,8 @@ const emptyForm = {
 
 const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
   [
-    'inline-flex items-center rounded-2xl px-4 py-2 text-sm font-medium transition-all',
-    isActive ? 'bg-[#008060] text-white shadow-xs font-semibold' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60',
+    'inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold transition-all',
+    isActive ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
   ].join(' ');
 
 export default function CustomerView() {
@@ -373,97 +373,97 @@ export default function CustomerView() {
   }, [currentPage, totalPages]);
 
   return (
-    <div className="app-page-shell">
-      <div className="w-full space-y-6">
-        <div className="app-surface app-surface-header">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h1 className="text-4xl font-medium tracking-tight text-slate-900">Клиенты</h1>
-                <p className="mt-1 text-slate-500">Только накладные формируют историю операций и баланс клиента.</p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={handlePrintAllReconciliation}
-                  disabled={isPrintingReconciliation || customers.length === 0}
-                  className="flex items-center justify-center space-x-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Printer size={18} />
-                  <span>{isPrintingReconciliation ? 'Подготовка...' : 'Общий акт сверки'}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setFormData(emptyForm);
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center justify-center space-x-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition-all hover:bg-slate-800"
-                >
-                  <Plus size={18} />
-                  <span>Новый клиент</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 rounded-3xl bg-slate-100 p-2">
-              <NavLink to="/customers" end className={sectionTabClassName}>
-                База клиентов
-              </NavLink>
-              <NavLink to="/customers/debts" className={sectionTabClassName}>
-                Долги и оплаты
-              </NavLink>
-            </div>
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="space-y-5 rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+        {/* Top Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Клиенты</h1>
+            <p className="mt-0.5 text-xs text-slate-500">База клиентов, детальные акты сверки и истории продаж по накладным.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handlePrintAllReconciliation}
+              disabled={isPrintingReconciliation || customers.length === 0}
+              className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Printer size={15} />
+              <span>{isPrintingReconciliation ? 'Подготовка...' : 'Общий акт сверки'}</span>
+            </button>
+            <button
+              onClick={() => {
+                setSelectedCustomer(null);
+                setFormData(emptyForm);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+            >
+              <Plus size={15} />
+              <span>Новый клиент</span>
+            </button>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-5">
-            <div className="mb-3 flex flex-col gap-3 md:flex-row">
-              <select
-                value={segmentFilter}
-                onChange={(e) => setSegmentFilter(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white md:max-w-60"
-              >
-                <option value="all">Все категории</option>
-                <option value="VIP">VIP</option>
-                <option value="Постоянный">Постоянный</option>
-                <option value="Обычный">Обычный</option>
-                <option value="Новый">Новый</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white md:max-w-65"
-              >
-                <option value="strength">Сильные сверху</option>
-                <option value="invoices">По числу накладных</option>
-                {isAdmin && <option value="amount">По сумме покупок</option>}
-                {isAdmin && <option value="balance">По долгу</option>}
-                <option value="lastPurchase">По последней покупке</option>
-              </select>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        {/* Sub Navigation Tabs */}
+        <div className="flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
+          <NavLink to="/customers" end className={sectionTabClassName}>
+            База клиентов
+          </NavLink>
+          <NavLink to="/customers/debts" className={sectionTabClassName}>
+            Долги и оплаты
+          </NavLink>
+        </div>
+
+        {/* Search & Filter Toolbar */}
+        <div className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-xs space-y-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="relative md:col-span-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
                 type="text"
                 placeholder="Поиск по имени или телефону..."
-                className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+                className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <select
+              value={segmentFilter}
+              onChange={(e) => setSegmentFilter(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+            >
+              <option value="all">Все категории</option>
+              <option value="VIP">VIP</option>
+              <option value="Постоянный">Постоянный</option>
+              <option value="Обычный">Обычный</option>
+              <option value="Новый">Новый</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+            >
+              <option value="strength">Сильные сверху</option>
+              <option value="invoices">По числу накладных</option>
+              {isAdmin && <option value="amount">По сумме покупок</option>}
+              {isAdmin && <option value="balance">По долгу</option>}
+              <option value="lastPurchase">По последней покупке</option>
+            </select>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 2xl:grid-cols-3">
-            {paginatedCustomers.map((customer) => (
-              <motion.div layout key={customer.id} className="h-full">
-                <Card className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
-                  <div className="mb-6 flex items-start justify-between">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 transition-colors duration-300 group-hover:bg-sky-500 group-hover:text-white">
-                      <User size={28} strokeWidth={2.2} />
+        {/* Customer Cards Grid */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {paginatedCustomers.map((customer) => (
+            <motion.div layout key={customer.id} className="h-full">
+              <div className="flex h-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                <div>
+                  <div className="mb-4 flex items-start justify-between">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 font-semibold">
+                      <User size={22} strokeWidth={2} />
                     </div>
-                    <div className="flex space-x-1">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => {
                           setSelectedCustomer(customer);
@@ -482,85 +482,85 @@ export default function CustomerView() {
                           });
                           setIsModalOpen(true);
                         }}
-                        className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        title="Редактировать"
                       >
-                        <Edit2 size={18} />
+                        <Edit2 size={15} />
                       </button>
                       <button
                         onClick={() => {
                           setSelectedCustomer(customer);
                           setShowDeleteConfirm(true);
                         }}
-                        className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                        title="Удалить"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
 
-                  <h3 className="mb-3 wrap-break-word text-xl font-medium leading-7 text-slate-900">{customer.name}</h3>
-                  {customer.customerCategory && (
-                    <p className="mb-3 inline-flex max-w-full rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                      {customer.customerCategory}
-                    </p>
-                  )}
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
+                  <h3 className="text-base font-semibold tracking-tight text-slate-900 line-clamp-1">{customer.name}</h3>
+                  
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {customer.customerCategory && (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                        {customer.customerCategory}
+                      </span>
+                    )}
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
                       {customer.customer_segment || 'Новый'}
                     </span>
-                    <span className="text-xs text-slate-400">
-                      Накладных: {formatCount(customer.invoice_count || 0)}
-                    </span>
                   </div>
-                  {customer.last_purchase_at && (
-                    <p className="mb-4 text-xs text-slate-400">
-                      Последняя покупка: {new Date(customer.last_purchase_at).toLocaleDateString('ru-RU')}
-                    </p>
-                  )}
-                  <div className="mb-6 space-y-3">
-                    <div className="flex items-start text-sm text-slate-500">
-                      <Phone size={14} className="mr-2" /> {customer.phone || 'Нет телефона'}
+
+                  <div className="mt-4 space-y-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <Phone size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{customer.phone || 'Нет телефона'}</span>
                     </div>
-                    <div className="flex items-center text-sm text-slate-500">
-                      <MapPin size={14} className="mr-2" /> {customer.address || 'Нет адреса'}
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{customer.address || 'Нет адреса'}</span>
                     </div>
                   </div>
 
-                  <div className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-[#f4f5fb] p-4 sm:grid-cols-3">
-                    <div className="min-w-0 rounded-2xl border border-sky-100 bg-sky-50 px-3 py-3">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Накладные</p>
-                      <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-slate-900 xl:text-[11px]">{formatMoneyByRole(customer.total_invoiced, true)}</p>
+                  {/* Financial Stats Box */}
+                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-[#f4f5fb] p-3 text-center">
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Накладные</p>
+                      <p className="mt-0.5 text-xs font-semibold text-slate-900">{formatMoneyByRole(customer.total_invoiced, true)}</p>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
-                      <p className="whitespace-nowrap text-[10px] leading-4 tabular-nums text-emerald-600 xl:text-[11px]">{formatMoneyByRole(customer.total_paid, true)}</p>
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплачено</p>
+                      <p className="mt-0.5 text-xs font-semibold text-emerald-600">{formatMoneyByRole(customer.total_paid, true)}</p>
                     </div>
-                    <div className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Долг</p>
-                      <p className={`whitespace-nowrap text-[10px] leading-4 tabular-nums xl:text-[11px] ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
+                    <div>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Долг</p>
+                      <p className={`mt-0.5 text-xs font-semibold ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <button
-                      onClick={() => openStatement(customer)}
-                      className="flex w-full items-center justify-center space-x-2 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-sm font-medium text-violet-700 transition-all hover:border-violet-300 hover:bg-violet-100"
-                    >
-                      <FileText size={16} />
-                      <span>Накладные</span>
-                    </button>
-                    <button
-                      onClick={() => handlePrintCustomerReconciliation(customer)}
-                      className="flex w-full items-center justify-center space-x-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <Printer size={16} />
-                      <span>Детальный акт</span>
-                    </button>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => openStatement(customer)}
+                    className="flex items-center justify-center gap-1.5 rounded-full bg-slate-900 py-2 px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+                  >
+                    <FileText size={14} />
+                    <span>Накладные</span>
+                  </button>
+                  <button
+                    onClick={() => handlePrintCustomerReconciliation(customer)}
+                    className="flex items-center justify-center gap-1.5 rounded-full border border-slate-200/70 bg-white py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
+                  >
+                    <Printer size={14} />
+                    <span>Детальный акт</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
           <PaginationControls
             currentPage={currentPage}
@@ -569,7 +569,6 @@ export default function CustomerView() {
             pageSize={pageSize}
             onPageChange={setCurrentPage}
           />
-        </div>
 
         <ConfirmationModal
           isOpen={showDeleteConfirm}
@@ -586,142 +585,167 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeCustomerModal}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
               />
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-10 sm:py-8">
-                  <h2 className="text-2xl font-medium tracking-tight text-slate-900">
-                    {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
-                  </h2>
-                  <button onClick={closeCustomerModal} className="rounded-xl p-2 transition-colors hover:bg-white">
-                    <X />
+                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-600 text-white">
+                      <User size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
+                      </h3>
+                      <p className="text-xs text-slate-500">Введите персональные и контактные данные клиента.</p>
+                    </div>
+                  </div>
+                  <button onClick={closeCustomerModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
+                    <X size={18} />
                   </button>
                 </div>
-                <form onSubmit={handleSave} className="flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-6 sm:p-10">
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Тип клиента</label>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, customerType: 'individual', companyName: '' })}
-                        className={`rounded-2xl border px-5 py-4 text-sm font-medium transition-all ${formData.customerType === 'individual' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
-                      >
-                        Частное лицо
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, customerType: 'company' })}
-                        className={`rounded-2xl border px-5 py-4 text-sm font-medium transition-all ${formData.customerType === 'company' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
-                      >
-                        Компания
-                      </button>
+                <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
+                  <div className="space-y-4 overflow-y-auto p-6">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-700">Тип клиента</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, customerType: 'individual', companyName: '' })}
+                          className={`rounded-full py-2.5 px-4 text-xs font-semibold transition-all ${formData.customerType === 'individual' ? 'bg-slate-900 text-white shadow-xs' : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'}`}
+                        >
+                          Частное лицо
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, customerType: 'company' })}
+                          className={`rounded-full py-2.5 px-4 text-xs font-semibold transition-all ${formData.customerType === 'company' ? 'bg-slate-900 text-white shadow-xs' : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'}`}
+                        >
+                          Компания
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {formData.customerType === 'company' && (
-                    <div className="space-y-2">
-                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Название компании</label>
+                    {formData.customerType === 'company' && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-700">Название компании</label>
+                        <input
+                          required
+                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          value={formData.companyName}
+                          onChange={(e) => setFormData({ ...formData, companyName: e.target.value, name: e.target.value })}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-700">
+                        {formData.customerType === 'company' ? 'Контактное лицо' : 'Имя клиента'}
+                      </label>
                       <input
-                        required
-                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                        value={formData.companyName}
-                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value, name: e.target.value })}
+                        required={formData.customerType !== 'company'}
+                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        value={formData.customerType === 'company' ? formData.contactName : formData.name}
+                        onChange={(e) =>
+                          setFormData(
+                            formData.customerType === 'company'
+                              ? { ...formData, contactName: e.target.value }
+                              : { ...formData, name: e.target.value, contactName: e.target.value },
+                          )
+                        }
                       />
                     </div>
-                  )}
 
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">
-                      {formData.customerType === 'company' ? 'Контактное лицо' : 'Имя клиента'}
-                    </label>
-                    <input
-                      required={formData.customerType !== 'company'}
-                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.customerType === 'company' ? formData.contactName : formData.name}
-                      onChange={(e) =>
-                        setFormData(
-                          formData.customerType === 'company'
-                            ? { ...formData, contactName: e.target.value }
-                            : { ...formData, name: e.target.value, contactName: e.target.value },
-                        )
-                      }
-                    />
-                  </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-700">Категория</label>
+                        <input
+                          list="customer-category-options"
+                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          value={formData.customerCategory}
+                          onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
+                          placeholder="VIP, Оптовик..."
+                        />
+                        <datalist id="customer-category-options">
+                          {customerCategories.map((category) => (
+                            <option key={category} value={category} />
+                          ))}
+                        </datalist>
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Категория клиента</label>
-                    <input
-                      list="customer-category-options"
-                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.customerCategory}
-                      onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
-                      placeholder="Например: VIP, Оптовик, Магазин, Партнер"
-                    />
-                    <datalist id="customer-category-options">
-                      {customerCategories.map((category) => (
-                        <option key={category} value={category} />
-                      ))}
-                    </datalist>
-                  </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-700">Телефон</label>
+                        <input
+                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Телефон</label>
-                    <input
-                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-700">Регион</label>
+                        <input
+                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          value={formData.region}
+                          onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-700">Город</label>
+                        <input
+                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          value={formData.city}
+                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Регион</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-700">Адрес</label>
                       <input
-                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                        value={formData.region}
-                        onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Город</label>
-                      <input
-                        className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-700">Заметки</label>
+                      <textarea
+                        rows={2}
+                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       />
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Адрес</label>
-                    <input
-                      className="w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    />
+                  <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={closeCustomerModal}
+                      className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-full bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+                    >
+                      Сохранить
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="ml-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Заметки</label>
-                    <textarea
-                      className="min-h-25 w-full rounded-2xl bg-slate-50 px-6 py-4 outline-none transition-all focus:ring-4 focus:ring-slate-500/10"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    />
-                  </div>
-                  <button type="submit" className="w-full rounded-2xl bg-slate-900 py-5 text-white transition-all hover:bg-slate-800">
-                    Сохранить
-                  </button>
                 </form>
               </motion.div>
             </div>
@@ -730,60 +754,61 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isStatementOpen && selectedCustomer && (
-            <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeStatementModal}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
               />
               <motion.div
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 50, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[3rem]"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
               >
-                <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-10 sm:py-10">
-                  <div className="mb-5 flex items-start justify-between gap-4 sm:mb-6">
-                    <div>
-                      <h2 className="text-3xl font-medium tracking-tight text-slate-900">{selectedCustomer.name}</h2>
-                      <p className="mt-1 text-slate-500">История и баланс строятся только по накладным.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handlePrintCustomerReconciliation(selectedCustomer, statementData)}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                      >
-                        <Printer size={16} />
-                        <span>Детальный акт</span>
-                      </button>
-                      <button onClick={closeStatementModal} className="rounded-2xl p-3 shadow-sm transition-colors hover:bg-white">
-                        <X />
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-8 py-6">
+                  <div>
+                    <h3 className="text-xl font-semibold tracking-tight text-slate-900">{selectedCustomer.name}</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">История и баланс строятся только по накладным.</p>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
-                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Всего по накладным</p>
-                      <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoneyByRole(selectedCustomer.total_invoiced)}</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerReconciliation(selectedCustomer, statementData)}
+                      className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
+                    >
+                      <Printer size={15} />
+                      <span>Детальный акт</span>
+                    </button>
+                    <button onClick={closeStatementModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Всего по накладным</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoneyByRole(selectedCustomer.total_invoiced)}</p>
                     </div>
-                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Всего оплачено</p>
-                      <p className="text-xl font-medium text-emerald-600">{formatMoneyByRole(selectedCustomer.total_paid)}</p>
+                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Всего оплачено</p>
+                      <p className="mt-1 text-lg font-semibold text-emerald-600">{formatMoneyByRole(selectedCustomer.total_paid)}</p>
                     </div>
-                    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                      <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-slate-400">Текущий долг</p>
-                      <p className="text-xl font-medium text-rose-600">{formatMoneyByRole(selectedCustomer.balance)}</p>
+                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Текущий долг</p>
+                      <p className="mt-1 text-lg font-semibold text-rose-600">{formatMoneyByRole(selectedCustomer.balance)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10">
+                <div className="flex-1 overflow-y-auto p-8">
                   <div className="space-y-3">
                     {statementData.length === 0 && (
-                      <div className="rounded-3xl bg-slate-50 p-8 text-center text-sm text-slate-500">
+                      <div className="rounded-2xl bg-[#f4f5fb] p-8 text-center text-xs font-medium text-slate-500">
                         У клиента пока нет накладных.
                       </div>
                     )}
@@ -792,15 +817,15 @@ export default function CustomerView() {
                       <div
                         key={invoice.id}
                         onClick={() => openInvoiceDetails(invoice)}
-                        className="flex cursor-pointer flex-col items-start gap-4 rounded-3xl bg-slate-50 p-4 transition-colors hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between md:rounded-3xl md:p-6"
+                        className="flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-4 transition-all hover:bg-white hover:shadow-xs sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="flex w-full min-w-0 items-center space-x-4 md:space-x-6">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 md:h-14 md:w-14">
-                            <FileText size={20} />
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 font-semibold">
+                            <FileText size={18} />
                           </div>
                           <div>
-                            <p className="text-base font-medium text-slate-900 md:text-lg">Накладная #{invoice.id}</p>
-                            <p className="text-xs text-slate-400 md:text-sm">
+                            <p className="text-sm font-semibold text-slate-900">Накладная #{invoice.id}</p>
+                            <p className="text-xs text-slate-400">
                               {new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
                                 day: 'numeric',
                                 month: 'long',
@@ -809,29 +834,26 @@ export default function CustomerView() {
                                 minute: '2-digit',
                               })}
                             </p>
-                            <p className="mt-1 text-[11px] text-slate-500">
+                            <p className="mt-0.5 text-[11px] text-slate-500">
                               Оплаты: {formatCount(invoice.paymentEvents?.length || 0)} · Возвраты: {formatCount(invoice.returnEvents?.length || 0)}
                             </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-4">
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-slate-900">{formatMoneyByRole(invoice.netAmount)}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500">Остаток: {formatMoneyByRole(invoice.invoiceBalance)}</p>
                           </div>
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
                               handlePrintInvoiceDirect(invoice);
                             }}
-                            className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100"
+                            className="flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                           >
-                            <Printer size={16} />
+                            <Printer size={14} />
                             <span>Печать</span>
                           </button>
-                        </div>
-                        <div className="w-full text-left sm:w-auto sm:text-right">
-                          <p className="text-lg font-medium text-slate-900 md:text-xl">{formatMoneyByRole(invoice.netAmount)}</p>
-                          <div className="mt-1.5 flex justify-end">
-                            <Badge variant={invoice.status === 'paid' ? 'success' : invoice.invoiceBalance > 0 ? 'warning' : 'default'}>
-                              {invoice.status === 'paid' ? 'Оплачено' : invoice.invoiceBalance > 0 ? 'Есть долг' : 'Закрыто'}
-                            </Badge>
-                          </div>
-                          <p className="mt-1.5 text-[11px] text-slate-500">Остаток: {formatMoneyByRole(invoice.invoiceBalance)}</p>
                         </div>
                       </div>
                     ))}
@@ -844,135 +866,138 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isInvoiceDetailsOpen && selectedInvoice && (
-            <div className="fixed inset-0 z-60 flex items-end justify-center p-3 sm:items-center sm:p-6">
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeInvoiceDetailsModal}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
               />
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
-                  <h3 className="text-2xl font-medium text-slate-900">Накладная #{selectedInvoice.id}</h3>
-                  <button onClick={closeInvoiceDetailsModal} className="rounded-xl p-2 transition-colors hover:bg-white">
-                    <X />
+                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">Накладная #{selectedInvoice.id}</h3>
+                    <p className="text-xs text-slate-500">Детали накладной, списки товаров и оплат</p>
+                  </div>
+                  <button onClick={closeInvoiceDetailsModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
+                    <X size={18} />
                   </button>
                 </div>
 
-                <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-8">
-                  <div className="flex flex-col gap-1 text-sm text-slate-500 sm:flex-row sm:justify-between">
+                <div className="flex-1 space-y-5 overflow-y-auto p-6">
+                  <div className="flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:justify-between rounded-2xl bg-[#f4f5fb] p-3.5 border border-slate-100">
                     <span>Дата: {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</span>
                     <span>Склад: {selectedInvoice.warehouse?.name || '---'}</span>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     {selectedInvoice.items?.map((item) => {
                       const quantityInfo = getInvoiceItemQuantityParts(item);
 
                       return (
-                        <div key={item.id} className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-3.5">
                           <div>
-                            <p className="font-medium text-slate-900">{item.product?.name}</p>
-                            <p className="whitespace-nowrap text-xs font-medium text-slate-700">{quantityInfo.primary}</p>
-                            <p className="mt-0.5 whitespace-nowrap text-[10px] text-slate-400">
-                              {quantityInfo.secondary || ''}
-                            </p>
-                            <p className="whitespace-nowrap text-[10px] text-slate-400">x {formatMoney(item.sellingPrice)}</p>
+                            <p className="text-xs font-semibold text-slate-900">{item.product?.name}</p>
+                            <p className="text-xs font-medium text-slate-700">{quantityInfo.primary}</p>
+                            {quantityInfo.secondary && (
+                              <p className="text-[10px] text-slate-400">{quantityInfo.secondary}</p>
+                            )}
+                            <p className="text-[10px] text-slate-400">x {formatMoney(item.sellingPrice)}</p>
                             {Number(item.returnedQty || 0) > 0 && (
-                              <p className="mt-1 text-xs text-amber-600">Возвращено: {formatCount(item.returnedQty || 0)}</p>
+                              <p className="mt-0.5 text-[11px] font-medium text-amber-600">Возвращено: {formatCount(item.returnedQty || 0)}</p>
                             )}
                           </div>
-                          <p className="font-medium text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
+                          <p className="text-xs font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
                         </div>
                       );
                     })}
                   </div>
 
-                  <div className="space-y-2 border-t border-slate-100 pt-6">
-                    <div className="flex justify-between text-sm text-slate-500">
+                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex justify-between text-xs text-slate-500">
                       <span>Сумма</span>
                       <span>{formatMoneyByRole(selectedInvoice.totalAmount)}</span>
                     </div>
                     {Number(selectedInvoice.discount || 0) > 0 && (
-                      <div className="flex justify-between text-sm text-rose-500">
+                      <div className="flex justify-between text-xs text-rose-500">
                         <span>Скидка ({selectedInvoice.discount}%)</span>
                         <span>-{formatMoneyByRole((Number(selectedInvoice.totalAmount || 0) * Number(selectedInvoice.discount || 0)) / 100)}</span>
                       </div>
                     )}
                     {Number(selectedInvoice.returnedAmount || 0) > 0 && (
-                      <div className="flex justify-between text-sm text-amber-600">
+                      <div className="flex justify-between text-xs text-amber-600">
                         <span>Возвраты</span>
                         <span>-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between pt-2 text-lg font-medium text-slate-900 md:text-xl">
+                    <div className="flex justify-between border-t border-slate-200/60 pt-2 text-sm font-bold text-slate-900">
                       <span>Итого</span>
                       <span>{formatMoneyByRole(selectedInvoice.netAmount)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-emerald-600">
+                    <div className="flex justify-between text-xs text-emerald-600 font-semibold">
                       <span>Оплачено</span>
                       <span>{formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-rose-600">
+                    <div className="flex justify-between text-xs text-rose-600 font-semibold">
                       <span>Остаток</span>
                       <span>{formatMoneyByRole(selectedInvoice.invoiceBalance)}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-3 border-t border-slate-100 pt-6">
-                    <h4 className="text-sm font-medium text-slate-900">Оплаты по накладной</h4>
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider text-slate-400">Оплаты по накладной</h4>
                     {selectedInvoice.paymentEvents?.length ? (
                       selectedInvoice.paymentEvents.map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3">
+                        <div key={payment.id} className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-2.5">
                           <div>
-                            <p className="text-sm font-medium text-emerald-700">{formatMoneyByRole(payment.amount)}</p>
-                            <p className="text-xs text-emerald-600">
+                            <p className="text-xs font-semibold text-emerald-700">{formatMoneyByRole(payment.amount)}</p>
+                            <p className="text-[11px] text-emerald-600">
                               {new Date(payment.createdAt).toLocaleString('ru-RU')} · {payment.staff_name}
                             </p>
                           </div>
-                          <span className="text-xs uppercase tracking-wider text-emerald-600">{payment.method}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">{payment.method}</span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 md:text-sm">Оплат по этой накладной нет.</p>
+                      <p className="text-xs text-slate-400">Оплат по этой накладной нет.</p>
                     )}
                   </div>
 
-                  <div className="space-y-3 border-t border-slate-100 pt-6">
-                    <h4 className="text-sm font-medium text-slate-900">Возвраты по накладной</h4>
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider text-slate-400">Возвраты по накладной</h4>
                     {selectedInvoice.returnEvents?.length ? (
                       selectedInvoice.returnEvents.map((itemReturn) => (
-                        <div key={itemReturn.id} className="rounded-2xl bg-amber-50 px-4 py-3">
+                        <div key={itemReturn.id} className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-2.5">
                           <div className="flex items-center justify-between gap-4">
-                            <p className="text-sm font-medium text-amber-700">{formatMoneyByRole(itemReturn.totalValue)}</p>
-                            <p className="text-xs text-amber-600">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</p>
+                            <p className="text-xs font-semibold text-amber-700">{formatMoneyByRole(itemReturn.totalValue)}</p>
+                            <p className="text-[11px] text-amber-600">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</p>
                           </div>
-                          <p className="mt-1 text-xs text-amber-700">{itemReturn.staff_name}</p>
-                          {itemReturn.reason && <p className="mt-1 text-xs text-amber-600">{itemReturn.reason}</p>}
+                          <p className="mt-0.5 text-xs text-amber-700">{itemReturn.staff_name}</p>
+                          {itemReturn.reason && <p className="mt-0.5 text-xs text-amber-600">{itemReturn.reason}</p>}
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 md:text-sm">Возвратов по этой накладной нет.</p>
+                      <p className="text-xs text-slate-400">Возвратов по этой накладной нет.</p>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:p-8">
+                <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
                   <button
                     onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100"
+                    className="flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-5 py-2.5 text-xs font-semibold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-100"
                   >
-                    <Printer size={18} />
+                    <Printer size={15} />
                     <span>Печать</span>
                   </button>
                   <button
                     onClick={closeInvoiceDetailsModal}
-                    className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                    className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                   >
                     Закрыть
                   </button>

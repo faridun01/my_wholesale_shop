@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Banknote, CalendarDays, Pencil, Plus, RotateCcw, Search, Trash2, Wallet, Warehouse, X } from 'lucide-react';
+import { Banknote, CalendarDays, Filter, Pencil, Plus, RotateCcw, Search, Trash2, Wallet, Warehouse, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { addExpensePayment, addExpenseRefund, cancelExpensePayment, createExpense, deleteExpense, getExpenses, updateExpense } from '../api/expenses.api';
 import { getWarehouses } from '../api/warehouses.api';
@@ -60,6 +60,7 @@ export default function ExpensesView() {
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [payingExpenseId, setPayingExpenseId] = useState<number | null>(null);
   const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(null);
   const [selectedExpenseForPayment, setSelectedExpenseForPayment] = useState<ExpenseRow | null>(null);
@@ -172,6 +173,19 @@ export default function ExpensesView() {
     }
   }, [currentPage, totalPages]);
 
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setForm({
+      title: '',
+      category: 'Прочее',
+      amount: '',
+      paidAmount: '',
+      paymentDate: todayValue,
+      expenseDate: todayValue,
+      note: '',
+    });
+  };
+
   const closePaymentModal = () => {
     setSelectedExpenseForPayment(null);
     setPaymentAmount('');
@@ -232,15 +246,7 @@ export default function ExpensesView() {
         note: form.note.trim(),
       });
       toast.success('Расход добавлен');
-      setForm({
-        title: '',
-        category: 'Прочее',
-        amount: '',
-        paidAmount: '',
-        paymentDate: todayValue,
-        expenseDate: todayValue,
-        note: '',
-      });
+      closeAddModal();
       await fetchExpenses(selectedWarehouseId);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Ошибка при добавлении расхода');
@@ -457,53 +463,395 @@ export default function ExpensesView() {
   };
 
   return (
-    <div className="app-page-shell">
-      <div className="w-full space-y-6">
-        <div className="overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-5 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">Расходы</h1>
-              <p className="mt-1 text-slate-500">Учитывайте расходы по каждому складу отдельно.</p>
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="space-y-5 overflow-hidden rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+        {/* Top Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Расходы</h1>
+            <p className="mt-0.5 text-xs text-slate-500">Учитывайте расходы по каждому складу отдельно.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {warehouses.length > 1 && (
+              <div className="relative">
+                <Warehouse className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <select
+                  value={selectedWarehouseId}
+                  onChange={(event) => setSelectedWarehouseId(event.target.value)}
+                  disabled={!isAdmin}
+                  className="appearance-none rounded-full border border-slate-200 bg-white py-2 pl-9 pr-8 text-xs font-medium text-slate-700 shadow-xs outline-none transition-colors hover:border-slate-300"
+                >
+                  <option value="">Все склады</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+            >
+              <Plus size={16} />
+              <span>Добавить расход</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Metrics Row */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-rose-500">Всего расходов</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalAmount)}</p>
+          </div>
+          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-emerald-500">Оплачено</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalPaidAmount)}</p>
+          </div>
+          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-amber-500">Остаток долга</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalRemainingAmount)}</p>
+          </div>
+        </div>
+
+        {/* Table & Filters Card */}
+        <div className="overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-xs">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Поиск по названию, категории или примечанию..."
+                  className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-11 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
+                  Записей: {filteredExpenses.length}
+                </span>
+                {(search || historyCategoryFilter !== 'all' || historyStatusFilter !== 'all' || historyDateFrom || historyDateTo) && (
+                  <button
+                    type="button"
+                    onClick={clearHistoryFilters}
+                    className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-900 hover:text-white"
+                  >
+                    Сбросить фильтры
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-right">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-rose-400">Всего расходов</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalAmount)}</p>
+
+            {/* Filter Bar */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+              <select
+                value={historyCategoryFilter}
+                onChange={(event) => setHistoryCategoryFilter(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+              >
+                <option value="all">Все категории</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={historyStatusFilter}
+                onChange={(event) => setHistoryStatusFilter(event.target.value as typeof historyStatusFilter)}
+                className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+              >
+                <option value="all">Все статусы</option>
+                <option value="paid">Полностью оплачено</option>
+                <option value="partial">Частично оплачено</option>
+                <option value="unpaid">Не оплачено</option>
+              </select>
+
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2">
+                <CalendarDays size={15} className="text-slate-400" />
+                <input
+                  type="date"
+                  value={historyDateFrom}
+                  onChange={(event) => setHistoryDateFrom(event.target.value)}
+                  className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                />
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-right">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-400">Оплачено</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalPaidAmount)}</p>
-              </div>
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-right">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-amber-500">Остаток</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalRemainingAmount)}</p>
+
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2">
+                <CalendarDays size={15} className="text-slate-400" />
+                <input
+                  type="date"
+                  value={historyDateTo}
+                  onChange={(event) => setHistoryDateTo(event.target.value)}
+                  className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                />
               </div>
             </div>
           </div>
 
-          <div className="grid gap-6 p-3 sm:p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+          {/* Desktop Table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-3">Дата</th>
+                  <th className="px-4 py-3">Расход</th>
+                  <th className="px-4 py-3">Категория</th>
+                  <th className="px-4 py-3">Склад</th>
+                  <th className="px-4 py-3">Сумма</th>
+                  <th className="px-4 py-3">Оплачено</th>
+                  <th className="px-4 py-3">Долг</th>
+                  <th className="px-4 py-3">Кто добавил</th>
+                  <th className="px-4 py-3 text-center">Действия</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {paginatedExpenses.map((expense) => {
+                  const remaining = getExpenseRemaining(expense);
+                  const refundLimit = getExpenseRefundLimit(expense);
+
+                  return (
+                    <tr key={expense.id} className="transition-colors hover:bg-[#f4f5fb]">
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-slate-500">
+                        {new Date(expense.expenseDate).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-slate-900">{expense.title}</p>
+                        {expense.note ? <p className="mt-0.5 text-[11px] text-slate-400">{expense.note}</p> : null}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5">
+                        <span className="inline-flex rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
+                          {expense.category}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-slate-600">
+                        {expense.warehouse?.name || '-'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-rose-600">
+                        {formatMoney(expense.amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-emerald-600">
+                        {formatMoney(expense.paidAmount || 0)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-amber-600">
+                        {formatMoney(remaining)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-slate-500">
+                        {expense.user?.username || '-'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(expense)}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+                            title="Редактировать"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          {remaining > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => openPaymentModal(expense)}
+                              disabled={payingExpenseId === expense.id}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                              title="Внести оплату"
+                            >
+                              <Wallet size={15} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
+                            </button>
+                          ) : null}
+                          {refundLimit > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => openRefundModal(expense)}
+                              disabled={payingExpenseId === expense.id}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
+                              title="Возврат расхода"
+                            >
+                              <RotateCcw size={15} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
+                            </button>
+                          ) : null}
+                          {(isAdmin || expense.user?.id === user.id) && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedExpenseForDelete(expense)}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100"
+                              title="Удалить"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!filteredExpenses.length && (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">
+                      Расходы пока не добавлены.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="space-y-3 p-3 md:hidden">
+            {paginatedExpenses.map((expense) => {
+              const remaining = getExpenseRemaining(expense);
+              const refundLimit = getExpenseRefundLimit(expense);
+
+              return (
+                <article key={`expense-mobile-${expense.id}`} className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs space-y-3">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{expense.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{new Date(expense.expenseDate).toLocaleDateString('ru-RU')}</p>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
+                      {expense.category}
+                    </span>
+                  </div>
+
+                  {expense.note ? <p className="text-xs text-slate-500">{expense.note}</p> : null}
+
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <div className="rounded-xl bg-[#f4f5fb] p-2.5">
+                      <p className="text-[10px] uppercase text-slate-400">Сумма</p>
+                      <p className="mt-0.5 font-semibold text-rose-600">{formatMoney(expense.amount)}</p>
+                    </div>
+                    <div className="rounded-xl bg-[#f4f5fb] p-2.5">
+                      <p className="text-[10px] uppercase text-slate-400">Оплачено</p>
+                      <p className="mt-0.5 font-semibold text-emerald-600">{formatMoney(expense.paidAmount || 0)}</p>
+                    </div>
+                    <div className="rounded-xl bg-[#f4f5fb] p-2.5">
+                      <p className="text-[10px] uppercase text-slate-400">Остаток</p>
+                      <p className="mt-0.5 font-semibold text-amber-600">{formatMoney(remaining)}</p>
+                    </div>
+                    <div className="rounded-xl bg-[#f4f5fb] p-2.5">
+                      <p className="text-[10px] uppercase text-slate-400">Склад</p>
+                      <p className="mt-0.5 font-medium text-slate-700">{expense.warehouse?.name || '-'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                    <span className="text-xs text-slate-400">Добавил: <span className="font-medium text-slate-700">{expense.user?.username || '-'}</span></span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(expense)}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700"
+                        title="Редактировать"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      {remaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => openPaymentModal(expense)}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          title="Оплатить"
+                        >
+                          <Wallet size={14} />
+                        </button>
+                      )}
+                      {refundLimit > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => openRefundModal(expense)}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700"
+                          title="Возврат"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+                      {(isAdmin || expense.user?.id === user.id) && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExpenseForDelete(expense)}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600"
+                          title="Удалить"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+
+            {!filteredExpenses.length && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+                Расходы пока не добавлены.
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {filteredExpenses.length > pageSize && (
+            <div className="border-t border-slate-100 bg-white">
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredExpenses.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                className="border-t-0"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal: Новый расход */}
+      {showAddModal && (
+        <div
+          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          onClick={closeAddModal}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white">
                   <Banknote size={18} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Новый расход</h2>
-                  <p className="text-sm text-slate-500">Добавьте расход для нужд склада.</p>
+                  <h3 className="text-base font-semibold text-slate-900">Новый расход</h3>
+                  <p className="text-xs text-slate-500">Добавьте новый расход для нужд склада.</p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={closeAddModal}
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              <form onSubmit={handleCreateExpense} className="space-y-3">
+            <form onSubmit={handleCreateExpense} className="flex min-h-0 flex-1 flex-col">
+              <div className="space-y-4 overflow-y-auto p-6">
                 {warehouses.length > 1 && (
-                  <div className="space-y-2">
-                    <label className="text-sm text-slate-600">Склад</label>
-                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                      <Warehouse size={16} className="text-slate-400" />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Склад</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
+                      <Warehouse size={15} className="text-slate-400" />
                       <select
                         value={selectedWarehouseId}
                         onChange={(event) => setSelectedWarehouseId(event.target.value)}
                         disabled={!isAdmin}
-                        className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                        className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
                       >
                         <option value="">Выберите склад</option>
                         {warehouses.map((warehouse) => (
@@ -516,34 +864,49 @@ export default function ExpensesView() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Категория</label>
-                  <select
-                    value={form.category}
-                    onChange={(event) => setForm({ ...form, category: event.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Категория</label>
+                    <select
+                      value={form.category}
+                      onChange={(event) => setForm({ ...form, category: event.target.value })}
+                      className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                    >
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Дата расхода</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2">
+                      <CalendarDays size={15} className="text-slate-400" />
+                      <input
+                        type="date"
+                        value={form.expenseDate}
+                        onChange={(event) => setForm({ ...form, expenseDate: event.target.value })}
+                        className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Название расхода</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700">Название расхода</label>
                   <input
                     value={form.title}
                     onChange={(event) => setForm({ ...form, title: event.target.value })}
-                    placeholder="Например: аренда, бензин, грузчики"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                    placeholder="Например: Аренда склада, Доставка товара, Бензин"
+                    className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                   />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm text-slate-600">Сумма расхода</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Сумма расхода</label>
                     <input
                       type="number"
                       min={0}
@@ -551,11 +914,11 @@ export default function ExpensesView() {
                       value={form.amount}
                       onChange={(event) => setForm({ ...form, amount: event.target.value })}
                       placeholder="0.00"
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm text-slate-600">Оплачено сейчас</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Оплачено сейчас</label>
                     <input
                       type="number"
                       min={0}
@@ -563,423 +926,149 @@ export default function ExpensesView() {
                       value={form.paidAmount}
                       onChange={(event) => setForm({ ...form, paidAmount: event.target.value })}
                       placeholder="0.00"
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                     />
                   </div>
                 </div>
 
                 {Number(form.paidAmount || 0) > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-sm text-slate-600">Дата оплаты</label>
-                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3 py-3">
-                      <CalendarDays size={16} className="text-emerald-500" />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Дата оплаты</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-3.5 py-2">
+                      <CalendarDays size={15} className="text-emerald-500" />
                       <input
                         type="date"
                         value={form.paymentDate}
                         onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
-                        className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                        className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
                       />
                     </div>
                     {form.expenseDate && form.paymentDate && form.paymentDate < form.expenseDate ? (
-                      <p className="text-xs font-semibold text-emerald-600">Оплата будет отмечена как аванс.</p>
+                      <p className="text-[11px] font-medium text-emerald-600">Оплата будет отмечена как аванс.</p>
                     ) : null}
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Остаток к оплате</p>
-                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                <div className="rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
+                  <p className="mt-0.5 text-lg font-semibold text-slate-900">
                     {formatMoney(Math.max(0, Number(form.amount || 0) - Number(form.paidAmount || 0)))}
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Дата</label>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                    <CalendarDays size={16} className="text-slate-400" />
-                    <input
-                      type="date"
-                      value={form.expenseDate}
-                      onChange={(event) => setForm({ ...form, expenseDate: event.target.value })}
-                      className="w-full bg-transparent text-sm text-slate-700 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Примечание</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700">Примечание</label>
                   <textarea
                     value={form.note}
                     onChange={(event) => setForm({ ...form, note: event.target.value })}
-                    rows={3}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                    rows={2}
+                    placeholder="Дополнительная информация (необязательно)..."
+                    className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                   />
                 </div>
+              </div>
 
+              <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeAddModal}
+                  className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  Отмена
+                </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+                  className="flex-1 rounded-full bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 disabled:opacity-50"
                 >
-                  <Plus size={16} />
-                  <span>{isSubmitting ? 'Сохраняем...' : 'Добавить расход'}</span>
-                </button>
-              </form>
-            </section>
-
-            <section className="flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white">
-              <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">История расходов</h2>
-                  <p className="text-sm text-slate-500">{filteredExpenses.length} записей</p>
-                </div>
-                <div className="relative w-full lg:max-w-sm">
-                  <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Поиск по расходам..."
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-700 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3 border-b border-slate-100 px-4 py-4 sm:px-5 md:grid-cols-2 xl:grid-cols-5">
-                <select
-                  value={historyCategoryFilter}
-                  onChange={(event) => setHistoryCategoryFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-                >
-                  <option value="all">Все категории</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={historyStatusFilter}
-                  onChange={(event) => setHistoryStatusFilter(event.target.value as typeof historyStatusFilter)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-                >
-                  <option value="all">Все статусы</option>
-                  <option value="paid">Полностью оплачено</option>
-                  <option value="partial">Частично оплачено</option>
-                  <option value="unpaid">Не оплачено</option>
-                </select>
-
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <CalendarDays size={16} className="text-slate-400" />
-                  <input
-                    type="date"
-                    value={historyDateFrom}
-                    onChange={(event) => setHistoryDateFrom(event.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <CalendarDays size={16} className="text-slate-400" />
-                  <input
-                    type="date"
-                    value={historyDateTo}
-                    onChange={(event) => setHistoryDateTo(event.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={clearHistoryFilters}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  Сбросить фильтры
+                  {isSubmitting ? 'Сохранение...' : 'Сохранить расход'}
                 </button>
               </div>
-
-              <div className="space-y-3 p-3 md:hidden">
-                {paginatedExpenses.map((expense) => {
-                  const remaining = getExpenseRemaining(expense);
-                  const refundLimit = getExpenseRefundLimit(expense);
-
-                  return (
-                    <article key={`expense-mobile-${expense.id}`} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900">{expense.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{new Date(expense.expenseDate).toLocaleDateString('ru-RU')}</p>
-                        </div>
-                        <span className="rounded-xl bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700">{expense.category}</span>
-                      </div>
-
-                      {expense.note ? <p className="mt-3 text-sm leading-5 text-slate-500">{expense.note}</p> : null}
-
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
-                          <p className="mt-1 text-sm font-semibold text-rose-600">{formatMoney(expense.amount)}</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Оплачено</p>
-                          <p className="mt-1 text-sm font-semibold text-emerald-600">{formatMoney(expense.paidAmount || 0)}</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                          <p className="mt-1 text-sm font-semibold text-amber-600">{formatMoney(remaining)}</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Склад</p>
-                          <p className="mt-1 text-sm font-medium text-slate-700">{expense.warehouse?.name || '-'}</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Добавил</p>
-                          <p className="mt-1 text-sm font-medium text-slate-700">{expense.user?.username || '-'}</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(expense)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs font-semibold text-sky-700"
-                        >
-                          <Pencil size={14} />
-                          <span>Изменить</span>
-                        </button>
-                        {remaining > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => openPaymentModal(expense)}
-                            disabled={payingExpenseId === expense.id}
-                            className="inline-flex h-11 w-11 items-center justify-center justify-self-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 disabled:opacity-50"
-                            aria-label="Оплатить"
-                          >
-                            <Wallet size={16} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
-                          </button>
-                        ) : null}
-                        {refundLimit > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => openRefundModal(expense)}
-                            disabled={payingExpenseId === expense.id}
-                            className="inline-flex h-11 w-11 items-center justify-center justify-self-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700 disabled:opacity-50"
-                            aria-label="Возврат расхода"
-                          >
-                            <RotateCcw size={16} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExpenseForDelete(expense)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-semibold text-rose-700"
-                        >
-                          <Trash2 size={14} />
-                          <span>Удалить</span>
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-
-                {!filteredExpenses.length && (
-                  <div className="rounded-[22px] border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-400">
-                    Расходы пока не добавлены.
-                  </div>
-                )}
-              </div>
-
-              <div className="hidden flex-1 overflow-x-auto md:block lg:overflow-x-visible">
-                <table className="min-w-full table-fixed">
-                  <thead className="bg-slate-50 text-left text-[12px] text-slate-500">
-                    <tr>
-                      <th className="w-25 whitespace-nowrap px-2 py-2 font-medium">Дата</th>
-                      <th className="w-37.5 px-2 py-2 font-medium">Расход</th>
-                      <th className="w-22.5 whitespace-nowrap px-2 py-2 font-medium">Категория</th>
-                      <th className="w-23.75 px-2 py-2 font-medium">Склад</th>
-                      <th className="w-25 whitespace-nowrap px-2 py-2 font-medium">Сумма</th>
-                      <th className="w-25 whitespace-nowrap px-2 py-2 font-medium">Оплачено</th>
-                      <th className="w-22.5 whitespace-nowrap px-2 py-2 font-medium">Долг</th>
-                      <th className="w-22.5 px-2 py-2 font-medium">Кто добавил</th>
-                      <th className="w-27.5 whitespace-nowrap px-2 py-2 text-right font-medium">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedExpenses.map((expense) => {
-                      const remaining = getExpenseRemaining(expense);
-                      const refundLimit = getExpenseRefundLimit(expense);
-
-                      return (
-                        <tr key={expense.id} className="border-t border-slate-100 text-[12px] text-slate-700">
-                          <td className="whitespace-nowrap px-2 py-3">{new Date(expense.expenseDate).toLocaleDateString('ru-RU')}</td>
-                          <td className="px-2 py-3">
-                            <div className="font-medium leading-4 text-slate-900">{expense.title}</div>
-                            {expense.note ? <div className="mt-1 text-[11px] leading-4 text-slate-400">{expense.note}</div> : null}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3">{expense.category}</td>
-                          <td className="px-2 py-3 leading-4">{expense.warehouse?.name || '-'}</td>
-                          <td className="whitespace-nowrap px-2 py-3 font-medium tabular-nums text-rose-600">
-                            {formatMoney(expense.amount).replace(' TJS', '')}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3 font-medium tabular-nums text-emerald-600">
-                            {formatMoney(expense.paidAmount || 0).replace(' TJS', '')}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3 font-medium tabular-nums text-amber-600">
-                            {formatMoney(remaining).replace(' TJS', '')}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3">{expense.user?.username || '-'}</td>
-                          <td className="whitespace-nowrap px-2 py-3">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEditModal(expense)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-600"
-                                title="Редактировать"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              {remaining > 0 ? (
-                                <button
-                                  onClick={() => openPaymentModal(expense)}
-                                  disabled={payingExpenseId === expense.id}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                                  aria-label="Внести оплату"
-                                >
-                                  <Wallet size={14} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
-                                </button>
-                              ) : null}
-                              {refundLimit > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openRefundModal(expense)}
-                                  disabled={payingExpenseId === expense.id}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
-                                  title="Возврат расхода"
-                                >
-                                  <RotateCcw size={14} className={payingExpenseId === expense.id ? 'animate-pulse' : ''} />
-                                </button>
-                              ) : null}
-                              {(isAdmin || expense.user?.id === user.id) && (
-                                <button
-                                  onClick={() => setSelectedExpenseForDelete(expense)}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                                  title="Удалить"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!filteredExpenses.length && (
-                      <tr>
-                        <td colSpan={9} className="px-3 py-12 text-center text-sm text-slate-400">
-                          Расходы пока не добавлены.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {filteredExpenses.length > pageSize && (
-                <div className="mt-auto border-t border-slate-100 bg-white">
-                  <PaginationControls
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    totalItems={filteredExpenses.length}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    className="border-t-0"
-                  />
-                </div>
-              )}
-            </section>
+            </form>
           </div>
         </div>
-      </div>
+      )}
 
+      {/* Modal: Оплата расхода */}
       {selectedExpenseForPayment && (
         <div
-          className="fixed inset-0 z-70 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
           onClick={closePaymentModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-              className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2.5rem]"
+            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 p-5 sm:p-7">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
-                  <Wallet size={22} />
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+                  <Wallet size={18} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Оплата расхода</h3>
-                  <p className="mt-1 text-sm text-slate-500">{selectedExpenseForPayment.title}</p>
+                  <h3 className="text-base font-semibold text-slate-900">Оплата расхода</h3>
+                  <p className="text-xs text-slate-500">{selectedExpenseForPayment.title}</p>
                 </div>
               </div>
               <button
                 onClick={closePaymentModal}
-                className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
               >
-                <X size={22} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-5 overflow-y-auto p-5 sm:p-7">
+            <div className="space-y-4 overflow-y-auto p-6">
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Всего</p>
-                  <p className="mt-1 text-lg font-black text-slate-900">{formatMoney(selectedExpenseForPayment.amount)}</p>
+                <div className="rounded-2xl bg-[#f4f5fb] p-3.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Всего</p>
+                  <p className="mt-0.5 text-base font-semibold text-slate-900">{formatMoney(selectedExpenseForPayment.amount)}</p>
                 </div>
-                <div className="rounded-2xl bg-amber-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-500">Остаток</p>
-                  <p className="mt-1 text-lg font-black text-amber-700">{formatMoney(getExpenseRemaining(selectedExpenseForPayment))}</p>
+                <div className="rounded-2xl bg-amber-50 p-3.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-amber-500">Остаток</p>
+                  <p className="mt-0.5 text-base font-semibold text-amber-700">{formatMoney(getExpenseRemaining(selectedExpenseForPayment))}</p>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_60%)] p-4">
-                <label className="ml-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Сумма оплаты</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={paymentAmount}
-                  onChange={(event) => setPaymentAmount(event.target.value)}
-                  autoFocus
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 text-2xl font-black text-slate-900 outline-none transition-all focus:border-emerald-400 focus:ring-8 focus:ring-emerald-500/5"
-                  placeholder="0.00"
-                />
-                <label className="ml-1 mt-4 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Дата оплаты</label>
-                <div className="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <CalendarDays size={16} className="text-emerald-500" />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Сумма оплаты</label>
                   <input
-                    type="date"
-                    value={expensePaymentDate}
-                    onChange={(event) => setExpensePaymentDate(event.target.value)}
-                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={paymentAmount}
+                    onChange={(event) => setPaymentAmount(event.target.value)}
+                    autoFocus
+                    className="mt-1.5 w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-3 text-xl font-bold text-slate-900 outline-none transition-all focus:border-emerald-500 focus:bg-white"
+                    placeholder="0.00"
                   />
                 </div>
-                {expensePaymentDate && String(selectedExpenseForPayment.expenseDate || '').slice(0, 10) && expensePaymentDate < String(selectedExpenseForPayment.expenseDate || '').slice(0, 10) ? (
-                  <p className="mt-2 text-xs font-bold text-emerald-600">Это аванс: оплата раньше даты расхода.</p>
-                ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Дата оплаты</label>
+                  <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
+                    <CalendarDays size={15} className="text-emerald-500" />
+                    <input
+                      type="date"
+                      value={expensePaymentDate}
+                      onChange={(event) => setExpensePaymentDate(event.target.value)}
+                      className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentAmount(String(roundMoney(getExpenseRemaining(selectedExpenseForPayment))))}
-                    className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
                   >
                     Оплатить весь остаток
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentAmount(String(roundMoney(getExpenseRemaining(selectedExpenseForPayment) / 2)))}
-                    className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                    className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
                   >
                     Половина остатка
                   </button>
@@ -987,11 +1076,11 @@ export default function ExpensesView() {
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-6">
+            <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
               <button
                 type="button"
                 onClick={closePaymentModal}
-                className="flex-1 rounded-2xl border border-slate-200 bg-white py-4 font-bold text-slate-700 transition-all hover:bg-slate-50"
+                className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Отмена
               </button>
@@ -999,7 +1088,7 @@ export default function ExpensesView() {
                 type="button"
                 onClick={handleAddPayment}
                 disabled={payingExpenseId === selectedExpenseForPayment.id || !paymentAmount}
-                className="flex-1 rounded-2xl bg-emerald-600 py-4 font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-600/20 transition-all hover:bg-emerald-700 disabled:opacity-50"
+                className="flex-1 rounded-full bg-emerald-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
                 {payingExpenseId === selectedExpenseForPayment.id ? 'Сохранение...' : 'Внести оплату'}
               </button>
@@ -1008,87 +1097,96 @@ export default function ExpensesView() {
         </div>
       )}
 
+      {/* Modal: Возврат расхода */}
       {selectedExpenseForRefund && (
         <div
-          className="fixed inset-0 z-70 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
           onClick={closeRefundModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2.5rem]"
+            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 p-5 sm:p-7">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-600/20">
-                  <RotateCcw size={22} />
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-600 text-white">
+                  <RotateCcw size={18} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 sm:text-2xl">Возврат расхода</h3>
-                  <p className="mt-1 text-sm text-slate-500">{selectedExpenseForRefund.title}</p>
+                  <h3 className="text-base font-semibold text-slate-900">Возврат расхода</h3>
+                  <p className="text-xs text-slate-500">{selectedExpenseForRefund.title}</p>
                 </div>
               </div>
               <button
                 onClick={closeRefundModal}
-                className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
               >
-                <X size={22} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-5 overflow-y-auto p-5 sm:p-7">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Сумма</p>
-                  <p className="mt-1 text-sm font-black text-slate-900">{formatMoney(selectedExpenseForRefund.amount)}</p>
+            <div className="space-y-4 overflow-y-auto p-6">
+              <div className="grid grid-cols-3 gap-2.5 text-xs">
+                <div className="rounded-xl bg-[#f4f5fb] p-2.5">
+                  <p className="text-[10px] uppercase text-slate-400">Сумма</p>
+                  <p className="mt-0.5 font-semibold text-slate-900">{formatMoney(selectedExpenseForRefund.amount)}</p>
                 </div>
-                <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-500">Оплачено</p>
-                  <p className="mt-1 text-sm font-black text-emerald-700">{formatMoney(selectedExpenseForRefund.paidAmount || 0)}</p>
+                <div className="rounded-xl bg-emerald-50 p-2.5">
+                  <p className="text-[10px] uppercase text-emerald-500">Оплачено</p>
+                  <p className="mt-0.5 font-semibold text-emerald-700">{formatMoney(selectedExpenseForRefund.paidAmount || 0)}</p>
                 </div>
-                <div className="rounded-2xl bg-sky-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-500">Можно</p>
-                  <p className="mt-1 text-sm font-black text-sky-700">{formatMoney(getExpenseRefundLimit(selectedExpenseForRefund))}</p>
+                <div className="rounded-xl bg-sky-50 p-2.5">
+                  <p className="text-[10px] uppercase text-sky-500">Можно</p>
+                  <p className="mt-0.5 font-semibold text-sky-700">{formatMoney(getExpenseRefundLimit(selectedExpenseForRefund))}</p>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_60%)] p-4">
-                <label className="ml-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Сумма возврата</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={refundAmount}
-                  onChange={(event) => setRefundAmount(event.target.value)}
-                  autoFocus
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 text-2xl font-black text-slate-900 outline-none transition-all focus:border-sky-400 focus:ring-8 focus:ring-sky-500/5"
-                  placeholder="0.00"
-                />
-                <label className="ml-1 mt-4 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Дата возврата</label>
-                <div className="mt-2 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <CalendarDays size={16} className="text-sky-500" />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Сумма возврата</label>
                   <input
-                    type="date"
-                    value={refundDate}
-                    onChange={(event) => setRefundDate(event.target.value)}
-                    className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={refundAmount}
+                    onChange={(event) => setRefundAmount(event.target.value)}
+                    autoFocus
+                    className="mt-1.5 w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-3 text-xl font-bold text-slate-900 outline-none transition-all focus:border-sky-500 focus:bg-white"
+                    placeholder="0.00"
                   />
                 </div>
-                <label className="ml-1 mt-4 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Примечание</label>
-                <textarea
-                  value={refundNote}
-                  onChange={(event) => setRefundNote(event.target.value)}
-                  rows={3}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  placeholder="Например: поставщик вернул часть суммы"
-                />
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Дата возврата</label>
+                  <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
+                    <CalendarDays size={15} className="text-sky-500" />
+                    <input
+                      type="date"
+                      value={refundDate}
+                      onChange={(event) => setRefundDate(event.target.value)}
+                      className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Примечание</label>
+                  <textarea
+                    value={refundNote}
+                    onChange={(event) => setRefundNote(event.target.value)}
+                    rows={2}
+                    className="mt-1.5 w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                    placeholder="Например: поставщик вернул часть суммы"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:p-6">
+            <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
               <button
                 type="button"
                 onClick={closeRefundModal}
-                className="flex-1 rounded-2xl border border-slate-200 bg-white py-4 font-bold text-slate-700 transition-all hover:bg-slate-50"
+                className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Отмена
               </button>
@@ -1096,7 +1194,7 @@ export default function ExpensesView() {
                 type="button"
                 onClick={handleAddRefund}
                 disabled={payingExpenseId === selectedExpenseForRefund.id || !refundAmount}
-                className="flex-1 rounded-2xl bg-sky-600 py-4 font-black uppercase tracking-widest text-white shadow-lg shadow-sky-600/20 transition-all hover:bg-sky-700 disabled:opacity-50"
+                className="flex-1 rounded-full bg-sky-600 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-sky-700 disabled:opacity-50"
               >
                 {payingExpenseId === selectedExpenseForRefund.id ? 'Сохранение...' : 'Сохранить возврат'}
               </button>
@@ -1105,45 +1203,46 @@ export default function ExpensesView() {
         </div>
       )}
 
+      {/* Modal: Редактировать расход */}
       {selectedExpenseForEdit && (
         <div
-          className="fixed inset-0 z-75 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-75 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
           onClick={closeEditModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2.5rem]"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 p-4 sm:p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-600/20">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-600 text-white">
                   <Pencil size={18} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 sm:text-2xl">Редактировать расход</h3>
-                  <p className="mt-1 text-sm text-slate-500">Измените сумму, название и остальные поля без удаления записи.</p>
+                  <h3 className="text-base font-semibold text-slate-900">Редактировать расход</h3>
+                  <p className="text-xs text-slate-500">Измените детали расхода без удаления записи.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeEditModal}
-                className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
               >
-                <X size={22} />
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleUpdateExpense} className="flex min-h-0 flex-1 flex-col">
-              <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-6 lg:grid-cols-2">
+              <div className="space-y-4 overflow-y-auto p-6">
                 {warehouses.length > 1 && (
-                  <div className="space-y-2 lg:col-span-2">
-                    <label className="text-sm text-slate-600">Склад</label>
-                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                      <Warehouse size={16} className="text-slate-400" />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Склад</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
+                      <Warehouse size={15} className="text-slate-400" />
                       <select
                         value={editForm.warehouseId}
                         onChange={(event) => setEditForm({ ...editForm, warehouseId: event.target.value })}
-                        className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                        className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
                       >
                         <option value="">Выберите склад</option>
                         {warehouses.map((warehouse) => (
@@ -1156,83 +1255,86 @@ export default function ExpensesView() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Категория</label>
-                  <select
-                    value={editForm.category}
-                    onChange={(event) => setEditForm({ ...editForm, category: event.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Категория</label>
+                    <select
+                      value={editForm.category}
+                      onChange={(event) => setEditForm({ ...editForm, category: event.target.value })}
+                      className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                    >
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Дата</label>
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2">
+                      <CalendarDays size={15} className="text-slate-400" />
+                      <input
+                        type="date"
+                        value={editForm.expenseDate}
+                        onChange={(event) => setEditForm({ ...editForm, expenseDate: event.target.value })}
+                        className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Дата</label>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                    <CalendarDays size={16} className="text-slate-400" />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700">Название расхода</label>
+                  <input
+                    value={editForm.title}
+                    onChange={(event) => setEditForm({ ...editForm, title: event.target.value })}
+                    placeholder="Например: Аренда склада, Доставка товара, Бензин"
+                    className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Сумма расхода</label>
                     <input
-                      type="date"
-                      value={editForm.expenseDate}
-                      onChange={(event) => setEditForm({ ...editForm, expenseDate: event.target.value })}
-                      className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={editForm.amount}
+                      onChange={(event) => setEditForm({ ...editForm, amount: event.target.value })}
+                      className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">Оплачено</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={editForm.paidAmount}
+                      readOnly
+                      className="w-full rounded-2xl border border-slate-200/70 bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2 lg:col-span-2">
-                  <label className="text-sm text-slate-600">Название расхода</label>
-                  <input
-                    value={editForm.title}
-                    onChange={(event) => setEditForm({ ...editForm, title: event.target.value })}
-                    placeholder="Например: аренда, бензин, грузчики"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Сумма расхода</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={editForm.amount}
-                    onChange={(event) => setEditForm({ ...editForm, amount: event.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-600">Оплачено</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={editForm.paidAmount}
-                    readOnly
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
-                  />
-                  <p className="text-xs text-slate-400">Оплата меняется через историю оплат: внесите или отмените конкретный платеж.</p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 lg:col-span-2">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Остаток к оплате</p>
-                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                <div className="rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
+                  <p className="mt-0.5 text-lg font-semibold text-slate-900">
                     {formatMoney(Math.max(0, Number(editForm.amount || 0) - Number(editForm.paidAmount || 0)))}
                   </p>
                 </div>
 
-                <div className="space-y-2 lg:col-span-2">
-                  <label className="text-sm text-slate-600">Примечание</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-700">Примечание</label>
                   <textarea
                     value={editForm.note}
                     onChange={(event) => setEditForm({ ...editForm, note: event.target.value })}
-                    rows={4}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                    rows={2}
+                    className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                   />
                 </div>
               </div>

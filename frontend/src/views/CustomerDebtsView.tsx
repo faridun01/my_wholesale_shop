@@ -76,8 +76,8 @@ type SortMode = (typeof sortOptions)[number]['value'];
 
 const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
   [
-    'inline-flex items-center rounded-2xl px-4 py-2 text-sm font-medium transition-all',
-    isActive ? 'bg-[#008060] text-white shadow-xs font-semibold' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60',
+    'inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold transition-all',
+    isActive ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
   ].join(' ');
 
 export default function CustomerDebtsView() {
@@ -511,84 +511,84 @@ export default function CustomerDebtsView() {
   };
 
   return (
-    <div className="app-page-shell">
-      <div className="w-full space-y-6">
-        <div className="app-surface app-surface-header">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h1 className="text-4xl font-medium tracking-tight text-slate-900">Долги и оплаты</h1>
-                <p className="mt-1 text-slate-500">Финансовая аналитика по клиентам строится на основе уже оформленных накладных.</p>
-                {!isAdmin && (
-                  <p className="mt-2 text-sm text-amber-600">Финансовые суммы и статусы оплаты скрыты для вашей роли.</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={handlePrint}
-                disabled={isExportingInvoices || filteredCustomers.length === 0}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Printer size={18} />
-                <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
-              </button>
-            </div>
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="space-y-5 rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+        {/* Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Долги и оплаты</h1>
+            <p className="mt-0.5 text-xs text-slate-500">Финансовая аналитика по клиентам на основе оформленных накладных.</p>
+            {!isAdmin && (
+              <p className="mt-1 text-xs text-amber-600 font-medium">Финансовые суммы и статусы оплаты скрыты для вашей роли.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={isExportingInvoices || filteredCustomers.length === 0}
+            className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Printer size={15} />
+            <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
+          </button>
+        </div>
 
-            <div className="flex flex-wrap gap-2 rounded-3xl bg-slate-100 p-2">
-              <NavLink to="/customers" end className={sectionTabClassName}>
-                База клиентов
-              </NavLink>
-              <NavLink to="/customers/debts" className={sectionTabClassName}>
-                Долги и оплаты
-              </NavLink>
-            </div>
+        {/* Sub Navigation Tabs */}
+        <div className="flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
+          <NavLink to="/customers" end className={sectionTabClassName}>
+            База клиентов
+          </NavLink>
+          <NavLink to="/customers/debts" className={sectionTabClassName}>
+            Долги и оплаты
+          </NavLink>
+        </div>
+
+        {/* Metric Summary Cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Общий долг</p>
+            <p className="mt-2 text-xl font-bold tracking-tight text-rose-600">{formatMoneyByRole(summary.totalDebt)}</p>
+          </div>
+          <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Общая сумма оплат</p>
+            <p className="mt-2 text-xl font-bold tracking-tight text-emerald-600">{formatMoneyByRole(summary.totalPaid)}</p>
+          </div>
+          <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплачено клиентов</p>
+            <p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{isAdmin ? formatCount(summary.fullyPaidCount) : 'Скрыто'}</p>
+          </div>
+          <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Частичная оплата</p>
+            <p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{isAdmin ? formatCount(summary.partialCount) : 'Скрыто'}</p>
+          </div>
+          <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Не оплачено</p>
+            <p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{isAdmin ? formatCount(summary.unpaidCount) : 'Скрыто'}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <Card className="rounded-[28px] border border-white shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Общий долг</p>
-            <p className="mt-3 text-2xl font-medium text-rose-600">{formatMoneyByRole(summary.totalDebt)}</p>
-          </Card>
-          <Card className="rounded-[28px] border border-white shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Общая сумма оплат</p>
-            <p className="mt-3 text-2xl font-medium text-emerald-600">{formatMoneyByRole(summary.totalPaid)}</p>
-          </Card>
-          <Card className="rounded-[28px] border border-white shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Оплачено</p>
-            <p className="mt-3 text-2xl font-medium text-slate-900">{isAdmin ? formatCount(summary.fullyPaidCount) : 'Скрыто'}</p>
-          </Card>
-          <Card className="rounded-[28px] border border-white shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Частично оплачено</p>
-            <p className="mt-3 text-2xl font-medium text-slate-900">{isAdmin ? formatCount(summary.partialCount) : 'Скрыто'}</p>
-          </Card>
-          <Card className="rounded-[28px] border border-white shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Не оплачено</p>
-            <p className="mt-3 text-2xl font-medium text-slate-900">{isAdmin ? formatCount(summary.unpaidCount) : 'Скрыто'}</p>
-          </Card>
-        </div>
-
-        <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-5">
-            <div className="mb-4 flex flex-wrap gap-2">
+        {/* Desktop Table & Filter Controls Container */}
+        <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-1.5">
               {(isAdmin ? filterTabs : filterTabs.slice(0, 1)).map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setStatusFilter(tab.key)}
-                  className={
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all ${
                     statusFilter === tab.key
-                      ? 'inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white'
-                      : 'inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50'
-                  }
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'
+                  }`}
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       statusFilter === tab.key
-                        ? 'rounded-full bg-white/15 px-1.5 py-0.5 text-[11px] font-semibold text-white'
-                        : 'rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500'
-                    }
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/60 text-slate-600'
+                    }`}
                   >
                     {formatCount(filterCounts[tab.key])}
                   </span>
@@ -596,13 +596,13 @@ export default function CustomerDebtsView() {
               ))}
             </div>
 
-            <div className="flex flex-col gap-3 lg:flex-row">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <input
                   type="text"
-                  placeholder="Поиск по имени или телефону..."
-                  className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white"
+                  placeholder="Поиск клиента..."
+                  className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -610,7 +610,7 @@ export default function CustomerDebtsView() {
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortMode)}
-                className="w-full rounded-2xl border border-slate-200 bg-[#f7f8fc] px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-slate-400 focus:bg-white lg:max-w-64"
+                className="rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -622,24 +622,24 @@ export default function CustomerDebtsView() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-[9px] uppercase tracking-[0.12em] text-slate-400">
-                  <th className="px-4 py-2.5 font-medium">Клиент</th>
-                  <th className="px-4 py-2.5 font-medium">Склад</th>
-                  <th className="px-4 py-2.5 font-medium">Телефон</th>
-                  <th className="px-4 py-2.5 font-medium">Накладных</th>
-                  <th className="px-4 py-2.5 font-medium">Купил всего</th>
-                  <th className="px-4 py-2.5 font-medium">Оплатил всего</th>
-                  <th className="px-4 py-2.5 font-medium">Долг</th>
-                  <th className="px-4 py-2.5 font-medium">Последняя покупка</th>
-                  <th className="px-4 py-2.5 font-medium">Статус оплаты</th>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="rounded-l-2xl py-3 px-4">Клиент</th>
+                  <th className="py-3 px-4">Склад</th>
+                  <th className="py-3 px-4">Телефон</th>
+                  <th className="py-3 px-4">Накладных</th>
+                  <th className="py-3 px-4">Купил всего</th>
+                  <th className="py-3 px-4">Оплатил всего</th>
+                  <th className="py-3 px-4">Долг</th>
+                  <th className="py-3 px-4">Последняя покупка</th>
+                  <th className="rounded-r-2xl py-3 px-4">Статус</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {paginatedCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-xs text-slate-500">
+                    <td colSpan={9} className="py-10 text-center text-xs font-medium text-slate-400">
                       По текущим фильтрам клиентов не найдено.
                     </td>
                   </tr>
@@ -675,24 +675,22 @@ export default function CustomerDebtsView() {
                           : getCustomerDebtTotal(customer);
 
                     return (
-                      <tr key={customer.id} className="text-xs text-slate-700">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{customer.name}</div>
-                        </td>
-                        <td className="px-4 py-3">{warehouseNames}</td>
-                        <td className="px-4 py-3">{customer.phone || 'Нет телефона'}</td>
-                        <td className="px-4 py-3">{formatCount(visibleInvoiceCount)}</td>
-                        <td className="px-4 py-3">{formatMoneyByRole(visiblePurchasedTotal)}</td>
-                        <td className="px-4 py-3">{formatMoneyByRole(visiblePaidTotal)}</td>
-                        <td className="px-4 py-3">
-                          <span className={isAdmin && visibleDebtTotal > 0 ? 'font-medium text-rose-600' : ''}>
+                      <tr key={customer.id} className="transition-colors hover:bg-slate-50/80">
+                        <td className="py-3 px-4 font-semibold text-slate-900">{customer.name}</td>
+                        <td className="py-3 px-4 text-slate-500">{warehouseNames}</td>
+                        <td className="py-3 px-4 text-slate-500">{customer.phone || '—'}</td>
+                        <td className="py-3 px-4 font-medium text-slate-900">{formatCount(visibleInvoiceCount)}</td>
+                        <td className="py-3 px-4 font-medium text-slate-900">{formatMoneyByRole(visiblePurchasedTotal)}</td>
+                        <td className="py-3 px-4 font-semibold text-emerald-600">{formatMoneyByRole(visiblePaidTotal)}</td>
+                        <td className="py-3 px-4 font-semibold">
+                          <span className={isAdmin && visibleDebtTotal > 0 ? 'text-rose-600' : 'text-slate-900'}>
                             {formatMoneyByRole(visibleDebtTotal)}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="py-3 px-4 text-slate-500">
                           {customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString('ru-RU') : 'Нет покупок'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="py-3 px-4">
                           {isAdmin ? <Badge variant={statusMeta.badgeVariant}>{statusMeta.label}</Badge> : <span className="text-slate-400">Скрыто</span>}
                         </td>
                       </tr>
