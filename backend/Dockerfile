@@ -9,7 +9,7 @@ COPY prisma ./prisma
 COPY tsconfig.json ./
 COPY src ./src
 
-RUN npx prisma generate --schema=prisma/schema.prisma
+RUN npx --no-install prisma generate --schema=prisma/schema.prisma
 RUN npm run build
 
 FROM node:22-alpine AS runner
