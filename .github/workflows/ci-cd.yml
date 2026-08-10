@@ -121,6 +121,9 @@ jobs:
   deploy:
     name: Build & Deploy Container
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: [ lint-and-typecheck, test-backend, build-frontend, docker-build ]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
