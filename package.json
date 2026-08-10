@@ -13,7 +13,8 @@
     "lint": "tsc -p backend --noEmit && tsc -p frontend --noEmit",
     "test": "npm --prefix backend run test",
     "prisma:generate": "prisma generate --schema=backend/prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema=backend/prisma/schema.prisma"
+    "prisma:migrate": "prisma migrate dev --schema=backend/prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema=backend/prisma/schema.prisma"
   },
   "dependencies": {},
   "devDependencies": {

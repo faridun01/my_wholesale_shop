@@ -67,12 +67,12 @@ jobs:
         run: npm ci --prefix backend
 
       - name: Generate Prisma Client
-        run: npx --no-install prisma generate --schema=backend/prisma/schema.prisma
+        run: npm --prefix backend run prisma:generate
 
       - name: Apply Prisma Migrations to Test Database
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/wholesale_test?schema=public
-        run: npx --no-install prisma migrate deploy --schema=backend/prisma/schema.prisma
+        run: npm --prefix backend run prisma:migrate:deploy
 
       - name: Run Vitest Unit & Integration Tests
         env:
