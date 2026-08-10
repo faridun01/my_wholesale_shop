@@ -243,15 +243,28 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       ? currentMonthProductsRaw.length
       : countUniqueProductsByName(currentMonthProductsRaw as Array<{ name: string }>);
 
-    const lowStock = filterAndSortLowStock(lowStockRaw as any[]);
-
     const previousMonthProducts = selectedWarehouseId
       ? previousMonthProductsRaw.length
       : countUniqueProductsByName(previousMonthProductsRaw as Array<{ name: string }>);
 
+    const lowStock = filterAndSortLowStock(lowStockRaw as any[]);
+
     const totalRevenue = Number(invoiceTotals._sum.netAmount || 0);
     const totalPaid = Number(invoiceTotals._sum.paidAmount || 0);
-    const totalDebts = Math.max(0, totalRevenue - totalPaid);
+
+    const allInvoicesForDebts = await prisma.invoice.findMany({
+      where: invoiceWhere,
+      select: {
+        netAmount: true,
+        paidAmount: true,
+      },
+    });
+
+    const totalDebts = allInvoicesForDebts.reduce((sum, inv) => {
+      const debt = Math.max(0, Number(inv.netAmount || 0) - Number(inv.paidAmount || 0));
+      return sum + debt;
+    }, 0);
+
     const totalProfit = Number(totalProfitAggregate || 0);
     const productSales = new Map(
       topProductSalesRaw.map((item: any) => [Number(item.productId), Number(item._sum.quantity || 0)])
