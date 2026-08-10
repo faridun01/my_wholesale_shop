@@ -11,6 +11,7 @@ import {
   buildInventoryWhere,
   buildInvoiceLineReportRows,
 } from './reports.helpers.js';
+import { isDefaultCustomerName } from '../utils/defaultCustomer.js';
 
 const router = Router();
 const MONEY_EPSILON = 0.0001;
@@ -208,7 +209,9 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
 
       totalRevenue += netAmount;
       const invoiceDebt = Math.max(0, netAmount - paidAmount);
-      totalDebts += invoiceDebt;
+      if (inv.customer && !isDefaultCustomerName(inv.customer.name)) {
+        totalDebts += invoiceDebt;
+      }
       monthlyData[month].sales += netAmount;
 
       if (!warehousePerformance[inv.warehouseId]) {

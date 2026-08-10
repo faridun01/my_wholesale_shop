@@ -56,7 +56,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     // For now, we'll get all stats, but in a real app, we'd filter by role.
     const isAdmin = access.isAdmin;
     const selectedWarehouseId = getScopedWarehouseId(access, req.query.warehouseId);
-    const { invoiceWhere, productWhere, lowStockProductWhere, customerWhere, warehouseWhere } = buildDashboardWhere({
+    const { invoiceWhere, debtInvoiceWhere, productWhere, lowStockProductWhere, customerWhere, warehouseWhere } = buildDashboardWhere({
       isAdmin,
       selectedWarehouseId,
       accessWarehouseId: access.warehouseId,
@@ -253,7 +253,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     const totalPaid = Number(invoiceTotals._sum.paidAmount || 0);
 
     const allInvoicesForDebts = await prisma.invoice.findMany({
-      where: invoiceWhere,
+      where: debtInvoiceWhere,
       select: {
         netAmount: true,
         paidAmount: true,

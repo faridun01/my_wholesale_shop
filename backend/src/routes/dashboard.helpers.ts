@@ -129,6 +129,18 @@ export const buildDashboardWhere = (options: {
     warehouseId: options.selectedWarehouseId ?? (options.isAdmin ? undefined : (options.accessWarehouseId ?? -1)),
   };
 
+  const debtInvoiceWhere = {
+    ...invoiceWhere,
+    customer: {
+      NOT: {
+        name: {
+          equals: DEFAULT_CUSTOMER_NAME,
+          mode: 'insensitive' as const,
+        },
+      },
+    },
+  };
+
   const productWhere = {
     active: true,
     warehouseId: options.selectedWarehouseId ?? (options.isAdmin ? undefined : (options.accessWarehouseId ?? -1)),
@@ -156,6 +168,7 @@ export const buildDashboardWhere = (options: {
 
   return {
     invoiceWhere,
+    debtInvoiceWhere,
     productWhere,
     lowStockProductWhere,
     customerWhere,
