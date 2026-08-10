@@ -1,14 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlertCircle,
   Bell,
-  Calendar,
+  Calendar as CalendarIcon,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Clock3,
+  Layers,
   Pencil,
   Plus,
   Search,
   Trash2,
+  User,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -47,18 +52,18 @@ const EMPTY_FORM: ReminderFormState = {
 };
 
 const TYPE_META: Record<string, { label: string; tone: string; dot: string; iconTone: string }> = {
-  general: { label: 'Общее', tone: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400', iconTone: 'bg-slate-100 text-slate-500' },
-  call: { label: 'Звонки клиентам', tone: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500', iconTone: 'bg-blue-50 text-blue-600' },
-  supplier: { label: 'Заказы поставщикам', tone: 'bg-orange-50 text-orange-600', dot: 'bg-orange-500', iconTone: 'bg-orange-50 text-orange-600' },
-  stock: { label: 'Склад и учет', tone: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500', iconTone: 'bg-emerald-50 text-emerald-600' },
-  finance: { label: 'Финансы', tone: 'bg-violet-50 text-violet-600', dot: 'bg-violet-500', iconTone: 'bg-violet-50 text-violet-600' },
+  general: { label: 'Общее', tone: 'bg-slate-100 text-slate-700 border border-slate-200', dot: 'bg-slate-500', iconTone: 'bg-slate-100 text-slate-600' },
+  call: { label: 'Звонки клиентам', tone: 'bg-sky-50 text-sky-700 border border-sky-200', dot: 'bg-sky-500', iconTone: 'bg-sky-100 text-sky-600' },
+  supplier: { label: 'Заказы поставщикам', tone: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500', iconTone: 'bg-amber-100 text-amber-600' },
+  stock: { label: 'Склад и учет', tone: 'bg-emerald-50 text-emerald-700 border border-emerald-200', dot: 'bg-emerald-500', iconTone: 'bg-emerald-100 text-emerald-600' },
+  finance: { label: 'Финансы', tone: 'bg-violet-50 text-violet-700 border border-violet-200', dot: 'bg-violet-500', iconTone: 'bg-violet-100 text-violet-600' },
 };
 
 const PRIORITY_META = {
-  overdue: { label: 'Высокий', tone: 'bg-rose-50 text-rose-500 border-rose-200' },
-  today: { label: 'Средний', tone: 'bg-amber-50 text-amber-500 border-amber-200' },
-  upcoming: { label: 'Низкий', tone: 'bg-emerald-50 text-emerald-500 border-emerald-200' },
-  completed: { label: 'Выполнено', tone: 'bg-slate-100 text-slate-500 border-slate-200' },
+  overdue: { label: 'Просрочено', tone: 'bg-rose-50 text-rose-600 border border-rose-200' },
+  today: { label: 'Сегодня', tone: 'bg-amber-50 text-amber-600 border border-amber-200' },
+  upcoming: { label: 'Скоро', tone: 'bg-sky-50 text-sky-600 border border-sky-200' },
+  completed: { label: 'Выполнено', tone: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
 };
 
 function startOfDay(date: Date) {
@@ -153,23 +158,120 @@ export default function RemindersView() {
   };
 
   useEffect(() => {
-    fetchReminders();
+    void fetchReminders();
   }, []);
 
-  useEffect(() => {
-    if (!showModal) {
-      return;
-    }
+  const now = useMemo(() => new Date(), []);
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeModal();
+  const groupedReminders = useMemo(() => {
+    const today: ReminderItem[] = [];
+    const overdue: ReminderItem[] = [];
+    const upcoming: ReminderItem[] = [];
+    const completed: ReminderItem[] = [];
+
+    reminders.forEach((item) => {
+      const bucket = getReminderBucket(item, now);
+      if (bucket === 'completed') completed.push(item);
+      else if (bucket === 'overdue') overdue.push(item);
+      else if (bucket === 'today') today.push(item);
+      else upcoming.push(item);
+    });
+
+    return { today, overdue, upcoming, completed };
+  }, [now, reminders]);
+
+  const filteredReminders = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return reminders.filter((item) => {
+      const bucket = getReminderBucket(item, now);
+      if (filterTab !== 'all' && bucket !== filterTab) {
+        return false;
       }
-    };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showModal]);
+      if (!query) return true;
+
+      const titleMatch = item.title.toLowerCase().includes(query);
+      const descMatch = (item.description || '').toLowerCase().includes(query);
+      const typeLabel = getTypeMeta(item.type).label.toLowerCase();
+      const typeMatch = typeLabel.includes(query);
+      const userMatch = (item.user?.username || '').toLowerCase().includes(query);
+
+      return titleMatch || descMatch || typeMatch || userMatch;
+    });
+  }, [filterTab, now, reminders, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterTab, searchTerm]);
+
+  const totalPages = Math.ceil(filteredReminders.length / reminderPageSize) || 1;
+
+  const paginatedReminders = useMemo(() => {
+    const start = (currentPage - 1) * reminderPageSize;
+    return filteredReminders.slice(start, start + reminderPageSize);
+  }, [currentPage, filteredReminders, reminderPageSize]);
+
+  const paginatedGroupedReminders = useMemo(() => {
+    const today: ReminderItem[] = [];
+    const overdue: ReminderItem[] = [];
+    const upcoming: ReminderItem[] = [];
+    const completed: ReminderItem[] = [];
+
+    paginatedReminders.forEach((item) => {
+      const bucket = getReminderBucket(item, now);
+      if (bucket === 'completed') completed.push(item);
+      else if (bucket === 'overdue') overdue.push(item);
+      else if (bucket === 'today') today.push(item);
+      else upcoming.push(item);
+    });
+
+    return { today, overdue, upcoming, completed };
+  }, [now, paginatedReminders]);
+
+  const handleComplete = async (id: number) => {
+    try {
+      await client.patch(`/reminders/${id}/toggle`);
+      toast.success('Статус задачи обновлен');
+      void fetchReminders();
+    } catch (err) {
+      console.error(err);
+      toast.error('Не удалось обновить статус');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Удалить эту задачу?')) return;
+
+    try {
+      await client.delete(`/reminders/${id}`);
+      toast.success('Задача удалена');
+      void fetchReminders();
+    } catch (err) {
+      console.error(err);
+      toast.error('Не удалось удалить задачу');
+    }
+  };
+
+  const openCreateModal = () => {
+    setSelectedReminder(null);
+    setReminderForm({
+      ...EMPTY_FORM,
+      dueDate: formatDateInputValue(new Date()),
+    });
+    setShowModal(true);
+  };
+
+  const openReminderModal = (reminder: ReminderItem) => {
+    setSelectedReminder(reminder);
+    setReminderForm({
+      title: reminder.title,
+      description: reminder.description || '',
+      dueDate: formatDateInputValue(parseReminderDate(reminder.dueDate)),
+      type: reminder.type || 'general',
+    });
+    setShowModal(true);
+  };
 
   const closeModal = () => {
     setShowModal(false);
@@ -177,123 +279,40 @@ export default function RemindersView() {
     setReminderForm(EMPTY_FORM);
   };
 
-  const openCreateModal = () => {
-    setSelectedReminder(null);
-    setReminderForm({ ...EMPTY_FORM, dueDate: formatDateInputValue(new Date()) });
-    setShowModal(true);
-  };
-
-  const openReminderModal = (reminder: ReminderItem) => {
-    setSelectedReminder(reminder);
-    setReminderForm({
-      title: reminder.title || '',
-      description: reminder.description || '',
-      dueDate: String(reminder.dueDate || '').slice(0, 10),
-      type: reminder.type || 'general',
-    });
-    setShowModal(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!reminderForm.title.trim() || !reminderForm.dueDate) {
+      toast.error('Заполните название и дату');
+      return;
+    }
+
     try {
-      const payload = { ...reminderForm, dueDate: `${reminderForm.dueDate}T12:00:00` };
-      if (selectedReminder?.id) {
-        await client.put(`/reminders/${selectedReminder.id}`, payload);
-        toast.success('Напоминание обновлено');
+      if (selectedReminder) {
+        await client.put(`/reminders/${selectedReminder.id}`, {
+          title: reminderForm.title.trim(),
+          description: reminderForm.description.trim() || null,
+          dueDate: reminderForm.dueDate,
+          type: reminderForm.type,
+        });
+        toast.success('Задача обновлена');
       } else {
-        await client.post('/reminders', payload);
-        toast.success('Напоминание создано');
+        await client.post('/reminders', {
+          title: reminderForm.title.trim(),
+          description: reminderForm.description.trim() || null,
+          dueDate: reminderForm.dueDate,
+          type: reminderForm.type,
+        });
+        toast.success('Задача создана');
       }
+
       closeModal();
-      fetchReminders();
-    } catch {
-      toast.error(selectedReminder ? 'Ошибка при обновлении напоминания' : 'Ошибка при создании напоминания');
+      void fetchReminders();
+    } catch (err) {
+      console.error(err);
+      toast.error('Ошибка при сохранении задачи');
     }
   };
-
-  const handleComplete = async (id: number) => {
-    try {
-      await client.put(`/reminders/${id}/complete`);
-      toast.success('Напоминание выполнено');
-      if (selectedReminder?.id === id) closeModal();
-      fetchReminders();
-    } catch {
-      toast.error('Не удалось отметить задачу');
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      await client.delete(`/reminders/${id}`);
-      toast.success('Напоминание удалено');
-      if (selectedReminder?.id === id) closeModal();
-      fetchReminders();
-    } catch (err: any) {
-      toast.error(err?.response?.status === 403 ? 'Удалять напоминания может только админ' : 'Ошибка удаления');
-    }
-  };
-
-  const now = useMemo(() => new Date(), [reminders]);
-
-  const filteredReminders = useMemo(() => {
-    return reminders
-      .filter((reminder) => {
-        const haystack = `${reminder.title || ''} ${reminder.description || ''}`.toLowerCase();
-        if (!haystack.includes(searchTerm.toLowerCase())) return false;
-        const bucket = getReminderBucket(reminder, now);
-        return filterTab === 'all' ? true : bucket === filterTab;
-      })
-      .sort((a, b) => parseReminderDate(a.dueDate || a.createdAt || '').getTime() - parseReminderDate(b.dueDate || b.createdAt || '').getTime());
-  }, [filterTab, now, reminders, searchTerm]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReminders.length / reminderPageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterTab]);
-
-  useEffect(() => {
-    setCurrentPage((prev) => Math.min(prev, totalPages));
-  }, [totalPages]);
-
-  const paginatedReminders = useMemo(() => {
-    const startIndex = (currentPage - 1) * reminderPageSize;
-    return filteredReminders.slice(startIndex, startIndex + reminderPageSize);
-  }, [currentPage, filteredReminders]);
-
-  const groupedReminders = useMemo(() => {
-    const groups = {
-      overdue: [] as ReminderItem[],
-      today: [] as ReminderItem[],
-      upcoming: [] as ReminderItem[],
-      completed: [] as ReminderItem[],
-    };
-    filteredReminders.forEach((reminder) => {
-      groups[getReminderBucket(reminder, now)].push(reminder);
-    });
-    return groups;
-  }, [filteredReminders, now]);
-
-  const paginatedGroupedReminders = useMemo(() => {
-    const groups = {
-      overdue: [] as ReminderItem[],
-      today: [] as ReminderItem[],
-      upcoming: [] as ReminderItem[],
-      completed: [] as ReminderItem[],
-    };
-    paginatedReminders.forEach((reminder) => {
-      groups[getReminderBucket(reminder, now)].push(reminder);
-    });
-    return groups;
-  }, [now, paginatedReminders]);
-
-  const stats = useMemo(() => {
-    const completed = reminders.filter((item) => item.isCompleted).length;
-    const overdue = reminders.filter((item) => getReminderBucket(item, now) === 'overdue').length;
-    const completionRate = reminders.length > 0 ? Math.round((completed / reminders.length) * 100) : 0;
-    return { completed, overdue, completionRate };
-  }, [reminders, now]);
 
   const categoryCounts = useMemo(() => {
     return reminders.reduce<Record<string, number>>((acc, item) => {
@@ -307,13 +326,14 @@ export default function RemindersView() {
   const activeMonthLabel = activeMonth.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
 
   const sections = [
-    { key: 'overdue', title: 'Просрочено', items: paginatedGroupedReminders.overdue, accent: 'text-rose-500' },
-    { key: 'today', title: 'Сегодня', items: paginatedGroupedReminders.today, accent: 'text-slate-900' },
-    { key: 'upcoming', title: 'Предстоящие', items: paginatedGroupedReminders.upcoming, accent: 'text-slate-900' },
-    { key: 'completed', title: 'Выполнены', items: paginatedGroupedReminders.completed, accent: 'text-slate-400' },
+    { key: 'overdue', title: 'Просрочено', items: paginatedGroupedReminders.overdue, accent: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { key: 'today', title: 'Сегодня', items: paginatedGroupedReminders.today, accent: 'text-amber-600 bg-amber-50 border-amber-200' },
+    { key: 'upcoming', title: 'Предстоящие', items: paginatedGroupedReminders.upcoming, accent: 'text-sky-600 bg-sky-50 border-sky-200' },
+    { key: 'completed', title: 'Выполнены', items: paginatedGroupedReminders.completed, accent: 'text-slate-500 bg-slate-100 border-slate-200' },
   ] as const;
+
   const reminderTabs = [
-    { key: 'all', label: 'Все', count: reminders.length },
+    { key: 'all', label: 'Все задачи', count: reminders.length },
     { key: 'today', label: 'Сегодня', count: groupedReminders.today.length },
     { key: 'overdue', label: 'Просрочены', count: groupedReminders.overdue.length },
     { key: 'upcoming', label: 'Скоро', count: groupedReminders.upcoming.length },
@@ -321,308 +341,349 @@ export default function RemindersView() {
   ] as const;
 
   return (
-    <div className="app-page-shell">
-      <div className="w-full">
-        <div className="overflow-hidden rounded-[28px] border border-[#dfe4ff] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-4 border-b border-[#eceffd] px-5 py-4 md:flex-row md:items-center md:justify-between md:px-7">
-            <h1 className="text-4xl font-medium tracking-tight text-slate-900">Напоминания</h1>
+    <div className="min-h-screen bg-slate-50/60 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 shadow-xs">
+                  <Bell size={20} />
+                </span>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Задачи и Напоминания</h1>
+              </div>
+              <p className="mt-2 text-sm text-slate-500">Управляйте ежедневными задачами, звонками клиентам и складскими делами</p>
+            </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative min-w-62.5">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94a3b8]" size={16} />
+              <div className="relative min-w-[240px]">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Поиск задач..."
-                  className="w-full rounded-2xl border border-[#e6e8f5] bg-[#f7f8ff] py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#7c4dff] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(124,77,255,0.24)] transition-all hover:bg-[#6e42ee]"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:from-violet-700 hover:to-indigo-700 hover:shadow-violet-500/30"
               >
-                <Plus size={16} />
+                <Plus size={18} />
                 Новая задача
               </button>
             </div>
           </div>
 
-          <div className="grid gap-5 bg-[#f8f9ff] p-5 md:p-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-5">
-              <div className="rounded-3xl border border-[#e7ebff] bg-white p-3 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
-                  <div className="min-w-0">
-                    <div className="sm:hidden">
-                      <select
-                        value={filterTab}
-                        onChange={(e) => setFilterTab(e.target.value as typeof filterTab)}
-                        className="w-full rounded-[18px] border border-[#dfe5ff] bg-[#f7f8ff] px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-violet-300 focus:bg-white"
-                      >
-                        {reminderTabs.map((tab) => (
-                          <option key={tab.key} value={tab.key}>
-                            {tab.label} ({tab.count})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="hidden min-w-0 grid-cols-5 gap-1 rounded-[20px] bg-[#f7f8ff] p-1 sm:grid">
-                      {reminderTabs.map((tab) => (
-                        <button
-                          key={tab.key}
-                          type="button"
-                          onClick={() => setFilterTab(tab.key as typeof filterTab)}
-                          className={clsx(
-                            'inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-[15px] px-2 py-1.5 text-center text-[10px] font-bold leading-none transition-all',
-                            filterTab === tab.key
-                              ? 'bg-white text-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.08)] ring-1 ring-[#dfe5ff]'
-                              : 'text-[#5d7190] hover:bg-white/80 hover:text-slate-900',
-                          )}
-                        >
-                          <span className="min-w-0 whitespace-nowrap">{tab.label}</span>
-                          <span
-                            className={clsx(
-                              'inline-flex min-w-5 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-black leading-none',
-                              filterTab === tab.key ? 'bg-[#eef2ff] text-slate-900' : 'bg-white text-[#5d7190]',
-                            )}
-                          >
-                            {tab.count}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {filteredReminders.length > reminderPageSize && (
-                    <div className="overflow-hidden rounded-[20px] border border-[#e7ebff] bg-[#fbfcff] xl:shrink-0">
-                      <PaginationControls
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filteredReminders.length}
-                        pageSize={reminderPageSize}
-                        onPageChange={setCurrentPage}
-                        className="border-t-0 bg-transparent px-2.5 py-2 sm:px-2.5 sm:py-2 xl:flex-row xl:items-center xl:justify-end xl:gap-2 xl:[&>p]:hidden xl:[&>div]:flex-nowrap xl:[&>div]:gap-1 xl:[&>div>button]:h-8 xl:[&>div>button]:rounded-xl xl:[&>div>button]:px-2 xl:[&>div>button]:text-[11px] xl:[&>div>div>button]:h-8 xl:[&>div>div>button]:min-w-[1.9rem] xl:[&>div>div>button]:rounded-xl xl:[&>div>div>button]:px-2 xl:[&>div>div>button]:text-[11px]"
-                      />
-                    </div>
-                  )}
-                </div>
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition-all hover:bg-slate-50">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>Всего задач</span>
+                <Layers size={16} className="text-slate-400" />
               </div>
-
-              {loading ? (
-                <div className="rounded-3xl border border-[#e7ebff] bg-white py-20 text-center text-sm font-medium text-slate-400">
-                  Загрузка...
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {sections.map((section) => (
-                    <div key={section.key} className="space-y-3">
-                      {section.items.length > 0 && (
-                        <div className="flex items-center gap-2 px-1">
-                          <span className={clsx('text-xs font-black uppercase tracking-[0.16em]', section.accent)}>
-                            {section.title}
-                          </span>
-                        </div>
-                      )}
-
-                      <AnimatePresence>
-                        {section.items.map((reminder) => {
-                          const typeMeta = getTypeMeta(reminder.type);
-                          const bucket = getReminderBucket(reminder, now);
-                          const priorityMeta = PRIORITY_META[bucket];
-
-                          return (
-                            <motion.button
-                              key={reminder.id}
-                              type="button"
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -6 }}
-                              onClick={() => openReminderModal(reminder)}
-                              className={clsx(
-                                'group w-full rounded-[22px] border bg-white p-5 text-left shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(15,23,42,0.08)]',
-                                bucket === 'overdue' && 'border-rose-200',
-                                bucket !== 'overdue' && 'border-[#e7ebff]',
-                                bucket === 'completed' && 'opacity-75',
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex min-w-0 items-start gap-4">
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      if (!reminder.isCompleted) handleComplete(reminder.id);
-                                    }}
-                                    className={clsx(
-                                      'mt-0.5 rounded-xl border p-2 transition-all',
-                                      reminder.isCompleted
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-500'
-                                        : 'border-[#e4e8fb] bg-white text-slate-300 hover:border-violet-200 hover:text-violet-500',
-                                    )}
-                                  >
-                                    {reminder.isCompleted ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                                  </button>
-
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-3">
-                                      <h3
-                                        className={clsx(
-                                          'text-[22px] font-semibold leading-tight text-slate-900',
-                                          reminder.isCompleted && 'line-through text-slate-400',
-                                        )}
-                                      >
-                                        {reminder.title}
-                                      </h3>
-                                      <span className={clsx('rounded-full border px-2.5 py-1 text-[11px] font-semibold', priorityMeta.tone)}>
-                                        {priorityMeta.label}
-                                      </span>
-                                    </div>
-
-                                    {reminder.description && (
-                                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                                        {reminder.description}
-                                      </p>
-                                    )}
-
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-600">
-                                        <Clock3 size={11} />
-                                        {formatDueLabel(reminder.dueDate, bucket)}
-                                      </span>
-                                      <span className={clsx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium', typeMeta.tone)}>
-                                        <span className={clsx('h-1.5 w-1.5 rounded-full', typeMeta.dot)} />
-                                        {typeMeta.label}
-                                      </span>
-                                      {reminder.user?.username && (
-                                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                                          {reminder.user.username}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <div className="rounded-xl bg-slate-50 p-2 text-slate-400 transition-all group-hover:bg-slate-100 group-hover:text-slate-600">
-                                    <Pencil size={16} />
-                                  </div>
-                                  {canDeleteReminder && (
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleDelete(reminder.id);
-                                      }}
-                                      className="rounded-xl p-2 text-slate-300 transition-all hover:bg-rose-50 hover:text-rose-600"
-                                    >
-                                      <Trash2 size={18} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  ))}
-
-                  {filteredReminders.length === 0 && (
-                    <div className="rounded-3xl border border-[#e7ebff] bg-white py-20 text-center">
-                      <Bell size={42} className="mx-auto mb-4 text-slate-200" />
-                      <h3 className="text-xl font-semibold text-slate-900">Нет задач</h3>
-                      <p className="mt-1 text-sm text-slate-500">Попробуйте сменить фильтр или создайте новое напоминание.</p>
-                    </div>
-                  )}
-
-                </div>
-              )}
+              <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{reminders.length}</p>
             </div>
 
-            <div className="flex h-full flex-col gap-5">
-              <div className="rounded-3xl border border-[#e7ebff] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
-                <div className="mb-4 flex items-center justify-between">
-                <h3 className="wrap-break-word text-[clamp(1.2rem,1.8vw,1.45rem)] font-medium leading-tight tracking-[-0.02em] text-slate-900">
-                  {activeMonthLabel.charAt(0).toUpperCase() + activeMonthLabel.slice(1)}
-                </h3>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() - 1, 1))}
-                      className="rounded-xl border border-[#e6e9f9] p-2 text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-700"
-                    >
-                      <span className="block text-base leading-none">‹</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 1))}
-                      className="rounded-xl border border-[#e6e9f9] p-2 text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-700"
-                    >
-                      <span className="block text-base leading-none">›</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-medium text-slate-400">
-                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
-                    <span key={day}>{day}</span>
-                  ))}
-                </div>
-
-                <div className="mt-4 grid grid-cols-7 gap-2">
-                  {monthDays.map((day) => {
-                    const isCurrentMonth = day.getMonth() === activeMonth.getMonth();
-                    const isToday = sameDay(day, now);
-                    const hasReminders = reminders.some((reminder) => sameDay(parseReminderDate(reminder.dueDate), day));
-
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        className={clsx(
-                          'flex h-9 items-center justify-center rounded-xl text-sm transition-all',
-                          isCurrentMonth ? 'text-slate-700' : 'text-slate-300',
-                          isToday && 'bg-[#7c4dff] font-semibold text-white shadow-sm',
-                          !isToday && hasReminders && 'bg-violet-50 font-semibold text-violet-600',
-                        )}
-                      >
-                        {day.getDate()}
-                      </div>
-                    );
-                  })}
-                </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 transition-all hover:bg-rose-50/80">
+              <div className="flex items-center justify-between text-xs font-semibold text-rose-600">
+                <span>Просрочено</span>
+                <AlertCircle size={16} className="text-rose-500" />
               </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-rose-600">{groupedReminders.overdue.length}</p>
+            </div>
 
-              <div className="mt-auto rounded-3xl border border-[#e7ebff] bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-5">
-                <h3 className="wrap-break-word text-[clamp(1.05rem,1.55vw,1.25rem)] font-medium leading-tight tracking-[-0.02em] text-slate-900">Категории</h3>
-                <div className="mt-3 space-y-2.5">
-                  {Object.entries(TYPE_META).map(([key, meta]) => (
-                    <div key={key} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2.5">
-                      <div className="flex items-center gap-3">
-                        <span className={clsx('flex h-8 w-8 items-center justify-center rounded-xl', meta.iconTone)}>
-                          <Calendar size={14} />
-                        </span>
-                        <span className="text-sm font-medium text-slate-700">{meta.label}</span>
-                      </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
-                        {categoryCounts[key] || 0}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 transition-all hover:bg-amber-50/80">
+              <div className="flex items-center justify-between text-xs font-semibold text-amber-600">
+                <span>На сегодня</span>
+                <Clock3 size={16} className="text-amber-500" />
               </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-amber-600">{groupedReminders.today.length}</p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 transition-all hover:bg-emerald-50/80">
+              <div className="flex items-center justify-between text-xs font-semibold text-emerald-600">
+                <span>Выполнено</span>
+                <CheckCircle2 size={16} className="text-emerald-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-600">{groupedReminders.completed.length}</p>
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#7c4dff] text-white shadow-[0_18px_40px_rgba(124,77,255,0.35)] transition-all hover:bg-[#6e42ee] xl:hidden"
-        >
-          <Plus size={22} />
-        </button>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/80 bg-white p-2 shadow-sm">
+              <div className="sm:hidden">
+                <select
+                  value={filterTab}
+                  onChange={(e) => setFilterTab(e.target.value as typeof filterTab)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none"
+                >
+                  {reminderTabs.map((tab) => (
+                    <option key={tab.key} value={tab.key}>
+                      {tab.label} ({tab.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="hidden grid-cols-5 gap-1.5 sm:grid">
+                {reminderTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setFilterTab(tab.key as typeof filterTab)}
+                    className={clsx(
+                      'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all',
+                      filterTab === tab.key
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                    )}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={clsx(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
+                        filterTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600',
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="rounded-3xl border border-white bg-white py-20 text-center text-sm font-medium text-slate-400 shadow-sm">
+                Загрузка задач...
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {sections.map((section) => (
+                  <div key={section.key} className="space-y-3">
+                    {section.items.length > 0 && (
+                      <div className="flex items-center gap-2 px-1">
+                        <span className={clsx('rounded-full border px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider', section.accent)}>
+                          {section.title} ({section.items.length})
+                        </span>
+                      </div>
+                    )}
+
+                    <AnimatePresence>
+                      {section.items.map((reminder) => {
+                        const typeMeta = getTypeMeta(reminder.type);
+                        const bucket = getReminderBucket(reminder, now);
+                        const priorityMeta = PRIORITY_META[bucket];
+
+                        return (
+                          <motion.div
+                            key={reminder.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            onClick={() => openReminderModal(reminder)}
+                            className={clsx(
+                              'group relative flex cursor-pointer items-start justify-between gap-4 rounded-3xl border bg-white p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md',
+                              bucket === 'overdue' && 'border-rose-200/80 hover:border-rose-300',
+                              bucket !== 'overdue' && 'border-slate-200/80 hover:border-slate-300',
+                              bucket === 'completed' && 'bg-slate-50/50 opacity-80',
+                            )}
+                          >
+                            <div className="flex min-w-0 items-start gap-4">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleComplete(reminder.id);
+                                }}
+                                className={clsx(
+                                  'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all',
+                                  reminder.isCompleted
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-600 shadow-xs'
+                                    : 'border-slate-200 bg-white text-slate-300 hover:border-violet-300 hover:text-violet-600',
+                                )}
+                                title={reminder.isCompleted ? 'Отметить как невыполнено' : 'Отметить как выполнено'}
+                              >
+                                {reminder.isCompleted ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                              </button>
+
+                              <div className="min-w-0 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3
+                                    className={clsx(
+                                      'text-base font-semibold leading-snug text-slate-900',
+                                      reminder.isCompleted && 'line-through text-slate-400',
+                                    )}
+                                  >
+                                    {reminder.title}
+                                  </h3>
+                                  <span className={clsx('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', priorityMeta.tone)}>
+                                    {priorityMeta.label}
+                                  </span>
+                                </div>
+
+                                {reminder.description && (
+                                  <p className="line-clamp-2 text-sm leading-relaxed text-slate-600">
+                                    {reminder.description}
+                                  </p>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                                    <Clock3 size={12} className="text-slate-400" />
+                                    {formatDueLabel(reminder.dueDate, bucket)}
+                                  </span>
+
+                                  <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium', typeMeta.tone)}>
+                                    <span className={clsx('h-1.5 w-1.5 rounded-full', typeMeta.dot)} />
+                                    {typeMeta.label}
+                                  </span>
+
+                                  {reminder.user?.username && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">
+                                      <User size={11} className="text-slate-400" />
+                                      {reminder.user.username}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openReminderModal(reminder);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                title="Редактировать"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              {canDeleteReminder && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDelete(reminder.id);
+                                  }}
+                                  className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                  title="Удалить"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ))}
+
+                {filteredReminders.length === 0 && (
+                  <div className="rounded-3xl border border-white bg-white py-16 text-center shadow-sm">
+                    <Bell size={40} className="mx-auto mb-3 text-slate-300" />
+                    <h3 className="text-lg font-semibold text-slate-900">Нет задач</h3>
+                    <p className="mt-1 text-xs text-slate-400">Попробуйте сменить фильтр или создайте новую задачу.</p>
+                  </div>
+                )}
+
+                {filteredReminders.length > reminderPageSize && (
+                  <div className="rounded-2xl border border-white bg-white p-3 shadow-sm">
+                    <PaginationControls
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={filteredReminders.length}
+                      pageSize={reminderPageSize}
+                      onPageChange={setCurrentPage}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900 capitalize">
+                  {activeMonthLabel}
+                </h3>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() - 1, 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400 mb-2">
+                {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
+                  <span key={day} className="py-1">{day}</span>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {monthDays.map((day) => {
+                  const isCurrentMonth = day.getMonth() === activeMonth.getMonth();
+                  const isToday = sameDay(day, now);
+                  const hasReminders = reminders.some((reminder) => sameDay(parseReminderDate(reminder.dueDate), day));
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={clsx(
+                        'relative flex h-8 items-center justify-center rounded-xl text-xs font-medium transition-all',
+                        isCurrentMonth ? 'text-slate-700' : 'text-slate-300',
+                        isToday && 'bg-violet-600 font-bold text-white shadow-sm',
+                        !isToday && hasReminders && 'bg-violet-50 font-bold text-violet-700',
+                      )}
+                    >
+                      {day.getDate()}
+                      {!isToday && hasReminders && (
+                        <span className="absolute bottom-1 h-1 w-1 rounded-full bg-violet-600" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
+              <h3 className="text-base font-bold text-slate-900">Категории задач</h3>
+              <div className="mt-4 space-y-2">
+                {Object.entries(TYPE_META).map(([key, meta]) => (
+                  <div key={key} className="flex items-center justify-between rounded-2xl bg-slate-50/80 p-3 transition-colors hover:bg-slate-100/80">
+                    <div className="flex items-center gap-2.5">
+                      <span className={clsx('flex h-7 w-7 items-center justify-center rounded-xl text-xs', meta.iconTone)}>
+                        <CalendarIcon size={14} />
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700">{meta.label}</span>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 shadow-2xs">
+                      {categoryCounts[key] || 0}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <AnimatePresence>
           {showModal && (
@@ -631,71 +692,79 @@ export default function RemindersView() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm md:items-center md:p-4"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
             >
               <motion.div
-                initial={{ scale: 0.96, opacity: 0, y: 24 }}
+                initial={{ scale: 0.95, opacity: 0, y: 16 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.96, opacity: 0, y: 24 }}
+                exit={{ scale: 0.95, opacity: 0, y: 16 }}
                 onClick={(event) => event.stopPropagation()}
-                className="w-full max-w-sm overflow-hidden rounded-t-[28px] bg-white shadow-2xl md:max-w-md md:rounded-[28px]"
+                className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
               >
-                <div className="border-b border-slate-100 bg-violet-50/60 p-5 md:p-7">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-                      <Bell size={20} className="text-violet-600" />
-                      <span>{selectedReminder ? 'Напоминание' : 'Новая задача'}</span>
-                    </h3>
+                <div className="border-b border-slate-100 bg-slate-50/80 px-6 py-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+                        <Bell size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">
+                          {selectedReminder ? 'Редактировать задачу' : 'Новая задача'}
+                        </h3>
+                        <p className="text-xs text-slate-500">Заполните подробности напоминания</p>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={closeModal}
-                      className="rounded-full p-2 text-slate-400 transition-all hover:bg-white hover:text-slate-700"
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
                     >
                       <X size={18} />
                     </button>
                   </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5 p-5 md:p-7">
+                <form onSubmit={handleSubmit} className="space-y-4 p-6">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Заголовок</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Заголовок *</label>
                     <input
                       type="text"
                       required
                       value={reminderForm.title}
                       onChange={(e) => setReminderForm({ ...reminderForm, title: e.target.value })}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
-                      placeholder="Например: Позвонить клиенту"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
+                      placeholder="Например: Позвонить клиенту по накладной #1042"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Описание</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Описание</label>
                     <textarea
                       value={reminderForm.description}
                       onChange={(e) => setReminderForm({ ...reminderForm, description: e.target.value })}
-                      className="h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
-                      placeholder="Дополнительные детали..."
+                      className="h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
+                      placeholder="Укажите подробности задачи..."
                     />
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700">Дата</label>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Срок выполнения *</label>
                       <input
                         type="date"
                         required
                         value={reminderForm.dueDate}
                         onChange={(e) => setReminderForm({ ...reminderForm, dueDate: e.target.value })}
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
                       />
                     </div>
+
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700">Категория</label>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Категория</label>
                       <select
                         value={reminderForm.type}
                         onChange={(e) => setReminderForm({ ...reminderForm, type: e.target.value })}
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10"
                       >
                         <option value="general">Общее</option>
                         <option value="call">Звонки клиентам</option>
@@ -706,12 +775,12 @@ export default function RemindersView() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                     {selectedReminder && !selectedReminder.isCompleted && (
                       <button
                         type="button"
                         onClick={() => handleComplete(selectedReminder.id)}
-                        className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
+                        className="mr-auto rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
                       >
                         Выполнить
                       </button>
@@ -719,13 +788,12 @@ export default function RemindersView() {
                     <button
                       type="button"
                       onClick={closeModal}
-                      className="rounded-2xl px-5 py-3 text-sm font-semibold text-slate-500 transition-all hover:bg-slate-50"
+                      className="rounded-2xl border border-slate-200 px-5 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
-                      className="rounded-2xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/20 transition-all hover:bg-violet-700"
                     >
                       {selectedReminder ? 'Сохранить' : 'Создать'}
                     </button>
