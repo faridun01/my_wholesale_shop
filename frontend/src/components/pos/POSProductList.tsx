@@ -178,7 +178,7 @@ export default function POSProductList({
                 <div className="text-center text-xs font-medium text-slate-400">{index + 1}</div>
 
                 <div className="min-w-0 pr-3">
-                  <p className="truncate text-xs font-semibold text-slate-900">{formatProductName(product.name)}</p>
+                  <p className="whitespace-normal text-xs font-semibold leading-snug text-slate-900 break-words">{formatProductName(product.name)}</p>
                 </div>
 
                 <div className="flex justify-center">
