@@ -85,7 +85,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       previousMonthProductsRaw,
     ] = await Promise.all([
       prisma.invoice.aggregate({
-        where: { ...invoiceWhere, createdAt: { gte: windows.today } },
+        where: { ...invoiceWhere, createdAt: { gte: windows.todayStart, lt: windows.tomorrowStart } },
         _sum: { netAmount: true },
       }),
       prisma.product.findMany({
