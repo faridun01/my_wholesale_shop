@@ -27,6 +27,10 @@ export function setAuthSession(_token: string | null, user: unknown) {
   }
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.removeItem('pwa_banner_dismissed');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('app-logged-in'));
+  }
 }
 
 export function updateStoredUser(user: unknown) {

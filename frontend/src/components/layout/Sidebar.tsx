@@ -6,6 +6,7 @@ import {
   BookOpen,
   Calendar,
   ChevronLeft,
+  Download,
   History,
   LayoutDashboard,
   LogOut,
@@ -23,6 +24,8 @@ import client from '../../api/client';
 import { logout } from '../../api/auth.api';
 import { clearAuthSession, hasStoredSession } from '../../utils/authStorage';
 import { getCurrentUser, isAdminUser, isCustomerUser } from '../../utils/userAccess';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
+import InstallPwaModal from '../pwa/InstallPwaModal';
 
 type NavSection = string;
 
@@ -69,6 +72,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
   const [isDesktopViewport, setIsDesktopViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   );
+  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall } = usePWAInstall();
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -372,6 +377,27 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
         </nav>
 
         <div className={clsx('mt-auto border-t border-white/5', sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-2.5')}>
+          {!isStandalone && !isInstalled && (
+            <button
+              onClick={async () => {
+                if (canPromptNative) {
+                  const success = await promptInstall();
+                  if (!success) setIsPwaModalOpen(true);
+                } else {
+                  setIsPwaModalOpen(true);
+                }
+              }}
+              title={sidebarCollapsed ? 'Установить приложение' : undefined}
+              className={clsx(
+                'mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-600/90 to-teal-600/90 font-medium text-white shadow-lg shadow-emerald-950/20 transition-all hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98]',
+                sidebarCollapsed ? 'h-11 w-11 p-0' : 'px-3.5 py-2.5 text-xs',
+              )}
+            >
+              <Download size={sidebarCollapsed ? 20 : 16} className="shrink-0 animate-bounce" />
+              {!sidebarCollapsed && <span>Установить приложение</span>}
+            </button>
+          )}
+
           <div
             className={clsx(
               'rounded-[18px] border border-[#223043] bg-[#172133]',
@@ -404,6 +430,14 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           </div>
         </div>
       </aside>
+
+      <InstallPwaModal
+        isOpen={isPwaModalOpen}
+        onClose={() => setIsPwaModalOpen(false)}
+        isIOS={isIOS}
+        canPromptNative={canPromptNative}
+        onNativeInstall={promptInstall}
+      />
     </>
   );
 }

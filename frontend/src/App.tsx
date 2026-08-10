@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { Toaster } from 'react-hot-toast';
 import { Loader2, Menu, X, Warehouse } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
+import InstallPwaBanner from './components/pwa/InstallPwaBanner';
 import { getCurrentUser, isAdminUser, isCustomerUser } from './utils/userAccess';
 import { clearAuthSession, getStoredUser, hasStoredSession, setAuthSession } from './utils/authStorage';
 import { getSessionUser } from './api/auth.api';
@@ -174,6 +175,7 @@ export default function App() {
   return (
     <Router>
       <Toaster position="top-right" />
+      <InstallPwaBanner />
       <Routes>
         <Route
           path="/login"
