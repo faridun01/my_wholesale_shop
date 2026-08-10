@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Calendar,
@@ -591,43 +591,6 @@ export default function RemindersView() {
                       </div>
                     );
                   })}
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-3xl border border-[#e7ebff] bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-5">
-                <h3 className="max-w-full wrap-break-word text-[clamp(0.95rem,4.8vw,1.2rem)] font-medium leading-[1.15] tracking-[-0.02em] text-slate-900 sm:text-[clamp(1.05rem,1.5vw,1.25rem)]">
-                  Статистика задач
-                </h3>
-                <div className="mt-5 space-y-4">
-                  <div>
-                    <div className="mb-2 flex min-w-0 items-start justify-between gap-3 text-sm text-slate-500">
-                      <span className="min-w-0 wrap-break-word leading-5">Выполнено за неделю</span>
-                      <span className="shrink-0 font-semibold text-slate-700">
-                        {stats.completed} / {reminders.length || 0}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-[#7c4dff] transition-all" style={{ width: `${stats.completionRate}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <div className="min-w-0 rounded-2xl bg-slate-50 px-2 py-3 sm:p-4">
-                      <p className="wrap-break-word text-[7px] uppercase tracking-[0.01em] leading-tight text-slate-400 sm:text-[9px]">
-                        Продуктивность
-                      </p>
-                      <p className="mt-2 whitespace-nowrap text-[clamp(1.4rem,5.4vw,2.2rem)] font-semibold leading-none text-slate-900">
-                        {stats.completionRate}%
-                      </p>
-                    </div>
-                    <div className="min-w-0 rounded-2xl bg-rose-50 px-2 py-3 sm:p-4">
-                      <p className="wrap-break-word text-[7px] uppercase tracking-[0.01em] leading-tight text-rose-400 sm:text-[9px]">
-                        Просрочено
-                      </p>
-                      <p className="mt-2 whitespace-nowrap text-[clamp(1.4rem,5.4vw,2.2rem)] font-semibold leading-none text-rose-500">
-                        {stats.overdue}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
 
