@@ -184,14 +184,14 @@ export default function ProductsMobileList({
                 </p>
               </div>
               {isAdmin && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
-                  <div className="mt-1 flex flex-col">
+                <div className={mobileMetricBaseClass}>
+                  <MobileMetricLabel>Закупка</MobileMetricLabel>
+                  <div className="mt-1.5 flex flex-col">
                     {isAggregateMode ? (
-                      <p className="text-sm font-semibold text-slate-900">-</p>
+                      <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">-</p>
                     ) : (
                       <>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
                           {(() => {
                             const activeBatches = (product.batches || [])
                               .filter((batch: any) => Number(batch.remainingQuantity) > 0)
@@ -200,23 +200,27 @@ export default function ProductsMobileList({
                             return formatMoney(currentBatch ? currentBatch.costPrice : product.costPrice);
                           })()}
                         </p>
-                        <p className="text-[10px] font-medium text-slate-400">Посл: {formatMoney(product.costPrice)}</p>
+                        <p className="mt-1 wrap-break-word text-[10px] font-medium text-slate-400">
+                          Посл: {formatMoney(product.costPrice)}
+                        </p>
                       </>
                     )}
                   </div>
                 </div>
               )}
               {isAdmin && (
-                <div className={clsx(mobileMetricBaseClass, 'col-span-2 min-h-19')}>
+                <div className={mobileMetricBaseClass}>
                   <MobileMetricLabel>Рентабельность</MobileMetricLabel>
-                  <p className="mt-1.5 wrap-break-word text-[18px] font-black leading-5 text-slate-900">
-                    {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
-                  </p>
-                  {!isAggregateMode && (
-                    <span className={clsx('mt-2 inline-flex rounded-full border px-3 py-1.5 text-[11px] font-black', getProductEfficiencyMetrics(product).className)}>
-                      {getProductEfficiencyMetrics(product).label}
-                    </span>
-                  )}
+                  <div className="mt-1.5 flex flex-col items-start">
+                    <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
+                      {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
+                    </p>
+                    {!isAggregateMode && (
+                      <span className={clsx('mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-tight', getProductEfficiencyMetrics(product).className)}>
+                        {getProductEfficiencyMetrics(product).label}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
