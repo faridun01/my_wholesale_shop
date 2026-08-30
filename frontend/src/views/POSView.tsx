@@ -17,11 +17,9 @@ import POSCartCustomerBlock from '../components/pos/POSCartCustomerBlock';
 import POSCartHeader from '../components/pos/POSCartHeader';
 import POSCartItemsList from '../components/pos/POSCartItemsList';
 import POSProductList from '../components/pos/POSProductList';
+import { Button } from '../components/UI';
 
 type PaymentMethod = 'cash' | 'card' | 'transfer';
-function tone(...classNames: Array<string | false | null | undefined>) {
-  return classNames.filter(Boolean).join(' ');
-}
 
 function getStoredWarehouseId() {
   if (typeof window === 'undefined') {
@@ -237,6 +235,40 @@ export default function POSView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
   const [isCartExpanded, setIsCartExpanded] = useState(false);
+  const [cartWidth, setCartWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('pos_cart_width');
+    return saved ? Math.max(280, Math.min(800, Number(saved))) : 440;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleCartWidthChange = (newWidth: number) => {
+    const clamped = Math.max(280, Math.min(800, newWidth));
+    setCartWidth(clamped);
+    localStorage.setItem('pos_cart_width', String(clamped));
+  };
+
+  const handleMouseDownResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = cartWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = startX - moveEvent.clientX;
+      const nextWidth = Math.max(280, Math.min(800, startWidth + deltaX));
+      setCartWidth(nextWidth);
+      localStorage.setItem('pos_cart_width', String(nextWidth));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
   const [productSearch, setProductSearch] = useState('');
   const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
@@ -656,11 +688,6 @@ export default function POSView() {
     }
 
     const existing = cart.find((item) => item.id === product.id);
-
-    if (false) {
-      toast.error(`Недостаточно товара. Доступно: ${product.stock} ${product.unit}`);
-      return;
-    }
 
     if (existing) {
       const packaging = getCartPackaging(existing);
@@ -1176,6 +1203,7 @@ export default function POSView() {
 
     return [product.name, String(product.id)]
       .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query));
   });
 
   const canAddProductFromList = (product: any) =>
@@ -1228,22 +1256,17 @@ export default function POSView() {
       />
 
       <div className="rounded-[28px] bg-[#f4f5fb] min-h-screen">
-        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">POS Терминал</h1>
-              <p className="mt-0.5 text-xs text-slate-500">Оформление продаж, выбор клиента и создание накладной.</p>
-            </div>
+        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-2.5 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <h1 className="text-sm font-semibold text-slate-900">POS терминал</h1>
 
-            <div className="flex items-center justify-end gap-3">
-              <div className="flex items-center gap-3 rounded-full bg-[#f4f5fb] pl-1 pr-4 py-1 border border-slate-200/60">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                  {(user.username || 'A').slice(0, 1).toUpperCase()}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-medium text-slate-900">{user.username || 'Admin'}</p>
-                  <p className="text-[10px] text-slate-400">{user.role || 'ADMIN'}</p>
-                </div>
+            <div className="flex items-center gap-3 rounded-full bg-[#f4f5fb] pl-1 pr-4 py-1 border border-slate-200/60">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                {(user.username || 'A').slice(0, 1).toUpperCase()}
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-medium text-slate-900">{user.username || 'Admin'}</p>
+                <p className="text-[10px] text-slate-400">{user.role || 'ADMIN'}</p>
               </div>
             </div>
           </div>
@@ -1273,11 +1296,17 @@ export default function POSView() {
 
           <div
             className={clsx(
-              'grid flex-1 items-start gap-5',
-              isCartExpanded ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[1.55fr_0.95fr]',
+              'flex flex-col lg:flex-row flex-1 items-start gap-4',
+              isResizing && 'select-none',
             )}
           >
-            <section className={clsx(activeTab === 'products' ? 'block' : 'hidden lg:block', isCartExpanded && 'lg:hidden')}>
+            <section
+              className={clsx(
+                'min-w-0 flex-1 w-full',
+                activeTab === 'products' ? 'block' : 'hidden lg:block',
+                isCartExpanded && 'lg:hidden',
+              )}
+            >
               <POSProductList
                 filteredProducts={filteredProducts}
                 warehouses={warehouses}
@@ -1295,7 +1324,28 @@ export default function POSView() {
               />
             </section>
 
-            <aside className={clsx(activeTab === 'cart' ? 'block' : 'hidden lg:block')}>
+            {!isCartExpanded && (
+              <div
+                onMouseDown={handleMouseDownResize}
+                title="Потяните мышью для изменения ширины корзины"
+                className={clsx(
+                  'hidden lg:flex w-2.5 h-[calc(100vh-140px)] cursor-col-resize items-center justify-center rounded-full transition-colors group shrink-0',
+                  isResizing ? 'bg-indigo-500/80' : 'hover:bg-slate-300/80',
+                )}
+              >
+                <div className="h-8 w-1 rounded-full bg-slate-300 group-hover:bg-slate-500 transition-colors" />
+              </div>
+            )}
+
+            <aside
+              className={clsx(
+                'w-full shrink-0',
+                activeTab === 'cart' ? 'block' : 'hidden lg:block',
+              )}
+              style={{
+                width: !isCartExpanded && typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${cartWidth}px` : undefined,
+              }}
+            >
               <div
                 className={clsx(
                   'rounded-[28px] border border-white bg-white shadow-xs',
@@ -1310,19 +1360,18 @@ export default function POSView() {
                   totalWeightKg={cartWeightSummary.totalWeightKg}
                   formatWeightKg={formatWeightKg}
                   setIsCartExpanded={setIsCartExpanded}
+                  cartWidth={cartWidth}
+                  setCartWidth={handleCartWidthChange}
                 />
 
                 <POSCartCustomerBlock
                   isCartExpanded={isCartExpanded}
-                  total={total}
-                  cartWeightSummary={cartWeightSummary}
                   cartOverflowMessage={cartOverflowMessage || ''}
                   customerId={customerId}
                   customerSearch={customerSearch}
                   isCustomerPortal={isCustomerPortal}
                   isCustomerDropdownOpen={isCustomerDropdownOpen}
                   filteredCustomers={filteredCustomers}
-                  formatWeightKg={formatWeightKg}
                   setCustomerId={setCustomerId}
                   setCustomerSearch={setCustomerSearch}
                   setIsCustomerDropdownOpen={setIsCustomerDropdownOpen}

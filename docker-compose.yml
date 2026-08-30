@@ -30,8 +30,6 @@ services:
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-my_wholesale_shop}?schema=public
       JWT_SECRET: ${JWT_SECRET}
-      OCR_API_KEY: ${OCR_API_KEY}
-      OCR_MODEL: ${OCR_MODEL:-gemini-3-flash-preview}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}

@@ -23,7 +23,7 @@ Wholesale CRM and inventory system:
    - `npm --prefix frontend install`
 3. Create backend env:
    - copy `backend/.env.example` to `backend/.env`
-   - fill at least: `DATABASE_URL`, `JWT_SECRET`, `TWO_FACTOR_BACKUP_PEPPER`, `OCR_API_KEY`
+   - fill at least: `DATABASE_URL`, `JWT_SECRET`, `TWO_FACTOR_BACKUP_PEPPER`
    - keep secure defaults:
      - `ALLOW_UPLOAD_QUERY_TOKEN=false`
      - `CSP_REPORT_ONLY=true`
@@ -55,15 +55,15 @@ Run both services together:
 ## Docker (Production-like Local)
 
 1. Copy `.env.docker.example` to `.env` in repository root.
-2. Fill required values (`POSTGRES_PASSWORD`, `JWT_SECRET`, `TWO_FACTOR_BACKUP_PEPPER`, `OCR_API_KEY`).
+2. Fill required values (`POSTGRES_PASSWORD`, `JWT_SECRET`, `TWO_FACTOR_BACKUP_PEPPER`).
 3. Keep secure defaults in production:
    - `ALLOW_UPLOAD_QUERY_TOKEN=false`
    - `CSP_REPORT_ONLY=true` (switch to `false` after CSP report review)
-3. Start stack:
+4. Start stack:
    - `docker compose up -d --build`
-4. Open frontend:
+5. Open frontend:
    - `http://localhost`
-5. Health:
+6. Health:
    - `http://localhost/api/health`
 
 ## Common Troubleshooting

@@ -28,3 +28,17 @@ export const normalizeMoney = (value: unknown, fieldName: string, options?: { al
 
   return normalized;
 };
+
+const PAYMENT_EPSILON = 0.01;
+
+export const getInvoiceStatus = (paidAmount: number, netAmount: number) => {
+  if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
+    return 'paid';
+  }
+
+  if (paidAmount > 0) {
+    return 'partial';
+  }
+
+  return 'unpaid';
+};

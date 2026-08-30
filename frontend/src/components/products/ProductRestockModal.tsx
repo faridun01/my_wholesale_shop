@@ -1,6 +1,6 @@
 import React from 'react';
 import { PlusCircle, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   formatCountWithUnit,
   formatPriceInput,
@@ -34,16 +34,16 @@ export default function ProductRestockModal({
   onSubmit,
   setRestockData,
 }: ProductRestockModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-    >
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+        >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -126,7 +126,6 @@ export default function ProductRestockModal({
                       setRestockData((prev: any) => ({
                         ...prev,
                         packageQuantityInput: event.target.value,
-                        quantity: String((Number(event.target.value || 0) || 0) * (selectedRestockPackaging?.unitsPerPackage || 0)),
                       }))
                     }
                     className="w-full rounded-full border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -209,6 +208,8 @@ export default function ProductRestockModal({
           </div>
         </form>
       </motion.div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

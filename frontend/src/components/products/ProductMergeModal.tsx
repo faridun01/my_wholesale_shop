@@ -1,5 +1,5 @@
 import { GitMerge, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { formatProductName } from '../../utils/productName';
 
 interface ProductMergeModalProps {
@@ -21,13 +21,13 @@ export default function ProductMergeModal({
   onMerge,
   onMergeTargetChange,
 }: ProductMergeModalProps) {
-  if (!isOpen || !selectedProduct) return null;
-
   return (
-    <motion.div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-    >
+    <AnimatePresence>
+      {isOpen && selectedProduct && (
+        <motion.div
+          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+        >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -96,6 +96,8 @@ export default function ProductMergeModal({
           </button>
         </div>
       </motion.div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

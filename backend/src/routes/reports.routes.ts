@@ -11,7 +11,8 @@ import {
   buildInventoryWhere,
   buildInvoiceLineReportRows,
 } from './reports.helpers.js';
-import { isDefaultCustomerName } from '../utils/defaultCustomer.js';
+import { DEFAULT_CUSTOMER_NAME, getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
+import { countUniqueProductsByName } from './dashboard.helpers.js';
 
 const router = Router();
 const MONEY_EPSILON = 0.0001;
@@ -48,18 +49,19 @@ function getLineNetRevenue(invoice: any, item: any) {
 }
 
 function getLineCost(item: any) {
-  const originalQty = Number(item?.quantity || 0);
   const remainingQty = getRemainingQuantity(item);
   if (remainingQty <= 0) return 0;
 
+  // StockService.deallocateStock already shrinks/deletes SaleAllocation rows by the
+  // returned quantity on every return, so summing the *current* allocations already
+  // yields the cost of just the remaining (post-return) quantity — re-scaling it by
+  // remainingQty/originalQty here would apply the return ratio a second time and
+  // understate cost (overstate profit) for any partially-returned line.
   const allocatedCost = Array.isArray(item.saleAllocations)
     ? item.saleAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.batch?.costPrice || 0) * Number(alloc.quantity || 0), 0)
     : 0;
 
   if (allocatedCost > MONEY_EPSILON) {
-    if (originalQty > MONEY_EPSILON && remainingQty < originalQty) {
-      return allocatedCost * (remainingQty / originalQty);
-    }
     return allocatedCost;
   }
 
@@ -128,8 +130,14 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           },
         },
       }),
-      prisma.product.count({ where: { active: true, warehouseId: warehouseId ?? undefined } }),
-      prisma.customer.count({ where: { active: true, city: access.isAdmin ? undefined : (access.city ?? '__no_city__') } }),
+      prisma.product.findMany({ where: { active: true, warehouseId: warehouseId ?? undefined }, select: { name: true } }),
+      prisma.customer.count({
+        where: {
+          active: true,
+          city: access.isAdmin ? undefined : (access.city ?? '__no_city__'),
+          NOT: { name: { equals: DEFAULT_CUSTOMER_NAME, mode: 'insensitive' } },
+        },
+      }),
       prisma.warehouse.findMany({ where: access.isAdmin ? { active: true } : { active: true, id: access.warehouseId ?? -1, city: access.city ?? undefined } }),
       prisma.productBatch.findMany({
         where: {
@@ -186,7 +194,9 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     let totalCost = 0;
     let totalExpenses = 0;
     const totalSalesCount = invoices.length;
-    let totalDebts = 0;
+    // Outstanding debt is intentionally NOT scoped to the report's date range (debt
+    // doesn't expire when the period ends) — shared with Dashboard so both agree.
+    const totalDebtsPromise = getTotalOutstandingDebt(prisma, warehouseId ?? undefined);
 
     for (const expense of expenses) {
       totalExpenses += Number(expense.amount || 0);
@@ -209,9 +219,6 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
 
       totalRevenue += netAmount;
       const invoiceDebt = Math.max(0, netAmount - paidAmount);
-      if (inv.customer && !isDefaultCustomerName(inv.customer.name)) {
-        totalDebts += invoiceDebt;
-      }
       monthlyData[month].sales += netAmount;
 
       if (!warehousePerformance[inv.warehouseId]) {
@@ -276,6 +283,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         productPerformance[productKey].profit += lineProfit;
       }
     }
+
+    const totalDebts = await totalDebtsPromise;
 
     const stockValuation = batches.reduce((sum: number, b: any) => sum + (Number(b.costPrice) * b.remainingQuantity), 0);
     const writeoffByReason: Record<string, { name: string; quantity: number; value: number; operations: number }> = {};
@@ -347,7 +356,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         totalExpenses: isAdmin ? totalExpenses : null,
         totalSalesCount,
         totalCustomers: customers,
-        totalProducts: products,
+        totalProducts: warehouseId ? products.length : countUniqueProductsByName(products),
         totalDebts,
         stockValuation: isAdmin ? stockValuation : null,
         margin: isAdmin ? (totalRevenue > 0 ? ((totalProfit - totalExpenses) / totalRevenue) * 100 : 0) : null,

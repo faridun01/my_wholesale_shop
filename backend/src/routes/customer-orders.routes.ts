@@ -213,27 +213,48 @@ router.post('/:id/approve', async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'Заказ уже обработан' });
     }
 
-    const invoice = await InvoiceService.createInvoice({
-      customerId: order.customerId,
-      userId: req.user!.id,
-      warehouseId: order.warehouseId,
-      items: order.items.map((item: any) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity),
-        totalBaseUnits: Number(item.totalBaseUnits ?? item.quantity),
-        packageQuantity: Number(item.packageQuantity || 0),
-        extraUnitQuantity: Number(item.extraUnitQuantity || 0),
-        packagingId: item.packagingId || null,
-        packageName: item.packageName || null,
-        baseUnitName: item.baseUnitName || null,
-        unitsPerPackage: item.unitsPerPackage || null,
-        sellingPrice: Number(item.sellingPrice || 0),
-        discount: Number(item.discount || 0),
-      })),
-      discount: Number(order.discount || 0),
-      paidAmount: 0,
-      paymentMethod: 'cash',
+    // Atomically claim the order before creating the invoice: only one concurrent
+    // approve request can flip status away from 'pending', so a double-click or two
+    // staff approving at once can never both succeed and create two invoices.
+    const claim = await (prisma as any).customerOrder.updateMany({
+      where: { id: orderId, status: 'pending' },
+      data: { status: 'processing' },
     });
+    if (claim.count === 0) {
+      return res.status(400).json({ error: 'Заказ уже обработан' });
+    }
+
+    let invoice;
+    try {
+      invoice = await InvoiceService.createInvoice({
+        customerId: order.customerId,
+        userId: req.user!.id,
+        warehouseId: order.warehouseId,
+        items: order.items.map((item: any) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity),
+          totalBaseUnits: Number(item.totalBaseUnits ?? item.quantity),
+          packageQuantity: Number(item.packageQuantity || 0),
+          extraUnitQuantity: Number(item.extraUnitQuantity || 0),
+          packagingId: item.packagingId || null,
+          packageName: item.packageName || null,
+          baseUnitName: item.baseUnitName || null,
+          unitsPerPackage: item.unitsPerPackage || null,
+          sellingPrice: Number(item.sellingPrice || 0),
+          discount: Number(item.discount || 0),
+        })),
+        discount: Number(order.discount || 0),
+        paidAmount: 0,
+        paymentMethod: 'cash',
+      });
+    } catch (invoiceError) {
+      // Release the claim so the order can be retried instead of getting stuck in 'processing'.
+      await (prisma as any).customerOrder.updateMany({
+        where: { id: orderId, status: 'processing' },
+        data: { status: 'pending' },
+      });
+      throw invoiceError;
+    }
 
     const updatedOrder = await (prisma as any).customerOrder.update({
       where: { id: orderId },

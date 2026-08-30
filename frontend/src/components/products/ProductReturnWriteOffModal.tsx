@@ -1,6 +1,6 @@
 import React from 'react';
 import { RotateCcw, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 
 interface ProductReturnWriteOffModalProps {
   isOpen: boolean;
@@ -27,16 +27,16 @@ export default function ProductReturnWriteOffModal({
   onSubmit,
   setReturnWriteOffData,
 }: ProductReturnWriteOffModalProps) {
-  if (!isOpen || !transaction) return null;
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-    >
+    <AnimatePresence>
+      {isOpen && transaction && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+        >
       <motion.div
         initial={{ scale: 0.96, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -121,6 +121,8 @@ export default function ProductReturnWriteOffModal({
           </div>
         </form>
       </motion.div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, setDefaultWarehouse } from '../api/warehouses.api';
-import { 
-  Warehouse, 
-  Users, 
+import {
+  Warehouse,
+  Users,
   User,
-  Shield, 
+  Shield,
   ShieldCheck,
   Star,
-  Plus, 
-  Trash2, 
+  Plus,
+  Trash2,
   Edit,
   MapPin,
   Phone,
@@ -17,6 +17,9 @@ import {
   Eye,
   Lock,
   CheckCircle2,
+  ChevronDown,
+  Building2,
+  ShieldAlert,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -57,6 +60,7 @@ export default function SettingsView() {
   });
   const [activeTab, setActiveTab] = useState<'warehouses' | 'users' | 'general' | 'profile'>('warehouses');
   
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [showAddWarehouse, setShowAddWarehouse] = useState(false);
   const [showEditWarehouse, setShowEditWarehouse] = useState(false);
   const [showDeleteWarehouseConfirm, setShowDeleteWarehouseConfirm] = useState(false);
@@ -255,7 +259,9 @@ export default function SettingsView() {
 
   const handleAddWarehouse = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingForm) return;
     try {
+      setIsSubmittingForm(true);
       await createWarehouse(warehouseForm);
       toast.success('Склад успешно создан');
       setShowAddWarehouse(false);
@@ -263,13 +269,16 @@ export default function SettingsView() {
       fetchData();
     } catch (err) {
       toast.error('Ошибка при создании склада');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
   const handleEditWarehouse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWarehouse) return;
+    if (!selectedWarehouse || isSubmittingForm) return;
     try {
+      setIsSubmittingForm(true);
       await updateWarehouse(selectedWarehouse.id, warehouseForm);
       toast.success('Склад обновлен');
       setShowEditWarehouse(false);
@@ -277,6 +286,8 @@ export default function SettingsView() {
       fetchData();
     } catch (err) {
       toast.error('Ошибка при обновлении склада');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
@@ -358,7 +369,9 @@ export default function SettingsView() {
       toast.error('Пароли не совпадают');
       return;
     }
+    if (isSubmittingForm) return;
     try {
+      setIsSubmittingForm(true);
       const { confirmPassword, ...payload } = newUser;
       const effectiveWarehouseId = payload.warehouseId || (warehouses.length === 1 ? String(warehouses[0].id) : '');
       await client.post('/auth/register', {
@@ -371,6 +384,8 @@ export default function SettingsView() {
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при создании пользователя');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
@@ -385,7 +400,9 @@ export default function SettingsView() {
       toast.error('Пароли не совпадают');
       return;
     }
+    if (isSubmittingForm) return;
     try {
+      setIsSubmittingForm(true);
       const { confirmPassword, ...payload } = newUser;
       const effectiveWarehouseId = payload.warehouseId || (warehouses.length === 1 ? String(warehouses[0].id) : '');
       await client.put(`/auth/users/${selectedUser.id}`, {
@@ -398,30 +415,36 @@ export default function SettingsView() {
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при обновлении пользователя');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingForm) return;
     try {
       if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
         toast.error('Пароли не совпадают');
         return;
       }
 
+      setIsSubmittingForm(true);
       const data: any = { username: profileForm.username };
       if (profileForm.password) data.password = profileForm.password;
-      
+
       const res = await client.put(`/auth/users/${currentUser.id}`, data);
       toast.success('Профиль обновлен. Пожалуйста, войдите снова, если вы изменили логин или пароль.');
-      
+
       // Update local storage if needed, but safer to just let them re-login if they changed sensitive info
       const updatedUser = { ...currentUser, ...res.data };
       updateStoredUser(updatedUser);
-      
+
       setProfileForm({ ...profileForm, password: '', confirmPassword: '' });
     } catch (err) {
       toast.error('Ошибка при обновлении профиля');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
@@ -446,21 +469,25 @@ export default function SettingsView() {
       toast.error('Недостаточно прав');
       return;
     }
+    if (isSubmittingForm) return;
 
     try {
+      setIsSubmittingForm(true);
       await client.post('/settings/company-profile', companyProfile);
       invalidateSettingsReferenceCache();
       toast.success('Данные компании сохранены');
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при сохранении данных компании');
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
   return (
     <div className="app-page-shell">
       <div className="w-full pb-20">
-        <section className="rounded-[32px] border border-white/80 bg-[#f8fafc] shadow-sm">
+        <section className="rounded-4xl border border-white/80 bg-bg-main shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-200/60 bg-white px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className={clsx('flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs', currentTabMeta.accent)}>
@@ -477,7 +504,7 @@ export default function SettingsView() {
               <button
                 type="button"
                 onClick={() => (document.getElementById('company-profile-form') as HTMLFormElement | null)?.requestSubmit()}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-95"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-95"
               >
                 <CheckCircle2 size={18} />
                 <span>Сохранить изменения</span>
@@ -631,8 +658,8 @@ export default function SettingsView() {
                 </div>
                 <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-4">
                   <button type="button" onClick={closeWarehouseModal} className="rounded-2xl px-8 py-4 font-medium text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" className="rounded-2xl bg-sky-500 px-10 py-4 font-medium text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95">
-                    {showEditWarehouse ? 'Сохранить' : 'Создать'}
+                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-sky-500 px-10 py-4 font-medium text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isSubmittingForm ? 'Сохранение...' : showEditWarehouse ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
               </form>
@@ -731,6 +758,29 @@ export default function SettingsView() {
                       </select>
                     </div>
                   )}
+                  {String(newUser.role || '').toUpperCase() !== 'CUSTOMER' && String(newUser.role || '').toUpperCase() !== 'ADMIN' && (
+                    <div className="space-y-2.5 rounded-2xl border border-slate-200 p-4">
+                      <label className="block text-sm font-semibold text-slate-700 uppercase tracking-widest">Дополнительные права</label>
+                      <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newUser.canCancelInvoices}
+                          onChange={e => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
+                          className="h-4 w-4 rounded border-slate-300 text-violet-500 focus:ring-violet-400"
+                        />
+                        <span>Может отменять накладные</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newUser.canDeleteData}
+                          onChange={e => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
+                          className="h-4 w-4 rounded border-slate-300 text-violet-500 focus:ring-violet-400"
+                        />
+                        <span>Может удалять данные</span>
+                      </label>
+                    </div>
+                  )}
                   {String(newUser.role || '').toUpperCase() === 'CUSTOMER' && (
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Клиент</label>
@@ -751,8 +801,8 @@ export default function SettingsView() {
 
                 <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
                   <button type="button" onClick={closeUserModal} className="rounded-2xl px-6 py-3 font-medium text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" className="rounded-2xl bg-violet-500 px-8 py-3 font-medium text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95">
-                    {showEditUser ? 'Сохранить' : 'Создать'}
+                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-violet-500 px-8 py-3 font-medium text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isSubmittingForm ? 'Сохранение...' : showEditUser ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
               </form>
@@ -923,15 +973,17 @@ export default function SettingsView() {
                   Управляйте ролями, складами доступа и статусом двухфакторной защиты в одном месте.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/80 bg-white/80 p-4 backdrop-blur">
-                <button 
-                  onClick={() => setShowAddUser(true)}
-                  className="inline-flex min-h-22 w-full items-center justify-center gap-2.5 rounded-[18px] bg-violet-500 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-600 active:scale-95"
-                >
-                  <Plus size={18} />
-                  <span>Добавить пользователя</span>
-                </button>
-              </div>
+              {isAdmin && (
+                <div className="rounded-3xl border border-white/80 bg-white/80 p-4 backdrop-blur">
+                  <button
+                    onClick={() => setShowAddUser(true)}
+                    className="inline-flex min-h-22 w-full items-center justify-center gap-2.5 rounded-[18px] bg-violet-500 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-600 active:scale-95"
+                  >
+                    <Plus size={18} />
+                    <span>Добавить пользователя</span>
+                  </button>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 gap-3 border-t border-violet-100/80 bg-white/70 p-5 sm:grid-cols-3 sm:p-6">
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
@@ -976,25 +1028,27 @@ export default function SettingsView() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedUser(u);
-                      setNewUser({
-                        username: u.username || '',
-                        password: '',
-                        confirmPassword: '',
-                        role: u.role || 'SELLER',
-                        warehouseId: u.warehouseId ? String(u.warehouseId) : '',
-                        customerId: u.customerId ? String(u.customerId) : '',
-                        canCancelInvoices: !!u.canCancelInvoices,
-                        canDeleteData: !!u.canDeleteData
-                      });
-                      setShowEditUser(true);
-                    }}
-                    className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500"
-                  >
-                    <Edit size={18} />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setSelectedUser(u);
+                        setNewUser({
+                          username: u.username || '',
+                          password: '',
+                          confirmPassword: '',
+                          role: u.role || 'SELLER',
+                          warehouseId: u.warehouseId ? String(u.warehouseId) : '',
+                          customerId: u.customerId ? String(u.customerId) : '',
+                          canCancelInvoices: !!u.canCancelInvoices,
+                          canDeleteData: !!u.canDeleteData
+                        });
+                        setShowEditUser(true);
+                      }}
+                      className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500"
+                    >
+                      <Edit size={18} />
+                    </button>
+                  )}
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-slate-50 px-3 py-3">
@@ -1008,17 +1062,19 @@ export default function SettingsView() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={() => {
-                      setSelectedUser(u);
-                      setShowDeleteUserConfirm(true);
-                    }}
-                    className="rounded-2xl border border-rose-100 px-4 py-3 text-rose-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setSelectedUser(u);
+                        setShowDeleteUserConfirm(true);
+                      }}
+                      className="rounded-2xl border border-rose-100 px-4 py-3 text-rose-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1103,36 +1159,40 @@ export default function SettingsView() {
                             <ShieldCheck size={20} />
                           </button>
                         ) : null}
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setNewUser({
-                              username: u.username || '',
-                              password: '',
-                              confirmPassword: '',
-                              role: u.role || 'SELLER',
-                              warehouseId: u.warehouseId ? String(u.warehouseId) : '',
-                              customerId: u.customerId ? String(u.customerId) : '',
-                              canCancelInvoices: !!u.canCancelInvoices,
-                              canDeleteData: !!u.canDeleteData
-                            });
-                            setShowEditUser(true);
-                          }}
-                          className="text-slate-300 hover:text-slate-700 p-3 hover:bg-slate-100 rounded-xl transition-all"
-                        >
-                          <Edit size={20} />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setShowDeleteUserConfirm(true);
-                          }}
-                          className="text-slate-300 hover:text-rose-600 p-3 hover:bg-rose-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={20} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setNewUser({
+                                username: u.username || '',
+                                password: '',
+                                confirmPassword: '',
+                                role: u.role || 'SELLER',
+                                warehouseId: u.warehouseId ? String(u.warehouseId) : '',
+                                customerId: u.customerId ? String(u.customerId) : '',
+                                canCancelInvoices: !!u.canCancelInvoices,
+                                canDeleteData: !!u.canDeleteData
+                              });
+                              setShowEditUser(true);
+                            }}
+                            className="text-slate-300 hover:text-slate-700 p-3 hover:bg-slate-100 rounded-xl transition-all"
+                          >
+                            <Edit size={20} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowDeleteUserConfirm(true);
+                            }}
+                            className="text-slate-300 hover:text-rose-600 p-3 hover:bg-rose-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1220,8 +1280,8 @@ export default function SettingsView() {
                 />
               </div>
               <div className="pt-4">
-                <button type="submit" className="w-full rounded-2xl bg-emerald-500 py-5 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95">
-                  Сохранить изменения
+                <button type="submit" disabled={isSubmittingForm} className="w-full rounded-2xl bg-emerald-500 py-5 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmittingForm ? 'Сохранение...' : 'Сохранить изменения'}
                 </button>
               </div>
             </form>
@@ -1344,8 +1404,8 @@ export default function SettingsView() {
                 </div>
 
                 <div className="pt-2">
-                  <button type="submit" className="rounded-2xl bg-emerald-500 px-6 py-4 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95">
-                    Сохранить данные компании
+                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-emerald-500 px-6 py-4 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isSubmittingForm ? 'Сохранение...' : 'Сохранить данные компании'}
                   </button>
                 </div>
               </form>

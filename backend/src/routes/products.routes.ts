@@ -252,57 +252,61 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const resolvedPhotoUrl = rest.photoUrl || null;
 
     // Create product with 0 stock first
-    const product = await prisma.product.create({
-      data: {
-        ...rest,
-        name: finalName,
-        rawName: normalizedName.rawName,
-        brand: normalizedName.brand,
-        nameKey: buildProductNameKey(finalName),
-        sku: null,
-        baseUnitName: resolvedBaseUnitName,
-        unit: resolvedBaseUnitName,
-        purchaseCostPrice: resolvedPurchaseCostPrice,
-        expensePercent: resolvedExpensePercent,
-        photoUrl: resolvedPhotoUrl,
-        initialStock: Number(initialStock || 0),
-        totalIncoming: 0,
-        stock: 0,
-        warehouseId: wId,
-        costPrice: resolvedEffectiveCostPrice,
-        sellingPrice: roundMoney(rest.sellingPrice || 0),
-      },
-    });
-
-    const packagingRows = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
-      .filter(Boolean)
-      .map((entry: any, index: number) => ({
-        productId: product.id,
-        warehouseId: wId,
-        packageName: normalizePackageName(entry.packageName),
-        baseUnitName: normalizeBaseUnitName(entry.baseUnitName || resolvedBaseUnitName),
-        unitsPerPackage: Number(entry.unitsPerPackage || 0),
-        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
-        barcode: entry.barcode ? String(entry.barcode) : null,
-        isDefault: Boolean(entry.isDefault ?? index === 0),
-        sortOrder: Number(entry.sortOrder || index),
-      }))
-      .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
-
-    if (packagingRows.length > 0) {
-      await prisma.productPackaging.createMany({
-        data: packagingRows,
-        skipDuplicates: true,
+    const product = await prisma.$transaction(async (tx: any) => {
+      const createdProduct = await tx.product.create({
+        data: {
+          ...rest,
+          name: finalName,
+          rawName: normalizedName.rawName,
+          brand: normalizedName.brand,
+          nameKey: buildProductNameKey(finalName),
+          sku: null,
+          baseUnitName: resolvedBaseUnitName,
+          unit: resolvedBaseUnitName,
+          purchaseCostPrice: resolvedPurchaseCostPrice,
+          expensePercent: resolvedExpensePercent,
+          photoUrl: resolvedPhotoUrl,
+          initialStock: Number(initialStock || 0),
+          totalIncoming: 0,
+          stock: 0,
+          warehouseId: wId,
+          costPrice: resolvedEffectiveCostPrice,
+          sellingPrice: roundMoney(rest.sellingPrice || 0),
+        },
       });
-    }
 
-    // Record initial price history
-    await prisma.priceHistory.create({
-      data: {
-        productId: product.id,
-        costPrice: resolvedEffectiveCostPrice,
-        sellingPrice: roundMoney(rest.sellingPrice || 0),
+      const packagingRows = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
+        .filter(Boolean)
+        .map((entry: any, index: number) => ({
+          productId: createdProduct.id,
+          warehouseId: wId,
+          packageName: normalizePackageName(entry.packageName),
+          baseUnitName: normalizeBaseUnitName(entry.baseUnitName || resolvedBaseUnitName),
+          unitsPerPackage: Number(entry.unitsPerPackage || 0),
+          packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
+          barcode: entry.barcode ? String(entry.barcode) : null,
+          isDefault: Boolean(entry.isDefault ?? index === 0),
+          sortOrder: Number(entry.sortOrder || index),
+        }))
+        .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
+
+      if (packagingRows.length > 0) {
+        await tx.productPackaging.createMany({
+          data: packagingRows,
+          skipDuplicates: true,
+        });
       }
+
+      // Record initial price history
+      await tx.priceHistory.create({
+        data: {
+          productId: createdProduct.id,
+          costPrice: resolvedEffectiveCostPrice,
+          sellingPrice: roundMoney(rest.sellingPrice || 0),
+        }
+      });
+
+      return createdProduct;
     });
 
     // Then add initial stock via StockService to create batches and transactions
@@ -385,106 +389,110 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       }
     }
     
-    const product = await prisma.product.update({
-      where: { id: productId },
-      data: {
-        ...productPayload,
-        name: newName,
-        rawName: normalizedRequestedName.rawName,
-        brand: normalizedRequestedName.brand,
-        nameKey: buildProductNameKey(newName),
-        baseUnitName: nextBaseUnitName,
-        unit: nextBaseUnitName,
-        purchaseCostPrice: nextPurchaseCostPrice,
-        expensePercent: nextExpensePercent,
-        costPrice: nextEffectiveCostPrice,
-        sellingPrice: productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : oldProduct.sellingPrice,
-        sku: null
-      }
-    });
-
-    if (productPayload.photoUrl !== undefined) {
-      const familyName = normalizeProductFamilyName(newName);
-      const relatedProducts = await prisma.product.findMany({
-        where: {
-          active: true,
-          id: { not: productId },
-        },
-        select: {
-          id: true,
-          name: true,
-        }
-      });
-
-      const relatedIds = relatedProducts
-        .filter((relatedProduct: { id: number; name: string }) => normalizeProductFamilyName(relatedProduct.name) === familyName)
-        .map((relatedProduct: { id: number; name: string }) => relatedProduct.id);
-
-      await prisma.product.updateMany({
-        where: {
-          id: { in: relatedIds },
-        },
+    const product = await prisma.$transaction(async (tx: any) => {
+      const updatedProduct = await tx.product.update({
+        where: { id: productId },
         data: {
-          photoUrl: productPayload.photoUrl || null
+          ...productPayload,
+          name: newName,
+          rawName: normalizedRequestedName.rawName,
+          brand: normalizedRequestedName.brand,
+          nameKey: buildProductNameKey(newName),
+          baseUnitName: nextBaseUnitName,
+          unit: nextBaseUnitName,
+          purchaseCostPrice: nextPurchaseCostPrice,
+          expensePercent: nextExpensePercent,
+          costPrice: nextEffectiveCostPrice,
+          sellingPrice: productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : oldProduct.sellingPrice,
+          sku: null
         }
       });
-    }
 
-    // If price changed, record history
-    if (oldProduct && (productPayload.costPrice !== undefined || productPayload.purchaseCostPrice !== undefined || productPayload.expensePercent !== undefined || productPayload.sellingPrice !== undefined)) {
-      const newCost = nextEffectiveCostPrice;
-      const newSelling = productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : roundMoney(oldProduct.sellingPrice);
-      
-      if (newCost !== Number(oldProduct.costPrice) || newSelling !== Number(oldProduct.sellingPrice)) {
-        const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
-
-        await prisma.priceHistory.create({
-          data: {
-            productId,
-            costPrice: newCost,
-            sellingPrice: newSelling
+      if (productPayload.photoUrl !== undefined) {
+        const familyName = normalizeProductFamilyName(newName);
+        const relatedProducts = await tx.product.findMany({
+          where: {
+            active: true,
+            id: { not: productId },
+          },
+          select: {
+            id: true,
+            name: true,
           }
         });
 
-        if (historyWarehouseId) {
-          await prisma.inventoryTransaction.create({
+        const relatedIds = relatedProducts
+          .filter((relatedProduct: { id: number; name: string }) => normalizeProductFamilyName(relatedProduct.name) === familyName)
+          .map((relatedProduct: { id: number; name: string }) => relatedProduct.id);
+
+        await tx.product.updateMany({
+          where: {
+            id: { in: relatedIds },
+          },
+          data: {
+            photoUrl: productPayload.photoUrl || null
+          }
+        });
+      }
+
+      // If price changed, record history
+      if (oldProduct && (productPayload.costPrice !== undefined || productPayload.purchaseCostPrice !== undefined || productPayload.expensePercent !== undefined || productPayload.sellingPrice !== undefined)) {
+        const newCost = nextEffectiveCostPrice;
+        const newSelling = productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : roundMoney(oldProduct.sellingPrice);
+
+        if (newCost !== Number(oldProduct.costPrice) || newSelling !== Number(oldProduct.sellingPrice)) {
+          const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
+
+          await tx.priceHistory.create({
             data: {
               productId,
-              warehouseId: historyWarehouseId,
-              userId,
-              qtyChange: 0,
-              type: 'adjustment',
-              reason: `Изменение цены: ${oldProduct.sellingPrice} -> ${newSelling}`,
-              costAtTime: newCost,
-              sellingAtTime: newSelling,
+              costPrice: newCost,
+              sellingPrice: newSelling
             }
           });
+
+          if (historyWarehouseId) {
+            await tx.inventoryTransaction.create({
+              data: {
+                productId,
+                warehouseId: historyWarehouseId,
+                userId,
+                qtyChange: 0,
+                type: 'adjustment',
+                reason: `Изменение цены: ${oldProduct.sellingPrice} -> ${newSelling}`,
+                costAtTime: newCost,
+                sellingAtTime: newSelling,
+              }
+            });
+          }
         }
       }
-    }
 
-    const parsedPackaging = packaging || parsePackagingFromRawName(productPayload.rawName || productPayload.name || oldProduct.rawName || oldProduct.name);
-    const nextPackagings = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
-      .filter(Boolean)
-      .map((entry: any, index: number) => ({
-        productId,
-        warehouseId: newWarehouseId,
-        packageName: normalizePackageName(entry.packageName),
-        baseUnitName: normalizeBaseUnitName(entry.baseUnitName || nextBaseUnitName),
-        unitsPerPackage: Number(entry.unitsPerPackage || 0),
-        packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
-        barcode: entry.barcode ? String(entry.barcode) : null,
-        isDefault: Boolean(entry.isDefault ?? index === 0),
-        sortOrder: Number(entry.sortOrder || index),
-      }))
-      .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
+      const parsedPackaging = packaging || parsePackagingFromRawName(productPayload.rawName || productPayload.name || oldProduct.rawName || oldProduct.name);
+      const nextPackagings = [...(Array.isArray(packagings) ? packagings : []), parsedPackaging]
+        .filter(Boolean)
+        .map((entry: any, index: number) => ({
+          productId,
+          warehouseId: newWarehouseId,
+          packageName: normalizePackageName(entry.packageName),
+          baseUnitName: normalizeBaseUnitName(entry.baseUnitName || nextBaseUnitName),
+          unitsPerPackage: Number(entry.unitsPerPackage || 0),
+          packageSellingPrice: entry.packageSellingPrice !== undefined && entry.packageSellingPrice !== null ? roundMoney(entry.packageSellingPrice) : null,
+          barcode: entry.barcode ? String(entry.barcode) : null,
+          isDefault: Boolean(entry.isDefault ?? index === 0),
+          sortOrder: Number(entry.sortOrder || index),
+        }))
+        .filter((entry: any) => entry.packageName && entry.unitsPerPackage > 0);
 
-    if (nextPackagings.length > 0) {
-      await prisma.productPackaging.createMany({
-        data: nextPackagings,
-        skipDuplicates: true,
-      });
-    }
+      if (nextPackagings.length > 0) {
+        await tx.productPackaging.createMany({
+          data: nextPackagings,
+          skipDuplicates: true,
+        });
+      }
+
+      return updatedProduct;
+    });
 
     res.json(product);
   } catch (error) {
@@ -739,6 +747,9 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
     );
     res.json(batch);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -768,6 +779,9 @@ router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
     );
     res.json(result);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -990,6 +1004,9 @@ router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
     );
     res.json(batch);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -1318,6 +1335,9 @@ router.post('/batches/:batchId/zero', async (req: AuthRequest, res, next) => {
     const result = await StockSvc.zeroBatchRemaining(batchId, req.user!.id);
     res.json(result);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -1350,6 +1370,9 @@ router.delete('/batches/:batchId', async (req: AuthRequest, res, next) => {
     const result = await StockSvc.deleteBatch(batchId);
     res.json(result);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });

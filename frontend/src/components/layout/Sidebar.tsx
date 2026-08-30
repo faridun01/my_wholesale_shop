@@ -40,7 +40,7 @@ const SHOW_CUSTOMER_ORDERS = false;
 
 const navItems: NavItem[] = [
   ...(SHOW_CUSTOMER_ORDERS
-    ? [{ to: '/customer-orders', icon: ShoppingBag, label: '?????? ????????', section: '??????????' }]
+    ? [{ to: '/customer-orders', icon: ShoppingBag, label: 'Заказы клиентов', section: 'Отношения' }]
     : []),
   { to: '/', icon: LayoutDashboard, label: 'Дашборд', section: 'Управление' },
   { to: '/pos', icon: ShoppingCart, label: 'POS терминал', section: 'Управление' },
@@ -222,7 +222,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     <>
       <div
         className={clsx(
-          'fixed inset-0 z-40 bg-[#08111d]/40 backdrop-blur-[3px] transition-opacity duration-300 lg:hidden',
+          'fixed inset-0 z-40 bg-slate-900/40 transition-opacity duration-200 lg:hidden',
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={onClose}
@@ -230,16 +230,14 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 flex h-dvh flex-col overflow-y-auto overflow-x-hidden border-r border-white/10 bg-[linear-gradient(180deg,#101a28_0%,#0d1521_100%)] text-[#eaf1f8] shadow-[0_28px_60px_rgba(2,8,23,0.38)] transition-[width,transform] duration-300 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:overflow-y-auto lg:border-r lg:border-t-0 lg:border-l-0 lg:border-b-0 lg:border-[#202c3c] lg:bg-[#111927] lg:shadow-none',
-          sidebarCollapsed
-            ? 'w-21 rounded-r-[28px] lg:w-21 lg:max-w-none lg:rounded-none'
-            : 'w-[min(86vw,340px)] rounded-r-[28px] lg:w-62 lg:max-w-none lg:rounded-none',
-          isOpen ? 'translate-x-0' : '-translate-x-[110%]',
+          'fixed inset-y-0 left-0 z-50 flex h-dvh flex-col overflow-y-auto overflow-x-hidden border-r border-sidebar-line bg-sidebar text-sidebar-fg transition-[width,transform] duration-200 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+          sidebarCollapsed ? 'w-20 lg:w-20' : 'w-[min(86vw,300px)] lg:w-60',
+          isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <div
           className={clsx(
-            'border-b border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_100%)] backdrop-blur-sm',
+            'border-b border-sidebar-line',
             sidebarCollapsed ? 'px-2.5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]' : 'px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))]',
           )}
         >
@@ -256,34 +254,25 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                 onClose();
               }}
               title={sidebarCollapsed ? 'Развернуть меню' : 'Оптовая торговля'}
-              className={clsx(
-                'flex shrink-0 items-center justify-center transition-all duration-200',
-                sidebarCollapsed
-                  ? 'h-11.5 w-11.5 rounded-2xl bg-[linear-gradient(180deg,#0f9f6e_0%,#0b7d59_100%)] text-white shadow-[0_12px_28px_rgba(15,159,110,0.28)]'
-                  : 'h-11 w-11 rounded-2xl bg-[linear-gradient(180deg,#0f9f6e_0%,#0b7d59_100%)] text-white shadow-[0_12px_24px_rgba(15,159,110,0.26)]',
-              )}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-500 text-white"
             >
-              <Warehouse size={sidebarCollapsed ? 21 : 19} />
+              <Warehouse size={19} />
             </button>
 
             {!sidebarCollapsed && (
               <>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[16px] font-semibold leading-[1.1] tracking-tight text-white">
-                    Оптовая торговля
-                  </div>
-                  <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[#7ca297]">
-                    Навигация
-                  </div>
+                  <div className="truncate text-[15px] font-semibold leading-tight text-white">Оптовая</div>
+                  <div className="truncate text-[15px] font-semibold leading-tight text-white">торговля</div>
                 </div>
 
                 <button
                   type="button"
                   onClick={onToggleCollapse}
-                  className="ml-auto hidden h-9 w-9 items-center justify-center rounded-xl bg-[#1a2535] text-[#c6d3e3] transition-colors hover:bg-[#223247] hover:text-white lg:flex"
+                  className="ml-auto hidden h-8 w-8 items-center justify-center rounded-md text-sidebar-fg-muted transition-colors hover:bg-sidebar-raised hover:text-white lg:flex"
                   title="Свернуть меню"
                 >
-                  <ChevronLeft size={17} />
+                  <ChevronLeft size={16} />
                 </button>
               </>
             )}
@@ -291,10 +280,10 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#d7e2ef] transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+              className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg border border-sidebar-line text-sidebar-fg transition-colors hover:bg-sidebar-raised lg:hidden"
               title="Закрыть меню"
             >
-              <ChevronLeft size={17} />
+              <ChevronLeft size={16} />
             </button>
           </div>
         </div>
@@ -304,12 +293,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             {Object.entries(navSections).map(([section, items]) => (
               <div key={section}>
                 {!sidebarCollapsed && (
-                  <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7a8ea7]">
+                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-fg-muted">
                     {section}
                   </p>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {items.map((item) => (
                     <NavLink
                       key={item.to}
@@ -321,31 +310,27 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                       title={sidebarCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         clsx(
-                          'group relative flex border transition-all duration-200',
+                          'group relative flex border transition-colors',
                           sidebarCollapsed
-                            ? 'mx-auto h-11.5 w-11.5 items-center justify-center rounded-2xl'
-                            : 'items-center gap-3 rounded-[18px] px-3.5 py-3',
+                            ? 'mx-auto h-11 w-11 items-center justify-center rounded-lg'
+                            : 'items-center gap-3 rounded-lg px-3 py-2.5',
                           isActive
-                            ? 'border-[#285449] bg-[linear-gradient(180deg,rgba(22,163,74,0.18)_0%,rgba(13,27,34,0.95)_100%)] text-white shadow-[0_12px_26px_rgba(9,15,28,0.26)]'
-                            : 'border-transparent bg-transparent text-[#a5b4c7] hover:border-white/10 hover:bg-white/4.5 hover:text-white',
+                            ? 'border-sidebar-active-line bg-sidebar-active text-white'
+                            : 'border-transparent text-sidebar-fg hover:bg-sidebar-raised hover:text-white',
                         )
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <item.icon
-                            size={sidebarCollapsed ? 22 : 18}
-                            className="shrink-0"
-                            strokeWidth={isActive ? 2.2 : 2}
-                          />
+                          <item.icon size={18} className="shrink-0" strokeWidth={isActive ? 2.2 : 2} />
 
-                          {!sidebarCollapsed && <span className="truncate text-[14px] font-medium">{item.label}</span>}
+                          {!sidebarCollapsed && <span className="truncate text-[13.5px] font-medium">{item.label}</span>}
 
                           {item.to === '/reminders' && remindersCount > 0 && (
                             <span
                               className={clsx(
-                                'flex items-center justify-center rounded-full bg-[#ef4444] text-[9px] font-semibold text-white',
-                                sidebarCollapsed ? 'absolute right-1.5 top-1.5 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
+                                'flex items-center justify-center rounded-full bg-rose-500 text-[9px] font-semibold text-white',
+                                sidebarCollapsed ? 'absolute right-1 top-1 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
                               )}
                             >
                               {remindersCount > 9 ? '9+' : remindersCount}
@@ -355,16 +340,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                           {SHOW_CUSTOMER_ORDERS && item.to === '/customer-orders' && customerOrdersCount > 0 && (
                             <span
                               className={clsx(
-                                'flex items-center justify-center rounded-full bg-[#f59e0b] text-[9px] font-semibold text-white',
-                                sidebarCollapsed ? 'absolute right-1.5 top-1.5 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
+                                'flex items-center justify-center rounded-full bg-amber-500 text-[9px] font-semibold text-white',
+                                sidebarCollapsed ? 'absolute right-1 top-1 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
                               )}
                             >
                               {customerOrdersCount > 9 ? '9+' : customerOrdersCount}
                             </span>
-                          )}
-
-                          {sidebarCollapsed && isActive && (
-                            <span className="absolute inset-0 rounded-2xl bg-[linear-gradient(180deg,rgba(15,159,110,0.22)_0%,rgba(11,125,89,0.2)_100%)]" />
                           )}
                         </>
                       )}
@@ -376,7 +357,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           </div>
         </nav>
 
-        <div className={clsx('mt-auto border-t border-white/5', sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-2.5')}>
+        <div className={clsx('mt-auto border-t border-sidebar-line', sidebarCollapsed ? 'px-2 py-2' : 'px-3 py-2.5')}>
           {!isStandalone && !isInstalled && (
             <button
               onClick={async () => {
@@ -389,30 +370,24 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
               }}
               title={sidebarCollapsed ? 'Установить приложение' : undefined}
               className={clsx(
-                'mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-600/90 to-teal-600/90 font-medium text-white shadow-lg shadow-emerald-950/20 transition-all hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98]',
+                'mb-2 flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 font-medium text-white transition-colors hover:bg-accent-600',
                 sidebarCollapsed ? 'h-11 w-11 p-0' : 'px-3.5 py-2.5 text-xs',
               )}
             >
-              <Download size={sidebarCollapsed ? 20 : 16} className="shrink-0 animate-bounce" />
+              <Download size={sidebarCollapsed ? 20 : 16} className="shrink-0" />
               {!sidebarCollapsed && <span>Установить приложение</span>}
             </button>
           )}
 
-          <div
-            className={clsx(
-              'rounded-[18px] border border-[#223043] bg-[#172133]',
-              sidebarCollapsed ? 'px-0 py-2' : 'p-2.5',
-            )}
-          >
+          <div className={clsx('rounded-lg border border-sidebar-line bg-sidebar-raised', sidebarCollapsed ? 'px-0 py-2' : 'p-2.5')}>
             <div className={clsx('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-3')}>
-              <div className="flex h-9.5 w-9.5 items-center justify-center rounded-[14px] bg-[#223148] text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sidebar text-sm font-semibold text-white">
                 {user.username?.[0]?.toUpperCase()}
               </div>
 
               {!sidebarCollapsed && (
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-[#eaf1f8]">{user.username}</p>
-                  <p className="truncate text-[9px] uppercase tracking-[0.12em] text-[#73869d]">{user.role}</p>
+                  <p className="truncate text-xs font-semibold text-white">{user.username}</p>
                 </div>
               )}
             </div>
@@ -420,7 +395,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             {!sidebarCollapsed && (
               <button
                 onClick={handleLogout}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-transparent bg-[#223148] py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#c9d5e3] transition-colors hover:border-[#5a3441] hover:bg-[#3a2430] hover:text-[#fecdd3]"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-md py-1.5 text-[9px] font-semibold uppercase tracking-wider text-sidebar-fg-muted transition-colors hover:bg-rose-950/40 hover:text-rose-300"
                 title="Выйти"
               >
                 <LogOut size={13} />

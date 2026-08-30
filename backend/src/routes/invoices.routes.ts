@@ -51,8 +51,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
         return {
           ...inv,
-          customer_name: inv.customerNameSnapshot || inv.customer.name,
-          staff_name: inv.user.username,
+          customer_name: inv.customerNameSnapshot || inv.customer?.name || 'Клиент',
+          staff_name: inv.user?.username || '—',
           totalProfit: String(req.user?.role || '').toUpperCase() === 'ADMIN' ? totalProfit : undefined,
         };
       }),
@@ -106,6 +106,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
     });
     res.status(201).json(invoice);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -154,6 +157,9 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       : await InvoiceService.reassignCustomer(invoiceId, customerId);
     res.json(invoice);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -191,6 +197,9 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
 
     res.json(result);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -216,6 +225,9 @@ router.post('/:id/return', async (req: AuthRequest, res, next) => {
     });
     res.json(result);
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
@@ -248,6 +260,9 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
 
     res.json({ success: true });
   } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });

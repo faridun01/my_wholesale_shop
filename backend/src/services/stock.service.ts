@@ -45,23 +45,18 @@ export class StockService {
 
     let batches: any[] = [];
     if (typeof client.$queryRaw === 'function') {
-      try {
-        batches = await client.$queryRaw`
-          SELECT id, product_id as "productId", warehouse_id as "warehouseId", 
-                 remaining_quantity as "remainingQuantity", cost_price as "costPrice"
-          FROM product_batches
-          WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} AND remaining_quantity > 0
-          ORDER BY created_at ASC
-          FOR UPDATE
-        `;
-      } catch (e) {
-        // Fallback for non-PostgreSQL / mock environments
-        batches = await client.productBatch.findMany({
-          where: { productId, warehouseId, remainingQuantity: { gt: 0 } },
-          orderBy: { createdAt: 'asc' },
-        });
-      }
+      // Row-locking read: must not silently fall back on error, or concurrent
+      // allocations can race unlocked and oversell/undershoot stock (see stock.service.ts audit).
+      batches = await client.$queryRaw`
+        SELECT id, product_id as "productId", warehouse_id as "warehouseId",
+               remaining_quantity as "remainingQuantity", cost_price as "costPrice"
+        FROM product_batches
+        WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} AND remaining_quantity > 0
+        ORDER BY created_at ASC
+        FOR UPDATE
+      `;
     } else {
+      // Only reached by test mocks that don't implement $queryRaw.
       batches = await client.productBatch.findMany({
         where: { productId, warehouseId, remainingQuantity: { gt: 0 } },
         orderBy: { createdAt: 'asc' },
@@ -175,7 +170,14 @@ export class StockService {
   }
 
   /**
-   * Transfers stock between warehouses.
+   * Transfers stock between warehouses. Products are warehouse-scoped rows (each
+   * warehouse has its own Product record for the same item, see the
+   * [warehouseId, nameKey] unique constraint), so a transfer must move stock into
+   * the destination warehouse's OWN product row (finding or cloning it), never
+   * into a new batch still tagged to the source product's id — otherwise the
+   * stock becomes invisible/unsellable at the destination while
+   * updateProductStockCache (which sums batches by productId only) keeps
+   * counting it against the source product too.
    */
   static async transferStock(
     productId: number,
@@ -190,15 +192,57 @@ export class StockService {
       throw new Error('Количество для переноса должно быть больше 0');
     }
 
+    if (Number(fromWarehouseId) === Number(toWarehouseId)) {
+      throw new Error('Склад назначения должен отличаться от склада списания');
+    }
+
     return await prisma.$transaction(async (tx: any) => {
-      const sourceBatches = await tx.productBatch.findMany({
-        where: {
-          productId,
-          warehouseId: fromWarehouseId,
-          remainingQuantity: { gt: 0 },
-        },
-        orderBy: { createdAt: 'asc' },
+      const sourceProduct = await tx.product.findUnique({ where: { id: productId } });
+
+      if (!sourceProduct) {
+        throw new Error('Товар не найден');
+      }
+
+      if (Number(sourceProduct.warehouseId) !== Number(fromWarehouseId)) {
+        throw new Error('Перемещение можно выполнить только со склада этого товара');
+      }
+
+      let destProduct = await tx.product.findFirst({
+        where: { warehouseId: toWarehouseId, nameKey: sourceProduct.nameKey },
       });
+
+      if (!destProduct) {
+        destProduct = await tx.product.create({
+          data: {
+            categoryId: sourceProduct.categoryId,
+            sku: sourceProduct.sku,
+            name: sourceProduct.name,
+            rawName: sourceProduct.rawName,
+            brand: sourceProduct.brand,
+            nameKey: sourceProduct.nameKey,
+            unit: sourceProduct.unit,
+            baseUnitName: sourceProduct.baseUnitName,
+            purchaseCostPrice: sourceProduct.purchaseCostPrice,
+            expensePercent: sourceProduct.expensePercent,
+            costPrice: sourceProduct.costPrice,
+            sellingPrice: sourceProduct.sellingPrice,
+            minStock: sourceProduct.minStock,
+            photoUrl: sourceProduct.photoUrl,
+            warehouseId: toWarehouseId,
+            active: true,
+          },
+        });
+      }
+
+      // Row-locking read: must not race unlocked, or concurrent transfers/write-offs
+      // of the same batches can both pass the availability check and oversell.
+      const sourceBatches: any[] = await tx.$queryRaw`
+        SELECT id, remaining_quantity as "remainingQuantity", cost_price as "costPrice"
+        FROM product_batches
+        WHERE product_id = ${productId} AND warehouse_id = ${fromWarehouseId} AND remaining_quantity > 0
+        ORDER BY created_at ASC
+        FOR UPDATE
+      `;
 
       const totalAvailable = sourceBatches.reduce(
         (sum: number, b: any) => sum + Number(b.remainingQuantity || 0),
@@ -226,7 +270,7 @@ export class StockService {
 
         await tx.productBatch.create({
           data: {
-            productId,
+            productId: destProduct.id,
             warehouseId: toWarehouseId,
             quantity: takeFromBatch,
             remainingQuantity: takeFromBatch,
@@ -250,7 +294,7 @@ export class StockService {
 
       await tx.inventoryTransaction.create({
         data: {
-          productId,
+          productId: destProduct.id,
           warehouseId: toWarehouseId,
           userId,
           qtyChange: transferQty,
@@ -260,8 +304,9 @@ export class StockService {
       });
 
       await this.updateProductStockCache(productId, tx);
+      await this.updateProductStockCache(destProduct.id, tx);
 
-      return { success: true };
+      return { success: true, destinationProductId: destProduct.id };
     });
   }
 
@@ -276,11 +321,15 @@ export class StockService {
     quantity: number,
     costPrice: number,
     userId: number,
-    reason?: string
+    reason?: string,
+    purchaseCostPrice?: number,
+    expensePercent?: number
   ) {
     const normalizedQty = roundQty(toNumber(quantity, 0));
     const normalizedCost = round2(toNumber(costPrice, 0));
     const normalizedReason = String(reason || 'Stock Arrival').trim();
+    const normalizedPurchaseCostPrice = purchaseCostPrice !== undefined ? round2(toNumber(purchaseCostPrice, 0)) : null;
+    const normalizedExpensePercent = expensePercent !== undefined ? toNumber(expensePercent, 0) : 0;
 
     if (normalizedQty <= 0) {
       throw new Error('Количество должно быть больше 0');
@@ -298,6 +347,8 @@ export class StockService {
           quantity: normalizedQty,
           remainingQuantity: normalizedQty,
           costPrice: normalizedCost,
+          purchaseCostPrice: normalizedPurchaseCostPrice,
+          expensePercent: normalizedExpensePercent,
         },
       });
 
@@ -426,16 +477,15 @@ export class StockService {
         throw new Error('Количество для списания должно быть больше нуля');
       }
 
-      const batches = await tx.productBatch.findMany({
-        where: {
-          productId,
-          warehouseId,
-          remainingQuantity: { gt: 0 },
-        },
-        orderBy: {
-          createdAt: 'asc',
-        },
-      });
+      // Row-locking read: must not race unlocked, or a concurrent write-off/transfer
+      // of the same batches can both pass the availability check and oversell.
+      const batches: any[] = await tx.$queryRaw`
+        SELECT id, remaining_quantity as "remainingQuantity", cost_price as "costPrice"
+        FROM product_batches
+        WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} AND remaining_quantity > 0
+        ORDER BY created_at ASC
+        FOR UPDATE
+      `;
 
       const totalAvailable = roundQty(
         batches.reduce((sum: number, batch: any) => sum + toNumber(batch.remainingQuantity, 0), 0)
@@ -715,6 +765,72 @@ export class StockService {
       });
 
       await this.updateProductStockCache(transaction.productId, tx);
+
+      return { success: true };
+    });
+  }
+
+  /**
+   * Zeroes out a batch's remaining quantity (e.g. correcting a bad batch record),
+   * recording an adjustment transaction for the difference.
+   */
+  static async zeroBatchRemaining(batchId: number, userId: number) {
+    return await prisma.$transaction(async (tx: any) => {
+      const batch = await tx.productBatch.findUnique({ where: { id: batchId } });
+
+      if (!batch) {
+        throw new Error('Партия не найдена');
+      }
+
+      const remaining = roundQty(toNumber(batch.remainingQuantity, 0));
+
+      if (remaining <= 0) {
+        return { success: true };
+      }
+
+      await tx.productBatch.update({
+        where: { id: batchId },
+        data: { remainingQuantity: 0 },
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: batch.productId,
+          warehouseId: batch.warehouseId,
+          userId,
+          qtyChange: -remaining,
+          type: 'adjustment',
+          reason: `Обнуление партии #${batchId}`,
+          costAtTime: round2(toNumber(batch.costPrice, 0)),
+        },
+      });
+
+      await this.updateProductStockCache(batch.productId, tx);
+
+      return { success: true };
+    });
+  }
+
+  /**
+   * Permanently deletes a batch record. Blocked with a friendly error if any sale
+   * has already allocated stock from it (the DB FK would otherwise reject the
+   * delete with a raw constraint error).
+   */
+  static async deleteBatch(batchId: number) {
+    return await prisma.$transaction(async (tx: any) => {
+      const batch = await tx.productBatch.findUnique({ where: { id: batchId } });
+
+      if (!batch) {
+        throw new Error('Партия не найдена');
+      }
+
+      const allocationCount = await tx.saleAllocation.count({ where: { batchId } });
+      if (allocationCount > 0) {
+        throw new Error('Нельзя удалить партию: часть товара из неё уже продана');
+      }
+
+      await tx.productBatch.delete({ where: { id: batchId } });
+      await this.updateProductStockCache(batch.productId, tx);
 
       return { success: true };
     });

@@ -2,29 +2,27 @@ import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext } from '../utils/access.js';
-import { normalizeMoney, roundMoney } from '../utils/money.js';
+import { normalizeMoney, roundMoney, getInvoiceStatus } from '../utils/money.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
 
-function getInvoiceStatus(paidAmount: number, netAmount: number) {
-  if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
-    return 'paid';
-  }
-
-  if (paidAmount > 0) {
-    return 'partial';
-  }
-
-  return 'unpaid';
-}
-
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
-    const { customer_id, invoice_id, amount, method, note } = req.body;
+    const { customer_id, invoice_id, amount, method, note, idempotency_key } = req.body;
     const normalizedAmount = normalizeMoney(amount, 'Amount', { allowZero: false });
     if (!Number.isFinite(normalizedAmount) || normalizedAmount < 0) {
       return res.status(400).json({ error: 'Amount must be a non-negative number' });
+    }
+
+    const idempotencyKey = typeof idempotency_key === 'string' && idempotency_key.trim() ? idempotency_key.trim() : null;
+    if (idempotencyKey) {
+      // A retried/double-submitted request (double-click, network retry) reusing the
+      // same client-generated key returns the original payment instead of creating a duplicate.
+      const existingPayment = await prisma.payment.findUnique({ where: { idempotencyKey } });
+      if (existingPayment) {
+        return res.status(200).json(existingPayment);
+      }
     }
 
     const userId = req.user!.id;
@@ -47,6 +45,22 @@ router.post('/', async (req: AuthRequest, res, next) => {
     }
 
     const payment = await prisma.$transaction(async (tx: any) => {
+      if (invoiceId) {
+        // Lock the invoice row first so concurrent payments (double-click, retry,
+        // two staff recording at once) serialize instead of racing on paidAmount.
+        const locked = await tx.$queryRaw<Array<{ netAmount: any; paidAmount: any }>>`
+          SELECT net_amount as "netAmount", paid_amount as "paidAmount" FROM invoices WHERE id = ${invoiceId} FOR UPDATE
+        `;
+        if (!locked[0]) {
+          throw new Error('Invoice not found');
+        }
+
+        const projectedPaidAmount = Number(locked[0].paidAmount) + normalizedAmount;
+        if (projectedPaidAmount > Number(locked[0].netAmount) + PAYMENT_EPSILON) {
+          throw new Error('Сумма оплаты не может превышать сумму накладной');
+        }
+      }
+
       const p = await tx.payment.create({
         data: {
           customerId: invoice?.customerId ?? Number(customer_id),
@@ -54,25 +68,26 @@ router.post('/', async (req: AuthRequest, res, next) => {
           userId,
           amount: normalizedAmount,
           method: method || 'cash',
+          idempotencyKey,
         },
       });
 
       if (invoiceId) {
-        const currentInvoice = await tx.invoice.findUnique({
+        // Atomic increment (not read-modify-write) so a concurrently-committed
+        // payment's amount can never be overwritten/lost.
+        const updated = await tx.invoice.update({
           where: { id: invoiceId },
+          data: { paidAmount: { increment: normalizedAmount } },
         });
 
-        if (currentInvoice) {
-          const newPaidAmount = roundMoney(Number(currentInvoice.paidAmount) + normalizedAmount);
-          const netAmount = Number(currentInvoice.netAmount);
-          const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
-          
+        const newPaidAmount = roundMoney(Number(updated.paidAmount));
+        const netAmount = Number(updated.netAmount);
+        const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
+
+        if (status !== updated.status) {
           await tx.invoice.update({
             where: { id: invoiceId },
-            data: {
-              paidAmount: newPaidAmount,
-              status,
-            },
+            data: { status },
           });
         }
       }
@@ -81,7 +96,17 @@ router.post('/', async (req: AuthRequest, res, next) => {
     });
 
     res.status(201).json(payment);
-  } catch (error) {
+  } catch (error: any) {
+    // Truly-concurrent duplicate submissions with the same idempotency key: the
+    // pre-check above can both pass before either commits, so the unique constraint
+    // is the final backstop — return the winning payment instead of a 500.
+    const retryKey = typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key.trim() : '';
+    if (error?.code === 'P2002' && retryKey && !res.headersSent) {
+      const existingPayment = await prisma.payment.findUnique({ where: { idempotencyKey: retryKey } });
+      if (existingPayment) {
+        return res.status(200).json(existingPayment);
+      }
+    }
     next(error);
   }
 });
@@ -128,6 +153,10 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     }
 
     const result = await prisma.$transaction(async (tx: any) => {
+      // Lock the invoice row before recomputing paidAmount so a concurrent
+      // payment insert/delete on the same invoice can't interleave with this recompute.
+      await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${payment.invoiceId} FOR UPDATE`;
+
       await tx.payment.delete({
         where: { id: paymentId },
       });
@@ -159,8 +188,8 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
         success: true,
         invoice: {
           ...invoice,
-          customer_name: invoice.customerNameSnapshot || invoice.customer.name,
-          staff_name: invoice.user.username,
+          customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
+          staff_name: invoice.user?.username || '—',
         },
       };
     });

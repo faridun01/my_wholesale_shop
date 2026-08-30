@@ -66,8 +66,8 @@ function PieTooltip({
   const fullName = formatProductName(label);
 
   return (
-    <div className="max-w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl text-left">
-      <p className="break-words text-xs font-semibold leading-relaxed text-slate-900">{fullName}</p>
+    <div className="max-w-70 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl text-left">
+      <p className="wrap-break-word text-xs font-semibold leading-relaxed text-slate-900">{fullName}</p>
       <p className="mt-1.5 text-xs font-bold text-slate-900">
         {reportType === 'returns' ? formatCount(value) : formatMoney(value)}
       </p>
@@ -88,7 +88,7 @@ export default function ReportsCharts({
   return (
     <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
       <Panel title={currentMeta.chartTitle}>
-        <div className="h-[320px]">
+        <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -112,7 +112,7 @@ export default function ReportsCharts({
       </Panel>
 
       <Panel title={currentMeta.pieTitle}>
-        <div className="h-[220px]">
+        <div className="h-55">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={78} paddingAngle={4} dataKey="value">
@@ -136,7 +136,7 @@ export default function ReportsCharts({
               >
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div className="h-3 w-3 shrink-0 rounded-full transition-transform group-hover:scale-110" style={{ backgroundColor: pieColors[index % pieColors.length] }} />
-                  <span className="break-words text-[13px] font-medium leading-5 text-slate-700 group-hover:text-slate-900">
+                  <span className="wrap-break-word text-[13px] font-medium leading-5 text-slate-700 group-hover:text-slate-900">
                     {fullName}
                   </span>
                 </div>

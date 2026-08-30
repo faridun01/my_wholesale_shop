@@ -1,4 +1,4 @@
-import { ceilMoney, formatMoney, roundMoney } from '../format';
+import { ceilMoney, formatCount, formatMoney, roundMoney } from '../format';
 import { formatProductName } from '../productName';
 
 const escapeHtml = (value: unknown) =>
@@ -153,7 +153,7 @@ export function printSalesInvoice({
           <td class="center">${index + 1}</td>
           <td>${escapeHtml(productName)}</td>
           <td class="center">${escapeHtml(unitName)}</td>
-          <td class="right">${escapeHtml(String(Math.round(quantity)))}</td>
+          <td class="right">${escapeHtml(formatCount(quantity))}</td>
           <td class="right">${escapeHtml(formatMoneyWithoutCurrency(price))}</td>
           <td class="right">${escapeHtml(formatMoneyWithoutCurrency(lineTotal))}</td>
           <td class="small">${getQuantityText(item).map((line) => escapeHtml(line)).join('<br>')}</td>

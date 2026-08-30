@@ -1,4 +1,4 @@
-import { FileText, Filter, Search, Tag } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 
 interface WarehouseOption {
   id: string | number;
@@ -15,8 +15,8 @@ interface ProductsCatalogToolbarProps {
   isMergingDuplicates: boolean;
   onSearchChange: (value: string) => void;
   onWarehouseChange: (value: string) => void;
-  onExportStockReport: () => void;
-  onExportPriceList: () => void;
+  onExportStockReport?: () => void;
+  onExportPriceList?: () => void;
   onMergeExactDuplicates: () => void;
 }
 
@@ -30,13 +30,11 @@ export default function ProductsCatalogToolbar({
   isMergingDuplicates,
   onSearchChange,
   onWarehouseChange,
-  onExportStockReport,
-  onExportPriceList,
   onMergeExactDuplicates,
 }: ProductsCatalogToolbarProps) {
   return (
     <div className="flex flex-col gap-4 border-b border-slate-100 bg-white p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex w-full flex-col gap-3 lg:max-w-4xl lg:flex-1">
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:max-w-4xl lg:flex-1">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
@@ -48,48 +46,24 @@ export default function ProductsCatalogToolbar({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          {warehouses.length > 1 ? (
-            <div className="relative w-full">
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-              <select
-                value={selectedWarehouseId}
-                onChange={(event) => onWarehouseChange(event.target.value)}
-                disabled={!isAdmin}
-                className="w-full appearance-none rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-11 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-              >
-                <option value="">Все склады</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="hidden sm:block" />
-          )}
-
-          <button
-            type="button"
-            onClick={onExportStockReport}
-            disabled={!filteredProductsCount}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            <FileText size={15} />
-            <span>Скачать остаток</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onExportPriceList}
-            disabled={!filteredProductsCount}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            <Tag size={15} />
-            <span>Скачать прайс</span>
-          </button>
-        </div>
+        {warehouses.length > 1 && (
+          <div className="relative w-full sm:w-60">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <select
+              value={selectedWarehouseId}
+              onChange={(event) => onWarehouseChange(event.target.value)}
+              disabled={!isAdmin}
+              className="w-full appearance-none rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-11 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+            >
+              <option value="">Все склады</option>
+              {warehouses.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

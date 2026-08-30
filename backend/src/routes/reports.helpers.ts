@@ -23,7 +23,18 @@ type BuildRowsOptions = {
 const parseReportDate = (value: unknown, endOfDay = false) => {
   if (!value) return undefined;
 
-  const date = new Date(String(value));
+  const raw = String(value);
+  // A bare "YYYY-MM-DD" (what the date-range picker sends) is parsed by `new Date()`
+  // as UTC midnight, while endOfDay's setHours(23,59,59,999) below mutates in the
+  // server's LOCAL timezone — on any non-UTC server that mismatch shifts the range
+  // boundaries by the UTC offset, silently excluding early transactions on the first
+  // day. Build date-only strings as local dates instead, matching how
+  // dashboard.helpers.ts's buildDashboardWindows constructs its boundaries.
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const date = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(raw);
+
   if (Number.isNaN(date.getTime())) return undefined;
 
   if (endOfDay) {

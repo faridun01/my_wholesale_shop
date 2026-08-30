@@ -44,7 +44,7 @@ const useProductRestockActions = ({
   const restockPackageQuantity = Math.max(0, Math.floor(Number(restockData.packageQuantityInput || 0) || 0));
   const totalRestockUnits =
     selectedRestockPackaging && selectedRestockPackaging.unitsPerPackage > 0
-      ? restockPackageQuantity * selectedRestockPackaging.unitsPerPackage
+      ? restockPackageQuantity * selectedRestockPackaging.unitsPerPackage + Math.max(0, Number(restockData.quantity || 0))
       : Number(restockData.quantity || 0);
 
   const openRestockProductModal = (product: any) => {

@@ -64,7 +64,7 @@ const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: nu
 };
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
-  return Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0);
+  return Math.max(0, Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0));
 };
 
 const getCustomerSegment = (params: {
@@ -271,7 +271,7 @@ const getCustomerAccess = async (
 ) => {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
-    select: { id: true, createdByUserId: true },
+    select: { id: true, name: true, createdByUserId: true },
   });
 
   if (!customer) {
@@ -299,6 +299,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
 
     const baseWhere: any = {
+      city: access.isAdmin ? undefined : (access.city ?? '__no_city__'),
       OR: [
         { active: true },
         { invoices: { some: {} } },
@@ -346,6 +347,12 @@ router.get('/', async (req: AuthRequest, res, next) => {
           total_paid: 0,
           balance: 0,
           average_invoice: 0,
+          paid_invoiced_total: 0,
+          paid_collected_total: 0,
+          partial_invoiced_total: 0,
+          partial_collected_total: 0,
+          unpaid_invoiced_total: 0,
+          customer_segment: null,
         };
       });
 
@@ -358,7 +365,9 @@ router.get('/', async (req: AuthRequest, res, next) => {
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
-    await mergeDuplicateCustomers(prisma, req.user?.id || null);
+    // Wrapped in a transaction: mergeCustomerRecords repoints invoices/payments/returns
+    // across several tables, and a partial failure mid-merge would desync customer linkage.
+    await prisma.$transaction((tx: any) => mergeDuplicateCustomers(tx, req.user?.id || null));
     const payload = buildCustomerPayload(req.body, access);
     const customerName = payload.name;
     if (!customerName) {
@@ -391,7 +400,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
-    await mergeDuplicateCustomers(prisma, req.user?.id || null);
+    // Wrapped in a transaction: mergeCustomerRecords repoints invoices/payments/returns
+    // across several tables, and a partial failure mid-merge would desync customer linkage.
+    await prisma.$transaction((tx: any) => mergeDuplicateCustomers(tx, req.user?.id || null));
     const customerId = Number(req.params.id);
     const payload = buildCustomerPayload(req.body, access);
     const customerName = payload.name;
@@ -405,6 +416,13 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 
     if (!customerName) {
       return res.status(400).json({ error: 'Название клиента обязательно' });
+    }
+
+    // The default customer is looked up by name (getCanonicalDefaultCustomer), not a
+    // stable flag — renaming it away would silently detach it from every anonymous-sale
+    // invoice that already points at this row, and auto-create a fresh replacement.
+    if (isDefaultCustomerName(current.name) && !isDefaultCustomerName(customerName)) {
+      return res.status(400).json({ error: `Нельзя переименовать служебного клиента "${DEFAULT_CUSTOMER_NAME}"` });
     }
 
     if (isDefaultCustomerName(req.body?.name)) {
@@ -541,11 +559,14 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
     setPaginationHeaders(res, { page, limit, total });
 
     res.json(
-      payments.map((p: any) => ({
-        ...p,
-        amount: access.isAdmin ? p.amount : 0,
-        staff_name: p.user.username,
-      })),
+      payments.map((p: any) => {
+        const { invoice, user, ...rest } = p;
+        return {
+          ...rest,
+          amount: access.isAdmin ? p.amount : 0,
+          staff_name: user?.username || '—',
+        };
+      }),
     );
   } catch (error) {
     next(error);
@@ -567,7 +588,7 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
 
     const where = {
       customerId,
-      invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
+      ...(access.isAdmin ? {} : { invoice: { warehouseId: access.warehouseId ?? -1 } }),
     };
 
     const [returns, total] = await Promise.all([
@@ -587,11 +608,14 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
     setPaginationHeaders(res, { page, limit, total });
 
     res.json(
-      returns.map((r: any) => ({
-        ...r,
-        totalValue: access.isAdmin ? r.totalValue : 0,
-        staff_name: r.user.username,
-      })),
+      returns.map((r: any) => {
+        const { invoice, user, ...rest } = r;
+        return {
+          ...rest,
+          totalValue: access.isAdmin ? r.totalValue : 0,
+          staff_name: user?.username || '—',
+        };
+      }),
     );
   } catch (error) {
     next(error);
@@ -614,8 +638,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     const where = {
       customerId,
       cancelled: false,
-      warehouseId: access.isAdmin ? undefined : (access.warehouseId ?? -1),
-      userId: access.isAdmin ? undefined : (access.userId ?? -1),
+      ...(access.isAdmin ? {} : access.warehouseId ? { warehouseId: access.warehouseId } : {}),
     };
 
     const [invoices, total] = await Promise.all([
@@ -646,19 +669,19 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     const history = invoices.map((invoice: any) => ({
       ...invoice,
       invoiceBalance: getInvoiceBalance(invoice),
-      paymentEvents: invoice.payments.map((payment: any) => ({
+      paymentEvents: (invoice.payments || []).map((payment: any) => ({
         id: payment.id,
         amount: payment.amount,
         method: payment.method,
         createdAt: payment.createdAt,
-        staff_name: payment.user.username,
+        staff_name: payment.user?.username || '—',
       })),
-      returnEvents: invoice.returns.map((itemReturn: any) => ({
+      returnEvents: (invoice.returns || []).map((itemReturn: any) => ({
         id: itemReturn.id,
         totalValue: itemReturn.totalValue,
         reason: itemReturn.reason,
         createdAt: itemReturn.createdAt,
-        staff_name: itemReturn.user.username,
+        staff_name: itemReturn.user?.username || '—',
       })),
     }));
 

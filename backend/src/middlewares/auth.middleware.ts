@@ -106,6 +106,7 @@ const getRequestToken = (req: Request) => {
 
 const resolveUserFromToken = async (token: string) => {
   const decoded = jwt.verify(token, JWT_SECRET, {
+    algorithms: ['HS256'],
     issuer: securityConfig.auth.tokenIssuer,
     audience: securityConfig.auth.tokenAudience,
   }) as any;

@@ -46,11 +46,11 @@ export default function POSCartItemsList({
   return (
     <div
       className={clsx(
-        'order-1 px-3 md:px-4 lg:order-0',
-        'max-h-[380px] lg:max-h-[420px] overflow-y-auto pr-1',
-        '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300/70 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400',
+        'order-1 px-2.5 md:px-3 lg:order-0',
+        'max-h-[calc(100vh-300px)] lg:max-h-[calc(100vh-320px)] overflow-y-auto pr-1',
+        '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300/80 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400',
         isCartExpanded
-          ? 'min-h-0 lg:col-start-1 lg:row-start-3 lg:max-h-[600px]'
+          ? 'min-h-0 lg:col-start-1 lg:row-start-3 lg:max-h-[calc(100vh-200px)]'
           : '',
       )}
     >

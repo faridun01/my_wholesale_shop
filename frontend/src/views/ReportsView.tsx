@@ -232,6 +232,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const [detailPage, setDetailPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [isExcelExporting, setIsExcelExporting] = useState(false);
+  const [showProfitAnalytics, setShowProfitAnalytics] = useState(false);
+  const [showWriteoffAnalytics, setShowWriteoffAnalytics] = useState(false);
   const [returnWriteoffRow, setReturnWriteoffRow] = useState<ReportRow | null>(null);
   const [returnWriteoffQuantity, setReturnWriteoffQuantity] = useState('1');
   const [returnWriteoffReason, setReturnWriteoffReason] = useState('ошибка ввода');
@@ -264,15 +266,23 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const selectedWarehouseName =
     warehouses.find((warehouse) => String(warehouse.id) === selectedWarehouseId)?.name || 'Все склады';
 
+  const loadReportRequestIdRef = React.useRef(0);
+
   const loadReport = async () => {
+    // Guard against out-of-order responses: if the user switches report type/date
+    // range/warehouse again before this request resolves, a slower earlier response
+    // must not overwrite the newer selection's data once it lands.
+    const requestId = ++loadReportRequestIdRef.current;
     const warehouseQuery = selectedWarehouseId ? `&warehouse_id=${selectedWarehouseId}` : '';
 
     try {
       const res = await client.get(
         `/reports/${reportType}?start=${dateRange.start}&end=${dateRange.end}${warehouseQuery}`
       );
+      if (loadReportRequestIdRef.current !== requestId) return;
       setReportData(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
+      if (loadReportRequestIdRef.current !== requestId) return;
       console.error(err);
       toast.error('Ошибка при загрузке отчёта');
     }
@@ -1314,6 +1324,24 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           </div>
 
           <div className="flex items-center gap-2">
+            {reportType === 'profit' && (
+              <button
+                onClick={() => setShowProfitAnalytics(true)}
+                className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700 shadow-xs transition-all hover:bg-emerald-100 hover:shadow-sm active:scale-98"
+              >
+                <TrendingUp size={15} />
+                <span>Детальная аналитика</span>
+              </button>
+            )}
+            {reportType === 'writeoffs' && (
+              <button
+                onClick={() => setShowWriteoffAnalytics(true)}
+                className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-700 shadow-xs transition-all hover:bg-amber-100 hover:shadow-sm active:scale-98"
+              >
+                <AlertTriangle size={15} />
+                <span>Детальная аналитика</span>
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               disabled={isExcelExporting || !reportData.length}
@@ -1552,25 +1580,23 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           </Panel>
         )}
 
-        {reportType !== 'writeoffs' && reportType !== 'returns' && (
-          <React.Suspense
-            fallback={
-              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
-                <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
-                <ChartSkeleton variant="pie" heightClassName="h-[392px]" />
-              </section>
-            }
-          >
-            <ReportsCharts
-              chartData={chartData}
-              pieData={pieData}
-              reportType={reportType}
-              currentMeta={currentMeta}
-              pieColors={PIE_COLORS}
-              panel={Panel}
-            />
-          </React.Suspense>
-        )}
+        <React.Suspense
+          fallback={
+            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
+              <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
+              <ChartSkeleton variant="pie" heightClassName="h-[392px]" />
+            </section>
+          }
+        >
+          <ReportsCharts
+            chartData={chartData}
+            pieData={pieData}
+            reportType={reportType}
+            currentMeta={currentMeta}
+            pieColors={PIE_COLORS}
+            panel={Panel}
+          />
+        </React.Suspense>
 
         <Panel
           title="Детализация транзакций"
@@ -1845,6 +1871,25 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             </div>
           </div>
         )}
+
+        {productProfitAnalytics && (
+          <ProfitAnalyticsModal
+            isOpen={showProfitAnalytics}
+            analytics={productProfitAnalytics}
+            selectedWarehouseName={selectedWarehouseName}
+            dateRangeLabel={`${dateRange.start} - ${dateRange.end}`}
+            onClose={() => setShowProfitAnalytics(false)}
+          />
+        )}
+        {writeoffAnalytics && (
+          <WriteoffAnalyticsModal
+            isOpen={showWriteoffAnalytics}
+            analytics={writeoffAnalytics}
+            selectedWarehouseName={selectedWarehouseName}
+            dateRangeLabel={`${dateRange.start} - ${dateRange.end}`}
+            onClose={() => setShowWriteoffAnalytics(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -1856,6 +1901,7 @@ function ProfitAnalyticsModal({
   selectedWarehouseName,
   dateRangeLabel,
   inline = false,
+  onClose,
 }: {
   isOpen: boolean;
   analytics: {
@@ -1875,6 +1921,7 @@ function ProfitAnalyticsModal({
   selectedWarehouseName: string;
   dateRangeLabel: string;
   inline?: boolean;
+  onClose?: () => void;
 }) {
   const [activeSection, setActiveSection] = useState<
     'leaders' | 'quantity' | 'profit' | 'margin' | 'efficiency' | 'inefficient'
@@ -1888,12 +1935,13 @@ function ProfitAnalyticsModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        onClose?.();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [inline, isOpen]);
+  }, [inline, isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -1901,6 +1949,7 @@ function ProfitAnalyticsModal({
 
   const content = (
       <div
+        onClick={(event) => event.stopPropagation()}
         className={`flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.22)] ${inline ? '' : 'max-h-[92vh] w-full max-w-7xl'}`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/90 px-5 py-4 backdrop-blur">
@@ -1915,9 +1964,13 @@ function ProfitAnalyticsModal({
             </p>
           </div>
           {!inline && (
-            <div className="rounded-2xl p-2 text-slate-400">
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
               <X size={20} />
-            </div>
+            </button>
           )}
         </div>
 
@@ -2100,7 +2153,10 @@ function ProfitAnalyticsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-90 flex items-end justify-center bg-slate-950/55 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+    <div
+      onClick={() => onClose?.()}
+      className="fixed inset-0 z-90 flex items-end justify-center bg-slate-950/55 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+    >
       {content}
     </div>
   );
@@ -2136,6 +2192,7 @@ function WriteoffAnalyticsModal({
   selectedWarehouseName,
   dateRangeLabel,
   inline = false,
+  onClose,
 }: {
   isOpen: boolean;
   analytics: {
@@ -2153,6 +2210,7 @@ function WriteoffAnalyticsModal({
   selectedWarehouseName: string;
   dateRangeLabel: string;
   inline?: boolean;
+  onClose?: () => void;
 }) {
   const [activeSection, setActiveSection] = useState<'leaders' | 'products' | 'reasons' | 'staff' | 'warehouses'>('leaders');
 
@@ -2164,12 +2222,13 @@ function WriteoffAnalyticsModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        onClose?.();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [inline, isOpen]);
+  }, [inline, isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -2177,6 +2236,7 @@ function WriteoffAnalyticsModal({
 
   const content = (
       <div
+        onClick={(event) => event.stopPropagation()}
         className={`flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.22)] ${inline ? '' : 'max-h-[92vh] w-full max-w-6xl'}`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/90 px-5 py-4 backdrop-blur">
@@ -2191,9 +2251,13 @@ function WriteoffAnalyticsModal({
             </p>
           </div>
           {!inline && (
-            <div className="rounded-2xl p-2 text-slate-400">
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
               <X size={20} />
-            </div>
+            </button>
           )}
         </div>
 
@@ -2315,7 +2379,10 @@ function WriteoffAnalyticsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-90 flex items-end justify-center bg-slate-950/55 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+    <div
+      onClick={() => onClose?.()}
+      className="fixed inset-0 z-90 flex items-end justify-center bg-slate-950/55 p-2 backdrop-blur-sm sm:items-center sm:p-4"
+    >
       {content}
     </div>
   );

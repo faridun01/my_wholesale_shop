@@ -121,6 +121,7 @@ const signAccessToken = (user: {
     },
     JWT_SECRET,
     {
+      algorithm: 'HS256',
       expiresIn: securityConfig.auth.tokenExpiresIn as SignOptions['expiresIn'],
       issuer: securityConfig.auth.tokenIssuer,
       audience: securityConfig.auth.tokenAudience,
@@ -129,6 +130,7 @@ const signAccessToken = (user: {
 
 const signScopedToken = (payload: Record<string, unknown>, expiresIn: string) =>
   jwt.sign(payload, JWT_SECRET, {
+    algorithm: 'HS256',
     expiresIn: expiresIn as SignOptions['expiresIn'],
     issuer: securityConfig.auth.tokenIssuer,
     audience: TWO_FACTOR_TOKEN_AUDIENCE,
@@ -136,6 +138,7 @@ const signScopedToken = (payload: Record<string, unknown>, expiresIn: string) =>
 
 const verifyScopedToken = (token: string) =>
   jwt.verify(token, JWT_SECRET, {
+    algorithms: ['HS256'],
     issuer: securityConfig.auth.tokenIssuer,
     audience: TWO_FACTOR_TOKEN_AUDIENCE,
   }) as jwt.JwtPayload & Record<string, unknown>;

@@ -47,6 +47,9 @@ const useSalesPaymentActions = ({
         invoice_id: selectedInvoice.id,
         amount: normalizedAmount,
         method: 'cash',
+        // Lets the backend dedupe a network retry of this exact submit instead of
+        // double-applying the payment.
+        idempotency_key: crypto.randomUUID(),
       });
       toast.success('Оплата принята');
       closePaymentModal();

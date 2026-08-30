@@ -1,6 +1,6 @@
 import React from 'react';
 import { Scissors, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
 import { formatProductName } from '../../utils/productName';
 import { getStockBreakdown } from '../../utils/productsViewUtils';
@@ -34,19 +34,19 @@ export default function ProductWriteOffModal({
   onSetQuantity,
   setWriteOffData,
 }: ProductWriteOffModalProps) {
-  if (!isOpen || !selectedProduct) return null;
-
-  const stock = Number(selectedProduct.stock || 0);
+  const stock = Number(selectedProduct?.stock || 0);
   const packageUnits = Number(selectedPackaging?.unitsPerPackage || 0);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-    >
+    <AnimatePresence>
+      {isOpen && selectedProduct && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+        >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -181,6 +181,8 @@ export default function ProductWriteOffModal({
           </div>
         </form>
       </motion.div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -114,7 +114,6 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci_docker_postgres_password
           JWT_SECRET: ci_docker_jwt_secret
-          OCR_API_KEY: ci_docker_ocr_key
           TWO_FACTOR_BACKUP_PEPPER: ci_docker_pepper
         run: docker compose build
 

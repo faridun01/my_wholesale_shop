@@ -12,7 +12,6 @@ Required variables:
 - `POSTGRES_PASSWORD`
 - `JWT_SECRET`
 - `TWO_FACTOR_BACKUP_PEPPER`
-- `OCR_API_KEY`
 
 Optional:
 - `POSTGRES_DB`

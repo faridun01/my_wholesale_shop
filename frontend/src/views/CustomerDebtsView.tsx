@@ -674,7 +674,107 @@ export default function CustomerDebtsView() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 pt-1 md:hidden">
+            {paginatedCustomers.length === 0 ? (
+              <p className="py-10 text-center text-xs font-medium text-slate-400">
+                По текущим фильтрам клиентов не найдено.
+              </p>
+            ) : (
+              paginatedCustomers.map((customer) => {
+                const aggregateStatus = getCustomerPaymentStatus(customer);
+                const displayStatus = statusFilter === 'all' ? aggregateStatus : statusFilter;
+                const statusMeta = customerPaymentStatusMeta[displayStatus];
+                const warehouseNames =
+                  Array.isArray(customer.warehouse_names) && customer.warehouse_names.length > 0
+                    ? customer.warehouse_names.join(', ')
+                    : '---';
+                const visibleHistoryInvoices = getVisibleInvoicesForCustomer(customer);
+                const visibleInvoiceCount =
+                  visibleHistoryInvoices !== null
+                    ? visibleHistoryInvoices.length
+                    : statusFilter === 'all'
+                      ? Number(customer.invoice_count || 0)
+                      : getCustomerInvoicesByStatus(customer, statusFilter);
+                const visiblePurchasedTotal =
+                  visibleHistoryInvoices !== null
+                    ? getInvoicesNetTotal(visibleHistoryInvoices)
+                    : getCustomerPurchasedTotalByFilter(customer, statusFilter);
+                const visiblePaidTotal =
+                  visibleHistoryInvoices !== null
+                    ? getInvoicesPaidTotal(visibleHistoryInvoices)
+                    : getCustomerPaidTotalByFilter(customer, statusFilter);
+                const visibleDebtTotal =
+                  visibleHistoryInvoices !== null
+                    ? getInvoicesDebtTotal(visibleHistoryInvoices)
+                    : statusFilter === 'paid'
+                      ? 0
+                      : getCustomerDebtTotal(customer);
+
+                return (
+                  <div key={`mobile-debt-${customer.id}`} className="rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 p-4 shadow-xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{customer.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-slate-400">{warehouseNames}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">{customer.phone || '—'}</p>
+                      </div>
+                      {isAdmin ? (
+                        <span
+                          title={statusMeta.label}
+                          className={clsx(
+                            'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border shadow-xs',
+                            displayStatus === 'paid'
+                              ? 'border-emerald-200/80 bg-emerald-50 text-emerald-600'
+                              : displayStatus === 'partial'
+                                ? 'border-amber-200/80 bg-amber-50 text-amber-600'
+                                : 'border-rose-200/80 bg-rose-50 text-rose-500'
+                          )}
+                        >
+                          {displayStatus === 'paid' ? (
+                            <CheckCircle2 size={15} />
+                          ) : displayStatus === 'partial' ? (
+                            <Clock size={15} />
+                          ) : (
+                            <AlertCircle size={15} />
+                          )}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-xs text-slate-400">Скрыто</span>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Накладных</p>
+                        <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatCount(visibleInvoiceCount)}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Купил всего</p>
+                        <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatMoneyByRole(visiblePurchasedTotal)}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплатил всего</p>
+                        <p className="mt-0.5 text-sm font-semibold text-emerald-600">{formatMoneyByRole(visiblePaidTotal)}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Долг</p>
+                        <p className={clsx('mt-0.5 text-sm font-semibold', isAdmin && visibleDebtTotal > 0 ? 'text-rose-600' : 'text-slate-900')}>
+                          {formatMoneyByRole(visibleDebtTotal)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-[11px] text-slate-400">
+                      Последняя покупка:{' '}
+                      {customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString('ru-RU') : 'Нет покупок'}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-wider text-slate-500">

@@ -302,7 +302,7 @@ const SalesInvoicesSection = ({
   );
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-[28px] border border-white bg-white p-5 shadow-sm md:min-h-[760px]">
+    <div className="flex flex-col overflow-hidden rounded-[28px] border border-white bg-white p-5 shadow-sm md:min-h-190">
       <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-slate-900">Накладные</h2>
@@ -521,14 +521,13 @@ const SalesInvoicesSection = ({
         />
       </div>
 
-      <div className="hidden min-h-[560px] flex-1 overflow-x-auto pt-3 md:block">
+      <div className="hidden min-h-140 flex-1 overflow-x-auto pt-3 md:block">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
               <th className="px-4 py-3">{renderSortLabel('Дата', 'createdAt')}</th>
               <th className="px-4 py-3">{renderSortLabel('Клиент', 'customer_name')}</th>
               <th className="px-4 py-3">{renderSortLabel('Сумма', 'netAmount')}</th>
-              <th className="px-4 py-3">Возврат</th>
               <th className="px-4 py-3">{renderSortLabel('Оплачено', 'paidAmount')}</th>
               <th className="px-4 py-3">{renderSortLabel('Остаток', 'balance')}</th>
               <th className="px-4 py-3">{renderSortLabel('Статус', 'status')}</th>
@@ -540,7 +539,6 @@ const SalesInvoicesSection = ({
               const paymentDisabled = isPaymentActionDisabled(inv);
               const returnDisabled = isReturnActionDisabled(inv);
               const returnedAmount = getInvoiceReturnedAmount(inv);
-              const returnedItemsCount = getInvoiceReturnedItems(inv).length;
               const hasReturns = hasInvoiceReturns(inv);
 
               return (
@@ -553,17 +551,12 @@ const SalesInvoicesSection = ({
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900">{inv.customer_name}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</td>
                   <td className="px-4 py-3">
-                    {hasReturns ? (
-                      <div className="inline-flex flex-col rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1">
-                        <span className="font-semibold text-rose-600">-{formatMoney(returnedAmount)}</span>
-                        <span className="text-[10px] font-medium text-amber-700">
-                          {returnedItemsCount > 0 ? `${formatCount(returnedItemsCount)} поз.` : 'возврат'}
-                        </span>
+                    <span className="font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</span>
+                    {hasReturns && (
+                      <div className="mt-0.5 text-[10px] font-medium text-rose-600">
+                        возврат: -{formatMoney(returnedAmount)}
                       </div>
-                    ) : (
-                      <span className="text-slate-300">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-semibold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
@@ -592,7 +585,7 @@ const SalesInvoicesSection = ({
             })}
             {sortedInvoicesLength === 0 && !isLoading && (
               <tr>
-                <td colSpan={8} className="px-8 py-20 text-center">
+                <td colSpan={7} className="px-8 py-20 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f5fb] text-slate-400">
                       <Receipt size={24} />

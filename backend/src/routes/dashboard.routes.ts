@@ -11,6 +11,7 @@ import {
   filterAndSortLowStock,
   safePercentChange,
 } from './dashboard.helpers.js';
+import { getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
 
 const router = Router();
 
@@ -23,19 +24,56 @@ const getInvoiceNetAmount = async (where: any) => {
   return Number(result._sum.netAmount || 0);
 };
 
+// Profit = SUM(invoice.net_amount) - SUM(actual COGS). Net amount already reflects
+// invoice discount/tax, and COGS prefers real batch-allocation cost (falling back to
+// the item's average cost) — this matches the methodology reports.routes.ts uses
+// (getLineNetRevenue/getLineCost), so Dashboard and Reports no longer diverge on
+// discounted/taxed invoices.
 const getDashboardProfit = async (warehouseId: number | null) => {
   const rows = await prisma.$queryRaw<Array<{ totalProfit: unknown }>>(
     warehouseId
       ? Prisma.sql`
-          SELECT COALESCE(SUM((ii.selling_price - ii.cost_price) * (ii.quantity - ii.returned_qty)), 0) AS "totalProfit"
-          FROM invoice_items ii
-          INNER JOIN invoices i ON i.id = ii.invoice_id
+          SELECT COALESCE(SUM(i.net_amount) - SUM(COALESCE(cost_agg.total_cost, 0)), 0) AS "totalProfit"
+          FROM invoices i
+          LEFT JOIN (
+            SELECT ii.invoice_id,
+              SUM(
+                CASE WHEN COALESCE(alloc.total_alloc_cost, 0) > 0
+                  THEN alloc.total_alloc_cost
+                  ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
+                END
+              ) AS total_cost
+            FROM invoice_items ii
+            LEFT JOIN (
+              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity) AS total_alloc_cost
+              FROM sale_allocations sa
+              INNER JOIN product_batches pb ON pb.id = sa.batch_id
+              GROUP BY sa.invoice_item_id
+            ) alloc ON alloc.invoice_item_id = ii.id
+            GROUP BY ii.invoice_id
+          ) cost_agg ON cost_agg.invoice_id = i.id
           WHERE i.cancelled = false AND i.warehouse_id = ${warehouseId}
         `
       : Prisma.sql`
-          SELECT COALESCE(SUM((ii.selling_price - ii.cost_price) * (ii.quantity - ii.returned_qty)), 0) AS "totalProfit"
-          FROM invoice_items ii
-          INNER JOIN invoices i ON i.id = ii.invoice_id
+          SELECT COALESCE(SUM(i.net_amount) - SUM(COALESCE(cost_agg.total_cost, 0)), 0) AS "totalProfit"
+          FROM invoices i
+          LEFT JOIN (
+            SELECT ii.invoice_id,
+              SUM(
+                CASE WHEN COALESCE(alloc.total_alloc_cost, 0) > 0
+                  THEN alloc.total_alloc_cost
+                  ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
+                END
+              ) AS total_cost
+            FROM invoice_items ii
+            LEFT JOIN (
+              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity) AS total_alloc_cost
+              FROM sale_allocations sa
+              INNER JOIN product_batches pb ON pb.id = sa.batch_id
+              GROUP BY sa.invoice_item_id
+            ) alloc ON alloc.invoice_item_id = ii.id
+            GROUP BY ii.invoice_id
+          ) cost_agg ON cost_agg.invoice_id = i.id
           WHERE i.cancelled = false
         `
   );
@@ -76,6 +114,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
       overviewSales,
       topProductSalesRaw,
       totalProfitAggregate,
+      totalDebtsAggregate,
       reminders,
       currentMonthInvoiceStats,
       previousMonthInvoiceStats,
@@ -184,6 +223,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
         take: 5,
       }),
       getDashboardProfit(selectedWarehouseId),
+      getTotalOutstandingDebt(prisma, debtInvoiceWhere.warehouseId),
       prisma.reminder.findMany({
         where: { userId: req.user!.id, isCompleted: false },
         orderBy: { dueDate: 'asc' },
@@ -252,18 +292,7 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     const totalRevenue = Number(invoiceTotals._sum.netAmount || 0);
     const totalPaid = Number(invoiceTotals._sum.paidAmount || 0);
 
-    const allInvoicesForDebts = await prisma.invoice.findMany({
-      where: debtInvoiceWhere,
-      select: {
-        netAmount: true,
-        paidAmount: true,
-      },
-    });
-
-    const totalDebts = allInvoicesForDebts.reduce((sum, inv) => {
-      const debt = Math.max(0, Number(inv.netAmount || 0) - Number(inv.paidAmount || 0));
-      return sum + debt;
-    }, 0);
+    const totalDebts = Number(totalDebtsAggregate || 0);
 
     const totalProfit = Number(totalProfitAggregate || 0);
     const productSales = new Map(

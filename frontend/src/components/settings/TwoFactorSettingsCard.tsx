@@ -8,6 +8,7 @@ import {
   verifyTwoFactorSetup,
 } from '../../api/auth.api';
 import { updateStoredUser } from '../../utils/authStorage';
+import { Badge, Button, Card, Input } from '../UI';
 
 type Props = {
   currentUser: {
@@ -139,179 +140,133 @@ export default function TwoFactorSettingsCard({ currentUser }: Props) {
   };
 
   return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-<h3 className="flex items-center space-x-3 text-2xl font-medium text-slate-900">
-  <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600 shadow-inner ring-4 ring-emerald-50">
-    <ShieldCheck size={28} />
-  </div>
-  <span>Двухфакторная защита</span>
-</h3>
-          <p className="mt-3 text-sm font-medium text-slate-500">
-            Вход будет подтверждаться кодом из Google Authenticator или Microsoft Authenticator.
-          </p>
-        </div>
-        <span className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.18em] transition-all ${twoFactorEnabled ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'}`}>
-          {twoFactorEnabled ? 'Включена' : 'Выключена'}
+    <Card
+      title={
+        <span className="flex items-center gap-2.5 text-section-title">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-50 text-accent-600">
+            <ShieldCheck size={18} />
+          </span>
+          <span>Двухфакторная защита</span>
         </span>
-      </div>
-
+      }
+      subtitle="Вход будет подтверждаться кодом из Google Authenticator или Microsoft Authenticator."
+      headerActions={<Badge variant={twoFactorEnabled ? 'success' : 'default'}>{twoFactorEnabled ? 'Включена' : 'Выключена'}</Badge>}
+    >
       {!twoFactorEnabled && !setupData && (
-        <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 transition-all duration-300 hover:border-emerald-200 hover:bg-emerald-50/40">
-            <p className="text-sm font-semibold leading-7 text-slate-600">
+        <div className="space-y-4">
+          <div className="rounded-lg border border-line bg-surface-muted p-4">
+            <p className="text-sm leading-6 text-slate-600">
               Нажмите кнопку ниже, затем добавьте аккаунт в приложение-аутентификатор вручную по секретному ключу.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleStartSetup}
-            disabled={isLoading}
-            className="rounded-2xl bg-emerald-500 px-8 py-4 font-black text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 disabled:opacity-70"
-          >
+          <Button type="button" onClick={handleStartSetup} disabled={isLoading} isLoading={isLoading}>
             Подготовить 2FA
-          </button>
+          </Button>
         </div>
       )}
 
       {!twoFactorEnabled && setupData && (
-        <form onSubmit={handleVerifySetup} className="space-y-6">
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-6 transition-all duration-300 hover:shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Шаг 1</p>
-            <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
+        <form onSubmit={handleVerifySetup} className="space-y-5">
+          <div className="rounded-lg border border-accent-100 bg-accent-50 p-4 sm:p-5">
+            <p className="text-eyebrow text-accent-700">Шаг 1</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
               Откройте Google Authenticator или Microsoft Authenticator и отсканируйте QR-код. Если сканирование недоступно, используйте секретный ключ вручную:
             </p>
             {qrCodeDataUrl && (
               <div className="mt-4 flex justify-center">
-                <div className="rounded-3xl bg-white p-4 shadow-sm">
+                <div className="rounded-lg border border-line bg-white p-3">
                   <img
                     src={qrCodeDataUrl}
                     alt="QR code for two-factor authentication"
-                    className="h-56 w-56 rounded-2xl"
+                    className="h-56 w-56 rounded-md"
                   />
                 </div>
               </div>
             )}
-            <div className="mt-4 rounded-2xl bg-white px-5 py-4 font-mono text-lg font-bold tracking-[0.18em] text-slate-900">
+            <div className="font-tabular mt-4 break-all rounded-lg border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-900">
               {setupData.secret}
             </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleOpenAuthenticator}
-                className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition-all hover:bg-emerald-700"
-              >
+            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+              <Button type="button" variant="primary" size="sm" onClick={handleOpenAuthenticator}>
                 Открыть в Authenticator
-              </button>
-              <button
-                type="button"
-                onClick={handleCopySecret}
-                className="rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 transition-all hover:bg-emerald-50"
-              >
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={handleCopySecret}>
                 Копировать ключ
-              </button>
+              </Button>
             </div>
             <p className="mt-3 text-xs text-slate-500">
               Если приложение не открылось автоматически, добавьте аккаунт вручную и вставьте этот секретный ключ.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-6 transition-all duration-300 hover:shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Шаг 2</p>
-            <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <p className="text-eyebrow text-amber-700">Шаг 2</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
               Сохраните резервные коды. Каждый код можно использовать только один раз.
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {setupData.backupCodes.map((code) => (
-                <div key={code} className="rounded-2xl bg-white px-4 py-3 font-mono text-sm font-bold text-slate-800">
+                <div key={code} className="font-tabular rounded-md border border-line bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800">
                   {code}
                 </div>
               ))}
             </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-black uppercase tracking-widest text-slate-700">Код подтверждения</label>
-            <div className="relative">
-              <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="text"
-                required
-                value={verificationCode}
-                onChange={(event) => setVerificationCode(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-5 py-4 pl-12 font-bold outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-300/40"
-                placeholder="Введите 6-значный код"
-              />
-            </div>
-          </div>
+          <Input
+            label="Код подтверждения"
+            icon={<KeyRound size={16} />}
+            type="text"
+            required
+            value={verificationCode}
+            onChange={(event) => setVerificationCode(event.target.value)}
+            placeholder="Введите 6-значный код"
+          />
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setSetupData(null)}
-              className="rounded-2xl px-6 py-4 font-black text-slate-500 transition-all hover:bg-slate-50"
-            >
+          <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+            <Button type="button" variant="ghost" onClick={() => setSetupData(null)}>
               Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="rounded-2xl bg-emerald-500 px-8 py-4 font-black text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 disabled:opacity-70"
-            >
+            </Button>
+            <Button type="submit" variant="primary" disabled={isLoading} isLoading={isLoading}>
               Подтвердить и включить
-            </button>
+            </Button>
           </div>
         </form>
       )}
 
       {twoFactorEnabled && (
-        <form onSubmit={handleDisable} className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <p className="text-sm font-semibold leading-7 text-slate-700">
+        <form onSubmit={handleDisable} className="space-y-5">
+          <div className="rounded-lg border border-line bg-surface-muted p-4">
+            <p className="text-sm leading-6 text-slate-600">
               Чтобы отключить 2FA, введите текущий пароль и код из приложения-аутентификатора. Вместо кода можно использовать один из backup codes.
             </p>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-black uppercase tracking-widest text-slate-700">Текущий пароль</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="password"
-                required
-                value={disablePassword}
-                onChange={(event) => setDisablePassword(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-5 py-4 pl-12 font-bold outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-300/40"
-                placeholder="Введите текущий пароль"
-              />
-            </div>
-          </div>
+          <Input
+            label="Текущий пароль"
+            icon={<Lock size={16} />}
+            type="password"
+            required
+            value={disablePassword}
+            onChange={(event) => setDisablePassword(event.target.value)}
+            placeholder="Введите текущий пароль"
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-black uppercase tracking-widest text-slate-700">Код 2FA или backup code</label>
-            <div className="relative">
-              <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="text"
-                required
-                value={disableCode}
-                onChange={(event) => setDisableCode(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-5 py-4 pl-12 font-bold outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-300/40"
-                placeholder="123456 или ABCDE-12345"
-              />
-            </div>
-          </div>
+          <Input
+            label="Код 2FA или backup code"
+            icon={<KeyRound size={16} />}
+            type="text"
+            required
+            value={disableCode}
+            onChange={(event) => setDisableCode(event.target.value)}
+            placeholder="123456 или ABCDE-12345"
+          />
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="rounded-2xl bg-rose-600 px-8 py-4 font-black text-white shadow-xl shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:opacity-70"
-          >
+          <Button type="submit" variant="destructive" disabled={isLoading} isLoading={isLoading}>
             Отключить 2FA
-          </button>
+          </Button>
         </form>
       )}
-    </div>
+    </Card>
   );
 }

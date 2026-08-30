@@ -1,10 +1,8 @@
 import React from 'react';
-import { AnimatePresence } from 'motion/react';
 import ConfirmationModal from '../common/ConfirmationModal';
 import { formatProductName } from '../../utils/productName';
 import ProductFormModal from './ProductFormModal';
 import ProductMergeModal from './ProductMergeModal';
-import ProductOcrResultsModal from './ProductOcrResultsModal';
 import ProductRestockModal from './ProductRestockModal';
 import ProductReturnWriteOffModal from './ProductReturnWriteOffModal';
 import ProductTransferModal from './ProductTransferModal';
@@ -54,17 +52,6 @@ interface ProductsModalsProps {
   writeOffReasonPresets: string[];
   normalizedWriteOffReason: string;
   isCustomWriteOffReason: boolean;
-  ocrResults: any[] | null;
-  visibleOcrResults: any[];
-  invalidOcrRowsCount: number;
-  problematicOcrRows: Array<{ lineIndex: number; reason: string }>;
-  ocrImportedCount: number;
-  ocrOriginalCount: number;
-  usdRate: string;
-  scanExpensePercent: string;
-  showOnlyProblematicOcrRows: boolean;
-  highlightedOcrLine: number | null;
-  ocrRowRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>;
   mergeCandidates: any[];
   mergeTargetId: string;
   returnWriteOffData: { quantity: string; reason: string };
@@ -72,7 +59,6 @@ interface ProductsModalsProps {
   closeTransferModal: () => void;
   closeRestockModal: () => void;
   closeWriteOffModal: () => void;
-  closeOcrResultsModal: () => void;
   closeHistoryModal: () => void;
   closeBatchesModal: () => void;
   closeMergeModal: () => void;
@@ -85,8 +71,6 @@ interface ProductsModalsProps {
   handleRestock: (event: React.FormEvent) => void;
   handleSubmitWriteOff: (event: React.FormEvent) => void;
   handleSetWriteOffQuantity: (value: number) => void;
-  handleAddOcrToStock: () => void;
-  jumpToOcrLine: (lineIndex: number) => void;
   handleReverseIncoming: (transactionId: number) => void;
   handleReverseCorrectionWriteOff: (transactionId: number) => void;
   handleOpenReturnWriteOffModal: (transaction: any) => void;
@@ -104,10 +88,6 @@ interface ProductsModalsProps {
   setTransferData: React.Dispatch<React.SetStateAction<any>>;
   setRestockData: React.Dispatch<React.SetStateAction<any>>;
   setWriteOffData: React.Dispatch<React.SetStateAction<any>>;
-  setOcrResults: React.Dispatch<React.SetStateAction<any[] | null>>;
-  setUsdRate: React.Dispatch<React.SetStateAction<string>>;
-  setScanExpensePercent: React.Dispatch<React.SetStateAction<string>>;
-  setShowOnlyProblematicOcrRows: React.Dispatch<React.SetStateAction<boolean>>;
   setMergeTargetId: React.Dispatch<React.SetStateAction<string>>;
   setReturnWriteOffData: React.Dispatch<React.SetStateAction<{ quantity: string; reason: string }>>;
 }
@@ -154,17 +134,6 @@ export default function ProductsModals(props: ProductsModalsProps) {
     writeOffReasonPresets,
     normalizedWriteOffReason,
     isCustomWriteOffReason,
-    ocrResults,
-    visibleOcrResults,
-    invalidOcrRowsCount,
-    problematicOcrRows,
-    ocrImportedCount,
-    ocrOriginalCount,
-    usdRate,
-    scanExpensePercent,
-    showOnlyProblematicOcrRows,
-    highlightedOcrLine,
-    ocrRowRefs,
     mergeCandidates,
     mergeTargetId,
     returnWriteOffData,
@@ -172,7 +141,6 @@ export default function ProductsModals(props: ProductsModalsProps) {
     closeTransferModal,
     closeRestockModal,
     closeWriteOffModal,
-    closeOcrResultsModal,
     closeHistoryModal,
     closeBatchesModal,
     closeMergeModal,
@@ -185,8 +153,6 @@ export default function ProductsModals(props: ProductsModalsProps) {
     handleRestock,
     handleSubmitWriteOff,
     handleSetWriteOffQuantity,
-    handleAddOcrToStock,
-    jumpToOcrLine,
     handleReverseIncoming,
     handleReverseCorrectionWriteOff,
     handleOpenReturnWriteOffModal,
@@ -204,112 +170,74 @@ export default function ProductsModals(props: ProductsModalsProps) {
     setTransferData,
     setRestockData,
     setWriteOffData,
-    setOcrResults,
-    setUsdRate,
-    setScanExpensePercent,
-    setShowOnlyProblematicOcrRows,
     setMergeTargetId,
     setReturnWriteOffData,
   } = props;
 
   return (
     <>
-      <AnimatePresence>
-        <ProductFormModal
-          isOpen={showAddModal || showEditModal}
-          isEditMode={showEditModal}
-          isAdmin={isAdmin}
-          formData={formData}
-          categoryInput={categoryInput}
-          visibleCategories={visibleCategories}
-          warehouses={warehouses}
-          isPhotoUploading={isPhotoUploading}
-          onClose={closeProductFormModal}
-          onSubmit={showEditModal ? handleEditProduct : handleAddProduct}
-          setFormData={setFormData}
-          setCategoryInput={setCategoryInput}
-          setIsCategoryManual={setIsCategoryManual}
-          onPhotoUpload={handlePhotoUpload}
-        />
-      </AnimatePresence>
+      <ProductFormModal
+        isOpen={showAddModal || showEditModal}
+        isEditMode={showEditModal}
+        isAdmin={isAdmin}
+        formData={formData}
+        categoryInput={categoryInput}
+        visibleCategories={visibleCategories}
+        warehouses={warehouses}
+        isPhotoUploading={isPhotoUploading}
+        onClose={closeProductFormModal}
+        onSubmit={showEditModal ? handleEditProduct : handleAddProduct}
+        setFormData={setFormData}
+        setCategoryInput={setCategoryInput}
+        setIsCategoryManual={setIsCategoryManual}
+        onPhotoUpload={handlePhotoUpload}
+      />
 
-      <AnimatePresence>
-        <ProductTransferModal
-          isOpen={showTransferModal}
-          selectedProduct={selectedProduct}
-          warehouses={warehouses}
-          transferData={transferData}
-          selectedTransferPackaging={selectedTransferPackaging}
-          transferUnitsPerPackage={transferUnitsPerPackage}
-          transferAvailableFullPackages={transferAvailableFullPackages}
-          transferRemainderUnits={transferRemainderUnits}
-          transferPackageQuantity={transferPackageQuantity}
-          totalTransferUnits={totalTransferUnits}
-          availableTransferStock={availableTransferStock}
-          onClose={closeTransferModal}
-          onSubmit={handleTransfer}
-          setTransferData={setTransferData}
-        />
-      </AnimatePresence>
+      <ProductTransferModal
+        isOpen={showTransferModal}
+        selectedProduct={selectedProduct}
+        warehouses={warehouses}
+        transferData={transferData}
+        selectedTransferPackaging={selectedTransferPackaging}
+        transferUnitsPerPackage={transferUnitsPerPackage}
+        transferAvailableFullPackages={transferAvailableFullPackages}
+        transferRemainderUnits={transferRemainderUnits}
+        transferPackageQuantity={transferPackageQuantity}
+        totalTransferUnits={totalTransferUnits}
+        availableTransferStock={availableTransferStock}
+        onClose={closeTransferModal}
+        onSubmit={handleTransfer}
+        setTransferData={setTransferData}
+      />
 
-      <AnimatePresence>
-        <ProductRestockModal
-          isOpen={showRestockModal}
-          isAdmin={isAdmin}
-          selectedProduct={selectedProduct}
-          warehouses={warehouses}
-          restockData={restockData}
-          restockPackagings={restockPackagings}
-          selectedRestockPackaging={selectedRestockPackaging}
-          totalRestockUnits={totalRestockUnits}
-          onClose={closeRestockModal}
-          onSubmit={handleRestock}
-          setRestockData={setRestockData}
-        />
-      </AnimatePresence>
+      <ProductRestockModal
+        isOpen={showRestockModal}
+        isAdmin={isAdmin}
+        selectedProduct={selectedProduct}
+        warehouses={warehouses}
+        restockData={restockData}
+        restockPackagings={restockPackagings}
+        selectedRestockPackaging={selectedRestockPackaging}
+        totalRestockUnits={totalRestockUnits}
+        onClose={closeRestockModal}
+        onSubmit={handleRestock}
+        setRestockData={setRestockData}
+      />
 
-      <AnimatePresence>
-        <ProductWriteOffModal
-          isOpen={showWriteOffModal}
-          selectedProduct={selectedWriteOffProduct}
-          warehouses={warehouses}
-          writeOffData={writeOffData}
-          selectedPackaging={selectedWriteOffPackaging}
-          reasonPresets={writeOffReasonPresets}
-          normalizedReason={normalizedWriteOffReason}
-          isCustomReason={isCustomWriteOffReason}
-          onClose={closeWriteOffModal}
-          onSubmit={handleSubmitWriteOff}
-          onSetQuantity={handleSetWriteOffQuantity}
-          setWriteOffData={setWriteOffData}
-        />
-      </AnimatePresence>
-
-      <AnimatePresence>
-        <ProductOcrResultsModal
-          isOpen={Boolean(ocrResults)}
-          ocrResults={ocrResults}
-          visibleOcrResults={visibleOcrResults}
-          invalidOcrRowsCount={invalidOcrRowsCount}
-          problematicOcrRows={problematicOcrRows}
-          ocrImportedCount={ocrImportedCount}
-          ocrOriginalCount={ocrOriginalCount}
-          usdRate={usdRate}
-          scanExpensePercent={scanExpensePercent}
-          showOnlyProblematicOcrRows={showOnlyProblematicOcrRows}
-          highlightedOcrLine={highlightedOcrLine}
-          isLoading={isLoading}
-          ocrRowRefs={ocrRowRefs}
-          onBackdropClose={() => setOcrResults(null)}
-          onClose={closeOcrResultsModal}
-          onAddOcrToStock={handleAddOcrToStock}
-          onJumpToOcrLine={jumpToOcrLine}
-          setOcrResults={setOcrResults}
-          setUsdRate={setUsdRate}
-          setScanExpensePercent={setScanExpensePercent}
-          setShowOnlyProblematicOcrRows={setShowOnlyProblematicOcrRows}
-        />
-      </AnimatePresence>
+      <ProductWriteOffModal
+        isOpen={showWriteOffModal}
+        selectedProduct={selectedWriteOffProduct}
+        warehouses={warehouses}
+        writeOffData={writeOffData}
+        selectedPackaging={selectedWriteOffPackaging}
+        reasonPresets={writeOffReasonPresets}
+        normalizedReason={normalizedWriteOffReason}
+        isCustomReason={isCustomWriteOffReason}
+        onClose={closeWriteOffModal}
+        onSubmit={handleSubmitWriteOff}
+        onSetQuantity={handleSetWriteOffQuantity}
+        setWriteOffData={setWriteOffData}
+      />
 
       <React.Suspense fallback={null}>
         <ProductHistoryModal
@@ -336,17 +264,15 @@ export default function ProductsModals(props: ProductsModalsProps) {
         />
       </React.Suspense>
 
-      <AnimatePresence>
-        <ProductMergeModal
-          isOpen={showMergeModal}
-          selectedProduct={selectedProduct}
-          mergeCandidates={mergeCandidates}
-          mergeTargetId={mergeTargetId}
-          onClose={closeMergeModal}
-          onMerge={handleMergeProduct}
-          onMergeTargetChange={setMergeTargetId}
-        />
-      </AnimatePresence>
+      <ProductMergeModal
+        isOpen={showMergeModal}
+        selectedProduct={selectedProduct}
+        mergeCandidates={mergeCandidates}
+        mergeTargetId={mergeTargetId}
+        onClose={closeMergeModal}
+        onMerge={handleMergeProduct}
+        onMergeTargetChange={setMergeTargetId}
+      />
 
       <React.Suspense fallback={null}>
         <ConfirmationModal
@@ -371,16 +297,14 @@ export default function ProductsModals(props: ProductsModalsProps) {
         />
       </React.Suspense>
 
-      <AnimatePresence>
-        <ProductReturnWriteOffModal
-          isOpen={showReturnWriteOffModal}
-          transaction={selectedHistoryTransaction}
-          returnWriteOffData={returnWriteOffData}
-          onClose={closeReturnWriteOffModal}
-          onSubmit={handleSubmitReturnWriteOff}
-          setReturnWriteOffData={setReturnWriteOffData}
-        />
-      </AnimatePresence>
+      <ProductReturnWriteOffModal
+        isOpen={showReturnWriteOffModal}
+        transaction={selectedHistoryTransaction}
+        returnWriteOffData={returnWriteOffData}
+        onClose={closeReturnWriteOffModal}
+        onSubmit={handleSubmitReturnWriteOff}
+        setReturnWriteOffData={setReturnWriteOffData}
+      />
     </>
   );
 }

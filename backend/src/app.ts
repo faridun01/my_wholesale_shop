@@ -9,14 +9,14 @@ import warehouseRoutes from './routes/warehouses.routes.js';
 import customerRoutes from './routes/customers.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
-import ocrRoutes from './routes/ocr.routes.js'
 import settingsRoutes from './routes/settings.routes.js';
 import reminderRoutes from './routes/reminders.routes.js';
 import paymentRoutes from './routes/payments.routes.js';
 import expenseRoutes from './routes/expenses.routes.js';
 import customerOrderRoutes from './routes/customer-orders.routes.js';
-import { authenticate } from './middlewares/auth.middleware.js';
+import { authenticate, authenticateUploadAccess } from './middlewares/auth.middleware.js';
 import { corsMiddleware, securityHeaders } from './middlewares/security.middleware.js';
+import { generalRateLimit } from './middlewares/general-rate-limit.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,10 +39,12 @@ app.use(corsMiddleware);
 app.use(securityHeaders);
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', authenticateUploadAccess, express.static(path.join(__dirname, '../uploads'), {
   immutable: true,
   maxAge: '7d',
 }));
+
+app.use('/api', generalRateLimit);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -52,7 +54,6 @@ app.use('/api/warehouses', authenticate, warehouseRoutes);
 app.use('/api/customers', authenticate, customerRoutes);
 app.use('/api/dashboard', authenticate, dashboardRoutes);
 app.use('/api/reports', authenticate, reportsRoutes);
-app.use('/api/ocr', authenticate, ocrRoutes)
 app.use('/api/settings', authenticate, settingsRoutes);
 app.use('/api/reminders', authenticate, reminderRoutes);
 app.use('/api/payments', authenticate, paymentRoutes);
@@ -80,7 +81,15 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     return res.status(401).json({ error: err.message });
   }
 
-  res.status(500).json({ error: err.message || 'Something went wrong!' });
+  const status = Number.isInteger(err.status) ? err.status : 500;
+  // Never leak internal error text (DB/constraint/file-path details) to clients in
+  // production; non-500 errors (validation, "not found", etc.) are already safe to show.
+  const isProduction = process.env.NODE_ENV === 'production';
+  const message = status !== 500 || !isProduction
+    ? err.message || 'Something went wrong!'
+    : 'Something went wrong!';
+
+  res.status(status).json({ error: message });
 });
 
 export default app;

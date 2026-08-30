@@ -1,17 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-primary: #008060;
-  --color-primary-hover: #006e52;
-  --color-primary-light: #e6f4f0;
-  --color-bg-main: #f8fafc;
+
+  /* Accent — one deliberate value, used everywhere instead of the previous mix of
+     #008060 / emerald-600 / #0f9f6e / gradients. */
+  --color-accent-50: #e6f3ee;
+  --color-accent-100: #cfe8dd;
+  --color-accent-500: #0f7a5c;
+  --color-accent-600: #0b6249;
+  --color-accent-700: #084c39;
+
+  /* Neutral surfaces */
+  --color-canvas: #f5f6f9;
   --color-surface: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text-main: #0f172a;
-  --color-text-muted: #64748b;
+  --color-surface-muted: #f0f1f5;
+  --color-line: #e2e4ea;
+  --color-line-strong: #cdd0da;
+  --color-ink: #14161f;
+  --color-ink-muted: #5b5f6e;
+  --color-ink-faint: #8b8e9b;
+
+  /* Sidebar (dark, flat — no gradients) */
+  --color-sidebar: #10151f;
+  --color-sidebar-raised: #161c28;
+  --color-sidebar-line: #232a38;
+  --color-sidebar-fg: #c7cbd6;
+  --color-sidebar-fg-muted: #6d7381;
+  --color-sidebar-active: #16332a;
+  --color-sidebar-active-line: #2a5245;
 }
 
 @layer base {
@@ -21,9 +40,9 @@
   }
 
   body {
-    @apply font-sans antialiased bg-slate-50 text-slate-900;
-    background-image: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
-                      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%);
+    @apply font-sans antialiased;
+    background: var(--color-canvas);
+    color: var(--color-ink);
     min-width: 320px;
     height: 100%;
     overflow: hidden;
@@ -31,6 +50,24 @@
 
   #root {
     height: 100%;
+  }
+
+  ::selection {
+    background: var(--color-accent-100);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Custom subtle scrollbars */
@@ -53,85 +90,104 @@
 }
 
 @layer components {
-  /* Layout Shell */
+  /* ---------------------------------------------------------------------
+     Layout shell
+     --------------------------------------------------------------------- */
   .app-page-shell {
-    @apply w-full min-w-0 overflow-hidden bg-slate-50/80;
+    @apply w-full min-w-0;
   }
 
   .app-page-pad {
-    @apply p-3 sm:p-5 lg:p-6 space-y-6;
+    @apply p-3 sm:p-5 lg:p-6 space-y-5;
   }
 
   .app-surface {
-    @apply overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all duration-200;
+    @apply overflow-hidden rounded-xl border border-line bg-surface;
   }
 
-  /* Enhanced Form Controls */
+  /* ---------------------------------------------------------------------
+     Typography helpers
+     --------------------------------------------------------------------- */
+  .text-page-title {
+    @apply text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl;
+  }
+
+  .text-section-title {
+    @apply text-sm font-semibold text-slate-900 sm:text-base;
+  }
+
+  .text-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  /* Tabular figures — money, quantities, IDs, dates-as-numbers. The one
+     deliberate typographic signature: numeric columns always line up. */
+  .font-tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ---------------------------------------------------------------------
+     Form controls
+     --------------------------------------------------------------------- */
   .app-control {
-    @apply min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
+    @apply min-h-10 rounded-lg border border-line bg-surface px-3.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
   }
 
-  /* Premium Gradient & Action Buttons */
+  /* ---------------------------------------------------------------------
+     Buttons — flat, no gradients, no scale/glow effects
+     --------------------------------------------------------------------- */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-4.5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-slate-700 bg-white hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none border border-slate-200/80 shadow-xs hover:border-slate-300;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-muted disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl font-medium text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted hover:text-slate-900 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-destructive {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-xs;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-50 disabled:pointer-events-none;
   }
 
-  /* Modern Card & Glassmorphic Tokens */
+  /* ---------------------------------------------------------------------
+     Cards — flat surfaces, no hover-lift/glow/glass
+     --------------------------------------------------------------------- */
   .card {
-    @apply bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs transition-all duration-250 hover:border-slate-300/90 hover:shadow-md;
+    @apply overflow-hidden rounded-xl border border-line bg-surface;
   }
 
-  .modern-card {
-    @apply bg-white overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300;
+  /* ---------------------------------------------------------------------
+     Tables — consistent shell for every data table in the app
+     --------------------------------------------------------------------- */
+  .table-shell {
+    @apply w-full text-left text-sm;
   }
 
-  .modern-saas-card {
-    @apply bg-white overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500/30;
+  .table-head-row {
+    @apply border-b border-line bg-surface-muted text-[11px] font-semibold uppercase tracking-wide text-slate-500;
   }
 
-  .glow-emerald {
-    box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.15);
+  .table-row {
+    @apply border-b border-line transition-colors last:border-b-0 hover:bg-surface-muted/70;
   }
 
-  .glow-slate {
-    box-shadow: 0 0 25px -5px rgba(100, 116, 139, 0.12);
+  .table-cell {
+    @apply px-4 py-3 align-middle;
   }
 
-  .accent-border-top {
-    border-top: 3px solid #008060;
+  /* Mobile card-list — the standard replacement for tables below `md` */
+  .mobile-row-card {
+    @apply rounded-xl border border-line bg-surface p-3.5;
   }
 
-  .glass-card {
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(241, 245, 249, 0.9);
-  }
-
-  .glass-header {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  }
-
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-  }
-
-  /* Touch Target */
+  /* ---------------------------------------------------------------------
+     Status pills (kept, already sensible — flat semantic tints, no glow)
+     --------------------------------------------------------------------- */
   .touch-target {
     min-height: 44px;
     min-width: 44px;

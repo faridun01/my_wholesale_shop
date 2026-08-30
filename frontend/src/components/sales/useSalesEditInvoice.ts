@@ -58,6 +58,21 @@ const useSalesEditInvoice = ({
       return false;
     }
 
+    // Not admin-exempt: the backend wipes Return rows and never reconciles paidAmount
+    // when items are edited, so nobody — including admins — can safely edit an
+    // invoice that already has a return or a payment recorded against it.
+    const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
+    const hasReturnedAmount = Number(invoice.returnedAmount || 0) > SALES_PAYMENT_EPSILON;
+    if (hasReturns || hasReturnedAmount) {
+      return false;
+    }
+
+    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.length > 0;
+    const hasPaidAmount = Number(invoice.paidAmount || 0) > SALES_PAYMENT_EPSILON;
+    if (hasPayments || hasPaidAmount) {
+      return false;
+    }
+
     if (isAdmin) {
       return true;
     }
@@ -66,29 +81,16 @@ const useSalesEditInvoice = ({
       return false;
     }
 
-    const hasReturns = Array.isArray(invoice.returns) && invoice.returns.length > 0;
-    const hasReturnedAmount = Number(invoice.returnedAmount || 0) > SALES_PAYMENT_EPSILON;
-    if (hasReturns || hasReturnedAmount) {
+    if (Number(invoice.userId || 0) !== Number(user?.id || 0)) {
       return false;
     }
 
-    if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
-      return false;
-    }
-
-    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.length > 0;
-    const hasPaidAmount = Number(invoice.paidAmount || 0) > SALES_PAYMENT_EPSILON;
-
-    return !hasPayments && !hasPaidAmount;
+    return true;
   };
 
   const getEditBlockedReason = (invoice: any) => {
     if (!invoice) {
       return 'Накладную нельзя изменить';
-    }
-
-    if (isAdmin) {
-      return 'Администратор может изменить накладную';
     }
 
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {
@@ -99,20 +101,24 @@ const useSalesEditInvoice = ({
       return 'Накладную с возвратом нельзя изменить';
     }
 
-    if (!isAdmin && Number(invoice.userId || 0) !== Number(user?.id || 0)) {
-      return 'Можно редактировать только свои накладные';
-    }
-
-    if (invoice.cancelled) {
-      return 'Отменённую накладную нельзя изменить';
-    }
-
     if (Array.isArray(invoice.payments) && invoice.payments.length > 0) {
       return 'Оплаченную накладную нельзя изменить';
     }
 
     if (Number(invoice.paidAmount || 0) > SALES_PAYMENT_EPSILON) {
       return 'Оплаченную накладную нельзя изменить';
+    }
+
+    if (isAdmin) {
+      return 'Администратор может изменить накладную';
+    }
+
+    if (Number(invoice.userId || 0) !== Number(user?.id || 0)) {
+      return 'Можно редактировать только свои накладные';
+    }
+
+    if (invoice.cancelled) {
+      return 'Отменённую накладную нельзя изменить';
     }
 
     return 'Накладную можно изменить';

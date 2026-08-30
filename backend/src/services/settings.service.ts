@@ -27,7 +27,7 @@ export class SettingsService {
   static async ensureCategory(name: string) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) {
-      throw new Error('Category name is required');
+      throw Object.assign(new Error('Category name is required'), { status: 400 });
     }
 
     const existing = await prisma.category.findFirst({

@@ -2,12 +2,6 @@ import { startTransition } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { User } from 'lucide-react';
 import { clsx } from 'clsx';
-import { formatMoney } from '../../utils/format';
-
-type CartWeightSummary = {
-  totalWeightKg: number;
-  missingWeightItems: number;
-};
 
 type CustomerOption = {
   id: number;
@@ -16,15 +10,12 @@ type CustomerOption = {
 
 type POSCartCustomerBlockProps = {
   isCartExpanded: boolean;
-  total: number;
-  cartWeightSummary: CartWeightSummary;
   cartOverflowMessage: string;
   customerId: number | null;
   customerSearch: string;
   isCustomerPortal: boolean;
   isCustomerDropdownOpen: boolean;
   filteredCustomers: CustomerOption[];
-  formatWeightKg: (value: unknown) => string;
   setCustomerId: Dispatch<SetStateAction<number | null>>;
   setCustomerSearch: Dispatch<SetStateAction<string>>;
   setIsCustomerDropdownOpen: Dispatch<SetStateAction<boolean>>;
@@ -32,32 +23,18 @@ type POSCartCustomerBlockProps = {
 
 export default function POSCartCustomerBlock({
   isCartExpanded,
-  total,
-  cartWeightSummary,
   cartOverflowMessage,
   customerId,
   customerSearch,
   isCustomerPortal,
   isCustomerDropdownOpen,
   filteredCustomers,
-  formatWeightKg,
   setCustomerId,
   setCustomerSearch,
   setIsCustomerDropdownOpen,
 }: POSCartCustomerBlockProps) {
   return (
     <div className={clsx('order-2 space-y-3 border-b border-slate-100 bg-[#f4f5fb]/40 px-5 py-4 lg:order-0', isCartExpanded && 'lg:col-start-1 lg:row-start-2')}>
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xs md:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-medium text-slate-500">Сумма корзины</span>
-          <span className="text-sm font-semibold text-slate-900">{formatMoney(total)}</span>
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <span className="font-medium text-slate-500">Масса/объем</span>
-          <span className="text-sm font-semibold text-emerald-600">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
-        </div>
-      </div>
-
       {cartOverflowMessage && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
           {cartOverflowMessage}

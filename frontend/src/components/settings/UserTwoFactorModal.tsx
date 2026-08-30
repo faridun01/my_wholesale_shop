@@ -130,6 +130,13 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
   };
 
   const handleDisable = async () => {
+    const confirmed = window.confirm(
+      `Отключить 2FA для ${user.username}? Это снизит защиту аккаунта — действие должно выполняться только по реальному запросу сотрудника.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
     try {
       setIsLoading(true);
       await disableUserTwoFactor(user.id);
@@ -156,11 +163,11 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/55 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-80 flex items-end justify-center bg-slate-900/55 p-3 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
+        className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-4xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6">

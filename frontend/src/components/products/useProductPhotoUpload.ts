@@ -25,7 +25,7 @@ export default function useProductPhotoUpload({ setFormData }: UseProductPhotoUp
       setIsPhotoUploading(true);
       const uploadFormData = new FormData();
       uploadFormData.append('photo', file);
-      const res = await client.post('/ocr/upload', uploadFormData);
+      const res = await client.post('/upload', uploadFormData);
 
       if (res.data?.photoUrl) {
         setFormData((prev) => ({ ...prev, photoUrl: res.data.photoUrl }));

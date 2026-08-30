@@ -14,7 +14,6 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 const imageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const ocrMimeTypes = new Set([...imageMimeTypes, 'application/pdf']);
 
 export const detectFileSignature = async (filePath: string) => {
   const handle = await fs.promises.open(filePath, 'r');
@@ -111,11 +110,4 @@ export const imageUpload = multer({
   fileFilter: createFileFilter(imageMimeTypes),
 });
 
-export const ocrUpload = multer({
-  storage: buildStorage(),
-  limits: { fileSize: securityConfig.upload.maxDocumentBytes, files: 1 },
-  fileFilter: createFileFilter(ocrMimeTypes),
-});
-
 export const allowedImageMimeTypes = imageMimeTypes;
-export const allowedOcrMimeTypes = ocrMimeTypes;

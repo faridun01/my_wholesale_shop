@@ -434,13 +434,14 @@ model SaleAllocation {
 }
 
 model Payment {
-  id         Int      @id @default(autoincrement())
-  customerId Int      @map("customer_id")
-  invoiceId  Int?     @map("invoice_id")
-  userId     Int      @map("user_id")
-  amount     Decimal  @db.Decimal(12, 2)
-  method     String   @default("cash") // 'cash' | 'card' | 'transfer'
-  createdAt  DateTime @default(now()) @map("created_at")
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @map("customer_id")
+  invoiceId       Int?     @map("invoice_id")
+  userId          Int      @map("user_id")
+  amount          Decimal  @db.Decimal(12, 2)
+  method          String   @default("cash") // 'cash' | 'card' | 'transfer'
+  idempotencyKey  String?  @unique @map("idempotency_key")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   customer Customer @relation(fields: [customerId], references: [id])
   invoice  Invoice? @relation(fields: [invoiceId], references: [id])
@@ -485,7 +486,10 @@ model ExpensePayment {
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  // Restrict (not Cascade): deleting an Expense must not silently wipe out real
+  // recorded cash payments against it. App layer additionally blocks the delete
+  // when paidAmount > 0 (see expenses.routes.ts DELETE /:id).
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
   user    User    @relation(fields: [userId], references: [id])
 
   @@index([expenseId, paymentDate])

@@ -31,6 +31,12 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
+# Run as the non-root `node` user baked into the base image, not root. The uploads
+# dir is created and chowned here so it keeps the right ownership once Docker
+# initializes the named volume mounted over it from this directory's contents.
+RUN mkdir -p /app/uploads && chown -R node:node /app
+USER node
+
 EXPOSE 3001
 
 CMD ["./docker-entrypoint.sh"]

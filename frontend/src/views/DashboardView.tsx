@@ -545,7 +545,7 @@ export default function DashboardView() {
               />
 
               {showSearchDropdown && (
-                <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-3xlrder border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+                <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
                   <div className="max-h-105 overflow-y-auto p-3">
                     <div className="space-y-3">
                       <div>
@@ -639,10 +639,8 @@ export default function DashboardView() {
         <div className="space-y-5 px-5 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-medium tracking-tight text-slate-900">Дашборд</h1>
-              <p className="mt-1 text-[11px] text-slate-500">Обзор продаж, остатков и активности клиентов.</p>
               {searchQuery && (
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   Результаты по запросу "{search}": товары {Math.max(filteredTopProducts.length, filteredLowStock.length)}, продажи {filteredSales.length}, клиенты {filteredCustomers.length}
                 </p>
               )}

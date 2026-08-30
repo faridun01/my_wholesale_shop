@@ -219,36 +219,6 @@ const addSection = (doc: jsPDF, section: ReportPdfSection, isFirstSection: boole
     },
   });
 
-  const unusedLegacyProductRows = section.productSummaryRows;
-  if (unusedLegacyProductRows && false) {
-    autoTable(doc, {
-      startY: getLastTableY(doc, detailsStartY) + 8,
-      margin: { left: margin, right: margin, bottom: 12 },
-      head: [['Товар', 'Количество', 'Чистая выручка', 'Прибыль']],
-      body: unusedLegacyProductRows!.map((row) => row.map(stringifyCell)),
-      theme: 'grid',
-      styles: {
-        font: PDF_FONT_NAME,
-        fontSize: 6.2,
-        lineColor: [203, 213, 225],
-        lineWidth: 0.1,
-        cellPadding: { top: 1.1, right: 1.2, bottom: 1.1, left: 1.2 },
-        textColor: [15, 23, 42],
-      },
-      headStyles: {
-        font: PDF_FONT_NAME,
-        fillColor: [15, 118, 110],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      didParseCell: (data: any) => {
-        if (data.section === 'body' && data.row.index === section.productSummaryRows!.length - 1) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [204, 251, 241];
-        }
-      },
-    });
-  }
 };
 
 export async function downloadReportPdf({

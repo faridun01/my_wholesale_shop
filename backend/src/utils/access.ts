@@ -48,7 +48,11 @@ export async function getAccessContext(req: AuthRequest): Promise<AccessContext>
 
 export function getScopedWarehouseId(context: AccessContext, requestedWarehouseId: unknown) {
   if (!context.isAdmin) {
-    return context.warehouseId ?? null;
+    // -1 (not null): every caller treats a null/undefined result as "no filter,
+    // show everything" — for an admin that means "all warehouses" intentionally,
+    // but for a non-admin with no warehouse assigned it must resolve to "show
+    // nothing", never a global data leak. -1 is an impossible warehouse id.
+    return context.warehouseId ?? -1;
   }
 
   if (requestedWarehouseId === undefined || requestedWarehouseId === null || requestedWarehouseId === '') {

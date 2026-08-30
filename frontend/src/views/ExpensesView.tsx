@@ -104,6 +104,9 @@ export default function ExpensesView() {
   };
 
   useEffect(() => {
+    // Fetching itself is left to the [selectedWarehouseId] effect below, which
+    // already fires once on mount with the initial value and again whenever this
+    // sets a different one — calling fetchExpenses here too just duplicated the request.
     getWarehouses()
       .then((data) => {
         const filtered = filterWarehousesForUser(Array.isArray(data) ? data : [], user);
@@ -115,15 +118,10 @@ export default function ExpensesView() {
 
         if (nextWarehouseId !== selectedWarehouseId) {
           setSelectedWarehouseId(nextWarehouseId);
-          fetchExpenses(nextWarehouseId);
-          return;
         }
-
-        fetchExpenses(nextWarehouseId);
       })
       .catch(() => {
         setWarehouses([]);
-        fetchExpenses(selectedWarehouseId);
       });
   }, []);
 
@@ -372,8 +370,14 @@ export default function ExpensesView() {
 
     setCancellingPaymentId(Number(payment.id));
     try {
-      await cancelExpensePayment(expense.id, payment.id);
+      const result = await cancelExpensePayment(expense.id, payment.id);
       toast.success(isRefund ? 'Возврат расхода отменен' : 'Оплата расхода отменена');
+      // Sync the still-open payment modal's snapshot too — a plain refetch only
+      // updates the `expenses` list state, leaving `selectedExpenseForPayment`
+      // (and the payment history just shown in this modal) stuck on stale data.
+      if (result?.expense) {
+        setSelectedExpenseForPayment((current) => (current && current.id === expense.id ? result.expense : current));
+      }
       await fetchExpenses(selectedWarehouseId);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Ошибка при отмене оплаты расхода');
@@ -502,15 +506,15 @@ export default function ExpensesView() {
 
         {/* Metrics Row */}
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+          <div className="rounded-3xl border border-slate-200/70 bg-white p-4 shadow-xs">
             <p className="text-[11px] font-medium uppercase tracking-wider text-rose-500">Всего расходов</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalAmount)}</p>
           </div>
-          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+          <div className="rounded-3xl border border-slate-200/70 bg-white p-4 shadow-xs">
             <p className="text-[11px] font-medium uppercase tracking-wider text-emerald-500">Оплачено</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalPaidAmount)}</p>
           </div>
-          <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-xs">
+          <div className="rounded-3xl border border-slate-200/70 bg-white p-4 shadow-xs">
             <p className="text-[11px] font-medium uppercase tracking-wider text-amber-500">Остаток долга</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(totalRemainingAmount)}</p>
           </div>
@@ -1074,6 +1078,36 @@ export default function ExpensesView() {
                   </button>
                 </div>
               </div>
+
+              {Boolean(selectedExpenseForPayment.payments?.length) && (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">История платежей</h4>
+                  <div className="space-y-1.5">
+                    {selectedExpenseForPayment.payments!.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="flex items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 px-3.5 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-emerald-700">{formatMoney(payment.amount)}</p>
+                          <p className="mt-0.5 truncate text-[10px] text-slate-400">
+                            {new Date(payment.paymentDate).toLocaleDateString('ru-RU')}
+                            {payment.staff_name ? ` · ${payment.staff_name}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleCancelExpensePayment(selectedExpenseForPayment, payment)}
+                          disabled={cancellingPaymentId === payment.id}
+                          className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {cancellingPaymentId === payment.id ? 'Отмена...' : 'Отменить'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">

@@ -24,10 +24,6 @@ import { getDefaultWarehouseId } from '../utils/warehouse';
 import ProductsCatalogSection from '../components/products/ProductsCatalogSection';
 import ProductsModals from '../components/products/ProductsModals';
 import ProductsPageHeader from '../components/products/ProductsPageHeader';
-import ProductsScanOverlay from '../components/products/ProductsScanOverlay';
-import useProductOcrImport from '../components/products/useProductOcrImport';
-import useProductOcrScanner from '../components/products/useProductOcrScanner';
-import useProductOcrState from '../components/products/useProductOcrState';
 import useProductPhotoUpload from '../components/products/useProductPhotoUpload';
 import useProductCrudActions from '../components/products/useProductCrudActions';
 import useProductMovementActions from '../components/products/useProductMovementActions';
@@ -41,7 +37,6 @@ import {
   formatCountWithUnit,
   formatPriceInput,
   getDefaultPackaging,
-  getOcrResolvedQuantity,
   getPreferredPackaging,
   getStockBreakdown,
   normalizeDisplayBaseUnit,
@@ -84,7 +79,6 @@ export default function ProductsView() {
   const [categories, setCategories] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -129,38 +123,6 @@ export default function ProductsView() {
   const [returnWriteOffData, setReturnWriteOffData] = useState({
     quantity: '1',
     reason: 'ошибка ввода',
-  });
-  const {
-    ocrResults,
-    setOcrResults,
-    ocrOriginalCount,
-    setOcrOriginalCount,
-    ocrImportedCount,
-    setOcrImportedCount,
-    usdRate,
-    setUsdRate,
-    scanExpensePercent,
-    setScanExpensePercent,
-    showOnlyProblematicOcrRows,
-    setShowOnlyProblematicOcrRows,
-    highlightedOcrLine,
-    setHighlightedOcrLine,
-    ocrRowRefs,
-    closeOcrResultsModal,
-    invalidOcrRowsCount,
-    visibleOcrResults,
-    problematicOcrRows,
-    jumpToOcrLine,
-  } = useProductOcrState();
-  const { handleScanInvoice } = useProductOcrScanner({
-    selectedWarehouseId,
-    setIsScanning,
-    setOcrOriginalCount,
-    setOcrImportedCount,
-    setOcrResults,
-    setScanExpensePercent,
-    setShowOnlyProblematicOcrRows,
-    setHighlightedOcrLine,
   });
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'name', direction: 'asc' });
@@ -267,7 +229,6 @@ export default function ProductsView() {
 
   const [formData, setFormData] = useState<ProductFormData>(createEmptyProductForm());
   const { isPhotoUploading, handlePhotoUpload } = useProductPhotoUpload({ setFormData });
-  const numericSortKeys = new Set(['costPrice', 'sellingPrice', 'stock', 'totalIncoming', 'minStock', 'initialStock']);
   useEffect(() => {
     if (!isReferenceDataReady) {
       return;
@@ -325,8 +286,7 @@ export default function ProductsView() {
       showDeleteConfirm ||
       showDeleteWriteOffConfirm ||
       showHistoryModal ||
-      showBatchesModal ||
-      Boolean(ocrResults);
+      showBatchesModal;
 
     if (!hasOpenModal) {
       return;
@@ -347,13 +307,11 @@ export default function ProductsView() {
       if (showTransferModal) return closeTransferModal();
       if (showRestockModal) return closeRestockModal();
       if (showAddModal || showEditModal) return closeProductFormModal();
-      if (ocrResults) return closeOcrResultsModal();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    ocrResults,
     showAddModal,
     showBatchesModal,
     showDeleteConfirm,
@@ -390,23 +348,6 @@ export default function ProductsView() {
       }
     }
   };
-
-  const { handleAddOcrToStock } = useProductOcrImport({
-    ocrResults,
-    selectedWarehouseId,
-    usdRate,
-    scanExpensePercent,
-    ocrImportedCount,
-    ocrOriginalCount,
-    setIsLoading,
-    setOcrImportedCount,
-    setOcrResults,
-    setShowOnlyProblematicOcrRows,
-    setHighlightedOcrLine,
-    jumpToOcrLine,
-    closeOcrResultsModal,
-    fetchInitialData,
-  });
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -493,6 +434,21 @@ export default function ProductsView() {
     });
   };
 
+  // Precomputed once per `products` change instead of re-scanning the full list for
+  // every rendered row (was O(n^2) per render — up to ~250k comparisons at 500 products).
+  const duplicateHintCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const candidate of products) {
+      const categoryId = Number(candidate?.categoryId || 0);
+      const massKey = extractMassKey(String(candidate?.name || ''));
+      if (!categoryId || !massKey) continue;
+      const warehouseId = Number(candidate?.warehouseId || 0);
+      const key = `${warehouseId}::${categoryId}::${massKey}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [products]);
+
   const getDuplicateHintCount = (product: any) => {
     const sourceWarehouseId = Number(product?.warehouseId || selectedWarehouseId || 0);
     const sourceCategoryId = Number(product?.categoryId || 0);
@@ -502,21 +458,9 @@ export default function ProductsView() {
       return 0;
     }
 
-    return products.filter((candidate) => {
-      if (!candidate || candidate.id === product?.id) {
-        return false;
-      }
-
-      const candidateWarehouseId = Number(candidate.warehouseId || 0);
-      const candidateCategoryId = Number(candidate.categoryId || 0);
-      const candidateMassKey = extractMassKey(String(candidate.name || ''));
-
-      if (sourceWarehouseId && candidateWarehouseId && candidateWarehouseId !== sourceWarehouseId) {
-        return false;
-      }
-
-      return candidateCategoryId === sourceCategoryId && candidateMassKey === sourceMassKey;
-    }).length;
+    const key = `${sourceWarehouseId}::${sourceCategoryId}::${sourceMassKey}`;
+    const total = duplicateHintCounts.get(key) || 0;
+    return Math.max(0, total - 1);
   };
 
   const handleOpenMergeModal = (product: any) => {
@@ -861,9 +805,10 @@ export default function ProductsView() {
       <div className="space-y-5 overflow-hidden rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
         <ProductsPageHeader
           isAdmin={isAdmin}
-          isScanning={isScanning}
           selectedWarehouseId={selectedWarehouseId}
-          onScanInvoice={handleScanInvoice}
+          filteredProductsCount={filteredProducts.length}
+          onExportStockReport={exportStockReport}
+          onExportPriceList={exportPriceList}
           onAddProduct={() => {
             if (!selectedWarehouseId) {
               toast.error('Пожалуйста, выберите склад перед добавлением товара');
@@ -874,8 +819,6 @@ export default function ProductsView() {
             setShowAddModal(true);
           }}
         />
-
-        <ProductsScanOverlay isOpen={isScanning} />
 
         <ProductsModals
           isAdmin={isAdmin}
@@ -918,17 +861,6 @@ export default function ProductsView() {
           writeOffReasonPresets={WRITE_OFF_REASON_PRESETS}
           normalizedWriteOffReason={normalizedWriteOffReason}
           isCustomWriteOffReason={isCustomWriteOffReason}
-          ocrResults={ocrResults}
-          visibleOcrResults={visibleOcrResults}
-          invalidOcrRowsCount={invalidOcrRowsCount}
-          problematicOcrRows={problematicOcrRows}
-          ocrImportedCount={ocrImportedCount}
-          ocrOriginalCount={ocrOriginalCount}
-          usdRate={usdRate}
-          scanExpensePercent={scanExpensePercent}
-          showOnlyProblematicOcrRows={showOnlyProblematicOcrRows}
-          highlightedOcrLine={highlightedOcrLine}
-          ocrRowRefs={ocrRowRefs}
           mergeCandidates={selectedProduct ? getMergeCandidates(selectedProduct) : []}
           mergeTargetId={mergeTargetId}
           returnWriteOffData={returnWriteOffData}
@@ -936,7 +868,6 @@ export default function ProductsView() {
           closeTransferModal={closeTransferModal}
           closeRestockModal={closeRestockModal}
           closeWriteOffModal={closeWriteOffModal}
-          closeOcrResultsModal={closeOcrResultsModal}
           closeHistoryModal={closeHistoryModal}
           closeBatchesModal={closeBatchesModal}
           closeMergeModal={closeMergeModal}
@@ -949,8 +880,6 @@ export default function ProductsView() {
           handleRestock={handleRestock}
           handleSubmitWriteOff={handleSubmitWriteOff}
           handleSetWriteOffQuantity={handleSetWriteOffQuantity}
-          handleAddOcrToStock={handleAddOcrToStock}
-          jumpToOcrLine={jumpToOcrLine}
           handleReverseIncoming={handleReverseIncoming}
           handleReverseCorrectionWriteOff={handleReverseCorrectionWriteOff}
           handleOpenReturnWriteOffModal={handleOpenReturnWriteOffModal}
@@ -968,10 +897,6 @@ export default function ProductsView() {
           setTransferData={setTransferData}
           setRestockData={setRestockData}
           setWriteOffData={setWriteOffData}
-          setOcrResults={setOcrResults}
-          setUsdRate={setUsdRate}
-          setScanExpensePercent={setScanExpensePercent}
-          setShowOnlyProblematicOcrRows={setShowOnlyProblematicOcrRows}
           setMergeTargetId={setMergeTargetId}
           setReturnWriteOffData={setReturnWriteOffData}
         />

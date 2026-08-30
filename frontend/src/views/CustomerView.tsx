@@ -62,6 +62,7 @@ export default function CustomerView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isPrintingReconciliation, setIsPrintingReconciliation] = useState(false);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const PAYMENT_EPSILON = CUSTOMER_PAYMENT_EPSILON;
   const { customerCategories, paginatedCustomers, sortedCustomers, totalPages } = useCustomerList({
     currentPage,
@@ -148,6 +149,7 @@ export default function CustomerView() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingCustomer) return;
     const payload = {
       ...formData,
       name: formData.name.trim(),
@@ -172,6 +174,7 @@ export default function CustomerView() {
     }
 
     try {
+      setIsSavingCustomer(true);
       if (selectedCustomer) {
         await updateCustomer(selectedCustomer.id, payload);
         toast.success('Клиент обновлен');
@@ -184,6 +187,8 @@ export default function CustomerView() {
       fetchCustomers();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при сохранении');
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
@@ -741,9 +746,10 @@ export default function CustomerView() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 rounded-full bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+                      disabled={isSavingCustomer}
+                      className="flex-1 rounded-full bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Сохранить
+                      {isSavingCustomer ? 'Сохранение...' : 'Сохранить'}
                     </button>
                   </div>
                 </form>
@@ -878,126 +884,204 @@ export default function CustomerView() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+                className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">Накладная #{selectedInvoice.id}</h3>
-                    <p className="text-xs text-slate-500">Детали накладной, списки товаров и оплат</p>
+                <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f4f5fb] text-slate-700">
+                      <FileText size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">Накладная #{selectedInvoice.id}</h3>
+                      <p className="text-[11px] text-slate-500">{new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</p>
+                    </div>
                   </div>
-                  <button onClick={closeInvoiceDetailsModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
-                    <X size={18} />
+                  <button onClick={closeInvoiceDetailsModal} className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-[#f4f5fb] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
+                    <X size={14} />
                   </button>
                 </div>
 
-                <div className="flex-1 space-y-5 overflow-y-auto p-6">
-                  <div className="flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:justify-between rounded-2xl bg-[#f4f5fb] p-3.5 border border-slate-100">
-                    <span>Дата: {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</span>
-                    <span>Склад: {selectedInvoice.warehouse?.name || '---'}</span>
+                <div className="flex-1 space-y-3 overflow-y-auto bg-white p-5">
+                  <div className="rounded-lg border border-slate-200 p-3 text-xs text-slate-500">
+                    <span>Склад: </span>
+                    <span className="font-semibold text-slate-900">{selectedInvoice.warehouse?.name || '---'}</span>
                   </div>
 
-                  <div className="space-y-2.5">
-                    {selectedInvoice.items?.map((item) => {
-                      const quantityInfo = getInvoiceItemQuantityParts(item);
+                  <div className="space-y-1.5">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Товары</h4>
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <div className="space-y-2 p-2 sm:hidden">
+                        {selectedInvoice.items?.map((item) => {
+                          const quantityInfo = getInvoiceItemQuantityParts(item);
 
-                      return (
-                        <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-3.5">
-                          <div>
-                            <p className="text-xs font-semibold text-slate-900">{item.product?.name}</p>
-                            <p className="text-xs font-medium text-slate-700">{quantityInfo.primary}</p>
-                            {quantityInfo.secondary && (
-                              <p className="text-[10px] text-slate-400">{quantityInfo.secondary}</p>
-                            )}
-                            <p className="text-[10px] text-slate-400">x {formatMoney(item.sellingPrice)}</p>
-                            {Number(item.returnedQty || 0) > 0 && (
-                              <p className="mt-0.5 text-[11px] font-medium text-amber-600">Возвращено: {formatCount(item.returnedQty || 0)}</p>
-                            )}
-                          </div>
-                          <p className="text-xs font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Сумма</span>
-                      <span>{formatMoneyByRole(selectedInvoice.totalAmount)}</span>
-                    </div>
-                    {Number(selectedInvoice.discount || 0) > 0 && (
-                      <div className="flex justify-between text-xs text-rose-500">
-                        <span>Скидка ({selectedInvoice.discount}%)</span>
-                        <span>-{formatMoneyByRole((Number(selectedInvoice.totalAmount || 0) * Number(selectedInvoice.discount || 0)) / 100)}</span>
+                          return (
+                            <div key={item.id} className="rounded-lg border border-slate-100 bg-[#f4f5fb]/50 p-2">
+                              <p className="wrap-break-word text-xs font-medium text-slate-900">{item.product?.name}</p>
+                              <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[11px]">
+                                <div className="rounded-lg bg-white px-2 py-1.5">
+                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Кол-во</p>
+                                  <p className="mt-0.5 whitespace-nowrap text-[11px] font-semibold text-slate-700">{quantityInfo.primary}</p>
+                                  {quantityInfo.secondary && (
+                                    <p className="mt-0.5 whitespace-nowrap text-[9px] text-slate-400">{quantityInfo.secondary}</p>
+                                  )}
+                                </div>
+                                <div className="rounded-lg bg-white px-2 py-1.5">
+                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Цена</p>
+                                  <p className="mt-0.5 text-[11px] font-semibold text-slate-900">{formatMoney(item.sellingPrice)}</p>
+                                </div>
+                                <div className="rounded-lg bg-white px-2 py-1.5">
+                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Итого</p>
+                                  <p className="mt-0.5 text-[11px] font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
+                                </div>
+                              </div>
+                              {Number(item.returnedQty || 0) > 0 && (
+                                <p className="mt-1.5 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
+                                  Возвращено: {formatCount(item.returnedQty || 0)}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-                    {Number(selectedInvoice.returnedAmount || 0) > 0 && (
-                      <div className="flex justify-between text-xs text-amber-600">
-                        <span>Возвраты</span>
-                        <span>-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
+                      <table className="hidden w-full border-collapse text-left text-[11px] sm:table">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-[#f4f5fb] text-[9px] font-medium uppercase tracking-wider text-slate-500">
+                            <th className="px-3 py-1.5">Товар</th>
+                            <th className="px-3 py-1.5">Кол-во</th>
+                            <th className="px-3 py-1.5">Цена</th>
+                            <th className="px-3 py-1.5 text-right">Итого</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedInvoice.items?.map((item) => {
+                            const quantityInfo = getInvoiceItemQuantityParts(item);
+
+                            return (
+                              <tr key={item.id} className="hover:bg-[#f4f5fb]/50 transition-colors">
+                                <td className="px-3 py-1.5">
+                                  <p className="font-medium text-slate-900">{item.product?.name}</p>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-slate-500">
+                                  <p className="whitespace-nowrap text-[11px] font-semibold text-slate-700">{quantityInfo.primary}</p>
+                                  {quantityInfo.secondary && (
+                                    <p className="mt-0.5 whitespace-nowrap text-[9px] text-slate-400">{quantityInfo.secondary}</p>
+                                  )}
+                                  {Number(item.returnedQty || 0) > 0 && (
+                                    <div className="mt-1 inline-flex rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5">
+                                      <span className="text-[9px] font-semibold text-amber-700">Возвращено: {formatCount(item.returnedQty || 0)}</span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-1.5 font-medium text-slate-700">{formatMoney(item.sellingPrice)}</td>
+                                <td className="px-3 py-1.5 text-right font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <div className="w-full max-w-70 space-y-1 rounded-lg border border-slate-200 p-3 text-[11px]">
+                      <div className="flex items-center justify-between text-slate-500">
+                        <span>Сумма</span>
+                        <span className="font-medium text-slate-900">{formatMoneyByRole(selectedInvoice.totalAmount)}</span>
                       </div>
-                    )}
-                    <div className="flex justify-between border-t border-slate-200/60 pt-2 text-sm font-bold text-slate-900">
-                      <span>Итого</span>
-                      <span>{formatMoneyByRole(selectedInvoice.netAmount)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-emerald-600 font-semibold">
-                      <span>Оплачено</span>
-                      <span>{formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-rose-600 font-semibold">
-                      <span>Остаток</span>
-                      <span>{formatMoneyByRole(selectedInvoice.invoiceBalance)}</span>
+                      {Number(selectedInvoice.discount || 0) > 0 && (
+                        <div className="flex items-center justify-between text-rose-500">
+                          <span>Скидка ({selectedInvoice.discount}%)</span>
+                          <span className="font-medium">-{formatMoneyByRole(getInvoiceDiscountAmount(selectedInvoice))}</span>
+                        </div>
+                      )}
+                      {Number(selectedInvoice.returnedAmount || 0) > 0 && (
+                        <div className="flex items-center justify-between text-amber-600">
+                          <span>Возвраты</span>
+                          <span className="font-semibold">-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 text-xs font-semibold text-slate-900">
+                        <span>Итого</span>
+                        <span className="text-sm font-bold text-slate-900">{formatMoneyByRole(selectedInvoice.netAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-slate-500">
+                        <span>Оплачено</span>
+                        <span className="font-semibold text-emerald-600">{formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-500">
+                        <span>Остаток</span>
+                        <span className="font-semibold text-rose-600">{formatMoneyByRole(selectedInvoice.invoiceBalance)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2.5">
-                    <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider text-slate-400">Оплаты по накладной</h4>
-                    {selectedInvoice.paymentEvents?.length ? (
-                      selectedInvoice.paymentEvents.map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-2.5">
-                          <div>
-                            <p className="text-xs font-semibold text-emerald-700">{formatMoneyByRole(payment.amount)}</p>
-                            <p className="text-[11px] text-emerald-600">
-                              {new Date(payment.createdAt).toLocaleString('ru-RU')} · {payment.staff_name}
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">{payment.method}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-400">Оплат по этой накладной нет.</p>
-                    )}
-                  </div>
+                  {Boolean(selectedInvoice.paymentEvents?.length) && (
+                    <div className="space-y-1.5">
+                      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Оплаты по накладной</h4>
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-left text-[11px]">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-[#f4f5fb] text-slate-500">
+                              <th className="px-3 py-1.5">Дата</th>
+                              <th className="px-3 py-1.5">Сумма</th>
+                              <th className="px-3 py-1.5">Сотрудник</th>
+                              <th className="px-3 py-1.5 text-right">Способ</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {selectedInvoice.paymentEvents!.map((payment) => (
+                              <tr key={payment.id}>
+                                <td className="px-3 py-1.5 text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
+                                <td className="px-3 py-1.5 font-semibold text-emerald-600">{formatMoneyByRole(payment.amount)}</td>
+                                <td className="px-3 py-1.5 text-slate-500">{payment.staff_name}</td>
+                                <td className="px-3 py-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">{payment.method}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="space-y-2.5">
-                    <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider text-slate-400">Возвраты по накладной</h4>
-                    {selectedInvoice.returnEvents?.length ? (
-                      selectedInvoice.returnEvents.map((itemReturn) => (
-                        <div key={itemReturn.id} className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-2.5">
-                          <div className="flex items-center justify-between gap-4">
-                            <p className="text-xs font-semibold text-amber-700">{formatMoneyByRole(itemReturn.totalValue)}</p>
-                            <p className="text-[11px] text-amber-600">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</p>
-                          </div>
-                          <p className="mt-0.5 text-xs text-amber-700">{itemReturn.staff_name}</p>
-                          {itemReturn.reason && <p className="mt-0.5 text-xs text-amber-600">{itemReturn.reason}</p>}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-400">Возвратов по этой накладной нет.</p>
-                    )}
-                  </div>
+                  {Boolean(selectedInvoice.returnEvents?.length) && (
+                    <div className="space-y-1.5">
+                      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Возвраты по накладной</h4>
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-left text-[11px]">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-[#f4f5fb] text-slate-500">
+                              <th className="px-3 py-1.5">Дата</th>
+                              <th className="px-3 py-1.5">Сумма</th>
+                              <th className="px-3 py-1.5">Причина</th>
+                              <th className="px-3 py-1.5">Сотрудник</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {selectedInvoice.returnEvents!.map((itemReturn) => (
+                              <tr key={itemReturn.id}>
+                                <td className="px-3 py-1.5 text-slate-500">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</td>
+                                <td className="px-3 py-1.5 font-semibold text-rose-600">-{formatMoneyByRole(itemReturn.totalValue)}</td>
+                                <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{itemReturn.reason || 'Без причины'}</td>
+                                <td className="px-3 py-1.5 text-slate-500">{itemReturn.staff_name}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
                   <button
                     onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
-                    className="flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-5 py-2.5 text-xs font-semibold text-indigo-700 shadow-xs transition-colors hover:bg-indigo-100"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
                   >
-                    <Printer size={15} />
+                    <Printer size={14} />
                     <span>Печать</span>
                   </button>
                   <button
                     onClick={closeInvoiceDetailsModal}
-                    className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    className="rounded-full border border-slate-200 bg-[#f4f5fb] px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
                   >
                     Закрыть
                   </button>

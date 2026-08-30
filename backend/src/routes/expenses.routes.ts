@@ -3,6 +3,7 @@ import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { normalizeMoney, roundMoney } from '../utils/money.js';
+import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
 
 const router = Router();
 
@@ -201,22 +202,35 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const start = normalizeOptionalString(req.query.start);
     const end = normalizeOptionalString(req.query.end);
+    // Was previously unbounded (no pagination anywhere in this route, unlike every
+    // other list endpoint) — a generous default cap so existing callers that don't
+    // pass page/limit keep seeing their full expense list, while very large
+    // warehouses no longer force an unbounded table scan + JSON payload.
+    const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 2000, maxLimit: 5000 });
 
-    const expenses = await prisma.expense.findMany({
-      where: {
-        warehouseId: warehouseId ?? undefined,
-        expenseDate: start || end
-          ? {
-              gte: start ? new Date(`${start}T00:00:00.000Z`) : undefined,
-              lte: end ? new Date(`${end}T23:59:59.999Z`) : undefined,
-            }
-          : undefined,
-      },
-      include: {
-        ...includeExpenseDetails,
-      },
-      orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
-    });
+    const where = {
+      warehouseId: warehouseId ?? undefined,
+      expenseDate: start || end
+        ? {
+            gte: start ? new Date(`${start}T00:00:00.000Z`) : undefined,
+            lte: end ? new Date(`${end}T23:59:59.999Z`) : undefined,
+          }
+        : undefined,
+    };
+
+    const [expenses, total] = await Promise.all([
+      prisma.expense.findMany({
+        where,
+        include: {
+          ...includeExpenseDetails,
+        },
+        orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.expense.count({ where }),
+    ]);
+    setPaginationHeaders(res, { page, limit, total });
 
     res.json(expenses.map(normalizeExpenseResponse));
   } catch (error) {
@@ -314,29 +328,40 @@ const updateExpenseHandler = async (req: AuthRequest, res: any, next: any) => {
     const category = String(req.body?.category || 'Прочее').trim() || 'Прочее';
     const amount = normalizePositiveAmount(req.body?.amount);
     const expenseDate = normalizeExpenseDate(req.body?.expenseDate);
-    const paidAmount = await (prisma as any).expensePayment
-      .findMany({
+
+    const updated = await prisma.$transaction(async (tx: any) => {
+      // Lock first: a concurrent payment/refund against this expense must not be
+      // able to insert between our paidAmount read and this write.
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM expenses WHERE id = ${expenseId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw Object.assign(new Error('Расход не найден'), { status: 404 });
+      }
+
+      const payments = await tx.expensePayment.findMany({
         where: { expenseId },
         select: { amount: true },
-      })
-      .then((payments: any[]) => roundMoney(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)));
+      });
+      const paidAmount = roundMoney(payments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0));
 
-    if (paidAmount > amount) {
-      return res.status(400).json({ error: 'Сумма расхода не может быть меньше уже внесенных оплат' });
-    }
+      if (paidAmount > amount) {
+        throw Object.assign(new Error('Сумма расхода не может быть меньше уже внесенных оплат'), { status: 400 });
+      }
 
-    const updated = await prisma.expense.update({
-      where: { id: expenseId },
-      data: {
-        warehouseId,
-        category,
-        title,
-        amount,
-        paidAmount,
-        expenseDate,
-        note: normalizeOptionalString(req.body?.note),
-      },
-      include: includeExpenseDetails,
+      return tx.expense.update({
+        where: { id: expenseId },
+        data: {
+          warehouseId,
+          category,
+          title,
+          amount,
+          paidAmount,
+          expenseDate,
+          note: normalizeOptionalString(req.body?.note),
+        },
+        include: includeExpenseDetails,
+      });
     });
 
     res.json(normalizeExpenseResponse(updated));
@@ -368,9 +393,18 @@ router.post('/:id/payments', async (req: AuthRequest, res, next) => {
     }
 
     const amount = normalizePositiveAmount(req.body?.amount);
-    const nextPaidAmount = normalizePaidAmount(Number(expense.paidAmount || 0) + amount, Number(expense.amount || 0));
 
     const updated = await prisma.$transaction(async (tx: any) => {
+      // Lock the expense row first so concurrent payments against the same expense
+      // serialize instead of each recomputing paidAmount from a pre-commit snapshot
+      // that's missing the other's not-yet-visible insert (last writer silently wins).
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM expenses WHERE id = ${expenseId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw Object.assign(new Error('Расход не найден'), { status: 404 });
+      }
+
       await tx.expensePayment.create({
         data: {
           expenseId,
@@ -396,24 +430,35 @@ router.post('/:id/refunds', async (req: AuthRequest, res, next) => {
     const access = await getAccessContext(req);
     ensureAdminOnly(access.isAdmin);
     const expenseId = Number(req.params.id);
-    const expense = await prisma.expense.findUnique({
+    const expenseExists = await prisma.expense.findUnique({
       where: { id: expenseId },
-      include: includeExpenseDetails,
+      select: { id: true },
     });
 
-    if (!expense) {
+    if (!expenseExists) {
       return res.status(404).json({ error: 'Расход не найден' });
     }
 
     const amount = normalizeRefundAmount(req.body?.amount);
-    const currentAmount = Number(expense.amount || 0);
-    const currentPaidAmount = Number(expense.paidAmount || 0);
-
-    if (amount > currentAmount) {
-      return res.status(400).json({ error: 'Сумма возврата не может быть больше суммы расхода' });
-    }
 
     const updated = await prisma.$transaction(async (tx: any) => {
+      // Lock (and re-read inside the lock) so a concurrent payment/refund/update
+      // against the same expense can't be silently overwritten by this write, which
+      // otherwise computes nextAmount/nextPaidAmount from a pre-transaction snapshot.
+      const locked: Array<{ amount: unknown; paidAmount: unknown }> = await tx.$queryRaw`
+        SELECT amount, paid_amount as "paidAmount" FROM expenses WHERE id = ${expenseId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw Object.assign(new Error('Расход не найден'), { status: 404 });
+      }
+
+      const currentAmount = Number(locked[0].amount || 0);
+      const currentPaidAmount = Number(locked[0].paidAmount || 0);
+
+      if (amount > currentAmount) {
+        throw Object.assign(new Error('Сумма возврата не может быть больше суммы расхода'), { status: 400 });
+      }
+
       const nextAmount = roundMoney(currentAmount - amount);
       const nextPaidAmount = roundMoney(Math.min(currentPaidAmount, nextAmount));
 
@@ -452,6 +497,13 @@ router.delete('/:id/payments/:paymentId', async (req: AuthRequest, res, next) =>
     }
 
     const updated = await prisma.$transaction(async (tx: any) => {
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM expenses WHERE id = ${expenseId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw Object.assign(new Error('Расход не найден'), { status: 404 });
+      }
+
       const paymentAmount = Number(payment.amount || 0);
       if (paymentAmount < 0) {
         await tx.expense.update({
@@ -486,11 +538,18 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
         id: true,
         warehouseId: true,
         userId: true,
+        paidAmount: true,
       },
     });
 
     if (!expense) {
       return res.status(404).json({ error: 'Расход не найден' });
+    }
+
+    if (Number(expense.paidAmount || 0) > 0) {
+      return res.status(400).json({
+        error: 'Нельзя удалить расход с зарегистрированными оплатами. Сначала удалите или отмените оплаты.',
+      });
     }
 
     await prisma.expense.delete({ where: { id: expenseId } });

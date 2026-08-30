@@ -1,22 +1,11 @@
 import 'dotenv/config';
 import prisma from '../db/prisma.js';
+import { getInvoiceStatus } from '../utils/money.js';
 
 const MONEY_EPSILON = 0.01;
 
 function roundMoney(value: number) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-}
-
-function getInvoiceStatus(paidAmount: number, netAmount: number) {
-  if (paidAmount > 0 && paidAmount >= netAmount - MONEY_EPSILON) {
-    return 'paid';
-  }
-
-  if (paidAmount > 0) {
-    return 'partial';
-  }
-
-  return 'unpaid';
 }
 
 function isDifferent(currentValue: number, expectedValue: number) {
@@ -42,6 +31,7 @@ async function main() {
           returnedQty: true,
           sellingPrice: true,
           totalPrice: true,
+          discount: true,
         },
       },
       returns: {
@@ -102,11 +92,17 @@ async function main() {
       }, 0),
     );
 
+    // Mirrors InvoiceService.returnItems()'s refund formula: apply both the line's own
+    // discount and the invoice-level discount, or a discounted invoice with returns
+    // gets its returnedAmount overstated here and netAmount corrupted on --apply.
+    const invoiceDiscountPercent = Number(invoice.discount || 0);
     const calculatedReturnedAmount = roundMoney(
-      (Array.isArray(invoice.items) ? invoice.items : []).reduce(
-        (sum, item) => sum + Number(item.returnedQty || 0) * Number(item.sellingPrice || 0),
-        0,
-      ),
+      (Array.isArray(invoice.items) ? invoice.items : []).reduce((sum, item) => {
+        const itemDiscountPercent = Number(item.discount || 0);
+        const discountedUnitPrice = Number(item.sellingPrice || 0) * (1 - itemDiscountPercent / 100);
+        const finalUnitPrice = discountedUnitPrice * (1 - invoiceDiscountPercent / 100);
+        return sum + Number(item.returnedQty || 0) * finalUnitPrice;
+      }, 0),
     );
 
     const expectedNetAmount = roundMoney(

@@ -3,7 +3,9 @@ import { z } from 'zod';
 const emptyToUndefined = <T>(schema: z.ZodType<T>) =>
   z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
 
-const dateString = z.string();
+const dateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
+  message: 'Invalid date',
+});
 
 const numericId = z.preprocess(
   (value) => (value === '' || value === null || value === undefined ? undefined : Number(value)),

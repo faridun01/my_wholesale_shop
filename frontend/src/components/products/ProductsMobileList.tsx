@@ -184,7 +184,7 @@ export default function ProductsMobileList({
                 </p>
               </div>
               {isAdmin && (
-                <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 md:block">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Закупка</p>
                   <div className="mt-1 flex flex-col">
                     {isAggregateMode ? (

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.js';
+import ErrorBoundary from './components/common/ErrorBoundary.js';
 import './index.css';
 
 // Register Service Worker for PWA installability & offline caching support
@@ -18,6 +19,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <App />
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
 );
 

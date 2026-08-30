@@ -1,7 +1,7 @@
 import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
-import { normalizeMoney, roundMoney, ceilMoney } from '../utils/money.js';
+import { normalizeMoney, roundMoney, ceilMoney, getInvoiceStatus } from '../utils/money.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -15,18 +15,6 @@ const buildCustomerAddressSnapshot = (customer: any) =>
     .filter(Boolean)
     .join(', ') || null;
 
-function getInvoiceStatus(paidAmount: number, netAmount: number) {
-  if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) {
-    return 'paid';
-  }
-
-  if (paidAmount > 0) {
-    return 'partial';
-  }
-
-  return 'unpaid';
-}
-
 function normalizeNonNegativeNumber(value: number, fieldName: string) {
   const normalized = Number(value);
   if (!Number.isFinite(normalized) || normalized < 0) {
@@ -37,7 +25,10 @@ function normalizeNonNegativeNumber(value: number, fieldName: string) {
 }
 
 function calculateDiscountedUnitPrice(sellingPrice: number, discountPercent = 0) {
-  return ceilMoney(sellingPrice * (1 - discountPercent / 100));
+  // Clamp defensively: a >100% discount would flip the unit price negative and
+  // silently cancel out other lines' revenue once summed into totalAmount.
+  const clampedDiscount = Math.min(100, Math.max(0, discountPercent));
+  return ceilMoney(sellingPrice * (1 - clampedDiscount / 100));
 }
 
 function calculateLineTotal(quantity: number, sellingPrice: number, discountPercent = 0) {
@@ -219,12 +210,20 @@ export class InvoiceService {
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
+        if (itemDiscount > 100) {
+          throw new Error('Скидка на товар не может превышать 100%');
+        }
 
         totalAmount = roundMoney(totalAmount + calculateLineTotal(quantity, sellingPrice, itemDiscount));
       }
 
       totalAmount = roundMoney(totalAmount);
       const netAmount = calculateInvoiceNetAmount(totalAmount, normalizedDiscount, normalizedTax);
+
+      if (normalizedPaidAmount > Number(netAmount) + PAYMENT_EPSILON) {
+        throw new Error('Сумма оплаты не может превышать сумму накладной');
+      }
+
       const status = getInvoiceStatus(normalizedPaidAmount, Number(netAmount));
 
       // 2. Create Invoice
@@ -435,6 +434,15 @@ export class InvoiceService {
     }
 
     await prisma.$transaction(async (tx: any) => {
+      // Lock the invoice row first so a concurrent payment/return/cancel against
+      // the same invoice can't interleave with this edit's stale reads.
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw new Error('Invoice not found');
+      }
+
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
         include: {
@@ -452,24 +460,25 @@ export class InvoiceService {
         throw new Error('Cancelled invoice cannot be edited');
       }
 
+      // Not admin-exempt: editing items after a return already happened has no safe
+      // reconciliation path here (updateInvoice unconditionally wipes Return rows and
+      // resets returnedAmount below) — even an admin must reverse/delete the returns
+      // through their own flow first, never lose that audit trail as an edit side effect.
       if (
-        !isAdmin &&
-        (
-          (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
-          Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
-        )
+        (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
+        Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
       ) {
-        throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
+        throw new Error('Нельзя менять товары в накладной после возврата. Сначала отмените возврат.');
       }
 
+      // Not admin-exempt: paidAmount is never touched by the edit below, so shrinking
+      // the invoice here would leave paidAmount > netAmount with no correction —
+      // an admin must delete/adjust the existing payment(s) first.
       if (
-        !isAdmin &&
-        (
-          (Array.isArray(invoice.payments) && invoice.payments.length > 0) ||
-          Number(invoice.paidAmount || 0) > PAYMENT_EPSILON
-        )
+        (Array.isArray(invoice.payments) && invoice.payments.length > 0) ||
+        Number(invoice.paidAmount || 0) > PAYMENT_EPSILON
       ) {
-        throw new Error('Нельзя менять товары в накладной после оплаты или возврата');
+        throw new Error('Нельзя менять товары в накладной после оплаты. Сначала удалите оплату.');
       }
 
       let customer: any = null;
@@ -547,6 +556,9 @@ export class InvoiceService {
 
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
+        }
+        if (itemDiscount > 100) {
+          throw new Error('Скидка на товар не может превышать 100%');
         }
 
         totalAmount = roundMoney(totalAmount + calculateLineTotal(quantity, sellingPrice, itemDiscount));
@@ -682,6 +694,15 @@ export class InvoiceService {
     const force = Boolean(options?.force);
 
     return await prisma.$transaction(async (tx: any) => {
+      // Lock the invoice row first so a double-submitted cancel can't race a
+      // concurrent payment/return against the same invoice.
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw new Error('Invoice not found or already cancelled');
+      }
+
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
         include: {
@@ -763,6 +784,9 @@ export class InvoiceService {
         },
         payments: {
           include: { user: true }
+        },
+        returns: {
+          include: { user: true }
         }
       }
     });
@@ -771,10 +795,7 @@ export class InvoiceService {
 
     const invoiceItems: any[] = Array.isArray(invoice.items) ? invoice.items : [];
     const invoicePayments: any[] = Array.isArray(invoice.payments) ? invoice.payments : [];
-    const invoiceReturns: any[] = await prisma.return.findMany({
-      where: { invoiceId },
-      include: { user: true }
-    });
+    const invoiceReturns: any[] = Array.isArray((invoice as any).returns) ? (invoice as any).returns : [];
 
     const normalizedItems = invoiceItems
       .map((item) => buildCurrentInvoiceItemSnapshot(item))
@@ -795,19 +816,19 @@ export class InvoiceService {
     const normalizedPayments = invoicePayments.map((payment) => ({
       ...payment,
       method: payment.method,
-      staff_name: payment.user.username
+      staff_name: payment.user?.username || '—'
     }));
 
     const normalizedReturns = invoiceReturns.map((itemReturn) => ({
       ...itemReturn,
-      staff_name: itemReturn.user.username
+      staff_name: itemReturn.user?.username || '—'
     }));
 
     return {
       ...invoice,
-      customer_name: invoice.customerNameSnapshot || invoice.customer.name,
-      customer_phone: invoice.customerPhoneSnapshot || invoice.customer.phone,
-      customer_address: invoice.customerAddressSnapshot || buildCustomerAddressSnapshot(invoice.customer),
+      customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
+      customer_phone: invoice.customerPhoneSnapshot || invoice.customer?.phone || null,
+      customer_address: invoice.customerAddressSnapshot || (invoice.customer ? buildCustomerAddressSnapshot(invoice.customer) : null),
       company_name: companyProfile?.name || invoice.companyNameSnapshot,
       company_country: companyProfile?.country || invoice.companyCountrySnapshot,
       company_region: companyProfile?.region || invoice.companyRegionSnapshot,
@@ -815,7 +836,7 @@ export class InvoiceService {
       company_address: companyProfile?.addressLine || invoice.companyAddressSnapshot,
       company_phone: companyProfile?.phone || null,
       company_note: companyProfile?.note || null,
-      staff_name: invoice.user.username,
+      staff_name: invoice.user?.username || '—',
       items: normalizedItems,
       payments: normalizedPayments,
       returns: normalizedReturns
@@ -829,6 +850,16 @@ export class InvoiceService {
     const { items, reason, userId } = data;
 
     return await prisma.$transaction(async (tx: any) => {
+      // Lock the invoice row first so concurrent returns against the same invoice
+      // (double-click, two staff at once) serialize instead of both validating
+      // "available to return" against the same stale returnedQty snapshot.
+      const locked = await tx.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE
+      `;
+      if (!locked[0]) {
+        throw new Error('Invoice not found');
+      }
+
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
         include: { items: true }
@@ -890,15 +921,16 @@ export class InvoiceService {
           data: { returnedQty: { increment: normalizedQuantity } }
         });
 
-        // 4. Calculate refund value
+        // 4. Calculate refund value. Mirrors calculateDiscountedUnitPrice's ceilMoney
+        // rounding at each discount step so refunds match what was actually charged.
         const itemDiscount = Number(originalItem.discount || 0);
         const globalDiscount = Number(invoice.discount || 0);
-        
+
         // Value after item discount
-        const discountedUnitPrice = Number(originalItem.sellingPrice) * (1 - itemDiscount / 100);
+        const discountedUnitPrice = calculateDiscountedUnitPrice(Number(originalItem.sellingPrice), itemDiscount);
         // Value after global discount
-        const finalUnitPrice = discountedUnitPrice * (1 - globalDiscount / 100);
-        
+        const finalUnitPrice = calculateDiscountedUnitPrice(discountedUnitPrice, globalDiscount);
+
         const lineRefundValue = roundMoney(finalUnitPrice * normalizedQuantity);
         totalRefundValue += lineRefundValue;
         processedReturnCount += 1;
@@ -910,27 +942,6 @@ export class InvoiceService {
 
       for (const productId of affectedProductIds) {
         await StockService.updateProductStockCache(productId, tx);
-      }
-
-      // Record Inventory Transactions for Returns
-      for (const returnItem of items) {
-        const originalItem = invoice.items.find((i: any) => Number(i.id) === Number(returnItem.invoiceItemId));
-        if (originalItem) {
-          const qty = Number(returnItem.quantity);
-          await tx.inventoryTransaction.create({
-            data: {
-              productId: originalItem.productId,
-              warehouseId: invoice.warehouseId,
-              userId,
-              qtyChange: qty,
-              type: 'return',
-              reason: reason || `Return from Invoice #${invoiceId}`,
-              referenceId: invoiceId,
-              costAtTime: originalItem.costPrice,
-              sellingAtTime: originalItem.sellingPrice
-            }
-          });
-        }
       }
 
       // 5. Create Return record
@@ -947,7 +958,7 @@ export class InvoiceService {
       // 6. Update invoice returned amount and net amount
       totalRefundValue = roundMoney(totalRefundValue);
       const newReturnedAmount = roundMoney(Number(invoice.returnedAmount) + totalRefundValue);
-      const newNetAmount = roundMoney(Number(invoice.netAmount) - totalRefundValue);
+      const newNetAmount = Math.max(0, roundMoney(Number(invoice.netAmount) - totalRefundValue));
       
       // Update status based on new net amount
       const status = getInvoiceStatus(Number(invoice.paidAmount), Number(newNetAmount));

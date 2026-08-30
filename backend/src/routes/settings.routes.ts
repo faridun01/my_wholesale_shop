@@ -27,7 +27,12 @@ router.get('/', authenticate, authorize(['ADMIN']), async (req, res, next) => {
 
 router.post('/', authenticate, authorize(['ADMIN']), async (req, res, next) => {
   try {
-    const { key, value } = req.body;
+    const key = String(req.body?.key || '').trim();
+    if (!key) {
+      return res.status(400).json({ error: 'Setting key is required' });
+    }
+
+    const value = String(req.body?.value ?? '');
     const setting = await SettingsService.updateSetting(key, value);
     res.json(setting);
   } catch (error) {

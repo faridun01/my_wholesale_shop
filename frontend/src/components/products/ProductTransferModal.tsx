@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRightLeft, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   formatCountWithUnit,
   normalizeDisplayBaseUnit,
@@ -45,16 +45,16 @@ export default function ProductTransferModal({
   onSubmit,
   setTransferData,
 }: ProductTransferModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-    >
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+        >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -166,6 +166,7 @@ export default function ProductTransferModal({
                   type="number"
                   required
                   min="1"
+                  max={availableTransferStock !== null ? availableTransferStock : undefined}
                   placeholder="Введите количество"
                   value={transferData.quantity}
                   onChange={(event) => setTransferData({ ...transferData, quantity: event.target.value })}
@@ -187,7 +188,8 @@ export default function ProductTransferModal({
               type="submit"
               disabled={
                 (selectedTransferPackaging && transferUnitsPerPackage > 0 && transferAvailableFullPackages <= 0) ||
-                totalTransferUnits <= 0
+                totalTransferUnits <= 0 ||
+                (availableTransferStock !== null && totalTransferUnits > availableTransferStock)
               }
               className="rounded-full bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
             >
@@ -196,6 +198,8 @@ export default function ProductTransferModal({
           </div>
         </form>
       </motion.div>
-    </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

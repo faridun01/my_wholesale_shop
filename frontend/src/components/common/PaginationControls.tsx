@@ -52,21 +52,21 @@ export default function PaginationControls({
 
   return (
     <div
-      className={`flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${className}`.trim()}
+      className={`flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${className}`.trim()}
     >
       <p className="text-xs text-slate-500 sm:text-sm">
         Показано {startItem}-{endItem} из {totalItems}
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="inline-flex h-9 items-center gap-1 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft size={16} />
-          <span>Назад</span>
+          <span className="hidden sm:inline">Назад</span>
         </button>
 
         {pageNumbers.map((pageNumber, index) => {
@@ -74,15 +74,15 @@ export default function PaginationControls({
           const showGap = previousPage && pageNumber - previousPage > 1;
 
           return (
-            <div key={`${pageNumber}-${index}`} className="flex items-center gap-2">
-              {showGap ? <span className="text-sm text-slate-300">...</span> : null}
+            <div key={`${pageNumber}-${index}`} className="flex items-center gap-1.5">
+              {showGap ? <span className="text-sm text-slate-300">…</span> : null}
               <button
                 type="button"
                 onClick={() => handlePageChange(pageNumber)}
                 className={
                   currentPage === pageNumber
-                    ? 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl bg-[#008060] px-3 text-sm font-semibold text-white shadow-xs'
-                    : 'flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50'
+                    ? 'flex h-9 min-w-9 items-center justify-center rounded-lg bg-accent-500 px-3 text-sm font-semibold text-white'
+                    : 'flex h-9 min-w-9 items-center justify-center rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted'
                 }
               >
                 {pageNumber}
@@ -95,9 +95,9 @@ export default function PaginationControls({
           type="button"
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="inline-flex h-9 items-center gap-1 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <span>Дальше</span>
+          <span className="hidden sm:inline">Дальше</span>
           <ChevronRight size={16} />
         </button>
       </div>

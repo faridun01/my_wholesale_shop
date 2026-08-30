@@ -74,7 +74,7 @@ export default function useProductsCatalogData({
       const productSearchValue = normalizeCatalogName(String(product.name || ''));
       const matchesSearch = !normalizedSearch || productSearchValue.includes(normalizedSearch);
       const matchesWarehouse =
-        !selectedWarehouseId || product.stock > 0 || product.warehouseId === Number(selectedWarehouseId);
+        !selectedWarehouseId || product.warehouseId === Number(selectedWarehouseId);
 
       return matchesSearch && matchesWarehouse;
     });

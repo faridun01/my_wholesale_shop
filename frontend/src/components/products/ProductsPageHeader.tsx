@@ -1,66 +1,63 @@
 import React from 'react';
-import { Camera, Loader2, Plus } from 'lucide-react';
-import { clsx } from 'clsx';
+import { FileText, Plus, Tag } from 'lucide-react';
+import { Button, PageHeader } from '../UI';
 
 interface ProductsPageHeaderProps {
   isAdmin: boolean;
-  isScanning: boolean;
   selectedWarehouseId: string;
+  filteredProductsCount: number;
   onAddProduct: () => void;
-  onScanInvoice: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onExportStockReport: () => void;
+  onExportPriceList: () => void;
 }
 
 export default function ProductsPageHeader({
   isAdmin,
-  isScanning,
   selectedWarehouseId,
+  filteredProductsCount,
   onAddProduct,
-  onScanInvoice,
+  onExportStockReport,
+  onExportPriceList,
 }: ProductsPageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Товары</h1>
-        <p className="mt-0.5 text-xs text-slate-500">Управление ассортиментом, ценами и остатками.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        {isAdmin && (
-          <label
-            className={clsx(
-              'inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-900 hover:text-white',
-              !selectedWarehouseId && 'cursor-not-allowed opacity-50',
-            )}
+    <PageHeader
+      title="Товары"
+      description="Управление ассортиментом, ценами и остатками."
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FileText size={15} />}
+            onClick={onExportStockReport}
+            disabled={!filteredProductsCount}
           >
-            {isScanning ? (
-              <Loader2 size={16} className="animate-spin text-slate-600" />
-            ) : (
-              <Camera size={16} />
-            )}
-            <span>{isScanning ? 'Чтение накладной...' : 'Загрузить накладную'}</span>
-            <input
-              type="file"
-              className="hidden"
-              accept="image/*,application/pdf"
-              onChange={onScanInvoice}
-              disabled={isScanning || !selectedWarehouseId}
-            />
-          </label>
-        )}
+            Скачать остаток
+          </Button>
 
-        {isAdmin && (
-          <button
-            onClick={onAddProduct}
-            disabled={!selectedWarehouseId}
-            className={clsx(
-              'inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800',
-              !selectedWarehouseId && 'cursor-not-allowed opacity-50',
-            )}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Tag size={15} />}
+            onClick={onExportPriceList}
+            disabled={!filteredProductsCount}
           >
-            <Plus size={16} />
-            <span>Добавить товар</span>
-          </button>
-        )}
-      </div>
-    </div>
+            Скачать прайс
+          </Button>
+
+          {isAdmin && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus size={16} />}
+              onClick={onAddProduct}
+              disabled={!selectedWarehouseId}
+            >
+              Добавить товар
+            </Button>
+          )}
+        </>
+      }
+    />
   );
 }
