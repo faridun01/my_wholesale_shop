@@ -9,6 +9,7 @@ import {
   getReturnItemRemainingUnits,
   isReturnActionDisabled,
 } from '../../utils/salesViewUtils';
+import { formatMoney } from '../../utils/format';
 
 type UseSalesReturnActionsOptions = {
   selectedInvoice: any;
@@ -102,11 +103,17 @@ const useSalesReturnActions = ({
         }
       }
 
-      await client.post(`/invoices/${selectedInvoice.id}/return`, {
+      const { data } = await client.post(`/invoices/${selectedInvoice.id}/return`, {
         items: itemsToReturn.map(({ invoiceItemId, quantity }) => ({ invoiceItemId, quantity })),
         reason: returnReason,
       });
-      toast.success('Возврат оформлен');
+      const cashRefundAmount = Number(data?.cashRefundAmount || 0);
+      toast.success(
+        cashRefundAmount > 0.009
+          ? `Возврат оформлен. Верните клиенту наличными: ${formatMoney(cashRefundAmount)}`
+          : 'Возврат оформлен',
+        { duration: cashRefundAmount > 0.009 ? 6000 : 4000 },
+      );
       closeReturnModal();
       await refreshSelectedInvoice(selectedInvoice.id);
       await fetchInvoices();

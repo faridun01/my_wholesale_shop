@@ -1029,14 +1029,20 @@ export default function CustomerView() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {selectedInvoice.paymentEvents!.map((payment) => (
+                            {selectedInvoice.paymentEvents!.map((payment) => {
+                              const isRefund = Number(payment.amount || 0) < 0;
+                              return (
                               <tr key={payment.id}>
                                 <td className="px-3 py-1.5 text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
-                                <td className="px-3 py-1.5 font-semibold text-emerald-600">{formatMoneyByRole(payment.amount)}</td>
+                                <td className={`px-3 py-1.5 font-semibold ${isRefund ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                  {isRefund ? '−' : ''}{formatMoneyByRole(Math.abs(Number(payment.amount || 0)))}
+                                  {isRefund && <span className="ml-1.5 rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-500">Возврат</span>}
+                                </td>
                                 <td className="px-3 py-1.5 text-slate-500">{payment.staff_name}</td>
                                 <td className="px-3 py-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">{payment.method}</td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

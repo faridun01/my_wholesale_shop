@@ -593,72 +593,99 @@ export default function SettingsView() {
             onClick={closeWarehouseModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-4xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[2.5rem]"
+              className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-4xl bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:max-h-[92vh] sm:rounded-[2.5rem]"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-8">
-                <h3 className="flex items-center space-x-3 text-xl font-semibold text-slate-900 sm:text-2xl">
-                  <div className="rounded-2xl bg-sky-500 p-2.5 text-white shadow-lg shadow-sky-500/20 sm:p-3">
-                    <Warehouse size={24} />
-                  </div>
-                  <span>{showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}</span>
-                </h3>
-                <button onClick={closeWarehouseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                  <X size={24} />
-                </button>
+              <div className="relative overflow-hidden border-b border-slate-100 bg-linear-to-br from-sky-50 via-white to-white p-5 sm:p-8">
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-sky-200/30 blur-2xl" />
+                <div className="relative flex items-center justify-between">
+                  <h3 className="flex items-center space-x-3.5">
+                    <div className="rounded-2xl bg-linear-to-br from-sky-500 to-sky-600 p-3 text-white shadow-lg shadow-sky-500/30 ring-4 ring-sky-500/10">
+                      <Warehouse size={22} />
+                    </div>
+                    <span className="flex flex-col">
+                      <span className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                        {showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400">
+                        {showEditWarehouse ? 'Обновите данные точки хранения' : 'Добавьте новую точку хранения'}
+                      </span>
+                    </span>
+                  </h3>
+                  <button
+                    onClick={closeWarehouseModal}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
-              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="space-y-5 p-5 sm:p-8">
+              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="space-y-4 p-5 sm:p-8">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Название</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={warehouseForm.name}
-                      onChange={e => setWarehouseForm({...warehouseForm, name: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="Напр: Основной склад"
-                    />
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Название</label>
+                    <div className="relative">
+                      <Building2 size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={warehouseForm.name}
+                        onChange={e => setWarehouseForm({...warehouseForm, name: e.target.value})}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                        placeholder="Напр: Основной склад"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Город</label>
+                      <div className="relative">
+                        <MapPin size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          required
+                          value={warehouseForm.city}
+                          onChange={e => setWarehouseForm({...warehouseForm, city: e.target.value})}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                          placeholder="Душанбе"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Телефон</label>
+                      <div className="relative">
+                        <Phone size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={warehouseForm.phone}
+                          onChange={e => setWarehouseForm({...warehouseForm, phone: e.target.value})}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                          placeholder="+992 900 00 00 00"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Город</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={warehouseForm.city}
-                      onChange={e => setWarehouseForm({...warehouseForm, city: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="Напр: Душанбе"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Адрес</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={warehouseForm.address}
-                      onChange={e => setWarehouseForm({...warehouseForm, address: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="Напр: ул. Рудаки 10"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Телефон</label>
-                    <input
-                      type="text"
-                      value={warehouseForm.phone}
-                      onChange={e => setWarehouseForm({...warehouseForm, phone: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium"
-                      placeholder="Напр: +992 900 00 00 00"
-                    />
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Адрес</label>
+                    <div className="relative">
+                      <MapPin size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={warehouseForm.address}
+                        onChange={e => setWarehouseForm({...warehouseForm, address: e.target.value})}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                        placeholder="ул. Рудаки 10"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-4">
-                  <button type="button" onClick={closeWarehouseModal} className="rounded-2xl px-8 py-4 font-medium text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-sky-500 px-10 py-4 font-medium text-white shadow-xl shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:gap-3 sm:pt-4">
+                  <button type="button" onClick={closeWarehouseModal} className="rounded-2xl px-6 py-3.5 font-semibold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-linear-to-br from-sky-500 to-sky-600 px-8 py-3.5 font-semibold text-white shadow-lg shadow-sky-500/25 transition-all hover:shadow-xl hover:shadow-sky-500/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
                     {isSubmittingForm ? 'Сохранение...' : showEditWarehouse ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
@@ -675,133 +702,178 @@ export default function SettingsView() {
             onClick={closeUserModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-4xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-[2.5rem]"
+              className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-4xl bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:max-h-[88vh] sm:rounded-[2.5rem]"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5 sm:p-6">
-                <h3 className="flex items-center space-x-3 text-lg font-semibold text-slate-900 sm:text-xl">
-                  <div className="rounded-2xl bg-violet-500 p-2.5 text-white shadow-lg shadow-violet-500/20">
-                    <Users size={20} />
-                  </div>
-                  <span>{showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}</span>
-                </h3>
-                <button onClick={closeUserModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                  <X size={24} />
-                </button>
+              <div className="relative overflow-hidden border-b border-slate-100 bg-linear-to-br from-violet-50 via-white to-white p-5 sm:p-6">
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-200/30 blur-2xl" />
+                <div className="relative flex items-center justify-between">
+                  <h3 className="flex items-center space-x-3.5">
+                    <div className="rounded-2xl bg-linear-to-br from-violet-500 to-violet-600 p-3 text-white shadow-lg shadow-violet-500/30 ring-4 ring-violet-500/10">
+                      <Users size={20} />
+                    </div>
+                    <span className="flex flex-col">
+                      <span className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                        {showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400">
+                        {showEditUser ? 'Обновите роль, склад и права доступа' : 'Создайте учётную запись сотрудника'}
+                      </span>
+                    </span>
+                  </h3>
+                  <button
+                    onClick={closeUserModal}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
               <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-4 p-5 sm:space-y-5 sm:p-6">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Логин</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={newUser.username}
-                      onChange={e => setNewUser({...newUser, username: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="username"
-                    />
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Логин</label>
+                    <div className="relative">
+                      <User size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={newUser.username}
+                        onChange={e => setNewUser({...newUser, username: e.target.value})}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                        placeholder="username"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">
-                      {showEditUser ? 'Новый пароль (оставьте пустым)' : 'Пароль'}
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      {showEditUser ? 'Новый пароль (необязательно)' : 'Пароль'}
                     </label>
-                    <input 
-                      type="password" 
-                      required={!showEditUser}
-                      value={newUser.password}
-                      onChange={e => setNewUser({...newUser, password: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="••••••••"
-                    />
-                    <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
-                      Минимум 8 символов, обязательно: большая буква, маленькая буква и цифра.
+                    <div className="relative">
+                      <Lock size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="password"
+                        required={!showEditUser}
+                        value={newUser.password}
+                        onChange={e => setNewUser({...newUser, password: e.target.value})}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-medium leading-5 text-slate-400">
+                      Минимум 8 символов: большая, маленькая буква и цифра.
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Повтор нового пароля</label>
-                    <input 
-                      type="password" 
-                      required={!showEditUser || Boolean(newUser.password)}
-                      value={newUser.confirmPassword}
-                      onChange={e => setNewUser({...newUser, confirmPassword: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                      placeholder="••••••••"
-                    />
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Повтор нового пароля</label>
+                    <div className="relative">
+                      <Lock size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="password"
+                        required={!showEditUser || Boolean(newUser.password)}
+                        value={newUser.confirmPassword}
+                        onChange={e => setNewUser({...newUser, confirmPassword: e.target.value})}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                        placeholder="••••••••"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Роль</label>
-                    <select 
-                      value={newUser.role}
-                      onChange={e => setNewUser({...newUser, role: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium appearance-none bg-white"
-                    >
-                      <option value="ADMIN">Админ</option>
-                      <option value="MANAGER">Менеджер</option>
-                      <option value="SELLER">Продавец</option>
-                      <option value="CUSTOMER">Клиент</option>
-                    </select>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Роль</label>
+                    <div className="relative">
+                      <Shield size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <select
+                        value={newUser.role}
+                        onChange={e => setNewUser({...newUser, role: e.target.value})}
+                        className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                      >
+                        <option value="ADMIN">Админ</option>
+                        <option value="MANAGER">Менеджер</option>
+                        <option value="SELLER">Продавец</option>
+                        <option value="CUSTOMER">Клиент</option>
+                      </select>
+                      <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
                   </div>
                   {warehouses.length > 1 && (
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Склад</label>
-                      <select
-                        value={newUser.warehouseId}
-                        onChange={e => setNewUser({...newUser, warehouseId: e.target.value})}
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium appearance-none bg-white"
-                      >
-                        <option value="">Все склады</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Склад</label>
+                      <div className="relative">
+                        <Warehouse size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={newUser.warehouseId}
+                          onChange={e => setNewUser({...newUser, warehouseId: e.target.value})}
+                          className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                        >
+                          <option value="">Все склады</option>
+                          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </select>
+                        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      </div>
                     </div>
                   )}
                   {String(newUser.role || '').toUpperCase() !== 'CUSTOMER' && String(newUser.role || '').toUpperCase() !== 'ADMIN' && (
-                    <div className="space-y-2.5 rounded-2xl border border-slate-200 p-4">
-                      <label className="block text-sm font-semibold text-slate-700 uppercase tracking-widest">Дополнительные права</label>
-                      <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newUser.canCancelInvoices}
-                          onChange={e => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
-                          className="h-4 w-4 rounded border-slate-300 text-violet-500 focus:ring-violet-400"
-                        />
-                        <span>Может отменять накладные</span>
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        <ShieldAlert size={14} className="text-slate-400" />
+                        Дополнительные права
                       </label>
-                      <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newUser.canDeleteData}
-                          onChange={e => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
-                          className="h-4 w-4 rounded border-slate-300 text-violet-500 focus:ring-violet-400"
-                        />
-                        <span>Может удалять данные</span>
+                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 shadow-xs">
+                        <span className="text-sm font-medium text-slate-700">Может отменять накладные</span>
+                        <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+                          <input
+                            type="checkbox"
+                            checked={newUser.canCancelInvoices}
+                            onChange={e => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
+                            className="peer sr-only"
+                          />
+                          <span className="absolute inset-0 rounded-full bg-slate-200 transition-colors peer-checked:bg-violet-500" />
+                          <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 shadow-xs">
+                        <span className="text-sm font-medium text-slate-700">Может удалять данные</span>
+                        <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+                          <input
+                            type="checkbox"
+                            checked={newUser.canDeleteData}
+                            onChange={e => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
+                            className="peer sr-only"
+                          />
+                          <span className="absolute inset-0 rounded-full bg-slate-200 transition-colors peer-checked:bg-violet-500" />
+                          <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
+                        </span>
                       </label>
                     </div>
                   )}
                   {String(newUser.role || '').toUpperCase() === 'CUSTOMER' && (
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Клиент</label>
-                      <select
-                        value={newUser.customerId}
-                        onChange={e => setNewUser({...newUser, customerId: e.target.value})}
-                        required
-                        className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium appearance-none bg-white"
-                      >
-                        <option value="">Выберите клиента</option>
-                        {customerOptions.map(customer => (
-                          <option key={customer.id} value={customer.id}>{customer.name}</option>
-                        ))}
-                      </select>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Клиент</label>
+                      <div className="relative">
+                        <User size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={newUser.customerId}
+                          onChange={e => setNewUser({...newUser, customerId: e.target.value})}
+                          required
+                          className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
+                        >
+                          <option value="">Выберите клиента</option>
+                          {customerOptions.map(customer => (
+                            <option key={customer.id} value={customer.id}>{customer.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0 sm:pt-6">
-                  <button type="button" onClick={closeUserModal} className="rounded-2xl px-6 py-3 font-medium text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-violet-500 px-8 py-3 font-medium text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:gap-3 sm:pt-6">
+                  <button type="button" onClick={closeUserModal} className="rounded-2xl px-6 py-3 font-semibold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
+                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-linear-to-br from-violet-500 to-violet-600 px-8 py-3 font-semibold text-white shadow-lg shadow-violet-500/25 transition-all hover:shadow-xl hover:shadow-violet-500/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
                     {isSubmittingForm ? 'Сохранение...' : showEditUser ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>

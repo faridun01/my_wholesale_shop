@@ -692,10 +692,15 @@ export default function SalesView() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {selectedInvoice.payments.map((p: any) => (
+                          {selectedInvoice.payments.map((p: any) => {
+                            const isRefund = Number(p.amount || 0) < 0;
+                            return (
                             <tr key={p.id}>
                               <td className="px-3 py-1.5 text-slate-500">{new Date(p.createdAt).toLocaleString('ru-RU')}</td>
-                              <td className="px-3 py-1.5 font-semibold text-emerald-600">{formatMoney(p.amount)}</td>
+                              <td className={clsx('px-3 py-1.5 font-semibold', isRefund ? 'text-rose-600' : 'text-emerald-600')}>
+                                {isRefund ? '−' : ''}{formatMoney(Math.abs(Number(p.amount || 0)))}
+                                {isRefund && <span className="ml-1.5 rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-500">Возврат</span>}
+                              </td>
                               <td className="px-3 py-1.5 text-slate-500">{p.staff_name}</td>
                               <td className="px-3 py-1.5 text-right">
                                 <button
@@ -709,7 +714,8 @@ export default function SalesView() {
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

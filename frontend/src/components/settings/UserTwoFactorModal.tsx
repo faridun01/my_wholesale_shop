@@ -167,37 +167,44 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
       onClick={onClose}
     >
       <div
-        className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-4xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-[2.5rem]"
+        className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-4xl bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:max-h-[90vh] sm:rounded-[2.5rem]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-violet-500 p-3 text-white shadow-lg shadow-violet-500/20">
-              <ShieldCheck size={22} />
+        <div className="relative overflow-hidden border-b border-slate-100 bg-linear-to-br from-violet-50 via-white to-white p-5 sm:p-6">
+          <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-200/30 blur-2xl" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="rounded-2xl bg-linear-to-br from-violet-500 to-violet-600 p-3 text-white shadow-lg shadow-violet-500/30 ring-4 ring-violet-500/10">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Двухфакторная защита</h3>
+                <p className="text-sm font-medium text-slate-400">
+                  {user.username} {user.role ? `• ${user.role}` : ''}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-black text-slate-900 sm:text-xl">Двухфакторная защита</h3>
-              <p className="text-sm font-medium text-slate-500">
-                {user.username} {user.role ? `• ${user.role}` : ''}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 transition-colors hover:text-slate-600">
-            <X size={24} />
-          </button>
         </div>
 
         <div className="space-y-5 p-5 sm:p-6">
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Статус</p>
-                <p className="mt-2 text-lg font-black text-slate-900">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Статус</p>
+                <p className="mt-2 text-lg font-bold text-slate-900">
                   {user.twoFactorEnabled ? 'Включена' : 'Выключена'}
                 </p>
               </div>
               <span
-                className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.18em] ${
+                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${
                   user.twoFactorEnabled
                     ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
                     : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
@@ -224,7 +231,7 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
                 type="button"
                 onClick={handleStartSetup}
                 disabled={isLoading}
-                className="rounded-2xl bg-violet-500 px-6 py-4 font-black text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 disabled:opacity-70"
+                className="rounded-2xl bg-violet-500 px-6 py-4 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 disabled:opacity-70"
               >
                 Подготовить 2FA
               </button>
@@ -234,7 +241,7 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
           {!user.twoFactorEnabled && setupData ? (
             <form onSubmit={handleVerify} className="space-y-5">
               <div className="rounded-3xl border border-violet-100 bg-violet-50 p-5">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">Шаг 1</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">Шаг 1</p>
                 <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
                   Откройте приложение-аутентификатор и отсканируйте QR-код или добавьте ключ вручную.
                 </p>
@@ -252,13 +259,13 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
                   <button
                     type="button"
                     onClick={handleCopySecret}
-                    className="rounded-2xl border border-violet-200 bg-white px-5 py-3 text-sm font-black text-violet-700 transition-all hover:bg-violet-50"
+                    className="rounded-2xl border border-violet-200 bg-white px-5 py-3 text-sm font-bold text-violet-700 transition-all hover:bg-violet-50"
                   >
                     Копировать ключ
                   </button>
                   <a
                     href={setupData.otpauthUrl}
-                    className="rounded-2xl bg-violet-600 px-5 py-3 text-center text-sm font-black text-white transition-all hover:bg-violet-700"
+                    className="rounded-2xl bg-violet-600 px-5 py-3 text-center text-sm font-bold text-white transition-all hover:bg-violet-700"
                   >
                     Открыть в Authenticator
                   </a>
@@ -266,7 +273,7 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
               </div>
 
               <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Резервные коды</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Резервные коды</p>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {setupData.backupCodes.map((code) => (
                     <div key={code} className="rounded-2xl bg-white px-4 py-3 font-mono text-sm font-bold text-slate-800">
@@ -277,7 +284,7 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-black uppercase tracking-widest text-slate-700">
+                <label className="mb-2 block text-sm font-bold uppercase tracking-widest text-slate-700">
                   Код подтверждения
                 </label>
                 <div className="relative">
@@ -297,14 +304,14 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
                 <button
                   type="button"
                   onClick={() => setSetupData(null)}
-                  className="rounded-2xl px-6 py-4 font-black text-slate-500 transition-all hover:bg-slate-50"
+                  className="rounded-2xl px-6 py-4 font-bold text-slate-500 transition-all hover:bg-slate-50"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="rounded-2xl bg-violet-500 px-8 py-4 font-black text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 disabled:opacity-70"
+                  className="rounded-2xl bg-violet-500 px-8 py-4 font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:bg-violet-600 disabled:opacity-70"
                 >
                   Подтвердить и включить
                 </button>
@@ -324,7 +331,7 @@ export default function UserTwoFactorModal({ isOpen, user, onClose, onUpdated }:
                   type="button"
                   onClick={handleDisable}
                   disabled={isLoading}
-                  className="rounded-2xl bg-rose-600 px-6 py-4 font-black text-white shadow-xl shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:opacity-70"
+                  className="rounded-2xl bg-rose-600 px-6 py-4 font-bold text-white shadow-xl shadow-rose-600/20 transition-all hover:bg-rose-700 disabled:opacity-70"
                 >
                   Сбросить 2FA
                 </button>

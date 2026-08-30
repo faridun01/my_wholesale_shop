@@ -959,20 +959,44 @@ export class InvoiceService {
       totalRefundValue = roundMoney(totalRefundValue);
       const newReturnedAmount = roundMoney(Number(invoice.returnedAmount) + totalRefundValue);
       const newNetAmount = Math.max(0, roundMoney(Number(invoice.netAmount) - totalRefundValue));
-      
-      // Update status based on new net amount
-      const status = getInvoiceStatus(Number(invoice.paidAmount), Number(newNetAmount));
+
+      // 7. Refund cash back to the customer for whatever portion of the returned
+      // goods they'd already paid for — capped at what was actually paid, so a
+      // return on an unpaid/partially-paid invoice never manufactures a refund
+      // beyond real money received. Recorded as a negative Payment (same convention
+      // ExpensePayment already uses for refunds) so paidAmount and the payment
+      // history both reflect the full 100% cash-back immediately, instead of
+      // leaving it as a standing "change owed" balance the invoice merely displays.
+      const currentPaidAmount = Number(invoice.paidAmount || 0);
+      const cashRefundAmount = roundMoney(Math.min(currentPaidAmount, totalRefundValue));
+      const newPaidAmount = roundMoney(currentPaidAmount - cashRefundAmount);
+
+      if (cashRefundAmount > PAYMENT_EPSILON) {
+        await tx.payment.create({
+          data: {
+            customerId: invoice.customerId,
+            invoiceId,
+            userId,
+            amount: -cashRefundAmount,
+            method: 'refund',
+          },
+        });
+      }
+
+      // Update status based on the new net amount and post-refund paid amount
+      const status = getInvoiceStatus(newPaidAmount, Number(newNetAmount));
 
       await tx.invoice.update({
         where: { id: invoiceId },
-        data: { 
+        data: {
           returnedAmount: newReturnedAmount,
           netAmount: newNetAmount,
+          paidAmount: newPaidAmount,
           status
         }
       });
 
-      return { success: true, refundAmount: roundMoney(totalRefundValue) };
+      return { success: true, refundAmount: roundMoney(totalRefundValue), cashRefundAmount };
     }, TRANSACTION_OPTIONS);
   }
 }
