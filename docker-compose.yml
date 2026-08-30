@@ -30,8 +30,9 @@ services:
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-my_wholesale_shop}?schema=public
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+      TWO_FACTOR_BACKUP_PEPPER: ${TWO_FACTOR_BACKUP_PEPPER}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://crm.itforce.pro}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://crm.itforce.pro}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     volumes:
       - backend_uploads:/app/uploads
@@ -55,9 +56,25 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: wholesale_caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
   backend_uploads:
+  caddy_data:
+  caddy_config:

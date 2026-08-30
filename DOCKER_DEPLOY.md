@@ -16,13 +16,18 @@ Required variables:
 Optional:
 - `POSTGRES_DB`
 - `POSTGRES_USER`
-- `FRONTEND_PORT`
 - `CORS_ORIGINS`
 - `FRONTEND_ORIGIN`
 - `COOKIE_SECURE`
 - `ALLOW_UPLOAD_QUERY_TOKEN`
 - `CSP_REPORT_ONLY`
 - `CSP_REPORT_URI`
+
+Before the first run, edit `Caddyfile` at the repo root and set your domain
+(it currently points at `crm.itforce.pro`) — the domain must already resolve
+(DNS A/AAAA record) to this server's public IP, and ports 80/443 must be
+reachable from the internet, or Caddy's automatic Let's Encrypt certificate
+issuance will fail.
 
 ## 2) Build and run
 
@@ -32,8 +37,15 @@ docker compose up -d --build
 
 ## 3) Verify services
 
-- Frontend: `http://localhost`
-- Backend health: `http://localhost/api/health`
+- Frontend: `https://crm.itforce.pro` (Caddy automatically obtains/renews a
+  Let's Encrypt certificate for the domain and redirects HTTP → HTTPS; no
+  manual certbot steps needed)
+- Backend health: `https://crm.itforce.pro/api/health`
+
+Certificates and the ACME account key are persisted in the `caddy_data`
+Docker volume — back it up along with `postgres_data` and `backend_uploads`,
+and avoid `docker compose down -v` in production (it deletes all named
+volumes, including certificates and the database).
 
 ## 4) Useful commands
 
