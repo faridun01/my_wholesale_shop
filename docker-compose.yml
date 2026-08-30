@@ -56,25 +56,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    expose:
-      - "80"
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: wholesale_caddy
-    restart: unless-stopped
-    depends_on:
-      - frontend
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      # Bound to loopback only — the host's own systemd Caddy is the public
+      # TLS-terminating reverse proxy (crm.itforce.pro -> 127.0.0.1:8080) and
+      # is the only thing allowed to reach this container from the outside.
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
 
 volumes:
   postgres_data:
   backend_uploads:
-  caddy_data:
-  caddy_config:

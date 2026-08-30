@@ -23,6 +23,15 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Production traffic always arrives through exactly two reverse proxies
+// (host Caddy, then the frontend nginx container) before reaching Express —
+// backend is never exposed directly (see docker-compose.yml). Without this,
+// req.ip/req.secure resolve to the nginx container's address for every
+// request, collapsing all clients into one IP-based rate-limit bucket.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 2);
+}
+
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
   const originalWriteHead = res.writeHead.bind(res);

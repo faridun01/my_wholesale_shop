@@ -1,7 +1,0 @@
-crm.itforce.pro {
-	# Caddy automatically obtains and renews a Let's Encrypt certificate for this
-	# domain, redirects HTTP -> HTTPS, and speaks HTTP/2 to browsers — nothing else
-	# to configure. It hands the request off to the existing frontend nginx
-	# container over plain HTTP on the internal Docker network.
-	reverse_proxy frontend:80
-}
