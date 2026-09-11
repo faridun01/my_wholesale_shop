@@ -52,20 +52,16 @@ export default function PaginationControls({
 
   return (
     <div
-      className={`flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${className}`.trim()}
+      className={`flex flex-col items-center justify-center gap-2 border-t border-slate-100 py-3 sm:py-3.5 px-4 w-full ${className}`.trim()}
     >
-      <p className="text-xs text-slate-500 sm:text-sm">
-        Показано {startItem}-{endItem} из {totalItems}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
         <button
           type="button"
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 sm:h-9 items-center gap-1 rounded-xl border border-slate-200/80 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={15} />
           <span className="hidden sm:inline">Назад</span>
         </button>
 
@@ -74,15 +70,15 @@ export default function PaginationControls({
           const showGap = previousPage && pageNumber - previousPage > 1;
 
           return (
-            <div key={`${pageNumber}-${index}`} className="flex items-center gap-1.5">
-              {showGap ? <span className="text-sm text-slate-300">…</span> : null}
+            <div key={`${pageNumber}-${index}`} className="flex items-center gap-1 sm:gap-1.5">
+              {showGap ? <span className="px-1 text-xs sm:text-sm font-bold text-slate-300 select-none">…</span> : null}
               <button
                 type="button"
                 onClick={() => handlePageChange(pageNumber)}
                 className={
                   currentPage === pageNumber
-                    ? 'flex h-9 min-w-9 items-center justify-center rounded-lg bg-accent-500 px-3 text-sm font-semibold text-white'
-                    : 'flex h-9 min-w-9 items-center justify-center rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted'
+                    ? 'flex h-8 min-w-8 sm:h-9 sm:min-w-9 items-center justify-center rounded-xl bg-slate-900 px-2.5 sm:px-3 text-xs sm:text-sm font-bold text-white shadow-xs transition-all'
+                    : 'flex h-8 min-w-8 sm:h-9 sm:min-w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95'
                 }
               >
                 {pageNumber}
@@ -95,12 +91,16 @@ export default function PaginationControls({
           type="button"
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-line-strong bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 sm:h-9 items-center gap-1 rounded-xl border border-slate-200/80 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <span className="hidden sm:inline">Дальше</span>
-          <ChevronRight size={16} />
+          <ChevronRight size={15} />
         </button>
       </div>
+
+      <p className="text-[11px] sm:text-xs text-slate-400 font-medium text-center">
+        Показано <span className="font-semibold text-slate-600">{startItem}–{endItem}</span> из <span className="font-semibold text-slate-600">{totalItems}</span>
+      </p>
     </div>
   );
 }
