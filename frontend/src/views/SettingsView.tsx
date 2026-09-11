@@ -459,25 +459,25 @@ export default function SettingsView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-4 pb-12">
-        {/* Compact Header & Top Toolbar */}
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
+        {/* Header with inline action button on the right */}
+        <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-slate-900 text-white shadow-xs">
               <SettingsIcon size={18} />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate">Настройки системы</h1>
+              <h1 className="text-sm sm:text-lg font-bold tracking-tight text-slate-900 truncate">Настройки системы</h1>
               <p className="hidden sm:block text-xs text-slate-500 truncate">Склады, доступ, безопасность и реквизиты компании</p>
             </div>
           </div>
 
-          {/* Quick Context Action Button */}
+          {/* Quick Context Action Button (right of Настройки системы) */}
           <div className="flex items-center gap-2 shrink-0">
             {activeTab === 'warehouses' && isAdmin && (
               <button
                 type="button"
                 onClick={() => { resetWarehouseForm(); setShowAddWarehouse(true); }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95"
+                className="inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl bg-slate-900 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-95 transition-all shrink-0"
               >
                 <Plus size={14} />
                 <span>Новый склад</span>
@@ -487,10 +487,11 @@ export default function SettingsView() {
               <button
                 type="button"
                 onClick={() => setShowAddUser(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95"
+                className="inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl bg-slate-900 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-95 transition-all shrink-0"
               >
                 <Plus size={14} />
-                <span>Новый пользователь</span>
+                <span className="hidden xs:inline">Новый </span>
+                <span>пользователь</span>
               </button>
             )}
             {activeTab === 'general' && canManageSettings && (
@@ -498,7 +499,7 @@ export default function SettingsView() {
                 type="button"
                 onClick={() => (document.getElementById('company-profile-form') as HTMLFormElement | null)?.requestSubmit()}
                 disabled={isSubmittingForm}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl bg-slate-900 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-50 shrink-0"
               >
                 <CheckCircle2 size={14} />
                 <span>{isSubmittingForm ? 'Сохранение...' : 'Сохранить реквизиты'}</span>
