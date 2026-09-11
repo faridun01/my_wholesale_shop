@@ -3,6 +3,7 @@ import { History, Search, Filter, ArrowUpRight, ArrowDownLeft, RefreshCcw } from
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
 import toast from 'react-hot-toast';
+import { formatTransactionReason } from '../utils/format';
 import PaginationControls from '../components/common/PaginationControls';
 
 interface Transaction {
@@ -97,7 +98,7 @@ export default function HistoryView() {
                     {t.qtyChange > 0 ? `+${t.qtyChange}` : t.qtyChange}
                   </td>
                   <td className="px-8 py-4 text-slate-600 font-bold">{t.username}</td>
-                  <td className="px-8 py-4 text-slate-500 italic text-sm">{t.reason}</td>
+                  <td className="px-8 py-4 text-slate-500 italic text-sm">{formatTransactionReason(t.reason)}</td>
                 </tr>
               ))}
               {transactions.length === 0 && !loading && (

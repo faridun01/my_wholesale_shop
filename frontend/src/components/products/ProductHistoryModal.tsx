@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
 import { History, RotateCcw, Scissors, X } from 'lucide-react';
 import { formatProductName } from '../../utils/productName';
+import { formatTransactionReason } from '../../utils/format';
 
 interface ProductHistoryModalProps {
   isOpen: boolean;
@@ -274,7 +275,7 @@ export default function ProductHistoryModal({
                     </div>
                     <div className="mt-3 rounded-2xl bg-white px-3 py-3">
                       <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Причина</p>
-                      <p className="mt-1 wrap-break-word text-sm text-slate-600">{t.reason || '---'}</p>
+                      <p className="mt-1 wrap-break-word text-sm text-slate-600">{formatTransactionReason(t.reason)}</p>
                       {Number(t.returnedQty || 0) > 0 && (
                         <p className="mt-2 text-xs font-semibold text-emerald-700">Возвращено на склад: {Math.abs(Number(t.returnedQty || 0))}</p>
                       )}
@@ -357,7 +358,7 @@ export default function ProductHistoryModal({
                       </td>
                       <td className="py-3 pr-3 align-top wrap-break-word text-slate-600">{t.warehouseName || t.warehouse?.name || '---'}</td>
                       <td className="py-3 pr-3 align-top wrap-break-word italic text-slate-500">
-                        <div>{t.reason || '---'}</div>
+                        <div>{formatTransactionReason(t.reason)}</div>
                         {Number(t.returnedQty || 0) > 0 && (
                           <div className="mt-1 text-[11px] font-semibold not-italic text-emerald-700">Возвращено: {Math.abs(Number(t.returnedQty || 0))}</div>
                         )}

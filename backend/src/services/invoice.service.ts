@@ -908,7 +908,7 @@ export class InvoiceService {
             userId,
             qtyChange: normalizedQuantity,
             type: 'return',
-            reason: `${reason} (Накладная #${invoiceId})`,
+            reason: String(reason || '').trim() ? `${String(reason).trim()} (Накладная #${invoiceId})` : `Возврат по накладной #${invoiceId}`,
             referenceId: invoiceId,
             costAtTime: Number(originalItem.costPrice || 0),
             sellingAtTime: Number(originalItem.sellingPrice || 0),

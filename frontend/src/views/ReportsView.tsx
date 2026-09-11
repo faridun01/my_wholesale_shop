@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import client from '../api/client';
 import { deleteWriteOffTransactionPermanently, returnWriteOffTransaction } from '../api/products.api';
 import { getWarehouses } from '../api/warehouses.api';
-import { formatCount, formatMoney, formatPercent, toFixedNumber } from '../utils/format';
+import { formatCount, formatMoney, formatPercent, formatTransactionReason, toFixedNumber } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getCurrentUser } from '../utils/userAccess';
 import ChartSkeleton from '../components/charts/ChartSkeleton';
@@ -257,7 +257,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       String(row.customer_name || '').toLowerCase().includes(term) ||
       String(row.staff_name || '').toLowerCase().includes(term) ||
       String(row.warehouse_name || '').toLowerCase().includes(term) ||
-      String(row.reason || '').toLowerCase().includes(term)
+      String(row.reason || '').toLowerCase().includes(term) ||
+      formatTransactionReason(row.reason).toLowerCase().includes(term)
     );
   }, [detailSearchTerm, reportData]);
 
@@ -735,7 +736,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       (row) => formatProductName(row.product_name),
     ).slice(0, 10);
     const topReasons = aggregateRows(
-      (row) => String(row.reason || 'Без причины').trim() || 'Без причины',
+      (row) => formatTransactionReason(row.reason),
     ).slice(0, 10);
     const topStaff = aggregateRows(
       (row) => String(row.staff_name || 'Не указан').trim() || 'Не указан',
@@ -821,7 +822,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           formatCount(row.quantity),
           toFixedNumber(row.cost_price || 0),
           toFixedNumber(row.total_value || 0),
-          row.reason || '',
+          formatTransactionReason(row.reason),
         ];
       }
 
@@ -834,8 +835,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         normalizeDisplayBaseUnit(row.unit),
         formatCount(row.quantity),
         toFixedNumber(row.selling_price || 0),
-        toFixedNumber(row.total_value || 0),
-        row.reason || '',
+        toFixedNumber(row.total_sales || 0),
+        formatTransactionReason(row.reason),
       ];
     });
 
@@ -1683,7 +1684,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                         <td className="py-1.5 sm:py-2 px-3 font-semibold text-emerald-600 tabular-nums">{formatMoney(row.profit || 0)}</td>
                       </>
                     )}
-                    {reportType === 'returns' && <td className="py-1.5 sm:py-2 px-3 italic text-rose-600">{row.reason || '-'}</td>}
+                    {reportType === 'returns' && <td className="py-1.5 sm:py-2 px-3 italic text-rose-600">{formatTransactionReason(row.reason)}</td>}
                     {reportType === 'writeoffs' && (
                       <>
                         <td className="py-1.5 sm:py-2 px-3 font-semibold text-amber-700 tabular-nums">{formatMoney(row.total_value || 0)}</td>
@@ -1695,7 +1696,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                             <div className="mt-0.5 text-[9px] sm:text-[10px] font-semibold text-emerald-700">Возвращено: {Number(row.returned_qty || 0)}</div>
                           )}
                         </td>
-                        <td className="py-1.5 sm:py-2 px-3 italic text-amber-700">{row.reason || '-'}</td>
+                        <td className="py-1.5 sm:py-2 px-3 italic text-amber-700">{formatTransactionReason(row.reason)}</td>
                         <td className="py-1.5 sm:py-2 px-3 text-slate-500">{row.staff_name || '-'}</td>
                         <td className="py-1.5 sm:py-2 px-3 text-slate-500">{row.warehouse_name || '-'}</td>
                         <td className="py-1.5 sm:py-2 px-3 text-slate-500 tabular-nums">{toFixedNumber(row.cost_price || 0)}</td>

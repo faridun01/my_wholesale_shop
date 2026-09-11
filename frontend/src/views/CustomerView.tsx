@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
-import { formatCount, formatMoney } from '../utils/format';
+import { formatCount, formatMoney, formatTransactionReason } from '../utils/format';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
 import { useMemo } from 'react';
@@ -1132,7 +1132,7 @@ export default function CustomerView() {
                               <tr key={itemReturn.id}>
                                 <td className="px-3 py-1.5 text-slate-500">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</td>
                                 <td className="px-3 py-1.5 font-semibold text-rose-600">-{formatMoneyByRole(itemReturn.totalValue)}</td>
-                                <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{itemReturn.reason || 'Без причины'}</td>
+                                <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{formatTransactionReason(itemReturn.reason)}</td>
                                 <td className="px-3 py-1.5 text-slate-500">{itemReturn.staff_name}</td>
                               </tr>
                             ))}

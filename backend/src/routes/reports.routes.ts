@@ -296,12 +296,15 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       const quantity = Math.abs(Number(transaction.qtyChange || 0));
       const value = quantity * Number(transaction.costAtTime || 0);
       const normalizedReason = String(transaction.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Списание';
-      const reasonKey = normalizedReason.toLowerCase();
+      const cleanReason = /^write-?off$/i.test(normalizedReason)
+        ? 'Списание'
+        : (normalizedReason.charAt(0).toUpperCase() + normalizedReason.slice(1));
+      const reasonKey = cleanReason.toLowerCase();
       const staffKey = String(transaction.user?.id || 0);
       const productKey = String(transaction.product?.id || 0);
 
       if (!writeoffByReason[reasonKey]) {
-        writeoffByReason[reasonKey] = { name: normalizedReason, quantity: 0, value: 0, operations: 0 };
+        writeoffByReason[reasonKey] = { name: cleanReason, quantity: 0, value: 0, operations: 0 };
       }
       writeoffByReason[reasonKey].quantity += quantity;
       writeoffByReason[reasonKey].value += value;
@@ -527,7 +530,7 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
         total_value: Math.abs(t.qtyChange) * Number(t.sellingAtTime || 0),
         reason: t.reason,
       }))
-      .filter((row) => !/^Invoice #\d+ Cancelled$/i.test(String(row.reason || '').trim()));
+      .filter((row) => !/^(Invoice #\d+ Cancelled|Отмена накладной #\d+)$/i.test(String(row.reason || '').trim()));
 
     res.json(report);
   } catch (error) {
@@ -598,7 +601,11 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
         returned_qty: returnedQty,
         cost_price: Number(t.costAtTime || 0),
         total_value: originalQty * Number(t.costAtTime || 0),
-        reason: String(t.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Write-off',
+        reason: (() => {
+          const raw = String(t.reason || '').replace(/^.*?:\s*/i, '').trim();
+          if (!raw || /^write-?off$/i.test(raw)) return 'Списание';
+          return raw.charAt(0).toUpperCase() + raw.slice(1);
+        })(),
         can_return: originalQty > returnedQty,
         can_delete: returnedQty <= 0,
         status:

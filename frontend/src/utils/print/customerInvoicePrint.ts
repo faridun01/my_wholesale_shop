@@ -1,4 +1,4 @@
-﻿import { formatMoney } from '../format';
+import { formatMoney, formatTransactionReason } from '../format';
 
 import { buildDocumentHtml, createHiddenPrintFrame, escapeHtml } from './customerInvoice/shared';
 
@@ -187,7 +187,7 @@ const renderReturnsBlock = (invoice: any) =>
                   <tr>
                     <td>${escapeHtml(formatRuDate(itemReturn.createdAt, true))}</td>
                     <td>-${escapeHtml(formatMoney(itemReturn.totalValue))}</td>
-                    <td>${escapeHtml(itemReturn.reason || '---')}</td>
+                    <td>${escapeHtml(formatTransactionReason(itemReturn.reason))}</td>
                     <td>${escapeHtml(itemReturn.staff_name)}</td>
                   </tr>
                 `,

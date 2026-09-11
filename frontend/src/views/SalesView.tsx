@@ -24,7 +24,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatCount, formatMoney, toFixedNumber, ceilMoney } from '../utils/format';
+import { formatCount, formatMoney, toFixedNumber, ceilMoney, formatTransactionReason } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import { getCustomers } from '../api/customers.api';
@@ -772,7 +772,7 @@ export default function SalesView() {
                             <tr key={r.id}>
                               <td className="px-3 py-1.5 text-slate-500">{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
                               <td className="px-3 py-1.5 font-semibold text-rose-600">-{formatMoney(r.totalValue)}</td>
-                              <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{r.reason || 'Без причины'}</td>
+                              <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{formatTransactionReason(r.reason)}</td>
                               <td className="px-3 py-1.5 text-slate-500">{r.staff_name}</td>
                             </tr>
                           ))}
