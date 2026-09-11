@@ -93,15 +93,15 @@ export default function POSCartItem({
   };
 
   return (
-    <div className="my-1.5 rounded-xl border border-slate-200/70 bg-[#f8f9fc] p-2 transition-colors hover:bg-slate-100/80">
+    <div className="my-1.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-colors hover:border-slate-300/80">
       {/* Line 1: ONLY Product Name & Delete button */}
-      <div className="flex items-start justify-between gap-2 min-w-0 border-b border-slate-200/40 pb-1.5">
+      <div className="flex items-start justify-between gap-2 min-w-0 border-b border-slate-100 pb-1.5">
         <div className="flex items-start gap-1.5 min-w-0 flex-1">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 mt-0.5">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-bold text-slate-600 mt-0.5">
             {index + 1}
           </span>
           <p
-            className="whitespace-normal wrap-break-word text-[12.5px] font-bold text-slate-900 leading-snug"
+            className="whitespace-normal wrap-break-word text-[12px] font-semibold text-slate-800 leading-snug line-clamp-2"
             style={{ overflowWrap: 'anywhere' }}
           >
             {formatProductName(item.name)}
@@ -112,9 +112,9 @@ export default function POSCartItem({
           type="button"
           onClick={() => removeFromCart(item.id)}
           title="Удалить из корзины"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 active:bg-rose-100"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 active:bg-rose-100"
         >
-          <Trash2 size={15} />
+          <Trash2 size={14} />
         </button>
       </div>
 
@@ -124,7 +124,7 @@ export default function POSCartItem({
           value={item.selectedPackagingId || ''}
           onChange={(e) => updateSelectedPackaging(item.id, e.target.value)}
           title="Выберите упаковку"
-          className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-800 outline-none focus:border-slate-300"
+          className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50/50 px-1.5 text-[11px] font-medium text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
         >
           <option value="">{item.baseUnitName}</option>
           {(Array.isArray(item.packagings) ? item.packagings : []).map((packaging) => {
@@ -137,13 +137,13 @@ export default function POSCartItem({
           })}
         </select>
 
-        <div className="flex h-9 shrink-0 items-center rounded-md border border-slate-200 bg-white">
+        <div className="flex h-8 shrink-0 items-center rounded-lg border border-slate-200 bg-white shadow-xs">
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(-1) : handleStepExtraUnitQuantity(-1))}
-            className="flex h-full w-8 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
+            className="flex h-full w-7 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
           >
-            <Minus size={14} />
+            <Minus size={13} />
           </button>
           <input
             type="number"
@@ -161,14 +161,14 @@ export default function POSCartItem({
             }
             onBlur={() => (isPackageSale ? commitPackageQuantityInput(item.id) : commitExtraUnitQuantityInput(item.id))}
             placeholder="0"
-            className="h-full w-10 text-center text-[12px] font-bold text-slate-900 outline-none"
+            className="h-full w-9 text-center font-mono text-[11px] font-bold text-slate-900 outline-none"
           />
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(1) : handleStepExtraUnitQuantity(1))}
-            className="flex h-full w-8 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
+            className="flex h-full w-7 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
           >
-            <Plus size={14} />
+            <Plus size={13} />
           </button>
         </div>
       </div>
@@ -191,18 +191,18 @@ export default function POSCartItem({
             onBlur={() => commitLineDiscountInput(item.id)}
             placeholder="%"
             title="Скидка в %"
-            className="h-8 w-full rounded-md border border-slate-200 bg-white px-1 text-center text-[11px] font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400"
+            className="h-7 w-full rounded-md border border-slate-200 bg-white px-1 text-center font-mono text-[11px] font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400"
           />
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {itemLineDiscount > 0 && (
-            <span className="text-[10px] text-slate-400 line-through">
+            <span className="font-mono text-[10px] text-slate-400 line-through tabular-nums">
               {formatMoney(itemLineSubtotal)}
             </span>
           )}
-          <span className="text-[13px] font-bold text-slate-900">{formatMoney(itemLineTotal)}</span>
-          <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span className="font-mono text-xs font-bold text-slate-900 tabular-nums">{formatMoney(itemLineTotal)}</span>
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-600">
             ={item.quantity}{item.baseUnitName}
           </span>
         </div>

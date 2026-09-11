@@ -127,10 +127,10 @@ export default function POSProductList({
 
       <div
         ref={productListRef}
-        className="bg-white max-h-[calc(100vh-230px)] lg:max-h-[calc(100vh-190px)] lg:min-h-0 lg:flex-1 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400"
+        className="bg-white lg:max-h-[calc(100vh-190px)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:bg-slate-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full hover:lg:[&::-webkit-scrollbar-thumb]:bg-slate-400"
       >
-        <div className="space-y-2 py-2 md:hidden">
-          {filteredProducts.map((product, index) => {
+        <div className="space-y-1.5 py-1 md:hidden">
+          {filteredProducts.map((product) => {
             const stockParts = getProductStockParts(product, product.unit);
 
             return (
@@ -138,22 +138,24 @@ export default function POSProductList({
                 key={`mobile-pos-${product.id}`}
                 onClick={() => handleAddFromList(product)}
                 className={clsx(
-                  'rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-colors active:bg-slate-50',
+                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-colors active:bg-slate-50',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/40',
                   canAddProductFromList(product) ? 'cursor-pointer' : '',
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
                     <p
-                      className="whitespace-normal wrap-break-word text-[13px] font-semibold leading-snug text-slate-900"
+                      className="whitespace-normal wrap-break-word text-[12px] font-medium leading-snug text-slate-800 line-clamp-2"
                       style={{ overflowWrap: 'anywhere' }}
                     >
                       {formatProductName(product.name)}
                     </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm font-bold tabular-nums text-slate-900">{formatMoney(product.sellingPrice)}</span>
-                      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-emerald-700 font-mono">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="font-mono text-xs font-bold tabular-nums text-slate-900">
+                        {formatMoney(product.sellingPrice)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded border border-emerald-200/60 bg-emerald-50/80 px-1.5 py-0.5 text-emerald-700 font-mono">
                         <span className="text-[10px] font-semibold">{stockParts.primary}</span>
                         {stockParts.secondary ? (
                           <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
@@ -170,9 +172,9 @@ export default function POSProductList({
                     }}
                     disabled={!canAddProductFromList(product)}
                     title="Добавить в корзину"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-25"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-25"
                   >
-                    <Plus size={18} />
+                    <Plus size={15} />
                   </button>
                 </div>
               </div>

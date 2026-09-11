@@ -76,7 +76,7 @@ export default function POSCartHeader({
           type="button"
           onClick={() => setIsCartExpanded((value) => !value)}
           title={isCartExpanded ? 'Свернуть корзину' : 'Развернуть корзину'}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 shadow-xs"
+          className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 shadow-xs"
         >
           {isCartExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
         </button>

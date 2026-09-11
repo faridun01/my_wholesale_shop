@@ -78,6 +78,23 @@ export default function POSCartSummary({
         </div>
       )}
 
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setPaidAmount(String(total))}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
+        >
+          Вся сумма
+        </button>
+        <button
+          type="button"
+          onClick={() => setPaidAmount('0')}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
+        >
+          В долг (0 TJS)
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <input
           type="number"
@@ -85,7 +102,7 @@ export default function POSCartSummary({
           value={discount === 0 ? '' : discount}
           onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
           placeholder="Скидка %"
-          className="h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+          className="h-9 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 font-mono"
         />
         <input
           type="number"
@@ -97,11 +114,11 @@ export default function POSCartSummary({
             setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
           }}
           placeholder="Оплачено"
-          className="h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 font-mono"
+          className="h-9 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 font-mono"
         />
       </div>
 
-      <div className="hidden space-y-2 rounded-xl border border-slate-200/80 bg-white p-3.5 text-xs shadow-xs lg:block">
+      <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white p-3 text-xs shadow-xs">
         <div className="flex items-center justify-between text-slate-500">
           <span>Подытог</span>
           <span className="font-mono font-medium text-slate-900 tabular-nums">{formatMoney(subtotal)}</span>
@@ -115,25 +132,29 @@ export default function POSCartSummary({
             У {cartWeightSummary.missingWeightItems} поз. вес не найден в названии
           </div>
         ) : null}
-        <div className="flex items-center justify-between text-slate-500">
-          <span>Скидка по товарам</span>
-          <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(lineDiscountAmount)}</span>
-        </div>
-        <div className="flex items-center justify-between text-slate-500">
-          <span>Скидка на чек</span>
-          <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(invoiceDiscountAmount)}</span>
-        </div>
-        {paidAmount && (
+        {lineDiscountAmount > 0 && (
           <div className="flex items-center justify-between text-slate-500">
-            <span>{balance >= 0 ? 'Сдача' : 'Долг'}</span>
+            <span>Скидка по товарам</span>
+            <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(lineDiscountAmount)}</span>
+          </div>
+        )}
+        {invoiceDiscountAmount > 0 && (
+          <div className="flex items-center justify-between text-slate-500">
+            <span>Скидка на чек</span>
+            <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(invoiceDiscountAmount)}</span>
+          </div>
+        )}
+        {paidAmount !== '' && (
+          <div className="flex items-center justify-between text-slate-500">
+            <span>{balance >= 0 ? 'Сдача' : 'Остаток в долг'}</span>
             <span className={clsx('font-mono font-semibold tabular-nums', balance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
               {formatMoney(Math.abs(balance))}
             </span>
           </div>
         )}
-        <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
-          <span className="text-sm font-bold text-slate-900">Итого</span>
-          <span className="font-mono text-xl font-bold tracking-tight text-slate-900 tabular-nums">{formatMoney(total)}</span>
+        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+          <span className="text-xs font-bold text-slate-900">Итого к оплате</span>
+          <span className="font-mono text-lg font-bold tracking-tight text-slate-900 tabular-nums">{formatMoney(total)}</span>
         </div>
       </div>
 

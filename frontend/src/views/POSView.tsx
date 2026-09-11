@@ -1,6 +1,7 @@
 import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getProducts } from '../api/products.api';
 import { createInvoice } from '../api/invoices.api';
@@ -1233,7 +1234,7 @@ export default function POSView() {
         type="warning"
       />
 
-      <div className="lg:rounded-[28px] lg:bg-[#f4f5fb] min-h-screen">
+      <div className="lg:rounded-[28px] lg:bg-[#f4f5fb]">
         <div className="hidden border-b border-slate-200/70 bg-white px-5 py-3 lg:sticky lg:top-0 lg:z-20 lg:block">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1255,13 +1256,13 @@ export default function POSView() {
           </div>
         </div>
 
-        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' ? 'pb-36 lg:pb-5' : cart.length > 0 ? 'pb-28 lg:pb-5' : 'pb-16 lg:pb-5')}>
-          <div className="grid grid-cols-2 gap-1.5 rounded-full bg-slate-200/80 p-1.5 text-xs lg:hidden">
+        <div className={clsx('flex flex-1 flex-col space-y-2.5 py-2 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' ? 'pb-16 lg:pb-5' : cart.length > 0 ? 'pb-14 lg:pb-5' : 'pb-2 lg:pb-5')}>
+          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-200/70 p-1 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
-                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5',
-                activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
+                'min-h-9 rounded-xl py-1.5 text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+                activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               )}
             >
               <span>Товары</span>
@@ -1272,13 +1273,13 @@ export default function POSView() {
             <button
               onClick={() => setActiveTab('cart')}
               className={clsx(
-                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5',
-                activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
+                'min-h-9 rounded-xl py-1.5 text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+                activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               )}
             >
               <span>Корзина</span>
               {cart.length > 0 && (
-                <span className="rounded-full bg-accent-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="rounded-full bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
                   {cart.length}
                 </span>
               )}
@@ -1414,30 +1415,32 @@ export default function POSView() {
       </div>
 
       {activeTab === 'cart' && (
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.1)] backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-xl items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Итого к оплате</p>
-              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-xl font-bold leading-none text-slate-900">{formatMoney(total)}</span>
-                <span className="text-xs font-semibold text-emerald-600">{formatWeightKg(cartWeightSummary.totalWeightKg)}</span>
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200/80 bg-white/95 px-4 pb-2.5 pt-2.5 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">К оплате</p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-lg font-bold leading-none text-slate-900 tabular-nums">
+                  {formatMoney(total)}
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-600">
+                  {formatWeightKg(cartWeightSummary.totalWeightKg)}
+                </span>
               </div>
-              {totalDiscountAmount > 0 && (
-                <p className="mt-1 inline-flex rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-medium text-rose-700">
-                  Скидка: -{formatMoney(totalDiscountAmount)}
-                </p>
-              )}
-              <p className={clsx('mt-1 text-[11px] font-medium', customerId ? 'text-slate-500' : 'text-amber-600')}>
-                {customerId ? 'Клиент выбран' : 'Выберите клиента'}
-              </p>
+              {!customerId ? (
+                <p className="text-[10px] font-medium text-amber-600">Выберите клиента</p>
+              ) : totalDiscountAmount > 0 ? (
+                <p className="text-[10px] font-medium text-rose-600">Скидка -{formatMoney(totalDiscountAmount)}</p>
+              ) : null}
             </div>
             <button
               type="button"
               onClick={handleCheckout}
               disabled={isSubmitting || cart.length === 0 || !customerId}
-              className="btn-primary min-h-12 shrink-0 px-5 text-sm active:scale-[0.98]"
+              className="flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isSubmitting ? '...' : 'Оформить'}
+              {isSubmitting ? 'Обработка...' : 'Оформить заказ'}
+              {!isSubmitting && <ChevronRight size={16} />}
             </button>
           </div>
         </div>
