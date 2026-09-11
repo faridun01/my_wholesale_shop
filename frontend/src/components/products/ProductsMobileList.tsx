@@ -85,10 +85,10 @@ export default function ProductsMobileList({
             key={`mobile-${product.id ?? product.name}-${index}`}
             className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all hover:border-slate-300 hover:shadow-xs"
           >
-            {/* Top row: Photo with micro-badge, title, tags, actions button */}
+            {/* Top row: Photo, title, tags, actions button */}
             <div className="flex items-start gap-2.5">
-              {/* Product Photo with modern micro-badge */}
-              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-slate-100 shadow-2xs">
+              {/* Product Photo */}
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/60 bg-slate-50 shadow-2xs">
                 {product.photoUrl ? (
                   <img
                     src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -98,33 +98,31 @@ export default function ProductsMobileList({
                     onError={(event) => handleBrokenImage(event, product.id)}
                   />
                 ) : (
-                  <Package className="text-slate-300" size={20} />
+                  <Package className="text-slate-400" size={18} />
                 )}
-                <span className="absolute bottom-0 right-0 rounded-tl-md bg-slate-900/70 px-1 py-0.2 text-[8px] font-mono font-bold text-white">
-                  #{(currentPage - 1) * pageSize + index + 1}
-                </span>
               </div>
 
               {/* Product Info */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-1.5">
                   <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-[13px] font-bold text-slate-900 leading-snug">
+                    <h4 className="truncate text-sm font-bold text-slate-900 leading-tight">
                       {formatProductName(product.name)}
                     </h4>
 
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <span className="truncate max-w-[120px] font-medium text-slate-600">
                         {product.category?.name || 'Без категории'}
                       </span>
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
+                      <span className="text-slate-300">•</span>
+                      <span className="truncate max-w-[110px] text-slate-400">
                         {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
                       </span>
                       {getDuplicateHintCount(product) > 0 && (
                         <button
                           type="button"
                           onClick={() => onOpenMergeModal(product)}
-                          className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700"
+                          className="ml-0.5 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700"
                         >
                           Дубликат
                         </button>
@@ -138,10 +136,10 @@ export default function ProductsMobileList({
                       type="button"
                       onClick={() => onToggleActions(Number(product.id))}
                       className={clsx(
-                        'flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all active:scale-95',
+                        'flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all active:scale-95',
                         isExpanded
                           ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                          : 'border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100 active:bg-slate-200'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
                       )}
                       title="Действия с товаром"
                     >
@@ -156,69 +154,63 @@ export default function ProductsMobileList({
               </div>
             </div>
 
-            {/* Core Row: Stock Status Pill on Left, Selling Price on Right */}
-            <div className="mt-2.5 flex items-center justify-between gap-2">
-              {/* Stock Status Pill */}
-              <div
-                className={clsx(
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border font-medium min-w-0',
-                  isLowStock
-                    ? 'border-rose-200/80 bg-rose-50 text-rose-700'
-                    : 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                )}
-              >
+            {/* Core Row: Stock on Left, Price on Right */}
+            <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+              {/* Stock Status Indicator */}
+              <div className="flex items-center gap-1.5 min-w-0">
                 <span
                   className={clsx(
-                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    'h-2 w-2 shrink-0 rounded-full',
                     isLowStock ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
                   )}
                 />
-                <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Остаток:</span>
-                <span className="font-bold">{stockBreakdown.primary}</span>
-                {stockBreakdown.secondary && (
-                  <span className="text-[10px] opacity-70 truncate max-w-[80px]">({stockBreakdown.secondary})</span>
-                )}
+                <div className="flex items-baseline gap-1 truncate text-xs">
+                  <span className="font-semibold text-slate-800">{stockBreakdown.primary}</span>
+                  {stockBreakdown.secondary && (
+                    <span className="text-[10px] text-slate-400 truncate">({stockBreakdown.secondary})</span>
+                  )}
+                </div>
                 {isLowStock && (
-                  <span className="shrink-0 rounded bg-rose-200/70 px-1 py-0.2 text-[9px] font-bold text-rose-800">
+                  <span className="shrink-0 rounded bg-rose-50 border border-rose-200/80 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">
                     {Number(product.stock || 0) <= 0 ? 'Нет' : 'Мало'}
                   </span>
                 )}
               </div>
 
-              {/* Price */}
+              {/* Selling Price */}
               <div className="text-right shrink-0">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
-                  Цена
-                </span>
-                <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900">
-                  {isAggregateMode ? '—' : formatMoney(product.sellingPrice)}
-                </span>
+                <div className="flex items-baseline justify-end gap-1">
+                  <span className="font-mono text-base font-extrabold text-slate-900 tabular-nums">
+                    {isAggregateMode ? '—' : formatMoney(product.sellingPrice)}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400">TJS</span>
+                </div>
               </div>
             </div>
 
             {/* Admin Wholesale Metrics Strip */}
             {isAdmin && (
-              <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-slate-100 bg-[#f8f9fc] p-1.5 text-center">
+              <div className="mt-2 grid grid-cols-3 divide-x divide-slate-200/60 rounded-xl border border-slate-100 bg-slate-50/70 py-1.5 text-center">
                 <div className="px-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Закупка</p>
-                  <p className="mt-0.5 text-xs font-bold text-slate-700 truncate">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Закупка</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold text-slate-700 tabular-nums truncate">
                     {isAggregateMode ? '—' : formatMoney(costPrice)}
                   </p>
                 </div>
-                <div className="border-x border-slate-200/60 px-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Маржа</p>
+                <div className="px-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Маржа</p>
                   <p
                     className={clsx(
-                      'mt-0.5 text-xs font-bold truncate',
+                      'mt-0.5 font-mono text-xs font-bold tabular-nums truncate',
                       efficiency.className?.includes('rose') ? 'text-rose-600' : 'text-emerald-600'
                     )}
                   >
-                    {isAggregateMode ? '—' : formatPercent(efficiency.marginPercent, 1)}
+                    {isAggregateMode ? '—' : `${efficiency.marginPercent > 0 ? '+' : ''}${formatPercent(efficiency.marginPercent, 1)}`}
                   </p>
                 </div>
                 <div className="px-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Приход</p>
-                  <p className="mt-0.5 text-xs font-bold text-slate-700 truncate">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Приход</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold text-slate-700 tabular-nums truncate">
                     {product.totalIncoming} {normalizeDisplayBaseUnit(product.unit || 'шт')}
                   </p>
                 </div>
