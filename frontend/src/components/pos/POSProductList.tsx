@@ -75,13 +75,8 @@ export default function POSProductList({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-slate-500">
-            Позиций: <span className="font-semibold text-slate-800">{filteredProducts.length}</span>
-          </span>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {warehouses.length > 1 && (
+        <div className="flex items-center justify-end gap-2">
+          {warehouses.length > 1 && (
               <div className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700">
                 <Warehouse size={13} className="text-slate-400 shrink-0" />
                 <select
@@ -108,7 +103,6 @@ export default function POSProductList({
               <X size={15} />
             </button>
           </div>
-        </div>
 
         {isAdmin && !warehouseId && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
@@ -129,37 +123,61 @@ export default function POSProductList({
         ref={productListRef}
         className="bg-white lg:max-h-[calc(100vh-190px)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:bg-slate-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full hover:lg:[&::-webkit-scrollbar-thumb]:bg-slate-400"
       >
-        <div className="space-y-1.5 py-1 md:hidden">
-          {filteredProducts.map((product) => {
+        <div className="space-y-2 py-1 md:hidden">
+          {filteredProducts.map((product, index) => {
             const stockParts = getProductStockParts(product, product.unit);
+            const isOutOfStock = Number(product.stock || 0) <= 0;
 
             return (
               <div
                 key={`mobile-pos-${product.id}`}
                 onClick={() => canAddProductFromList(product) && handleAddFromList(product)}
                 className={clsx(
-                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-all active:scale-[0.99] active:bg-slate-50',
+                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs transition-all active:scale-[0.99] active:bg-slate-50',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/40',
                   canAddProductFromList(product) ? 'cursor-pointer select-none' : 'opacity-60 cursor-not-allowed',
                 )}
               >
-                <div>
-                  <p
-                    className="whitespace-normal wrap-break-word text-[12px] font-medium leading-snug text-slate-800 line-clamp-2"
-                    style={{ overflowWrap: 'anywhere' }}
-                  >
-                    {formatProductName(product.name)}
-                  </p>
-                  <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs font-bold tabular-nums text-slate-900">
+                <div className="flex items-start gap-2.5">
+                  <span className="flex h-5.5 min-w-5.5 shrink-0 items-center justify-center rounded-md bg-slate-100 px-1 font-mono text-[11px] font-bold text-slate-600">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="whitespace-normal wrap-break-word text-[13px] font-semibold leading-snug text-slate-900 line-clamp-2"
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
+                      {formatProductName(product.name)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100/90 pt-2">
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-mono text-sm font-extrabold text-slate-900 tabular-nums">
                       {formatMoney(product.sellingPrice)}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded border border-emerald-200/60 bg-emerald-50/80 px-1.5 py-0.5 text-emerald-700 font-mono">
-                      <span className="text-[10px] font-semibold">{stockParts.primary}</span>
-                      {stockParts.secondary ? (
-                        <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
-                      ) : null}
-                    </span>
+                    <span className="text-[10px] font-semibold text-slate-400">TJS</span>
+                  </div>
+
+                  <div
+                    className={clsx(
+                      'inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium border font-mono',
+                      isOutOfStock
+                        ? 'border-rose-200/70 bg-rose-50/60 text-rose-700'
+                        : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700'
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        'h-1.5 w-1.5 rounded-full shrink-0',
+                        isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500'
+                      )}
+                    />
+                    <span className="text-[11px] font-bold">{stockParts.primary}</span>
+                    {stockParts.secondary ? (
+                      <span className="text-[10px] font-medium text-emerald-600/90">{stockParts.secondary}</span>
+                    ) : null}
                   </div>
                 </div>
               </div>
