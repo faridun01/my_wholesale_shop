@@ -42,21 +42,37 @@ export default function POSProductList({
   onClose,
 }: POSProductListProps) {
   return (
-    <div className="flex flex-col overflow-visible rounded-[28px] border border-white bg-white p-5 shadow-sm lg:h-full lg:min-h-0 lg:overflow-hidden">
-      <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
+    <div className="flex flex-col overflow-visible rounded-2xl border border-white bg-white p-3 shadow-xs lg:h-full lg:min-h-0 lg:overflow-hidden lg:rounded-[28px] lg:p-5 lg:shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 lg:gap-4 lg:pb-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+          <input
+            type="text"
+            value={productSearch}
+            onChange={(e) => {
+              const value = e.target.value;
+              startTransition(() => {
+                setProductSearch(value);
+              });
+            }}
+            placeholder="Поиск товара, ID или штрихкода..."
+            autoComplete="off"
+            className="h-11 w-full rounded-full border border-slate-200 bg-[#f4f5fb] pl-11 pr-4 text-sm text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white lg:h-auto lg:py-2 lg:pl-10 lg:text-xs"
+          />
+        </div>
+
         <div className="flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <span className="text-xs font-semibold text-slate-600">Всего позиций: {filteredProducts.length}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-slate-500">Всего позиций: {filteredProducts.length}</span>
+
+          <div className="flex flex-wrap items-center gap-2">
             {warehouses.length > 1 && (
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs text-slate-700 shadow-xs">
-                <Warehouse size={14} className="text-slate-400" />
+              <div className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-xs text-slate-700 shadow-xs">
+                <Warehouse size={14} className="text-slate-400 shrink-0" />
                 <select
                   value={warehouseId}
                   onChange={(e) => handleWarehouseChange(e.target.value)}
                   disabled={!isAdmin}
-                  className="min-w-36 appearance-none bg-transparent outline-none"
+                  className="min-w-0 max-w-32 appearance-none bg-transparent outline-none"
                 >
                   <option value="">Выберите склад</option>
                   {warehouses.map((warehouse) => (
@@ -70,28 +86,10 @@ export default function POSProductList({
 
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-[#f4f5fb] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-[#f4f5fb] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:flex"
             >
               <X size={16} />
             </button>
-          </div>
-        </div>
-
-        <div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              value={productSearch}
-              onChange={(e) => {
-                const value = e.target.value;
-                startTransition(() => {
-                  setProductSearch(value);
-                });
-              }}
-              placeholder="Поиск товара, ID или штрихкода..."
-              className="w-full rounded-full border border-slate-200 bg-[#f4f5fb] py-2 pl-10 pr-4 text-xs text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-            />
           </div>
         </div>
 
@@ -114,7 +112,7 @@ export default function POSProductList({
         ref={productListRef}
         className="bg-white max-h-[calc(100vh-230px)] lg:max-h-[calc(100vh-190px)] lg:min-h-0 lg:flex-1 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400"
       >
-        <div className="space-y-2 p-2 md:hidden">
+        <div className="space-y-2 py-2 md:hidden">
           {filteredProducts.map((product, index) => {
             const stockParts = getProductStockParts(product, product.unit);
 
@@ -123,22 +121,27 @@ export default function POSProductList({
                 key={`mobile-pos-${product.id}`}
                 onClick={() => handleAddFromList(product)}
                 className={clsx(
-                  'rounded-xl border border-slate-200/70 bg-[#f4f5fb] p-2.5 shadow-xs transition-colors hover:bg-slate-100/80',
+                  'rounded-xl border border-slate-200/70 bg-[#f4f5fb] p-3 transition-colors active:bg-slate-100',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/50',
                   canAddProductFromList(product) ? 'cursor-pointer' : '',
                 )}
               >
-                <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p
-                      className="whitespace-normal wrap-break-word text-[11px] font-semibold leading-snug text-slate-900"
+                      className="whitespace-normal wrap-break-word text-[13px] font-semibold leading-snug text-slate-900"
                       style={{ overflowWrap: 'anywhere' }}
                     >
                       {formatProductName(product.name)}
                     </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-slate-900">{formatMoney(product.sellingPrice)}</span>
-                      <span className="text-[10px] text-slate-400">#{index + 1}</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[13px] font-bold text-slate-900">{formatMoney(product.sellingPrice)}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                        <span className="text-[10px] font-semibold">{stockParts.primary}</span>
+                        {stockParts.secondary ? (
+                          <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
+                        ) : null}
+                      </span>
                     </div>
                   </div>
 
@@ -149,17 +152,10 @@ export default function POSProductList({
                     }}
                     disabled={!canAddProductFromList(product)}
                     title="Добавить в корзину"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                   >
-                    <Plus size={15} />
+                    <Plus size={18} />
                   </button>
-                </div>
-
-                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                  <span className="text-[10px] font-semibold">{stockParts.primary}</span>
-                  {stockParts.secondary ? (
-                    <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
-                  ) : null}
                 </div>
               </div>
             );

@@ -341,7 +341,7 @@ export default function RemindersView() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-slate-50/60 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-50/60 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -356,7 +356,7 @@ export default function RemindersView() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative min-w-[240px]">
+              <div className="relative min-w-60">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   value={searchTerm}
@@ -369,7 +369,7 @@ export default function RemindersView() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:from-violet-700 hover:to-indigo-700 hover:shadow-violet-500/30"
+                className="btn-primary min-h-11"
               >
                 <Plus size={18} />
                 Новая задача
@@ -692,14 +692,14 @@ export default function RemindersView() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0, y: 16 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.95, opacity: 0, y: 16 }}
                 onClick={(event) => event.stopPropagation()}
-                className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+                className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
               >
                 <div className="border-b border-slate-100 bg-slate-50/80 px-6 py-5">
                   <div className="flex items-center justify-between">
@@ -724,7 +724,8 @@ export default function RemindersView() {
                   </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4 p-6">
+                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Заголовок *</label>
                     <input
@@ -775,12 +776,14 @@ export default function RemindersView() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                </div>
+
+                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 p-6 pt-4">
                     {selectedReminder && !selectedReminder.isCompleted && (
                       <button
                         type="button"
                         onClick={() => handleComplete(selectedReminder.id)}
-                        className="mr-auto rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        className="mr-auto min-h-11 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
                       >
                         Выполнить
                       </button>
@@ -788,12 +791,13 @@ export default function RemindersView() {
                     <button
                       type="button"
                       onClick={closeModal}
-                      className="rounded-2xl border border-slate-200 px-5 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                      className="min-h-11 rounded-2xl border border-slate-200 px-5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
+                      className="btn-primary min-h-11"
                     >
                       {selectedReminder ? 'Сохранить' : 'Создать'}
                     </button>

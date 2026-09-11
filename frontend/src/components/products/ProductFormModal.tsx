@@ -53,14 +53,14 @@ export default function ProductFormModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-3"
         >
       <motion.div
         initial={{ scale: 0.96, opacity: 0, y: 8 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 8 }}
         onClick={(event) => event.stopPropagation()}
-        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-slate-100 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl"
       >
         {/* Compact Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
@@ -85,8 +85,9 @@ export default function ProductFormModal({
           </button>
         </div>
 
-        {/* Compact Form Body (Single Viewport Fit) */}
-        <form onSubmit={onSubmit} className="p-4 space-y-3 bg-white">
+        {/* Compact Form Body — scrolls independently so tall forms never get cut off on mobile */}
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
           {/* Row 1: Name */}
           <div>
             <label className="mb-0.5 block text-[11px] font-semibold text-slate-700">Наименование товара *</label>
@@ -322,19 +323,20 @@ export default function ProductFormModal({
               )}
             </div>
           </div>
+        </div>
 
           {/* Compact Footer Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 p-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
             >
               Отмена
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-colors"
+              className="min-h-11 rounded-xl bg-slate-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-colors"
             >
               {isEditMode ? 'Сохранить' : 'Создать'}
             </button>

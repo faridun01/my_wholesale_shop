@@ -468,7 +468,7 @@ export default function ExpensesView() {
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-5 overflow-hidden rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+      <div className="space-y-4 overflow-hidden lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
         {/* Top Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -818,12 +818,12 @@ export default function ExpensesView() {
       {/* Modal: Новый расход */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-70 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={closeAddModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
           >
             <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
               <div className="flex items-center gap-3">
@@ -996,12 +996,12 @@ export default function ExpensesView() {
       {/* Modal: Оплата расхода */}
       {selectedExpenseForPayment && (
         <div
-          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-70 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={closePaymentModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
           >
             <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
               <div className="flex items-center gap-3">
@@ -1134,12 +1134,12 @@ export default function ExpensesView() {
       {/* Modal: Возврат расхода */}
       {selectedExpenseForRefund && (
         <div
-          className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-70 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={closeRefundModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
           >
             <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
               <div className="flex items-center gap-3">
@@ -1240,12 +1240,12 @@ export default function ExpensesView() {
       {/* Modal: Редактировать расход */}
       {selectedExpenseForEdit && (
         <div
-          className="fixed inset-0 z-75 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-75 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={closeEditModal}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
           >
             <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
               <div className="flex items-center gap-3">

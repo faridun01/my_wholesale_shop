@@ -407,14 +407,14 @@ export default function SalesView() {
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-5 overflow-hidden rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+      <div className="space-y-4 overflow-hidden lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Продажи</h1>
             <p className="mt-0.5 text-xs text-slate-500">Управление накладными и заказами клиентов.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3 rounded-full bg-white px-4 py-1.5 border border-slate-200/60 shadow-xs">
+            <div className="hidden items-center gap-3 rounded-full bg-white px-4 py-1.5 border border-slate-200/60 shadow-xs lg:flex">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
                 {(user.username || 'A').slice(0, 1).toUpperCase()}
               </div>
@@ -497,13 +497,13 @@ export default function SalesView() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeDetailsModal}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-xs sm:items-center sm:p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+              className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl"
             >
               <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
                 <div className="flex items-center space-x-3">

@@ -379,7 +379,7 @@ export default function CustomerView() {
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-5 rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+      <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
         {/* Top Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -590,7 +590,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -602,7 +602,7 @@ export default function CustomerView() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -760,7 +760,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isStatementOpen && selectedCustomer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -772,7 +772,7 @@ export default function CustomerView() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
+                className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-8 py-6">
                   <div>
@@ -872,7 +872,7 @@ export default function CustomerView() {
 
         <AnimatePresence>
           {isInvoiceDetailsOpen && selectedInvoice && (
-            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-60 flex items-end justify-center p-0 sm:items-center sm:p-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -884,7 +884,7 @@ export default function CustomerView() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+                className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl"
               >
                 <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
                   <div className="flex items-center space-x-3">

@@ -1310,7 +1310,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-5 rounded-[28px] bg-[#f4f5fb] p-5 min-h-screen">
+      <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
         {/* Top Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
@@ -1755,11 +1755,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
         {returnWriteoffRow && (
           <div
-            className="fixed inset-0 z-90 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={closeReturnWriteoffModal}
           >
             <div
-              className="w-full max-w-lg overflow-hidden rounded-[28px] bg-white shadow-2xl"
+              className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
@@ -1775,7 +1775,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   <X size={18} />
                 </button>
               </div>
-              <div className="space-y-4 p-6">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3.5 text-xs font-medium text-emerald-800">
                   Доступно к возврату: {Math.max(0, Number(returnWriteoffRow.quantity || 0) - Number(returnWriteoffRow.returned_qty || 0))}
                 </div>
@@ -1823,11 +1823,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
         {deleteWriteoffRow && (
           <div
-            className="fixed inset-0 z-90 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={closeDeleteWriteoffModal}
           >
             <div
-              className="w-full max-w-lg overflow-hidden rounded-[28px] bg-white shadow-2xl"
+              className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">

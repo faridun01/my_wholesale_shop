@@ -78,14 +78,14 @@ export default function POSCartSummary({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2">
         <input
           type="number"
           min={0}
           value={discount === 0 ? '' : discount}
           onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
           placeholder="Скидка %"
-          className="rounded-2xl border border-slate-200 bg-[#f4f5fb] px-4 py-2.5 text-xs text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-11 rounded-xl border border-slate-200 bg-[#f4f5fb] px-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
         />
         <input
           type="number"
@@ -97,7 +97,7 @@ export default function POSCartSummary({
             setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
           }}
           placeholder="Оплачено"
-          className="rounded-2xl border border-slate-200 bg-[#f4f5fb] px-4 py-2.5 text-xs text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-11 rounded-xl border border-slate-200 bg-[#f4f5fb] px-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
         />
       </div>
 

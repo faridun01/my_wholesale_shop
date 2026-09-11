@@ -62,7 +62,7 @@ export default function POSCartCustomerBlock({
           }}
           placeholder="Поиск клиента по имени..."
           readOnly={isCustomerPortal}
-          className="w-full rounded-2xl border border-slate-200 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-11 w-full rounded-xl border border-slate-200 bg-[#f4f5fb] pl-10 pr-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
         />
         {isCustomerDropdownOpen && (
           <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-60 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl">

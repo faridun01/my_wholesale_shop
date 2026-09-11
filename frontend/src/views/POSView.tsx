@@ -29,28 +29,6 @@ function getStoredWarehouseId() {
   return sessionStorage.getItem('pos_warehouse_session') || localStorage.getItem('pos_warehouse_session') || '';
 }
 
-const posTheme = {
-  products: {
-    soft: 'bg-[#eef3f8]',
-    icon: 'bg-[#dbe7f3] text-[#23527c]',
-    accent: 'border border-[#7f9db9] bg-[#eaf2fb] text-[#1f3f63] hover:bg-[#dbeafd]',
-    tab: 'border border-[#9fb7d5] bg-[#dbeafd] text-[#143a5a]',
-    pill: 'bg-[#eaf2fb] text-[#23527c]',
-  },
-  cart: {
-    soft: 'bg-[#fff7d6]',
-    icon: 'bg-[#fff0b3] text-[#7a5a00]',
-    accent: 'border border-[#c8a64a] bg-[#ffe184] text-[#2f2f2f] hover:bg-[#ffd45f]',
-    tab: 'border border-[#c8a64a] bg-[#ffe184] text-[#2f2f2f]',
-    pill: 'bg-[#fff0b3] text-[#7a5a00]',
-  },
-  payment: {
-    active: 'border-[#b08a28] bg-[#ffd966] text-[#2f2f2f]',
-    idle: 'border-[#c8d2df] bg-[#f5f7fa] text-[#32465a]',
-    summary: 'bg-[#fff8dc]',
-  },
-};
-
 const normalizePackagings = (product: any): PackagingOption[] =>
   Array.isArray(product?.packagings)
     ? product.packagings
@@ -1255,8 +1233,8 @@ export default function POSView() {
         type="warning"
       />
 
-      <div className="rounded-[28px] bg-[#f4f5fb] min-h-screen">
-        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-2.5 backdrop-blur">
+      <div className="lg:rounded-[28px] lg:bg-[#f4f5fb] min-h-screen">
+        <div className="hidden border-b border-slate-200/70 bg-white/95 px-5 py-2.5 backdrop-blur lg:sticky lg:top-0 lg:z-20 lg:block">
           <div className="flex items-center justify-between">
             <h1 className="text-sm font-semibold text-slate-900">POS терминал</h1>
 
@@ -1272,12 +1250,12 @@ export default function POSView() {
           </div>
         </div>
 
-        <div className={clsx('space-y-4 px-5 py-5 flex-1 flex flex-col', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
+        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' && 'pb-40 lg:pb-5')}>
           <div className="grid grid-cols-2 gap-1.5 rounded-full bg-[#e8eaf2] p-1.5 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
-                'rounded-full py-2 text-xs font-medium transition-all',
+                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all',
                 activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
@@ -1286,7 +1264,7 @@ export default function POSView() {
             <button
               onClick={() => setActiveTab('cart')}
               className={clsx(
-                'rounded-full py-2 text-xs font-medium transition-all',
+                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all',
                 activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
@@ -1423,7 +1401,7 @@ export default function POSView() {
       </div>
 
       {activeTab === 'cart' && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.1)] backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200/80 bg-white/95 px-4 pb-3 pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.1)] backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-xl items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Итого к оплате</p>
@@ -1444,7 +1422,7 @@ export default function POSView() {
               type="button"
               onClick={handleCheckout}
               disabled={isSubmitting || cart.length === 0 || !customerId}
-              className="min-h-12 shrink-0 rounded-xl border border-[#8f6f18] bg-[#ffd966] px-4 text-sm font-black text-[#2f2f2f] shadow-sm transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              className="btn-primary min-h-12 shrink-0 px-5 text-sm active:scale-[0.98]"
             >
               {isSubmitting ? '...' : 'Оформить'}
             </button>

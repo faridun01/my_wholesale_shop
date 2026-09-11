@@ -5,49 +5,127 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const STORAGE_KEY_INSTALLED = 'pwa_is_installed';
+const STORAGE_KEY_DISMISSED = 'pwa_banner_dismissed';
+
+export const checkIsStandalone = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  const isStandaloneMedia =
+    window.matchMedia?.('(display-mode: standalone)')?.matches ||
+    window.matchMedia?.('(display-mode: window-controls-overlay)')?.matches ||
+    window.matchMedia?.('(display-mode: minimal-ui)')?.matches ||
+    window.matchMedia?.('(display-mode: fullscreen)')?.matches;
+
+  const isNavigatorStandalone = (window.navigator as any)?.standalone === true;
+  const isAndroidApp = typeof document !== 'undefined' && document.referrer?.startsWith('android-app://');
+  const isPwaUrlParam =
+    typeof window.location !== 'undefined' &&
+    (window.location.search?.includes('source=pwa') ||
+      window.location.search?.includes('mode=pwa') ||
+      window.location.search?.includes('standalone=true'));
+
+  return Boolean(isStandaloneMedia || isNavigatorStandalone || isAndroidApp || isPwaUrlParam);
+};
+
+export const checkIsInstalled = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (checkIsStandalone()) {
+    try {
+      localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+    } catch (_) {}
+    return true;
+  }
+  try {
+    return localStorage.getItem(STORAGE_KEY_INSTALLED) === 'true';
+  } catch (_) {
+    return false;
+  }
+};
+
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
-  const [isInstalled, setIsInstalled] = useState<boolean>(false);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(() => checkIsStandalone());
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => checkIsInstalled());
+  const [isIOS, setIsIOS] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator?.userAgent || '';
+    const isIosDevice = /iPhone|iPad|iPod/i.test(ua);
+    const isSafari = /Safari/i.test(ua) && !/CriOS/i.test(ua) && !/FxiOS/i.test(ua);
+    return isIosDevice || (isSafari && typeof document !== 'undefined' && 'ontouchend' in document);
+  });
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('pwa_banner_dismissed') === 'true';
+    try {
+      return localStorage.getItem(STORAGE_KEY_DISMISSED) === 'true';
+    } catch (_) {
+      return false;
+    }
   });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check standalone mode (already installed & opened as PWA app)
-    const checkStandalone = () => {
-      const isStandaloneMatch =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: window-controls-overlay)').matches ||
-        (navigator as any).standalone === true;
+    const recheckStatus = () => {
+      const standalone = checkIsStandalone();
+      setIsStandalone(standalone);
 
-      setIsStandalone(Boolean(isStandaloneMatch));
-      if (isStandaloneMatch) {
+      if (standalone) {
         setIsInstalled(true);
+        try {
+          localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+        } catch (_) {}
+      } else {
+        const storedInstalled = checkIsInstalled();
+        if (storedInstalled) {
+          setIsInstalled(true);
+        }
       }
     };
 
-    checkStandalone();
+    recheckStatus();
 
-    const mediaQuery = window.matchMedia('(display-mode: standalone)');
-    const handleMediaChange = (e: MediaQueryListEvent) => {
-      setIsStandalone(e.matches);
-      if (e.matches) setIsInstalled(true);
-    };
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handleMediaChange);
+    // Check modern Chrome / Edge getInstalledRelatedApps API
+    if ('getInstalledRelatedApps' in navigator && typeof (navigator as any).getInstalledRelatedApps === 'function') {
+      (navigator as any)
+        .getInstalledRelatedApps()
+        .then((apps: any[]) => {
+          if (Array.isArray(apps) && apps.length > 0) {
+            setIsInstalled(true);
+            try {
+              localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+            } catch (_) {}
+          }
+        })
+        .catch(() => {});
     }
 
-    // Check iOS browser
-    const ua = window.navigator.userAgent;
-    const isIosDevice = /iPhone|iPad|iPod/i.test(ua);
-    const isSafari = /Safari/i.test(ua) && !/CriOS/i.test(ua) && !/FxiOS/i.test(ua);
-    setIsIOS(isIosDevice || (isSafari && 'ontouchend' in document));
+    // Media query listeners for standalone display modes
+    const displayModes = [
+      '(display-mode: standalone)',
+      '(display-mode: window-controls-overlay)',
+      '(display-mode: minimal-ui)',
+      '(display-mode: fullscreen)',
+    ];
+
+    const mediaQueryLists = displayModes.map((mode) => window.matchMedia(mode));
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsStandalone(true);
+        setIsInstalled(true);
+        try {
+          localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+        } catch (_) {}
+      } else {
+        recheckStatus();
+      }
+    };
+
+    mediaQueryLists.forEach((mql) => {
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', handleMediaChange);
+      }
+    });
 
     // Handle beforeinstallprompt event for Chrome/Edge/Android
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -58,12 +136,21 @@ export function usePWAInstall() {
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
-      localStorage.removeItem('pwa_banner_dismissed');
+      try {
+        localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+        localStorage.removeItem(STORAGE_KEY_DISMISSED);
+      } catch (_) {}
     };
 
     const handleAppLoggedIn = () => {
+      // If already installed or standalone, do nothing
+      if (checkIsStandalone() || checkIsInstalled()) {
+        return;
+      }
       setIsDismissed(false);
-      localStorage.removeItem('pwa_banner_dismissed');
+      try {
+        localStorage.removeItem(STORAGE_KEY_DISMISSED);
+      } catch (_) {}
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -71,9 +158,11 @@ export function usePWAInstall() {
     window.addEventListener('app-logged-in', handleAppLoggedIn);
 
     return () => {
-      if (typeof mediaQuery.removeEventListener === 'function') {
-        mediaQuery.removeEventListener('change', handleMediaChange);
-      }
+      mediaQueryLists.forEach((mql) => {
+        if (typeof mql.removeEventListener === 'function') {
+          mql.removeEventListener('change', handleMediaChange);
+        }
+      });
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('app-logged-in', handleAppLoggedIn);
@@ -88,6 +177,9 @@ export function usePWAInstall() {
         if (choiceResult.outcome === 'accepted') {
           setIsInstalled(true);
           setDeferredPrompt(null);
+          try {
+            localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+          } catch (_) {}
           return true;
         }
       } catch (err) {
@@ -99,12 +191,16 @@ export function usePWAInstall() {
 
   const dismissBanner = useCallback(() => {
     setIsDismissed(true);
-    localStorage.setItem('pwa_banner_dismissed', 'true');
+    try {
+      localStorage.setItem(STORAGE_KEY_DISMISSED, 'true');
+    } catch (_) {}
   }, []);
 
   const resetDismissed = useCallback(() => {
     setIsDismissed(false);
-    localStorage.removeItem('pwa_banner_dismissed');
+    try {
+      localStorage.removeItem(STORAGE_KEY_DISMISSED);
+    } catch (_) {}
   }, []);
 
   return {

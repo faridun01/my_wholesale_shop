@@ -20,8 +20,12 @@ export default function InstallPwaBanner() {
     if (typeof window === 'undefined') return;
 
     const handleAutoShowOnLogin = () => {
-      if (!isStandalone && !isInstalled) {
-        // Auto-open modal/prompt after login if app is not installed
+      const alreadyInstalled =
+        isStandalone ||
+        isInstalled ||
+        (typeof window !== 'undefined' && localStorage.getItem('pwa_is_installed') === 'true');
+
+      if (!alreadyInstalled && window.innerWidth >= 1024) {
         setTimeout(() => {
           setIsModalOpen(true);
         }, 500);
@@ -52,8 +56,8 @@ export default function InstallPwaBanner() {
 
   return (
     <>
-      {/* Floating bottom banner for desktop & mobile */}
-      <div className="fixed bottom-4 left-4 right-4 z-40 mx-auto max-w-xl">
+      {/* Floating bottom banner — sits above the mobile bottom nav, back to bottom-4 on desktop where there is no nav bar */}
+      <div className="fixed bottom-[calc(4rem+0.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-xl lg:bottom-4">
         <div className="relative rounded-xl border border-sidebar-line bg-sidebar p-4 text-white sm:p-4.5">
           <button
             onClick={dismissBanner}

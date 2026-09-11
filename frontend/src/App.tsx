@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { Loader2, Menu, X, Warehouse } from 'lucide-react';
-import { clsx } from 'clsx';
+import { Loader2 } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
+import MobileBottomNav from './components/layout/MobileBottomNav';
 import InstallPwaBanner from './components/pwa/InstallPwaBanner';
 import { getCurrentUser, isAdminUser, isCustomerUser } from './utils/userAccess';
 import { clearAuthSession, getStoredUser, hasStoredSession, setAuthSession } from './utils/authStorage';
@@ -47,12 +47,21 @@ const StaffRoute = ({ children }: { children: React.ReactNode }) => {
   return isCustomerUser(user) ? <Navigate to="/catalog" replace /> : <>{children}</>;
 };
 
+/** Mobile and desktop use different default landing pages: on mobile every
+ * role lands on the fast Sales/checkout screen, while desktop admins keep the
+ * Dashboard overview. Breakpoint matches the `lg:` (1024px) cutoff used
+ * everywhere else in the shell (Sidebar, MobileBottomNav). */
+const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth < 1024;
+
 const RootRoute = () => {
   const user = getCurrentUser();
   if (isCustomerUser(user)) {
     return <Navigate to="/catalog" replace />;
   }
-  return isAdminUser(user) ? <DashboardView /> : <Navigate to="/pos" replace />;
+  if (isAdminUser(user)) {
+    return isMobileViewport() ? <Navigate to="/pos" replace /> : <DashboardView />;
+  }
+  return <Navigate to="/pos" replace />;
 };
 
 const Layout = () => {
@@ -79,32 +88,15 @@ const Layout = () => {
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-white px-4 py-3 lg:hidden">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-500 text-white">
-              <Warehouse size={18} />
-            </div>
-            <span className="text-[15px] font-semibold leading-none tracking-tight text-slate-900">Оптовая торговля</span>
-          </div>
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={clsx(
-              'rounded-lg border p-2.5 transition-colors',
-              isSidebarOpen ? 'border-accent-100 bg-accent-50 text-accent-600' : 'border-slate-200 bg-white text-slate-700',
-            )}
-            aria-label={isSidebarOpen ? 'Закрыть меню' : 'Открыть меню'}
-          >
-            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </header>
-
-        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-0">
+        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 pb-[calc(4rem+1rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 lg:p-0">
           <div className="min-h-full">
             <React.Suspense fallback={<RouteLoading />}>
               <Outlet />
             </React.Suspense>
           </div>
         </main>
+
+        <MobileBottomNav />
       </div>
     </div>
   );

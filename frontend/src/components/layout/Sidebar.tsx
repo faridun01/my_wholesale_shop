@@ -1,23 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  Banknote,
-  BarChart3,
-  BookOpen,
-  Calendar,
-  ChevronLeft,
-  Download,
-  History,
-  LayoutDashboard,
-  LogOut,
-  Package,
-  Settings,
-  ShoppingBag,
-  ShoppingCart,
-  Users,
-  Warehouse,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { ChevronLeft, Download, LogOut, Warehouse } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -26,33 +9,7 @@ import { clearAuthSession, hasStoredSession } from '../../utils/authStorage';
 import { getCurrentUser, isAdminUser, isCustomerUser } from '../../utils/userAccess';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import InstallPwaModal from '../pwa/InstallPwaModal';
-
-type NavSection = string;
-
-type NavItem = {
-  to: string;
-  icon: LucideIcon;
-  label: string;
-  section: NavSection;
-};
-
-const SHOW_CUSTOMER_ORDERS = false;
-
-const navItems: NavItem[] = [
-  ...(SHOW_CUSTOMER_ORDERS
-    ? [{ to: '/customer-orders', icon: ShoppingBag, label: 'Заказы клиентов', section: 'Отношения' }]
-    : []),
-  { to: '/', icon: LayoutDashboard, label: 'Дашборд', section: 'Управление' },
-  { to: '/pos', icon: ShoppingCart, label: 'POS терминал', section: 'Управление' },
-  { to: '/catalog', icon: BookOpen, label: 'Каталог', section: 'Управление' },
-  { to: '/products', icon: Package, label: 'Товары', section: 'Управление' },
-  { to: '/sales', icon: History, label: 'История продаж', section: 'Управление' },
-  { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
-  { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
-  { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
-  { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
-  { to: '/settings', icon: Settings, label: 'Настройки', section: 'Система' },
-];
+import { SHOW_CUSTOMER_ORDERS, getFilteredNavItems, type NavItem } from './navConfig';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -171,42 +128,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     navigate('/login');
   };
 
-  const filteredNavItems = navItems
-    .filter((item) => {
-      if (isCustomer) {
-        return item.to === '/catalog' || item.to === '/pos';
-      }
-
-      if (
-        !isAdmin &&
-        (item.to === '/' ||
-          item.to === '/expenses' ||
-          item.to === '/analytics' ||
-          item.to === '/reports' ||
-          item.to === '/settings')
-      ) {
-        return false;
-      }
-      if (
-        item.to === '/expenses' ||
-        item.to === '/analytics' ||
-        item.to === '/reports' ||
-        item.to === '/settings'
-      ) {
-        return isAdmin;
-      }
-      return true;
-    })
-    .map((item) => {
-      if (!isAdmin && item.to === '/sales') {
-        return {
-          ...item,
-          label: 'Мои накладные',
-        };
-      }
-
-      return item;
-    });
+  const filteredNavItems = React.useMemo(() => getFilteredNavItems(user), [user]);
 
   const navSections = filteredNavItems.reduce<Record<string, NavItem[]>>((acc, item) => {
     if (!acc[item.section]) {
@@ -407,7 +329,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
       </aside>
 
       <InstallPwaModal
-        isOpen={isPwaModalOpen}
+        isOpen={isPwaModalOpen && !isStandalone && !isInstalled}
         onClose={() => setIsPwaModalOpen(false)}
         isIOS={isIOS}
         canPromptNative={canPromptNative}
