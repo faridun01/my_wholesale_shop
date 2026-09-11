@@ -1505,20 +1505,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             }
           >
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-[11px] sm:text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="rounded-l-2xl py-2 sm:py-3 px-2.5 sm:px-3 text-center">№</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3">Товар</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Продано</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Продаж</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Себест./шт</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Цена/шт</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Прибыль/шт</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Сумма себест.</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Сумма продаж</th>
-                    <th className="py-2 sm:py-3 px-2.5 sm:px-3 text-right">Общая прибыль</th>
-                    <th className="rounded-r-2xl py-2 sm:py-3 px-2.5 sm:px-3 text-right">Рентаб.</th>
+                    <th className="rounded-l-xl py-2 px-2.5 text-center">№</th>
+                    <th className="py-2 px-2.5">Товар</th>
+                    <th className="py-2 px-2.5 text-right">Продано</th>
+                    <th className="py-2 px-2.5 text-right">Продаж</th>
+                    <th className="py-2 px-2.5 text-right">Себест./шт</th>
+                    <th className="py-2 px-2.5 text-right">Цена/шт</th>
+                    <th className="py-2 px-2.5 text-right">Прибыль/шт</th>
+                    <th className="py-2 px-2.5 text-right">Сумма себест.</th>
+                    <th className="py-2 px-2.5 text-right">Сумма продаж</th>
+                    <th className="py-2 px-2.5 text-right">Общая прибыль</th>
+                    <th className="rounded-r-xl py-2 px-2.5 text-right">Рентаб.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1540,24 +1540,24 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
                     return (
                       <tr key={`${row.name}-${index}`} className="transition-colors hover:bg-slate-50/80">
-                        <td className="py-2.5 px-3 text-center font-medium text-slate-400">{index + 1}</td>
-                        <td className="py-2.5 px-3 font-semibold text-slate-900 min-w-[130px] max-w-[200px]" title={row.name}>
-                          <div className="line-clamp-2 leading-snug">{row.name}</div>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-medium text-slate-400">{index + 1}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 font-semibold text-slate-900 min-w-[140px] leading-snug break-words">
+                          {row.name}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-medium text-slate-900 tabular-nums">{formatCount(quantity)}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 tabular-nums">{formatCount(row.salesCount)}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 tabular-nums">{formatMoney(costPerUnit)}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 tabular-nums">{formatMoney(salePerUnit)}</td>
-                        <td className={`py-2.5 px-3 text-right font-semibold tabular-nums ${profitPerUnit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right font-medium text-slate-900 tabular-nums">{formatCount(quantity)}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatCount(row.salesCount)}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(costPerUnit)}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(salePerUnit)}</td>
+                        <td className={`py-1.5 sm:py-2 px-2.5 text-right font-semibold tabular-nums ${profitPerUnit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {formatMoney(profitPerUnit)}
                         </td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 tabular-nums">{formatMoney(row.costTotal)}</td>
-                        <td className="py-2.5 px-3 text-right font-semibold text-slate-900 tabular-nums">{formatMoney(row.revenue)}</td>
-                        <td className={`py-2.5 px-3 text-right font-semibold tabular-nums ${row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(row.costTotal)}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right font-semibold text-slate-900 tabular-nums">{formatMoney(row.revenue)}</td>
+                        <td className={`py-1.5 sm:py-2 px-2.5 text-right font-semibold tabular-nums ${row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {formatMoney(row.profit)}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${marginBadgeClass}`}>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-right">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold tabular-nums ${marginBadgeClass}`}>
                             {formatPercent(margin, 1)}
                           </span>
                         </td>
@@ -1572,22 +1572,22 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                     </tr>
                   ) : (
                     <tr className="bg-amber-50/80 font-bold text-slate-900 border-t-2 border-amber-200/80">
-                      <td className="py-3 px-3 text-center rounded-l-2xl" colSpan={2}>ИТОГО</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{formatCount(productSalesSummaryTotals.quantity)}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{formatCount(productSalesSummaryTotals.salesCount)}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">
+                      <td className="py-2 px-2.5 text-center rounded-l-xl" colSpan={2}>ИТОГО</td>
+                      <td className="py-2 px-2.5 text-right tabular-nums">{formatCount(productSalesSummaryTotals.quantity)}</td>
+                      <td className="py-2 px-2.5 text-right tabular-nums">{formatCount(productSalesSummaryTotals.salesCount)}</td>
+                      <td className="py-2 px-2.5 text-right tabular-nums">
                         {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.costTotal / productSalesSummaryTotals.quantity : 0)}
                       </td>
-                      <td className="py-3 px-3 text-right tabular-nums">
+                      <td className="py-2 px-2.5 text-right tabular-nums">
                         {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.revenue / productSalesSummaryTotals.quantity : 0)}
                       </td>
-                      <td className="py-3 px-3 text-right tabular-nums">
+                      <td className="py-2 px-2.5 text-right tabular-nums">
                         {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.profit / productSalesSummaryTotals.quantity : 0)}
                       </td>
-                      <td className="py-3 px-3 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.costTotal)}</td>
-                      <td className="py-3 px-3 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.revenue)}</td>
-                      <td className="py-3 px-3 text-right text-emerald-700 tabular-nums">{formatMoney(productSalesSummaryTotals.profit)}</td>
-                      <td className="py-3 px-3 text-right rounded-r-2xl tabular-nums">
+                      <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.costTotal)}</td>
+                      <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.revenue)}</td>
+                      <td className="py-2 px-2.5 text-right text-emerald-700 tabular-nums">{formatMoney(productSalesSummaryTotals.profit)}</td>
+                      <td className="py-2 px-2.5 text-right rounded-r-xl tabular-nums">
                         {formatPercent(productSalesSummaryTotals.revenue > 0 ? (productSalesSummaryTotals.profit / productSalesSummaryTotals.revenue) * 100 : 0, 1)}
                       </td>
                     </tr>
@@ -1650,34 +1650,34 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           }
         >
           <div className="max-h-160 overflow-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-[11px] sm:text-xs">
               <thead>
-                <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="rounded-l-2xl py-3 px-4">Товар</th>
-                  <th className="py-3 px-4">Кол-во</th>
+                <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="rounded-l-xl py-2 px-3">Товар</th>
+                  <th className="py-2 px-3">Кол-во</th>
                   {reportType === 'sales' && (
                     <>
-                      <th className="py-3 px-4">Цена прод.</th>
-                      <th className="py-3 px-4">Итого</th>
+                      <th className="py-2 px-3">Цена прод.</th>
+                      <th className="py-2 px-3">Итого</th>
                     </>
                   )}
                   {reportType === 'profit' && (
                     <>
-                      <th className="py-3 px-4">Цена прод.</th>
-                      <th className="py-3 px-4">Себест.</th>
-                      <th className="py-3 px-4">Прибыль</th>
+                      <th className="py-2 px-3">Цена прод.</th>
+                      <th className="py-2 px-3">Себест.</th>
+                      <th className="py-2 px-3">Прибыль</th>
                     </>
                   )}
-                  {reportType === 'returns' && <th className="py-3 px-4">Причина</th>}
+                  {reportType === 'returns' && <th className="py-2 px-3">Причина</th>}
                   {reportType === 'writeoffs' && (
                     <>
-                      <th className="py-3 px-4">Сумма</th>
-                      <th className="py-3 px-4">Статус</th>
-                      <th className="py-3 px-4">Причина</th>
-                      <th className="py-3 px-4">Сотрудник</th>
-                      <th className="py-3 px-4">Склад</th>
-                      <th className="py-3 px-4">Себест.</th>
-                      <th className="rounded-r-2xl py-3 px-4 text-right">Действия</th>
+                      <th className="py-2 px-3">Сумма</th>
+                      <th className="py-2 px-3">Статус</th>
+                      <th className="py-2 px-3">Причина</th>
+                      <th className="py-2 px-3">Сотрудник</th>
+                      <th className="py-2 px-3">Склад</th>
+                      <th className="py-2 px-3">Себест.</th>
+                      <th className="rounded-r-xl py-2 px-3 text-right">Действия</th>
                     </>
                   )}
                 </tr>
@@ -1685,46 +1685,46 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {paginatedDetailRows.map((row, index) => (
                   <tr key={`${row.date}-${row.product_name}-${index}`} className="transition-colors hover:bg-slate-50/80">
-                    <td className="py-2.5 px-4 font-semibold text-slate-900 leading-snug break-words min-w-[180px]">
+                    <td className="py-1.5 sm:py-2 px-3 font-semibold text-slate-900 leading-snug break-words min-w-[150px] text-[11px] sm:text-xs">
                       {formatProductName(row.product_name)}
                     </td>
-                    <td className="py-2.5 px-4 font-medium text-slate-900 tabular-nums">{row.quantity}</td>
+                    <td className="py-1.5 sm:py-2 px-3 font-medium text-slate-900 tabular-nums">{row.quantity}</td>
                     {reportType === 'sales' && (
                       <>
-                        <td className="py-2.5 px-4 text-slate-500 tabular-nums">{toFixedNumber(row.selling_price || 0)}</td>
-                        <td className="py-2.5 px-4 font-semibold text-sky-700 tabular-nums">{formatMoney(row.total_sales || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500 tabular-nums">{toFixedNumber(row.selling_price || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 font-semibold text-sky-700 tabular-nums">{formatMoney(row.total_sales || 0)}</td>
                       </>
                     )}
                     {reportType === 'profit' && (
                       <>
-                        <td className="py-2.5 px-4 text-slate-500 tabular-nums">{toFixedNumber(row.selling_price || 0)}</td>
-                        <td className="py-2.5 px-4 text-slate-500 tabular-nums">{toFixedNumber(row.cost_price || 0)}</td>
-                        <td className="py-2.5 px-4 font-semibold text-emerald-600 tabular-nums">{formatMoney(row.profit || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500 tabular-nums">{toFixedNumber(row.selling_price || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500 tabular-nums">{toFixedNumber(row.cost_price || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 font-semibold text-emerald-600 tabular-nums">{formatMoney(row.profit || 0)}</td>
                       </>
                     )}
-                    {reportType === 'returns' && <td className="py-2.5 px-4 italic text-rose-600">{row.reason || '-'}</td>}
+                    {reportType === 'returns' && <td className="py-1.5 sm:py-2 px-3 italic text-rose-600">{row.reason || '-'}</td>}
                     {reportType === 'writeoffs' && (
                       <>
-                        <td className="py-2.5 px-4 font-semibold text-amber-700 tabular-nums">{formatMoney(row.total_value || 0)}</td>
-                        <td className="py-2.5 px-4">
-                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getWriteoffStatusClassName(row.status)}`}>
+                        <td className="py-1.5 sm:py-2 px-3 font-semibold text-amber-700 tabular-nums">{formatMoney(row.total_value || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3">
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${getWriteoffStatusClassName(row.status)}`}>
                             {getWriteoffStatusLabel(row.status)}
                           </span>
                           {Number(row.returned_qty || 0) > 0 && (
-                            <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Возвращено: {Number(row.returned_qty || 0)}</div>
+                            <div className="mt-0.5 text-[9px] sm:text-[10px] font-semibold text-emerald-700">Возвращено: {Number(row.returned_qty || 0)}</div>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 italic text-amber-700">{row.reason || '-'}</td>
-                        <td className="py-2.5 px-4 text-slate-500">{row.staff_name || '-'}</td>
-                        <td className="py-2.5 px-4 text-slate-500">{row.warehouse_name || '-'}</td>
-                        <td className="py-2.5 px-4 text-slate-500 tabular-nums">{toFixedNumber(row.cost_price || 0)}</td>
-                        <td className="py-2.5 px-4 text-right">
-                          <div className="flex justify-end gap-1.5">
+                        <td className="py-1.5 sm:py-2 px-3 italic text-amber-700">{row.reason || '-'}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500">{row.staff_name || '-'}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500">{row.warehouse_name || '-'}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-slate-500 tabular-nums">{toFixedNumber(row.cost_price || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 text-right">
+                          <div className="flex justify-end gap-1">
                             {row.can_return ? (
                               <button
                                 type="button"
                                 onClick={() => openReturnWriteoffModal(row)}
-                                className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
                               >
                                 Возврат
                               </button>
@@ -1733,7 +1733,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                               <button
                                 type="button"
                                 onClick={() => openDeleteWriteoffModal(row)}
-                                className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-700 transition-colors hover:bg-rose-100"
+                                className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 transition-colors hover:bg-rose-100"
                               >
                                 Удалить
                               </button>
