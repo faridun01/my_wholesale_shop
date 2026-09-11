@@ -391,7 +391,7 @@ export default function CustomerView() {
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
+      <div className="space-y-4 lg:space-y-5">
         {/* Top Header for Desktop */}
         <div className="hidden lg:flex lg:items-center lg:justify-between">
           <div>

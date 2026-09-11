@@ -86,7 +86,7 @@ function ProductRowActions({
       <button
         type="button"
         onClick={() => onRestockProduct(product)}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white"
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white shadow-xs"
         title="Пополнить"
       >
         <PlusCircle size={14} />
@@ -95,7 +95,7 @@ function ProductRowActions({
       <button
         type="button"
         onClick={() => onEditProduct(product)}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white shadow-xs"
         title="Редактировать"
       >
         <Edit size={14} />
@@ -103,19 +103,9 @@ function ProductRowActions({
 
       <button
         type="button"
-        onClick={() => onOpenWriteOffModal(product)}
-        disabled={Number(product.stock || 0) <= 0}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-500 hover:text-white disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
-        title="Списать"
-      >
-        <Scissors size={14} />
-      </button>
-
-      <button
-        type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={clsx(
-          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors shadow-xs',
           isOpen
             ? 'border-slate-900 bg-slate-900 text-white'
             : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
@@ -126,14 +116,27 @@ function ProductRowActions({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl text-left">
+        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lg text-left">
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onOpenWriteOffModal(product);
+            }}
+            disabled={Number(product.stock || 0) <= 0}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Scissors size={14} className="text-slate-400" />
+            <span>Списать</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
               setIsOpen(false);
               onShowBatches(product);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <Layers size={14} className="text-slate-400" />
             <span>Партии (FIFO)</span>
@@ -218,50 +221,50 @@ export default function ProductsDesktopTable({
   onAddProduct,
 }: ProductsDesktopTableProps) {
   return (
-    <div className="hidden overflow-x-auto md:block">
+    <div className="hidden overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs md:block">
       <table className="w-full border-collapse text-left text-xs">
         <thead>
-          <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
-            <th className="px-4 py-3">№</th>
-            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('name')}>
+          <tr className="border-b border-slate-200/80 bg-slate-100/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <th className="w-12 px-3 py-2.5 text-slate-400 font-mono">№</th>
+            <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-slate-900" onClick={() => onSort('name')}>
               <div className="flex items-center space-x-1.5">
                 <span>Товар</span>
                 <SortIcon sortConfig={sortConfig} sortKey="name" />
               </div>
             </th>
             {isAdmin && (
-              <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('costPrice')}>
-                <div className="flex items-center space-x-1.5">
+              <th className="cursor-pointer px-3 py-2.5 text-right pr-4 transition-colors hover:text-slate-900" onClick={() => onSort('costPrice')}>
+                <div className="flex items-center justify-end space-x-1.5">
                   <span>Закупка</span>
                   <SortIcon sortConfig={sortConfig} sortKey="costPrice" />
                 </div>
               </th>
             )}
-            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('sellingPrice')}>
-              <div className="flex items-center space-x-1.5">
+            <th className="cursor-pointer px-3 py-2.5 text-right pr-4 transition-colors hover:text-slate-900" onClick={() => onSort('sellingPrice')}>
+              <div className="flex items-center justify-end space-x-1.5">
                 <span>Продажа</span>
                 <SortIcon sortConfig={sortConfig} sortKey="sellingPrice" />
               </div>
             </th>
-            <th className="cursor-pointer px-4 py-3 transition-colors hover:text-slate-900" onClick={() => onSort('stock')}>
+            <th className="cursor-pointer px-3 py-2.5 transition-colors hover:text-slate-900" onClick={() => onSort('stock')}>
               <div className="flex items-center space-x-1.5">
                 <span>Остаток</span>
                 <SortIcon sortConfig={sortConfig} sortKey="stock" />
               </div>
             </th>
-            <th className="px-4 py-3">Приход</th>
-            {isAdmin && <th className="px-4 py-3">Рентабельность</th>}
-            {isAdmin && <th className="px-4 py-3 text-center">Действия</th>}
+            <th className="px-3 py-2.5 text-right pr-4">Приход</th>
+            {isAdmin && <th className="px-3 py-2.5 text-center">Рентабельность</th>}
+            {isAdmin && <th className="px-3 py-2.5 text-center">Действия</th>}
           </tr>
         </thead>
 
         <tbody className="divide-y divide-slate-100 bg-white">
           {products.map((product, index) => (
-            <tr key={product.id} className="transition-colors hover:bg-[#f4f5fb]">
-              <td className="px-4 py-3 font-medium text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
-              <td className="px-4 py-3">
+            <tr key={product.id} className="transition-colors hover:bg-slate-50">
+              <td className="px-3 py-2.5 font-mono text-[11px] text-slate-400">{(currentPage - 1) * pageSize + index + 1}</td>
+              <td className="px-3 py-2.5">
                 <div className="flex items-center space-x-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/70 bg-[#f4f5fb]">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50">
                     {product.photoUrl ? (
                       <img
                         src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -271,17 +274,17 @@ export default function ProductsDesktopTable({
                         onError={(event) => handleBrokenImage(event, product.id)}
                       />
                     ) : (
-                      <ImageIcon className="text-slate-400" size={16} />
+                      <ImageIcon className="text-slate-400" size={15} />
                     )}
                   </div>
                   <div>
-                    <p className="font-medium leading-tight text-slate-900">{formatProductName(product.name)}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <p className="text-[11px] text-slate-400">{product.category?.name || 'Без категории'}</p>
+                    <p className="text-xs font-semibold leading-tight text-slate-900">{formatProductName(product.name)}</p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <p className="text-[10px] text-slate-400">{product.category?.name || 'Без категории'}</p>
                       {getDuplicateHintCount(product) > 0 && (
                         <button
                           onClick={() => onOpenMergeModal(product)}
-                          className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700"
+                          className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.2 text-[9px] font-semibold uppercase tracking-wider text-amber-700"
                         >
                           Дубликат
                         </button>
@@ -292,9 +295,9 @@ export default function ProductsDesktopTable({
               </td>
 
               {isAdmin && (
-                <td className="px-4 py-3">
+                <td className="px-3 py-2.5 text-right pr-4 font-mono text-xs tabular-nums">
                   {selectedWarehouseId ? (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-end">
                       <p className="font-semibold text-slate-900">
                         {(() => {
                           const activeBatches = (product.batches || [])
@@ -312,11 +315,11 @@ export default function ProductsDesktopTable({
                 </td>
               )}
 
-              <td className="px-4 py-3 font-semibold text-slate-900">
+              <td className="px-3 py-2.5 text-right pr-4 font-mono text-xs font-bold tabular-nums text-slate-900">
                 {selectedWarehouseId ? formatMoney(product.sellingPrice) : <span className="text-slate-300">-</span>}
               </td>
 
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <div className="flex items-center space-x-2">
                   <div
                     className={clsx(
@@ -324,30 +327,30 @@ export default function ProductsDesktopTable({
                       product.stock <= product.minStock ? 'animate-pulse bg-rose-500' : 'bg-emerald-500'
                     )}
                   />
-                  <div className={clsx('min-w-0', product.stock <= product.minStock ? 'text-rose-600 font-medium' : 'text-slate-900 font-medium')}>
+                  <div className={clsx('min-w-0 font-mono text-xs tabular-nums', product.stock <= product.minStock ? 'text-rose-600 font-semibold' : 'text-slate-900 font-medium')}>
                     <p className="whitespace-pre-line leading-tight">{getStockBreakdown(product).primary}</p>
                     {getStockBreakdown(product).secondary && (
-                      <p className="text-[10px] text-slate-400">{getStockBreakdown(product).secondary}</p>
+                      <p className="text-[10px] text-slate-400 font-sans">{getStockBreakdown(product).secondary}</p>
                     )}
                   </div>
                 </div>
               </td>
 
-              <td className="px-4 py-3 text-slate-500">
+              <td className="px-3 py-2.5 text-right pr-4 font-mono text-xs tabular-nums text-slate-500">
                 <p>
                   {product.totalIncoming}{' '}
-                  <span className="text-[10px] uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
+                  <span className="text-[10px] uppercase text-slate-400 font-sans">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
                 </p>
               </td>
 
               {isAdmin && (
-                <td className="px-4 py-3">
+                <td className="px-3 py-2.5 text-center">
                   {selectedWarehouseId ? (
-                    <div className="space-y-1">
-                      <p className="font-semibold text-slate-900">
+                    <div className="flex flex-col items-center space-y-1">
+                      <p className="font-mono text-xs font-semibold tabular-nums text-slate-900">
                         {formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
                       </p>
-                      <span className={clsx('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getProductEfficiencyMetrics(product).className)}>
+                      <span className={clsx('inline-flex rounded-full border px-2 py-0.2 text-[9px] font-semibold', getProductEfficiencyMetrics(product).className)}>
                         {getProductEfficiencyMetrics(product).label}
                       </span>
                     </div>
@@ -358,7 +361,7 @@ export default function ProductsDesktopTable({
               )}
 
               {isAdmin && (
-                <td className="px-4 py-3 text-center align-middle">
+                <td className="px-3 py-2.5 text-center align-middle">
                   {selectedWarehouseId ? (
                     <ProductRowActions
                       product={product}

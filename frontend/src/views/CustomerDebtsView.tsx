@@ -546,7 +546,7 @@ export default function CustomerDebtsView() {
 
   return (
     <div className="app-page-shell min-h-full font-sans">
-      <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
+      <div className="space-y-4 lg:space-y-5">
         {/* Desktop Header */}
         <div className="hidden lg:flex items-center justify-between">
           <div>

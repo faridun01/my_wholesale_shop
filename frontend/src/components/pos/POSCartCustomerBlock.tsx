@@ -34,15 +34,15 @@ export default function POSCartCustomerBlock({
   setIsCustomerDropdownOpen,
 }: POSCartCustomerBlockProps) {
   return (
-    <div className={clsx('order-2 space-y-3 border-b border-slate-100 bg-[#f4f5fb]/40 px-5 py-4 lg:order-0', isCartExpanded && 'lg:col-start-1 lg:row-start-2')}>
+    <div className={clsx('order-2 space-y-2.5 border-b border-slate-100 bg-slate-50/50 px-4 py-3 lg:order-0', isCartExpanded && 'lg:col-start-1 lg:row-start-2')}>
       {cartOverflowMessage && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
           {cartOverflowMessage}
         </div>
       )}
 
       <div className="relative">
-        <User className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+        <User className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
         <input
           value={customerSearch}
           onChange={(e) => {
@@ -62,10 +62,10 @@ export default function POSCartCustomerBlock({
           }}
           placeholder="Поиск клиента по имени..."
           readOnly={isCustomerPortal}
-          className="h-11 w-full rounded-xl border border-slate-200 bg-[#f4f5fb] pl-10 pr-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-10 w-full rounded-xl border border-slate-200/90 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
         />
         {isCustomerDropdownOpen && (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-60 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl">
+          <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
             {filteredCustomers.map((customer) => (
               <button
                 key={customer.id}
@@ -77,8 +77,8 @@ export default function POSCartCustomerBlock({
                   setIsCustomerDropdownOpen(false);
                 }}
                 className={clsx(
-                  'flex w-full rounded-xl px-3 py-2 text-left text-xs transition-colors hover:bg-[#f4f5fb]',
-                  customerId === customer.id ? 'bg-[#f4f5fb] font-semibold text-slate-900' : 'text-slate-700',
+                  'flex w-full rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50',
+                  customerId === customer.id ? 'bg-slate-100 font-semibold text-slate-900' : 'text-slate-700',
                 )}
               >
                 {customer.name}
@@ -92,7 +92,7 @@ export default function POSCartCustomerBlock({
       </div>
 
       {!customerId && (
-        <div className="rounded-2xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
           Выберите клиента для оформления продажи.
         </div>
       )}

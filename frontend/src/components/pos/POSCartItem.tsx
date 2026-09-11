@@ -189,9 +189,9 @@ export default function POSCartItem({
             }
             onChange={(e) => updateLineDiscountInput(item.id, e.target.value)}
             onBlur={() => commitLineDiscountInput(item.id)}
-            placeholder="Скидка"
+            placeholder="%"
             title="Скидка в %"
-            className="h-9 w-full rounded-md border border-slate-200 bg-white px-1.5 text-center text-[11px] text-slate-800 outline-none focus:border-slate-300"
+            className="h-8 w-full rounded-md border border-slate-200 bg-white px-1 text-center text-[11px] font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400"
           />
         </div>
 

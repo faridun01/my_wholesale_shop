@@ -530,27 +530,34 @@ export default function DashboardView() {
   );
 
   return (
-    <div className="app-page-shell min-h-full">
-      <div className="overflow-hidden rounded-[28px] bg-[#f4f5fb]">
-        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative flex-1 max-w-3xl">
-              <Search className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="overflow-hidden lg:rounded-2xl bg-canvas">
+        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white px-5 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base font-bold tracking-tight text-slate-900">Дашборд</h1>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                Аналитика
+              </span>
+            </div>
+
+            <div className="relative flex-1 max-w-md">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Поиск..."
-                className="w-full rounded-full border border-slate-200 bg-[#f4f5fb] py-3 pl-12 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-slate-300"
+                placeholder="Поиск по товарам, продажам, клиентам..."
+                className="h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5"
               />
 
               {showSearchDropdown && (
-                <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
-                  <div className="max-h-105 overflow-y-auto p-3">
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                  <div className="max-h-105 overflow-y-auto p-2">
                     <div className="space-y-3">
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Товары</p>
-                        <div className="space-y-1">
+                        <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Товары</p>
+                        <div className="space-y-0.5">
                           {dropdownProducts.map((item: any) => (
                             <button
                               key={`product-${item.id}`}
@@ -558,22 +565,22 @@ export default function DashboardView() {
                                 navigate('/products');
                                 setSearch('');
                               }}
-                              className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-[#f4f5fb]"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-sm text-slate-900">{item.name}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">{item.category?.name || 'Без категории'}</p>
+                                <p className="truncate font-semibold text-slate-900">{item.name}</p>
+                                <p className="text-[10px] text-slate-400">{item.category?.name || 'Без категории'}</p>
                               </div>
-                              <span className="ml-3 shrink-0 text-xs text-slate-500">{item.stock} {item.unit}</span>
+                              <span className="ml-3 shrink-0 font-mono text-[11px] text-slate-500">{item.stock} {item.unit}</span>
                             </button>
                           ))}
-                          {!dropdownProducts.length && <p className="px-3 py-2 text-sm text-slate-400">Нет товаров</p>}
+                          {!dropdownProducts.length && <p className="px-3 py-1 text-xs text-slate-400">Нет товаров</p>}
                         </div>
                       </div>
 
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Продажи</p>
-                        <div className="space-y-1">
+                        <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Продажи</p>
+                        <div className="space-y-0.5">
                           {dropdownSales.map((sale: any) => (
                             <button
                               key={`sale-${sale.id}`}
@@ -581,22 +588,22 @@ export default function DashboardView() {
                                 navigate('/sales');
                                 setSearch('');
                               }}
-                              className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-[#f4f5fb]"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-sm text-slate-900">Продажа #{sale.id}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">{sale.customer?.name || 'Клиент'}</p>
+                                <p className="truncate font-semibold text-slate-900">Продажа #{sale.id}</p>
+                                <p className="text-[10px] text-slate-400">{sale.customer?.name || 'Клиент'}</p>
                               </div>
-                              <span className="ml-3 shrink-0 text-xs text-slate-500">{formatMoney(sale.netAmount || 0)}</span>
+                              <span className="ml-3 shrink-0 font-mono text-[11px] font-semibold text-slate-900">{formatMoney(sale.netAmount || 0)}</span>
                             </button>
                           ))}
-                          {!dropdownSales.length && <p className="px-3 py-2 text-sm text-slate-400">Нет продаж</p>}
+                          {!dropdownSales.length && <p className="px-3 py-1 text-xs text-slate-400">Нет продаж</p>}
                         </div>
                       </div>
 
                       <div>
-                        <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Клиенты</p>
-                        <div className="space-y-1">
+                        <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Клиенты</p>
+                        <div className="space-y-0.5">
                           {dropdownCustomers.map((sale: any, index: number) => (
                             <button
                               key={`customer-${sale.customer?.id || sale.id || sale.customer?.name || 'unknown'}-${index}`}
@@ -604,16 +611,16 @@ export default function DashboardView() {
                                 navigate('/customers');
                                 setSearch('');
                               }}
-                              className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-[#f4f5fb]"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-sm text-slate-900">{sale.customer?.name}</p>
-                                <p className="mt-0.5 text-xs text-slate-400">Из последних продаж</p>
+                                <p className="truncate font-semibold text-slate-900">{sale.customer?.name}</p>
+                                <p className="text-[10px] text-slate-400">Из последних продаж</p>
                               </div>
                               <span className="ml-3 shrink-0 text-xs text-slate-500">Открыть</span>
                             </button>
                           ))}
-                          {!dropdownCustomers.length && <p className="px-3 py-2 text-sm text-slate-400">Нет клиентов</p>}
+                          {!dropdownCustomers.length && <p className="px-3 py-1 text-xs text-slate-400">Нет клиентов</p>}
                         </div>
                       </div>
                     </div>
@@ -622,16 +629,12 @@ export default function DashboardView() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3">
-              <div className="flex items-center gap-3 rounded-full bg-white pl-1 pr-3 py-1">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
-                  {(user.username || 'A').slice(0, 1).toUpperCase()}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900">{user.username || 'Admin'}</p>
-                  <p className="text-xs text-slate-400">{user.role || 'ADMIN'}</p>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="font-medium text-slate-700">{user.username || 'Admin'}</span>
+              <span className="rounded bg-slate-200/70 px-1 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                {user.role || 'ADMIN'}
+              </span>
             </div>
           </div>
         </div>
@@ -672,68 +675,68 @@ export default function DashboardView() {
             </div>
           )}
 
-          <section className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
+          <section className="grid gap-3.5 xl:grid-cols-4 md:grid-cols-2">
             {metrics.map((metric) => (
-              <div key={metric.title} className="rounded-3xl border border-white bg-white p-4 shadow-sm">
+              <div key={metric.title} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <div className="flex items-start justify-between gap-3">
-                  <div className={card('flex h-14 w-14 items-center justify-center rounded-full', metric.iconWrap)}>
-                    <metric.icon size={24} />
+                  <div className={card('flex h-9 w-9 items-center justify-center rounded-xl', metric.iconWrap)}>
+                    <metric.icon size={18} />
                   </div>
-                  <span className={card('text-sm font-medium', metric.deltaValue < 0 ? 'text-rose-500' : 'text-emerald-500')}>
+                  <span className={card('text-xs font-semibold', metric.deltaValue < 0 ? 'text-rose-600' : 'text-emerald-600')}>
                     {metric.delta}
-                    {metric.deltaValue < 0 ? <TrendingDown className="ml-1 inline" size={14} /> : <TrendingUp className="ml-1 inline" size={14} />}
+                    {metric.deltaValue < 0 ? <TrendingDown className="ml-0.5 inline" size={12} /> : <TrendingUp className="ml-0.5 inline" size={12} />}
                   </span>
                 </div>
-                <div className="mt-4">
-                  <p className="text-[13px] text-slate-700">{metric.title}</p>
-                  <p className="mt-2 wrap-break-word text-[clamp(1rem,1.5vw,1.45rem)] font-semibold leading-none tracking-tight text-slate-900">
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-slate-500">{metric.title}</p>
+                  <p className="mt-1 font-mono text-xl font-bold tracking-tight text-slate-900 tabular-nums">
                     {metric.value}
                   </p>
-                  <p className="mt-2 text-[11px] text-slate-400">{metric.subtitle}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{metric.subtitle}</p>
                 </div>
               </div>
             ))}
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-3">
-            <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
+          <section className="grid gap-3.5 xl:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Продажи за сегодня</p>
-                  <p className="mt-2 wrap-break-word text-[clamp(1rem,1.35vw,1.35rem)] font-semibold leading-none tracking-tight text-slate-900">
+                  <p className="text-[11px] font-medium text-slate-500">Продажи за сегодня</p>
+                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900 tabular-nums">
                     {formatMoney(summary?.todaySales || 0)}
                   </p>
                 </div>
-                <div className="rounded-full bg-sky-100 p-4 text-sky-600">
-                  <Clock3 size={22} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                  <Clock3 size={16} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Долги клиентов</p>
-                  <p className="mt-2 wrap-break-word text-[clamp(1rem,1.35vw,1.35rem)] font-semibold leading-none tracking-tight text-slate-900">
+                  <p className="text-[11px] font-medium text-slate-500">Долги клиентов</p>
+                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-rose-600 tabular-nums">
                     {formatMoney(summary?.totalDebts || 0)}
                   </p>
                 </div>
-                <div className="rounded-full bg-rose-100 p-4 text-rose-600">
-                  <TrendingDown size={22} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                  <TrendingDown size={16} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-500">Сумма товаров на складе</p>
-                  <p className="mt-2 wrap-break-word text-[clamp(1rem,1.35vw,1.35rem)] font-semibold leading-none tracking-tight text-slate-900">
+                  <p className="text-[11px] font-medium text-slate-500">Сумма товаров на складе</p>
+                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900 tabular-nums">
                     {formatMoney(summary?.inventoryValue || 0)}
                   </p>
                 </div>
-                <div className="rounded-full bg-violet-100 p-4 text-violet-600">
-                  <Package size={22} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <Package size={16} />
                 </div>
               </div>
             </div>

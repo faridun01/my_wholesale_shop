@@ -1234,41 +1234,54 @@ export default function POSView() {
       />
 
       <div className="lg:rounded-[28px] lg:bg-[#f4f5fb] min-h-screen">
-        <div className="hidden border-b border-slate-200/70 bg-white/95 px-5 py-2.5 backdrop-blur lg:sticky lg:top-0 lg:z-20 lg:block">
+        <div className="hidden border-b border-slate-200/70 bg-white px-5 py-3 lg:sticky lg:top-0 lg:z-20 lg:block">
           <div className="flex items-center justify-between">
-            <h1 className="text-sm font-semibold text-slate-900">POS терминал</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-base font-bold tracking-tight text-slate-900">Касса / POS Терминал</h1>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                {filteredProducts.length} поз.
+              </span>
+            </div>
 
-            <div className="flex items-center gap-3 rounded-full bg-[#f4f5fb] pl-1 pr-4 py-1 border border-slate-200/60">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                {(user.username || 'A').slice(0, 1).toUpperCase()}
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-medium text-slate-900">{user.username || 'Admin'}</p>
-                <p className="text-[10px] text-slate-400">{user.role || 'ADMIN'}</p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="font-medium text-slate-700">{user.username || 'Оператор'}</span>
+                <span className="rounded bg-slate-200/70 px-1 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                  {user.role || 'Кассир'}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
-          <div className="grid grid-cols-2 gap-1.5 rounded-full bg-[#e8eaf2] p-1.5 text-xs lg:hidden">
+        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' ? 'pb-36 lg:pb-5' : cart.length > 0 ? 'pb-28 lg:pb-5' : 'pb-16 lg:pb-5')}>
+          <div className="grid grid-cols-2 gap-1.5 rounded-full bg-slate-200/80 p-1.5 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
-                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all',
+                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5',
                 activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
-              Товары
+              <span>Товары</span>
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                {filteredProducts.length}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('cart')}
               className={clsx(
-                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all',
+                'min-h-11 rounded-full py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5',
                 activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
-              Корзина {cart.length ? `(${cart.length})` : ''}
+              <span>Корзина</span>
+              {cart.length > 0 && (
+                <span className="rounded-full bg-accent-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                  {cart.length}
+                </span>
+              )}
             </button>
           </div>
 

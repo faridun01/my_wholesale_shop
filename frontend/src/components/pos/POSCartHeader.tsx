@@ -35,13 +35,13 @@ export default function POSCartHeader({
       </div>
       <div className={clsx('flex items-center gap-2', isCartExpanded && 'lg:ml-auto')}>
         {!isCartExpanded && setCartWidth && (
-          <div className="hidden sm:flex items-center gap-1 rounded-xl border border-slate-200 bg-[#f4f5fb] p-1">
+          <div className="hidden sm:flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 p-0.5">
             <button
               type="button"
               onClick={() => setCartWidth(320)}
               title="Компактная корзина (320px)"
               className={clsx(
-                'rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all',
+                'rounded-md px-2 py-0.5 text-[10px] font-bold transition-all',
                 cartWidth === 320 ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
               )}
             >
@@ -52,7 +52,7 @@ export default function POSCartHeader({
               onClick={() => setCartWidth(440)}
               title="Стандартная корзина (440px)"
               className={clsx(
-                'rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all',
+                'rounded-md px-2 py-0.5 text-[10px] font-bold transition-all',
                 cartWidth === 440 ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
               )}
             >
@@ -63,7 +63,7 @@ export default function POSCartHeader({
               onClick={() => setCartWidth(580)}
               title="Широкая корзина (580px)"
               className={clsx(
-                'rounded-lg px-2 py-0.5 text-[10px] font-bold transition-all',
+                'rounded-md px-2 py-0.5 text-[10px] font-bold transition-all',
                 cartWidth === 580 ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
               )}
             >
@@ -76,13 +76,13 @@ export default function POSCartHeader({
           type="button"
           onClick={() => setIsCartExpanded((value) => !value)}
           title={isCartExpanded ? 'Свернуть корзину' : 'Развернуть корзину'}
-          className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-[#f4f5fb] text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 shadow-xs"
         >
-          {isCartExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          {isCartExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
         </button>
-        <div className={clsx('flex items-center gap-1.5 rounded-full border border-slate-200 bg-[#f4f5fb] px-2.5 py-1 text-slate-700', isCartExpanded && 'lg:hidden')}>
-          <ShoppingCart size={14} />
-          <span className="text-xs font-semibold">{cartLength}</span>
+        <div className={clsx('flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-700 shadow-xs', isCartExpanded && 'lg:hidden')}>
+          <ShoppingCart size={13} />
+          <span className="font-mono text-xs font-bold tabular-nums">{cartLength}</span>
         </div>
       </div>
     </div>

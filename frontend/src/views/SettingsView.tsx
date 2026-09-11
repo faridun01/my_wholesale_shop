@@ -94,10 +94,10 @@ export default function SettingsView() {
   const canManageSettings = role === 'ADMIN' || role === 'MANAGER';
   const canViewUsers = role === 'ADMIN' || role === 'MANAGER';
   const tabTheme = {
-    warehouses: 'bg-sky-500 text-white shadow-lg shadow-sky-500/20',
-    users: 'bg-violet-500 text-white shadow-lg shadow-violet-500/20',
-    profile: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20',
-    general: 'bg-amber-500 text-white shadow-lg shadow-amber-500/20',
+    warehouses: 'bg-slate-900 text-white shadow-xs',
+    users: 'bg-slate-900 text-white shadow-xs',
+    profile: 'bg-slate-900 text-white shadow-xs',
+    general: 'bg-slate-900 text-white shadow-xs',
   } as const;
   const enabledTwoFactorCount = users.filter((user) => user.twoFactorEnabled).length;
   const adminCount = users.filter((user) => String(user.role || '').toUpperCase() === 'ADMIN').length;
@@ -114,25 +114,25 @@ export default function SettingsView() {
       title: 'Точки продаж и склады',
       description: 'Управляйте филиалами, адресами и основным складом системы.',
       icon: Warehouse,
-      accent: 'text-sky-600 bg-sky-50 border-sky-100',
+      accent: 'text-slate-900 bg-slate-100 border-slate-200',
     },
     users: {
       title: 'Пользователи и роли',
       description: 'Контролируйте доступ команды, роли сотрудников и двухфакторную защиту.',
       icon: Users,
-      accent: 'text-violet-600 bg-violet-50 border-violet-100',
+      accent: 'text-slate-900 bg-slate-100 border-slate-200',
     },
     profile: {
       title: 'Профиль и безопасность',
       description: 'Обновляйте логин, пароль и персональные параметры входа.',
       icon: User,
-      accent: 'text-emerald-600 bg-emerald-50 border-emerald-100',
+      accent: 'text-slate-900 bg-slate-100 border-slate-200',
     },
     general: {
       title: 'Профиль компании',
       description: 'Реквизиты компании и системные параметры для печати и каталога.',
       icon: SettingsIcon,
-      accent: 'text-amber-600 bg-amber-50 border-amber-100',
+      accent: 'text-slate-900 bg-slate-100 border-slate-200',
     },
   } as const;
   const currentTabMeta = activeTabMeta[activeTab];
@@ -512,72 +512,72 @@ export default function SettingsView() {
             ) : null}
           </div>
 
-          <div className="grid gap-6 p-4 xl:items-start xl:grid-cols-[280px_minmax(0,1fr)] xl:p-6">
+          <div className="grid gap-6 p-4 xl:items-start xl:grid-cols-[260px_minmax(0,1fr)] xl:p-6">
             <aside className="self-start space-y-4 xl:sticky xl:top-6">
-              <div className="rounded-[28px] border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="space-y-1.5">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs">
+                <div className="space-y-1">
                   <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Разделы настроек</p>
                   {canManageSettings && (
                     <button
                       onClick={() => setActiveTab('general')}
                       className={clsx(
-                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                        'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
                         activeTab === 'general'
-                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
-                          : 'text-slate-600 hover:bg-amber-50/80 hover:text-amber-700',
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                       )}
                     >
-                      <SettingsIcon size={18} />
+                      <SettingsIcon size={16} />
                       <span>Профиль компании</span>
                     </button>
                   )}
                   <button
                     onClick={() => setActiveTab('warehouses')}
                     className={clsx(
-                      'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                      'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
                       activeTab === 'warehouses'
-                        ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                        : 'text-slate-600 hover:bg-sky-50/80 hover:text-sky-700',
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                     )}
                   >
-                    <Warehouse size={18} />
+                    <Warehouse size={16} />
                     <span>Склады и точки</span>
                   </button>
                   {canViewUsers && (
                     <button
                       onClick={() => setActiveTab('users')}
                       className={clsx(
-                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                        'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
                         activeTab === 'users'
-                          ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
-                          : 'text-slate-600 hover:bg-violet-50/80 hover:text-violet-700',
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                       )}
                     >
-                      <Users size={18} />
+                      <Users size={16} />
                       <span>Пользователи и роли</span>
                     </button>
                   )}
                   <button
                     onClick={() => setActiveTab('profile')}
                     className={clsx(
-                      'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-all',
+                      'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
                       activeTab === 'profile'
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-                        : 'text-slate-600 hover:bg-emerald-50/80 hover:text-emerald-700',
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                     )}
                   >
-                    <User size={18} />
+                    <User size={16} />
                     <span>Профиль</span>
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Текущий раздел</p>
-                <div className={clsx('mt-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl border shadow-2xs', currentTabMeta.accent)}>
-                  <currentTabMeta.icon size={22} />
+                <div className={clsx('mt-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-2xs', currentTabMeta.accent)}>
+                  <currentTabMeta.icon size={18} />
                 </div>
-                <p className="mt-3 text-base font-bold text-slate-900">{currentTabMeta.title}</p>
+                <p className="mt-2.5 text-sm font-bold text-slate-900">{currentTabMeta.title}</p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">{currentTabMeta.description}</p>
               </div>
             </aside>

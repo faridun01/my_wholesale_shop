@@ -330,25 +330,25 @@ const SalesInvoicesSection = ({
   );
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-[28px] border border-white bg-white p-4 sm:p-5 shadow-sm md:min-h-190">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs md:min-h-190">
       {/* Top Header - Desktop only */}
       <div className="hidden md:flex flex-col gap-3 border-b border-slate-100 pb-3 sm:pb-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2.5">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Накладные</h2>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+          <h2 className="text-base font-bold tracking-tight text-slate-900">Накладные продаж</h2>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 font-mono">
             {formatCount(invoicesCount)}
           </span>
         </div>
 
         {/* Desktop Search Bar */}
-        <div className="relative hidden flex-1 max-w-xl md:block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <div className="relative hidden flex-1 max-w-md md:block">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             placeholder="Поиск по ID или клиенту..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-full border border-slate-200 bg-[#f4f5fb] py-2.5 pl-11 pr-5 text-sm text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+            className="h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5"
           />
         </div>
       </div>
@@ -513,11 +513,11 @@ const SalesInvoicesSection = ({
       </div>
 
       {/* Desktop Filters (md: and up) */}
-      <div className="mt-4 hidden items-center gap-2.5 rounded-2xl border border-slate-100 bg-[#f4f5fb]/50 p-3 md:grid md:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-3 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 md:grid md:grid-cols-2 xl:grid-cols-5">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300"
+          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
         >
           <option value="all">Все статусы</option>
           <option value="paid">Оплачено</option>
@@ -528,7 +528,7 @@ const SalesInvoicesSection = ({
         <select
           value={staffFilter}
           onChange={(e) => setStaffFilter(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300"
+          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
         >
           <option value="all">Все сотрудники</option>
           {staffOptions.map((staffName) => (
@@ -538,8 +538,8 @@ const SalesInvoicesSection = ({
           ))}
         </select>
 
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-[11px] font-bold uppercase text-slate-400">От</span>
+        <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5">
+          <span className="text-[10px] font-bold uppercase text-slate-400">От</span>
           <input
             type="date"
             value={dateFrom}
@@ -548,8 +548,8 @@ const SalesInvoicesSection = ({
           />
         </div>
 
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-[11px] font-bold uppercase text-slate-400">До</span>
+        <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5">
+          <span className="text-[10px] font-bold uppercase text-slate-400">До</span>
           <input
             type="date"
             value={dateTo}
@@ -563,18 +563,18 @@ const SalesInvoicesSection = ({
           onClick={clearInvoiceFilters}
           disabled={!hasAnyActiveFilter}
           className={clsx(
-            'flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all',
+            'flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all',
             hasAnyActiveFilter
               ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 shadow-xs'
               : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
           )}
         >
-          <RotateCcw size={13} />
-          <span>Сбросить фильтры</span>
+          <RotateCcw size={12} />
+          <span>Сбросить</span>
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 pt-3 md:hidden">
+      <div className="flex-1 space-y-2.5 pt-3 md:hidden">
         {paginatedInvoices.map((inv) => {
           const paymentDisabled = isPaymentActionDisabled(inv);
           const returnDisabled = isReturnActionDisabled(inv);
@@ -583,40 +583,41 @@ const SalesInvoicesSection = ({
           const hasReturns = hasInvoiceReturns(inv);
 
           return (
-            <div key={`mobile-invoice-${inv.id}`} className="rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 p-4 shadow-xs">
+            <div key={`mobile-invoice-${inv.id}`} className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base font-semibold text-slate-900">Накладная</p>
-                  <p className="mt-0.5 text-xs text-slate-400">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</p>
-                  <p className="mt-2 text-sm font-medium text-slate-800">{inv.customer_name}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-slate-900">№{inv.id}</span>
+                    <span className="font-mono text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                  <p className="mt-1 text-[13px] font-semibold text-slate-900 leading-snug">{inv.customer_name}</p>
+                  {inv.warehouse?.name && (
+                    <p className="mt-0.5 text-[10px] text-slate-400">Склад: {inv.warehouse.name}</p>
+                  )}
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
                   {getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}
                   {hasReturns && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-700 border border-amber-200/80">
-                      <RotateCcw size={12} />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 border border-amber-200">
+                      <RotateCcw size={10} />
                       Возврат
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Сумма</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
+              <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-slate-100 bg-slate-50/70 p-2 text-center">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Сумма</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
                 </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплачено</p>
-                  <p className="mt-0.5 text-sm font-semibold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Оплачено</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
                 </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Остаток</p>
-                  <p className="mt-0.5 text-sm font-semibold text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
-                </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Склад</p>
-                  <p className="mt-0.5 text-sm font-medium text-slate-800">{inv.warehouse?.name || '---'}</p>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Остаток</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
                 </div>
               </div>
 
@@ -781,14 +782,14 @@ const SalesInvoicesSection = ({
       <div className="hidden min-h-140 flex-1 overflow-x-auto pt-3 md:block">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-100 bg-[#f4f5fb] text-xs font-medium uppercase tracking-wider text-slate-500">
-              <th className="px-4 py-3">{renderSortLabel('Дата', 'createdAt')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Клиент', 'customer_name')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Сумма', 'netAmount')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Оплачено', 'paidAmount')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Остаток', 'balance')}</th>
-              <th className="px-4 py-3">{renderSortLabel('Статус', 'status')}</th>
-              <th className="px-3 py-3 text-center">Действия</th>
+            <tr className="border-b border-slate-200/80 bg-slate-100/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <th className="px-4 py-2.5">{renderSortLabel('Дата', 'createdAt')}</th>
+              <th className="px-4 py-2.5">{renderSortLabel('Клиент', 'customer_name')}</th>
+              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Сумма', 'netAmount')}</th>
+              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Оплачено', 'paidAmount')}</th>
+              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Остаток', 'balance')}</th>
+              <th className="px-4 py-2.5 text-center">{renderSortLabel('Статус', 'status')}</th>
+              <th className="px-3 py-2.5 text-center">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -802,23 +803,23 @@ const SalesInvoicesSection = ({
                 <tr
                   key={inv.id}
                   onClick={() => fetchInvoiceDetails(inv.id)}
-                  className="cursor-pointer transition-colors hover:bg-[#f4f5fb]"
+                  className="cursor-pointer transition-colors hover:bg-slate-50"
                 >
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">
                     {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{inv.customer_name}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-semibold text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</span>
+                  <td className="px-4 py-2.5 font-medium text-slate-900 text-xs">{inv.customer_name}</td>
+                  <td className="px-4 py-2.5 text-right pr-4">
+                    <span className="font-mono text-xs font-semibold tabular-nums text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</span>
                     {hasReturns && (
-                      <div className="mt-0.5 text-[10px] font-medium text-rose-600">
+                      <div className="mt-0.5 font-mono text-[10px] font-medium tabular-nums text-rose-600">
                         возврат: -{formatMoney(returnedAmount)}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-semibold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
-                  <td className="px-4 py-3 font-semibold text-rose-600">{formatMoney(getInvoiceBalance(inv))}</td>
-                  <td className="px-4 py-3">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
+                  <td className="px-4 py-2.5 text-right pr-4 font-mono text-xs font-semibold tabular-nums text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
+                  <td className="px-4 py-2.5 text-right pr-4 font-mono text-xs font-semibold tabular-nums text-rose-600">{formatMoney(getInvoiceBalance(inv))}</td>
+                  <td className="px-4 py-2.5 text-center">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
                   <td className="px-3 py-3 text-center align-middle">
                     <SalesRowActions
                       inv={inv}

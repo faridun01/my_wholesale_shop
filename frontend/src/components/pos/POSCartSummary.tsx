@@ -85,7 +85,7 @@ export default function POSCartSummary({
           value={discount === 0 ? '' : discount}
           onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
           placeholder="Скидка %"
-          className="h-11 rounded-xl border border-slate-200 bg-[#f4f5fb] px-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
         />
         <input
           type="number"
@@ -97,14 +97,14 @@ export default function POSCartSummary({
             setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
           }}
           placeholder="Оплачено"
-          className="h-11 rounded-xl border border-slate-200 bg-[#f4f5fb] px-4 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+          className="h-10 rounded-xl border border-slate-200/90 bg-white px-3 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 font-mono"
         />
       </div>
 
-      <div className="hidden space-y-2 rounded-2xl border border-slate-200/70 bg-white p-4 text-xs shadow-xs lg:block">
+      <div className="hidden space-y-2 rounded-xl border border-slate-200/80 bg-white p-3.5 text-xs shadow-xs lg:block">
         <div className="flex items-center justify-between text-slate-500">
           <span>Подытог</span>
-          <span className="font-medium text-slate-900">{formatMoney(subtotal)}</span>
+          <span className="font-mono font-medium text-slate-900 tabular-nums">{formatMoney(subtotal)}</span>
         </div>
         <div className="flex items-center justify-between text-slate-500">
           <span>Масса/объем товаров</span>
@@ -117,33 +117,33 @@ export default function POSCartSummary({
         ) : null}
         <div className="flex items-center justify-between text-slate-500">
           <span>Скидка по товарам</span>
-          <span className="font-medium text-slate-900">-{formatMoney(lineDiscountAmount)}</span>
+          <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(lineDiscountAmount)}</span>
         </div>
         <div className="flex items-center justify-between text-slate-500">
           <span>Скидка на чек</span>
-          <span className="font-medium text-slate-900">-{formatMoney(invoiceDiscountAmount)}</span>
+          <span className="font-mono font-medium text-slate-900 tabular-nums">-{formatMoney(invoiceDiscountAmount)}</span>
         </div>
         {paidAmount && (
           <div className="flex items-center justify-between text-slate-500">
             <span>{balance >= 0 ? 'Сдача' : 'Долг'}</span>
-            <span className={clsx('font-semibold', balance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
+            <span className={clsx('font-mono font-semibold tabular-nums', balance >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
               {formatMoney(Math.abs(balance))}
             </span>
           </div>
         )}
-        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-          <span className="text-base font-semibold text-slate-900">Итого</span>
-          <span className="text-2xl font-bold tracking-tight text-slate-900">{formatMoney(total)}</span>
+        <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+          <span className="text-sm font-bold text-slate-900">Итого</span>
+          <span className="font-mono text-xl font-bold tracking-tight text-slate-900 tabular-nums">{formatMoney(total)}</span>
         </div>
       </div>
 
       <button
         onClick={handleCheckout}
         disabled={isSubmitting || cartLength === 0 || !customerId}
-        className="hidden w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 lg:flex"
+        className="hidden w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-semibold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 lg:flex"
       >
         {isSubmitting ? 'Обработка...' : 'Оформить продажу'}
-        {!isSubmitting && <ChevronRight size={18} />}
+        {!isSubmitting && <ChevronRight size={16} />}
       </button>
     </div>
   );
