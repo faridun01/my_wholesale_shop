@@ -136,46 +136,31 @@ export default function POSProductList({
             return (
               <div
                 key={`mobile-pos-${product.id}`}
-                onClick={() => handleAddFromList(product)}
+                onClick={() => canAddProductFromList(product) && handleAddFromList(product)}
                 className={clsx(
-                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-colors active:bg-slate-50',
+                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-all active:scale-[0.99] active:bg-slate-50',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/40',
-                  canAddProductFromList(product) ? 'cursor-pointer' : '',
+                  canAddProductFromList(product) ? 'cursor-pointer select-none' : 'opacity-60 cursor-not-allowed',
                 )}
               >
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="whitespace-normal wrap-break-word text-[12px] font-medium leading-snug text-slate-800 line-clamp-2"
-                      style={{ overflowWrap: 'anywhere' }}
-                    >
-                      {formatProductName(product.name)}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold tabular-nums text-slate-900">
-                        {formatMoney(product.sellingPrice)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded border border-emerald-200/60 bg-emerald-50/80 px-1.5 py-0.5 text-emerald-700 font-mono">
-                        <span className="text-[10px] font-semibold">{stockParts.primary}</span>
-                        {stockParts.secondary ? (
-                          <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
-                        ) : null}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddFromList(product);
-                    }}
-                    disabled={!canAddProductFromList(product)}
-                    title="Добавить в корзину"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-25"
+                <div>
+                  <p
+                    className="whitespace-normal wrap-break-word text-[12px] font-medium leading-snug text-slate-800 line-clamp-2"
+                    style={{ overflowWrap: 'anywhere' }}
                   >
-                    <Plus size={15} />
-                  </button>
+                    {formatProductName(product.name)}
+                  </p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold tabular-nums text-slate-900">
+                      {formatMoney(product.sellingPrice)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded border border-emerald-200/60 bg-emerald-50/80 px-1.5 py-0.5 text-emerald-700 font-mono">
+                      <span className="text-[10px] font-semibold">{stockParts.primary}</span>
+                      {stockParts.secondary ? (
+                        <span className="text-[9px] font-medium text-emerald-600">{stockParts.secondary}</span>
+                      ) : null}
+                    </span>
+                  </div>
                 </div>
               </div>
             );
