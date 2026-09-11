@@ -88,7 +88,7 @@ export default function ReportsCharts({
   return (
     <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
       <Panel title={currentMeta.chartTitle}>
-        <div className="h-80">
+        <div className="h-64 sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
