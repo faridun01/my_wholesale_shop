@@ -467,28 +467,29 @@ export default function DashboardView() {
   const showSearchDropdown = searchQuery.length > 0;
 
   const recentSalesPanel = (
-    <div className="overflow-hidden rounded-3xl border border-white bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-2xl font-semibold text-slate-900">Последние продажи</h2>
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+      <div className="border-b border-slate-100 px-3.5 py-3 sm:px-5 sm:py-4">
+        <h2 className="text-sm sm:text-base font-semibold text-slate-900">Последние продажи</h2>
       </div>
-      <div className="space-y-3 p-4 sm:hidden sm:max-h-none">
+      <div className="space-y-1.5 p-2.5 sm:hidden">
         {filteredSales.slice(0, 5).map((sale: any) => (
-          <div key={sale.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Заказ #{sale.id}</p>
-                <p className="mt-1 text-sm text-slate-500">{sale.customer?.name || 'Клиент'}</p>
+          <div key={sale.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <span className="font-mono text-xs font-bold text-slate-900">#{sale.id}</span>
+                <span className="mx-1.5 text-slate-300">•</span>
+                <span className="text-xs font-medium text-slate-700 truncate">{sale.customer?.name || 'Клиент'}</span>
               </div>
               {getDashboardStatusBadge(sale.status)}
             </div>
-            <div className="mt-4 rounded-2xl bg-white px-4 py-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Сумма</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(sale.netAmount || 0)}</p>
+            <div className="mt-1.5 flex items-center justify-between border-t border-slate-200/40 pt-1.5">
+              <span className="text-[10px] text-slate-400">Сумма заказа</span>
+              <span className="font-mono text-xs font-bold text-slate-900 tabular-nums">{formatMoney(sale.netAmount || 0)}</span>
             </div>
           </div>
         ))}
         {!filteredSales.length && (
-          <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+          <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-xs text-slate-400">
             Нет недавних продаж
           </div>
         )}
@@ -532,23 +533,31 @@ export default function DashboardView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="overflow-hidden lg:rounded-2xl bg-canvas">
-        <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base font-bold tracking-tight text-slate-900">Дашборд</h1>
-              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                Аналитика
-              </span>
+        <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-3 py-2 sm:px-5 sm:py-3 backdrop-blur">
+          <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold tracking-tight text-slate-900">Дашборд</h1>
+                <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                  Аналитика
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 lg:hidden">
+                <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="font-medium text-slate-700">{user.username || 'Admin'}</span>
+                </div>
+              </div>
             </div>
 
             <div className="relative flex-1 max-w-md">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Поиск по товарам, продажам, клиентам..."
-                className="h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5"
+                className="h-8.5 sm:h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 pl-9 pr-4 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5"
               />
 
               {showSearchDropdown && (
@@ -629,7 +638,7 @@ export default function DashboardView() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs">
+            <div className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               <span className="font-medium text-slate-700">{user.username || 'Admin'}</span>
               <span className="rounded bg-slate-200/70 px-1 text-[9px] font-bold uppercase tracking-wider text-slate-600">
@@ -639,8 +648,8 @@ export default function DashboardView() {
           </div>
         </div>
 
-        <div className="space-y-5 px-5 py-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               {searchQuery && (
                 <p className="text-[11px] text-slate-500">
@@ -649,13 +658,13 @@ export default function DashboardView() {
               )}
             </div>
             {warehouses.length > 1 && (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <div className="flex w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm md:w-auto">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-xs sm:w-auto">
                   <Store size={14} className="text-slate-400" />
                   <select
                     value={selectedWarehouseId}
                     onChange={(event) => handleWarehouseSelect(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent pr-1 outline-none md:flex-none"
+                    className="min-w-0 flex-1 bg-transparent pr-1 outline-none sm:flex-none"
                   >
                     {isAdmin && <option value="">Все склады</option>}
                     {warehouses.map((warehouse) => (
@@ -670,90 +679,90 @@ export default function DashboardView() {
           </div>
 
           {searchQuery && !hasSearchResults && (
-            <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">
               Ничего не найдено по запросу "{search}".
             </div>
           )}
 
-          <section className="grid gap-3.5 xl:grid-cols-4 md:grid-cols-2">
+          <section className="grid grid-cols-2 gap-2 sm:gap-3.5 xl:grid-cols-4">
             {metrics.map((metric) => (
-              <div key={metric.title} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-                <div className="flex items-start justify-between gap-3">
-                  <div className={card('flex h-9 w-9 items-center justify-center rounded-xl', metric.iconWrap)}>
-                    <metric.icon size={18} />
+              <div key={metric.title} className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-4 shadow-xs">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className={card('flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg sm:rounded-xl', metric.iconWrap)}>
+                    <metric.icon size={15} />
                   </div>
-                  <span className={card('text-xs font-semibold', metric.deltaValue < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                  <span className={card('text-[10px] sm:text-xs font-semibold', metric.deltaValue < 0 ? 'text-rose-600' : 'text-emerald-600')}>
                     {metric.delta}
-                    {metric.deltaValue < 0 ? <TrendingDown className="ml-0.5 inline" size={12} /> : <TrendingUp className="ml-0.5 inline" size={12} />}
+                    {metric.deltaValue < 0 ? <TrendingDown className="ml-0.5 inline" size={10} /> : <TrendingUp className="ml-0.5 inline" size={10} />}
                   </span>
                 </div>
-                <div className="mt-3">
-                  <p className="text-xs font-medium text-slate-500">{metric.title}</p>
-                  <p className="mt-1 font-mono text-xl font-bold tracking-tight text-slate-900 tabular-nums">
+                <div className="mt-2 sm:mt-3">
+                  <p className="truncate text-[11px] sm:text-xs font-medium text-slate-500">{metric.title}</p>
+                  <p className="mt-0.5 font-mono text-base sm:text-xl font-bold tracking-tight text-slate-900 tabular-nums">
                     {metric.value}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-400">{metric.subtitle}</p>
+                  <p className="mt-0.5 text-[9px] sm:text-[11px] text-slate-400 truncate">{metric.subtitle}</p>
                 </div>
               </div>
             ))}
           </section>
 
-          <section className="grid gap-3.5 xl:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-slate-500">Продажи за сегодня</p>
-                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900 tabular-nums">
+          <section className="grid grid-cols-3 gap-1.5 sm:gap-3.5">
+            <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-500">Продажи сегодня</p>
+                  <p className="mt-0.5 font-mono text-xs sm:text-lg font-bold tracking-tight text-slate-900 tabular-nums truncate">
                     {formatMoney(summary?.todaySales || 0)}
                   </p>
                 </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 shrink-0">
                   <Clock3 size={16} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-slate-500">Долги клиентов</p>
-                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-rose-600 tabular-nums">
+            <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-500">Долги клиентов</p>
+                  <p className="mt-0.5 font-mono text-xs sm:text-lg font-bold tracking-tight text-rose-600 tabular-nums truncate">
                     {formatMoney(summary?.totalDebts || 0)}
                   </p>
                 </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 shrink-0">
                   <TrendingDown size={16} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-slate-500">Сумма товаров на складе</p>
-                  <p className="mt-1 font-mono text-lg font-bold tracking-tight text-slate-900 tabular-nums">
+            <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-500">Сумма склада</p>
+                  <p className="mt-0.5 font-mono text-xs sm:text-lg font-bold tracking-tight text-slate-900 tabular-nums truncate">
                     {formatMoney(summary?.inventoryValue || 0)}
                   </p>
                 </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700 shrink-0">
                   <Package size={16} />
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="grid gap-4">
-            <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <section className="grid gap-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 shadow-xs">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Обзор продаж</h2>
-                  <p className="mt-2 text-[11px] text-slate-500">{overviewDescription}</p>
+                  <h2 className="text-sm sm:text-base font-semibold text-slate-900">Обзор продаж</h2>
+                  <p className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">{overviewDescription}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 rounded-[22px] bg-[#f4f5fb] p-1 text-sm sm:flex sm:items-center sm:rounded-full">
+                <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-0.5 text-xs">
                   {[
-                    { key: 'week', label: 'Неделя' },
-                    { key: 'month', label: 'Месяц' },
-                    { key: 'quarter', label: 'Квартал' },
+                    { key: 'week', label: 'Нед' },
+                    { key: 'month', label: 'Мес' },
+                    { key: 'quarter', label: 'Кварт' },
                     { key: 'year', label: 'Год' },
                   ].map((period) => (
                     <button
@@ -762,8 +771,8 @@ export default function DashboardView() {
                       onClick={() => setOverviewPeriod(period.key as 'week' | 'month' | 'quarter' | 'year')}
                       className={
                         overviewPeriod === period.key
-                          ? 'rounded-full bg-white px-4 py-2 text-sky-600 shadow-sm'
-                          : 'rounded-full px-3 py-2 text-slate-500 transition-colors hover:text-slate-700'
+                          ? 'rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-900 shadow-xs'
+                          : 'rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-900'
                       }
                     >
                       {period.label}
@@ -775,7 +784,7 @@ export default function DashboardView() {
 
             <React.Suspense
               fallback={
-                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_360px]">
+                <section className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_360px]">
                   <ChartSkeleton variant="area" />
                   <ChartSkeleton variant="pie" />
                 </section>
@@ -792,24 +801,24 @@ export default function DashboardView() {
             </React.Suspense>
           </section>
 
-          <section className="grid gap-4">
-            <div className="overflow-hidden rounded-3xl border border-white bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <section className="grid gap-3">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-3 sm:px-5 sm:py-4">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-semibold text-slate-900">Товары с низким остатком</h2>
-                  <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                  <h2 className="text-sm sm:text-base font-semibold text-slate-900">Товары с низким остатком</h2>
+                  <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
                     {formatCount(totalLowStockCount)}
                   </span>
                 </div>
                 <button
                   onClick={() => navigate(isAdmin ? '/products?sort=low-stock&view=warehouse-low-stock' : '/products?sort=low-stock')}
-                  className="inline-flex items-center gap-1 text-sm text-[#5b8def] transition-colors hover:text-[#3d73da]"
+                  className="inline-flex items-center gap-0.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
                 >
-                  <span>Смотреть все</span>
-                  <ChevronRight size={16} />
+                  <span>Все</span>
+                  <ChevronRight size={14} />
                 </button>
               </div>
-              <div className="space-y-3 p-4 sm:hidden">
+              <div className="space-y-1.5 p-2.5 sm:hidden">
                 {visibleLowStock.map((item: any) => {
                   const stockValue = Number(item.stock || 0);
                   const outOfStock = stockValue <= 0;
@@ -817,42 +826,32 @@ export default function DashboardView() {
                   const warehouseLabel = getWarehouseLabel(item);
                   const stockInfo = getProductStockParts(item);
                   return (
-                    <div key={item.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-                          <Package size={18} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="wrap-break-word text-sm font-medium leading-5 text-slate-900">{item.name}</p>
-                          <p className="mt-1 text-xs font-medium text-sky-600">{warehouseLabel}</p>
-                        </div>
+                    <div key={item.id} className="flex items-center justify-between gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-slate-800">{item.name}</p>
+                        <p className="mt-0.5 text-[10px] font-medium text-slate-400">{warehouseLabel}</p>
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl bg-white px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Остаток</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900">{stockInfo.primary}</p>
-                          {stockInfo.secondary && <p className="mt-0.5 text-[10px] text-slate-400">{stockInfo.secondary}</p>}
-                        </div>
-                        <div className="rounded-2xl bg-white px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Статус</p>
-                          <span
-                            title={outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}
-                            className={card(
-                              'mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full border shadow-xs',
-                              outOfStock || isCriticalLowStock
-                                ? 'border-rose-200/80 bg-rose-50 text-rose-600'
-                                : 'border-amber-200/80 bg-amber-50 text-amber-600'
-                            )}
-                          >
-                            <AlertTriangle size={15} />
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono text-xs font-bold text-slate-900 tabular-nums">
+                          {stockInfo.primary}
+                        </span>
+                        <span
+                          title={outOfStock ? 'Нет в наличии' : isCriticalLowStock ? 'Критично' : 'Низкий остаток'}
+                          className={card(
+                            'inline-flex h-6 w-6 items-center justify-center rounded-lg border shadow-xs',
+                            outOfStock || isCriticalLowStock
+                              ? 'border-rose-200/80 bg-rose-50 text-rose-600'
+                              : 'border-amber-200/80 bg-amber-50 text-amber-600'
+                          )}
+                        >
+                          <AlertTriangle size={13} />
+                        </span>
                       </div>
                     </div>
                   );
                 })}
                 {!visibleLowStock.length && (
-                  <div className="rounded-3xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+                  <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-xs text-slate-400">
                     Нет товаров с таким фильтром
                   </div>
                 )}
