@@ -20,7 +20,10 @@ import {
   ChevronDown,
   Building2,
   ShieldAlert,
-  X
+  X,
+  KeyRound,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
@@ -93,49 +96,12 @@ export default function SettingsView() {
   const isAdmin = role === 'ADMIN';
   const canManageSettings = role === 'ADMIN' || role === 'MANAGER';
   const canViewUsers = role === 'ADMIN' || role === 'MANAGER';
-  const tabTheme = {
-    warehouses: 'bg-slate-900 text-white shadow-xs',
-    users: 'bg-slate-900 text-white shadow-xs',
-    profile: 'bg-slate-900 text-white shadow-xs',
-    general: 'bg-slate-900 text-white shadow-xs',
-  } as const;
-  const enabledTwoFactorCount = users.filter((user) => user.twoFactorEnabled).length;
-  const adminCount = users.filter((user) => String(user.role || '').toUpperCase() === 'ADMIN').length;
+
+  const enabledTwoFactorCount = users.filter((u) => u.twoFactorEnabled).length;
+  const adminCount = users.filter((u) => String(u.role || '').toUpperCase() === 'ADMIN').length;
   const currentUserWarehouseLabel = currentUser?.warehouse?.name || 'Все склады';
-  const companyPreviewLines = [
-    companyProfile.name,
-    companyProfile.country,
-    [companyProfile.region, companyProfile.city].filter(Boolean).join(', '),
-    companyProfile.addressLine,
-    companyProfile.phone,
-  ].filter(Boolean);
-  const activeTabMeta = {
-    warehouses: {
-      title: 'Точки продаж и склады',
-      description: 'Управляйте филиалами, адресами и основным складом системы.',
-      icon: Warehouse,
-      accent: 'text-slate-900 bg-slate-100 border-slate-200',
-    },
-    users: {
-      title: 'Пользователи и роли',
-      description: 'Контролируйте доступ команды, роли сотрудников и двухфакторную защиту.',
-      icon: Users,
-      accent: 'text-slate-900 bg-slate-100 border-slate-200',
-    },
-    profile: {
-      title: 'Профиль и безопасность',
-      description: 'Обновляйте логин, пароль и персональные параметры входа.',
-      icon: User,
-      accent: 'text-slate-900 bg-slate-100 border-slate-200',
-    },
-    general: {
-      title: 'Профиль компании',
-      description: 'Реквизиты компании и системные параметры для печати и каталога.',
-      icon: SettingsIcon,
-      accent: 'text-slate-900 bg-slate-100 border-slate-200',
-    },
-  } as const;
-  const currentTabMeta = activeTabMeta[activeTab];
+  const defaultWarehouse = warehouses.find((w) => w.isDefault);
+
   const warehousesTotalPages = Math.max(1, Math.ceil(warehouses.length / warehousesPageSize));
   const paginatedWarehouses = React.useMemo(
     () => warehouses.slice((warehousePage - 1) * warehousesPageSize, warehousePage * warehousesPageSize),
@@ -436,7 +402,6 @@ export default function SettingsView() {
       const res = await client.put(`/auth/users/${currentUser.id}`, data);
       toast.success('Профиль обновлен. Пожалуйста, войдите снова, если вы изменили логин или пароль.');
 
-      // Update local storage if needed, but safer to just let them re-login if they changed sensitive info
       const updatedUser = { ...currentUser, ...res.data };
       updateStoredUser(updatedUser);
 
@@ -484,208 +449,883 @@ export default function SettingsView() {
     }
   };
 
-  return (
-    <div className="app-page-shell">
-      <div className="w-full pb-20">
-        <section className="rounded-4xl border border-white/80 bg-bg-main shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-200/60 bg-white px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className={clsx('flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs', currentTabMeta.accent)}>
-                <currentTabMeta.icon size={26} />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Настройки системы</p>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{currentTabMeta.title}</h1>
-                <p className="mt-1 text-sm text-slate-500">{currentTabMeta.description}</p>
-              </div>
-            </div>
+  const tabs = [
+    { id: 'warehouses' as const, label: 'Склады и точки', icon: Warehouse, count: warehouses.length, visible: true },
+    { id: 'users' as const, label: 'Пользователи и роли', icon: Users, count: users.length, visible: canViewUsers },
+    { id: 'general' as const, label: 'Профиль компании', icon: Building2, visible: canManageSettings },
+    { id: 'profile' as const, label: 'Мой профиль', icon: User, visible: true },
+  ].filter((t) => t.visible);
 
-            {activeTab === 'general' && canManageSettings ? (
+  return (
+    <div className="app-page-shell min-h-full font-sans">
+      <div className="space-y-4 pb-12">
+        {/* Compact Header & Top Toolbar */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
+              <SettingsIcon size={18} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate">Настройки системы</h1>
+              <p className="text-xs text-slate-500 truncate">Склады, доступ, безопасность и реквизиты компании</p>
+            </div>
+          </div>
+
+          {/* Quick Context Action Button */}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeTab === 'warehouses' && isAdmin && (
+              <button
+                type="button"
+                onClick={() => { resetWarehouseForm(); setShowAddWarehouse(true); }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95"
+              >
+                <Plus size={14} />
+                <span>Новый склад</span>
+              </button>
+            )}
+            {activeTab === 'users' && isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowAddUser(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95"
+              >
+                <Plus size={14} />
+                <span>Новый пользователь</span>
+              </button>
+            )}
+            {activeTab === 'general' && canManageSettings && (
               <button
                 type="button"
                 onClick={() => (document.getElementById('company-profile-form') as HTMLFormElement | null)?.requestSubmit()}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-95"
+                disabled={isSubmittingForm}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
               >
-                <CheckCircle2 size={18} />
-                <span>Сохранить изменения</span>
+                <CheckCircle2 size={14} />
+                <span>{isSubmittingForm ? 'Сохранение...' : 'Сохранить реквизиты'}</span>
               </button>
-            ) : null}
+            )}
           </div>
+        </div>
 
-          <div className="grid gap-6 p-4 xl:items-start xl:grid-cols-[260px_minmax(0,1fr)] xl:p-6">
-            <aside className="self-start space-y-4 xl:sticky xl:top-6">
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs">
-                <div className="space-y-1">
-                  <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Разделы настроек</p>
-                  {canManageSettings && (
-                    <button
-                      onClick={() => setActiveTab('general')}
-                      className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
-                        activeTab === 'general'
-                          ? 'bg-slate-900 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-                      )}
-                    >
-                      <SettingsIcon size={16} />
-                      <span>Профиль компании</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setActiveTab('warehouses')}
+        {/* Compact Segmented Tabs Strip */}
+        <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-2xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={clsx(
+                  'flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shrink-0',
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                )}
+              >
+                <Icon size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+                {typeof tab.count === 'number' && (
+                  <span
                     className={clsx(
-                      'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
-                      activeTab === 'warehouses'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                      'ml-0.5 rounded-full px-1.5 py-0.2 font-mono text-[10px] font-bold',
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                     )}
                   >
-                    <Warehouse size={16} />
-                    <span>Склады и точки</span>
-                  </button>
-                  {canViewUsers && (
-                    <button
-                      onClick={() => setActiveTab('users')}
-                      className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
-                        activeTab === 'users'
-                          ? 'bg-slate-900 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-                      )}
-                    >
-                      <Users size={16} />
-                      <span>Пользователи и роли</span>
-                    </button>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* TAB 1: WAREHOUSES */}
+        {activeTab === 'warehouses' && (
+          <div className="space-y-3.5">
+            {/* Summary Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-3.5 py-2 shadow-2xs text-xs">
+              <div className="flex items-center gap-4">
+                <span className="text-slate-500">
+                  Всего складов: <strong className="text-slate-900 font-bold">{warehouses.length}</strong>
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  Основной склад: <strong className="text-emerald-700 font-bold">{defaultWarehouse?.name || 'Не назначен'}</strong>
+                </span>
+              </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => { resetWarehouseForm(); setShowAddWarehouse(true); }}
+                  className="sm:hidden inline-flex items-center gap-1 text-xs font-semibold text-slate-900 hover:underline"
+                >
+                  <Plus size={13} />
+                  <span>Добавить</span>
+                </button>
+              )}
+            </div>
+
+            {/* Warehouses Grid */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {paginatedWarehouses.map((w) => (
+                <div
+                  key={w.id}
+                  className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs"
+                >
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+                          <Warehouse size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-slate-900 truncate">{w.name}</h3>
+                          {w.isDefault && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 border border-amber-200/70">
+                              <Star size={10} className="fill-amber-500 text-amber-500" />
+                              Основной
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedWarehouse(w);
+                            setWarehouseForm({
+                              name: w.name || '',
+                              city: w.city || '',
+                              address: w.address || '',
+                              phone: w.phone || '',
+                            });
+                            setShowEditWarehouse(true);
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                          title="Редактировать"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeletingWarehouse}
+                          onClick={() => openDeleteWarehouseConfirm(w)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40"
+                          title="Удалить"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-1 text-xs text-slate-600 pt-1 border-t border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{[w.city, w.address].filter(Boolean).join(', ') || 'Адрес не указан'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone size={13} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{w.phone || 'Телефон не указан'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Action */}
+                  {isAdmin && !w.isDefault && (
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefaultWarehouse(w.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                      >
+                        <Star size={12} />
+                        <span>Сделать основным</span>
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={() => setActiveTab('profile')}
-                    className={clsx(
-                      'flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-all',
-                      activeTab === 'profile'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-                    )}
-                  >
-                    <User size={16} />
-                    <span>Профиль</span>
-                  </button>
+                </div>
+              ))}
+
+              {/* Add warehouse card placeholder */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => { resetWarehouseForm(); setShowAddWarehouse(true); }}
+                  className="flex min-h-28 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-slate-200 p-4 text-slate-400 hover:border-sky-300 hover:bg-sky-50/40 hover:text-sky-700 transition-all group"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700 transition-colors">
+                    <Plus size={16} />
+                  </div>
+                  <span className="text-xs font-semibold">Добавить новый склад</span>
+                </button>
+              )}
+            </div>
+
+            {/* Centered Pagination */}
+            {warehouses.length > warehousesPageSize && (
+              <div className="pt-2">
+                <PaginationControls
+                  currentPage={warehousePage}
+                  totalPages={warehousesTotalPages}
+                  totalItems={warehouses.length}
+                  pageSize={warehousesPageSize}
+                  onPageChange={setWarehousePage}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: USERS & ROLES */}
+        {activeTab === 'users' && (
+          <div className="space-y-3.5">
+            {/* Summary Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-3.5 py-2 shadow-2xs text-xs">
+              <div className="flex items-center gap-4">
+                <span className="text-slate-500">
+                  Всего: <strong className="text-slate-900 font-bold">{users.length}</strong>
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  Администраторы: <strong className="text-violet-700 font-bold">{adminCount}</strong>
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">
+                  2FA защита: <strong className="text-emerald-700 font-bold">{enabledTwoFactorCount}</strong>
+                </span>
+              </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddUser(true)}
+                  className="sm:hidden inline-flex items-center gap-1 text-xs font-semibold text-slate-900 hover:underline"
+                >
+                  <Plus size={13} />
+                  <span>Добавить</span>
+                </button>
+              )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200/80 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th className="px-3.5 py-2.5">Пользователь</th>
+                    <th className="px-3.5 py-2.5">Роль</th>
+                    <th className="px-3.5 py-2.5">Склад доступа</th>
+                    <th className="px-3.5 py-2.5">2FA</th>
+                    <th className="px-3.5 py-2.5">Разрешения</th>
+                    <th className="px-3.5 py-2.5 text-right">Действия</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {users.map((u) => {
+                    const uRole = String(u.role || '').toUpperCase();
+                    return (
+                      <tr key={u.id} className="transition-colors hover:bg-slate-50/70">
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 font-bold text-xs text-slate-700">
+                              {u.username[0]?.toUpperCase()}
+                            </div>
+                            <span>{u.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <span
+                            className={clsx(
+                              'inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                              uRole === 'ADMIN'
+                                ? 'bg-violet-100 text-violet-700'
+                                : uRole === 'MANAGER'
+                                ? 'bg-sky-100 text-sky-700'
+                                : uRole === 'CUSTOMER'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-100 text-slate-700'
+                            )}
+                          >
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-600">
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            {u.warehouse?.name || 'Все склады'}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <span
+                            className={clsx(
+                              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                              u.twoFactorEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            )}
+                          >
+                            <ShieldCheck size={12} className={u.twoFactorEnabled ? 'text-emerald-600' : 'text-slate-400'} />
+                            <span>{u.twoFactorEnabled ? 'Включена' : 'Выкл'}</span>
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {u.canCancelInvoices && (
+                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200/60">
+                                Отмена накл.
+                              </span>
+                            )}
+                            {u.canDeleteData && (
+                              <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 border border-rose-200/60">
+                                Удаление
+                              </span>
+                            )}
+                            {!u.canCancelInvoices && !u.canDeleteData && (
+                              <span className="text-slate-400 text-[11px]">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setShowUserTwoFactorModal(true);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-600 transition-colors"
+                                title="2FA защита"
+                              >
+                                <ShieldCheck size={14} />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setNewUser({
+                                    username: u.username || '',
+                                    password: '',
+                                    confirmPassword: '',
+                                    role: u.role || 'SELLER',
+                                    warehouseId: u.warehouseId ? String(u.warehouseId) : '',
+                                    customerId: u.customerId ? String(u.customerId) : '',
+                                    canCancelInvoices: !!u.canCancelInvoices,
+                                    canDeleteData: !!u.canDeleteData,
+                                  });
+                                  setShowEditUser(true);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                                title="Редактировать"
+                              >
+                                <Edit size={14} />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setShowDeleteUserConfirm(true);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                title="Удалить"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="space-y-2.5 md:hidden">
+              {users.map((u) => {
+                const uRole = String(u.role || '').toUpperCase();
+                return (
+                  <div key={u.id} className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
+                          {u.username[0]?.toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">{u.username}</p>
+                          <span
+                            className={clsx(
+                              'inline-flex items-center rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider',
+                              uRole === 'ADMIN'
+                                ? 'bg-violet-100 text-violet-700'
+                                : uRole === 'MANAGER'
+                                ? 'bg-sky-100 text-sky-700'
+                                : uRole === 'CUSTOMER'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-100 text-slate-700'
+                            )}
+                          >
+                            {u.role}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isAdmin && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowUserTwoFactorModal(true);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-600"
+                          >
+                            <ShieldCheck size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setNewUser({
+                                username: u.username || '',
+                                password: '',
+                                confirmPassword: '',
+                                role: u.role || 'SELLER',
+                                warehouseId: u.warehouseId ? String(u.warehouseId) : '',
+                                customerId: u.customerId ? String(u.customerId) : '',
+                                canCancelInvoices: !!u.canCancelInvoices,
+                                canDeleteData: !!u.canDeleteData,
+                              });
+                              setShowEditUser(true);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setShowDeleteUserConfirm(true);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        {u.warehouse?.name || 'Все склады'}
+                      </span>
+                      <span
+                        className={clsx(
+                          'inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold',
+                          u.twoFactorEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        )}
+                      >
+                        <ShieldCheck size={12} />
+                        <span>{u.twoFactorEnabled ? '2FA вкл' : '2FA выкл'}</span>
+                      </span>
+                      {u.canCancelInvoices && (
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Отмена
+                        </span>
+                      )}
+                      {u.canDeleteData && (
+                        <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                          Удаление
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: COMPANY PROFILE (GENERAL) */}
+        {activeTab === 'general' && canManageSettings && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_0.9fr]">
+            {/* Form Column */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <MapPin size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Реквизиты компании для печати</h3>
+                  <p className="text-xs text-slate-500">Автоматически подставляются в печатные чеки и накладные</p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Текущий раздел</p>
-                <div className={clsx('mt-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border shadow-2xs', currentTabMeta.accent)}>
-                  <currentTabMeta.icon size={18} />
+              <form id="company-profile-form" onSubmit={handleSaveCompanyProfile} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Название компании</label>
+                  <input
+                    type="text"
+                    required
+                    value={companyProfile.name}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, name: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                    placeholder='Напр: ООО "Оптовая База"'
+                  />
                 </div>
-                <p className="mt-2.5 text-sm font-bold text-slate-900">{currentTabMeta.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{currentTabMeta.description}</p>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Страна</label>
+                    <input
+                      type="text"
+                      value={companyProfile.country}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, country: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="Таджикистан"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Область / регион</label>
+                    <input
+                      type="text"
+                      value={companyProfile.region}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, region: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="Согдийская область"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Город</label>
+                    <input
+                      type="text"
+                      value={companyProfile.city}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, city: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="Душанбе"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Телефон</label>
+                    <input
+                      type="text"
+                      value={companyProfile.phone}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, phone: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="+992..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Адрес</label>
+                  <input
+                    type="text"
+                    value={companyProfile.addressLine}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, addressLine: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                    placeholder="ул. Ленина, склад №4"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Примечание в чеке</label>
+                  <textarea
+                    rows={2}
+                    value={companyProfile.note}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, note: e.target.value })}
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                    placeholder="Спасибо за покупку! Товар возврату не подлежит."
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingForm}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmittingForm ? 'Сохранение...' : 'Сохранить данные компании'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Sidebar Column: Preview & System Options */}
+            <div className="space-y-4">
+              {/* Receipt Preview Card */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-2">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <FileText size={15} className="text-slate-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Вид в шапке накладной</h4>
+                </div>
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-3.5 text-center font-mono text-[11px] leading-relaxed text-slate-700">
+                  <p className="font-bold text-xs text-slate-900 uppercase tracking-wide">
+                    {companyProfile.name || 'Название компании'}
+                  </p>
+                  <p className="text-slate-500">
+                    {[companyProfile.city, companyProfile.addressLine].filter(Boolean).join(', ') || 'Город, Адрес'}
+                  </p>
+                  <p className="text-slate-500">Тел: {companyProfile.phone || '+992 ...'}</p>
+                  {companyProfile.note && (
+                    <p className="mt-1.5 pt-1.5 border-t border-slate-200 text-[10px] text-slate-400 italic">
+                      "{companyProfile.note}"
+                    </p>
+                  )}
+                </div>
               </div>
-            </aside>
 
-            <div className="min-w-0 space-y-8">
+              {/* Price Visibility Card */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-2.5">
+                <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
+                  <Eye size={15} className="text-slate-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Цены в каталоге</h4>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'everyone', label: 'Всем', desc: 'Цены видны всем посетителям' },
+                    { id: 'in_stock', label: 'Только в наличии', desc: 'Скрывать, если остаток 0' },
+                    { id: 'nobody', label: 'Никому', desc: 'Цены скрыты для гостей' },
+                  ].map((option) => {
+                    const isSelected = (settings.priceVisibility || 'everyone') === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => handleUpdateSetting('priceVisibility', option.id)}
+                        className={clsx(
+                          'flex w-full items-center justify-between rounded-xl border p-2.5 text-left transition-all',
+                          isSelected
+                            ? 'border-amber-400 bg-amber-50/60 shadow-2xs'
+                            : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50/50'
+                        )}
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">{option.label}</p>
+                          <p className="text-[10px] text-slate-500">{option.desc}</p>
+                        </div>
+                        <div
+                          className={clsx(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                            isSelected ? 'border-amber-500 bg-amber-500 text-white' : 'border-slate-300'
+                          )}
+                        >
+                          {isSelected && <CheckCircle2 size={12} />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
+              {/* Security Hint */}
+              <div className="flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-800">
+                <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="leading-snug">
+                  Реквизиты и видимость цен обновляются сразу для всех сотрудников и клиентов в каталоге.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: MY PROFILE */}
+        {activeTab === 'profile' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Account Info & Password Form */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <User size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Учётные данные</h3>
+                  <p className="text-xs text-slate-500">Изменение логина и пароля текущей сессии</p>
+                </div>
+              </div>
+
+              {/* User Overview Badges */}
+              <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center text-xs">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Логин</p>
+                  <p className="mt-0.5 font-bold text-slate-900 truncate">{currentUser.username || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Роль</p>
+                  <p className="mt-0.5 font-bold text-slate-900 truncate">{role}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Склад</p>
+                  <p className="mt-0.5 font-bold text-slate-900 truncate">{currentUserWarehouseLabel}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateProfile} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Логин</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.username}
+                    onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Новый пароль <span className="text-slate-400 font-normal">(если меняете)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={profileForm.password}
+                    onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Повтор нового пароля</label>
+                  <input
+                    type="password"
+                    required={Boolean(profileForm.password)}
+                    value={profileForm.confirmPassword}
+                    onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingForm}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmittingForm ? 'Сохранение...' : 'Обновить профиль'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* 2FA Card */}
+            <div>
+              <TwoFactorSettingsCard currentUser={currentUser} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* MODAL: ADD / EDIT WAREHOUSE */}
       <AnimatePresence>
         {(showAddWarehouse || showEditWarehouse) && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeWarehouseModal}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-xs sm:items-center sm:p-4"
           >
             <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              initial={{ scale: 0.94, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[94vh] w-full max-w-md overflow-y-auto rounded-t-4xl bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:max-h-[92vh] sm:rounded-[2.5rem]"
+              className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:rounded-3xl"
             >
-              <div className="relative overflow-hidden border-b border-slate-100 bg-linear-to-br from-sky-50 via-white to-white p-5 sm:p-8">
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-sky-200/30 blur-2xl" />
-                <div className="relative flex items-center justify-between">
-                  <h3 className="flex items-center space-x-3.5">
-                    <div className="rounded-2xl bg-linear-to-br from-sky-500 to-sky-600 p-3 text-white shadow-lg shadow-sky-500/30 ring-4 ring-sky-500/10">
-                      <Warehouse size={22} />
-                    </div>
-                    <span className="flex flex-col">
-                      <span className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                        {showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}
-                      </span>
-                      <span className="text-xs font-medium text-slate-400">
-                        {showEditWarehouse ? 'Обновите данные точки хранения' : 'Добавьте новую точку хранения'}
-                      </span>
-                    </span>
-                  </h3>
-                  <button
-                    onClick={closeWarehouseModal}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X size={20} />
-                  </button>
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 sm:px-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+                    <Warehouse size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {showEditWarehouse ? 'Редактировать склад' : 'Новый склад'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Данные точки хранения</p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeWarehouseModal}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="space-y-4 p-5 sm:p-8">
-                <div className="space-y-4">
+
+              <form onSubmit={showEditWarehouse ? handleEditWarehouse : handleAddWarehouse} className="space-y-3 p-4 sm:p-5">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Название склада</label>
+                  <input
+                    type="text"
+                    required
+                    value={warehouseForm.name}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-sky-300 focus:bg-white"
+                    placeholder="Напр: Основной склад"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Название</label>
-                    <div className="relative">
-                      <Building2 size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={warehouseForm.name}
-                        onChange={e => setWarehouseForm({...warehouseForm, name: e.target.value})}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                        placeholder="Напр: Основной склад"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Город</label>
-                      <div className="relative">
-                        <MapPin size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          required
-                          value={warehouseForm.city}
-                          onChange={e => setWarehouseForm({...warehouseForm, city: e.target.value})}
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                          placeholder="Душанбе"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Телефон</label>
-                      <div className="relative">
-                        <Phone size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={warehouseForm.phone}
-                          onChange={e => setWarehouseForm({...warehouseForm, phone: e.target.value})}
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                          placeholder="+992 900 00 00 00"
-                        />
-                      </div>
-                    </div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Город</label>
+                    <input
+                      type="text"
+                      required
+                      value={warehouseForm.city}
+                      onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-sky-300 focus:bg-white"
+                      placeholder="Душанбе"
+                    />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Адрес</label>
-                    <div className="relative">
-                      <MapPin size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={warehouseForm.address}
-                        onChange={e => setWarehouseForm({...warehouseForm, address: e.target.value})}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                        placeholder="ул. Рудаки 10"
-                      />
-                    </div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Телефон</label>
+                    <input
+                      type="text"
+                      value={warehouseForm.phone}
+                      onChange={(e) => setWarehouseForm({ ...warehouseForm, phone: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-sky-300 focus:bg-white"
+                      placeholder="+992..."
+                    />
                   </div>
                 </div>
-                <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:gap-3 sm:pt-4">
-                  <button type="button" onClick={closeWarehouseModal} className="rounded-2xl px-6 py-3.5 font-semibold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-linear-to-br from-sky-500 to-sky-600 px-8 py-3.5 font-semibold text-white shadow-lg shadow-sky-500/25 transition-all hover:shadow-xl hover:shadow-sky-500/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Адрес</label>
+                  <input
+                    type="text"
+                    value={warehouseForm.address}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-sky-300 focus:bg-white"
+                    placeholder="ул. Складская, 12"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={closeWarehouseModal}
+                    className="rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingForm}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                  >
                     {isSubmittingForm ? 'Сохранение...' : showEditWarehouse ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
@@ -693,187 +1333,175 @@ export default function SettingsView() {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
 
+      {/* MODAL: ADD / EDIT USER */}
+      <AnimatePresence>
         {(showAddUser || showEditUser) && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeUserModal}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-xs sm:items-center sm:p-4"
           >
             <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              initial={{ scale: 0.94, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-4xl bg-white shadow-[0_30px_80px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/5 sm:max-h-[88vh] sm:rounded-[2.5rem]"
+              className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:rounded-3xl"
             >
-              <div className="relative overflow-hidden border-b border-slate-100 bg-linear-to-br from-violet-50 via-white to-white p-5 sm:p-6">
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-200/30 blur-2xl" />
-                <div className="relative flex items-center justify-between">
-                  <h3 className="flex items-center space-x-3.5">
-                    <div className="rounded-2xl bg-linear-to-br from-violet-500 to-violet-600 p-3 text-white shadow-lg shadow-violet-500/30 ring-4 ring-violet-500/10">
-                      <Users size={20} />
-                    </div>
-                    <span className="flex flex-col">
-                      <span className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                        {showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}
-                      </span>
-                      <span className="text-xs font-medium text-slate-400">
-                        {showEditUser ? 'Обновите роль, склад и права доступа' : 'Создайте учётную запись сотрудника'}
-                      </span>
-                    </span>
-                  </h3>
-                  <button
-                    onClick={closeUserModal}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X size={20} />
-                  </button>
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 sm:px-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                    <Users size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {showEditUser ? 'Редактировать пользователя' : 'Новый пользователь'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Роль, склад и права доступа</p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeUserModal}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-4 p-5 sm:space-y-5 sm:p-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+
+              <form onSubmit={showEditUser ? handleEditUser : handleAddUser} className="space-y-3 p-4 sm:p-5">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Логин</label>
-                    <div className="relative">
-                      <User size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={newUser.username}
-                        onChange={e => setNewUser({...newUser, username: e.target.value})}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                        placeholder="username"
-                      />
-                    </div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Логин</label>
+                    <input
+                      type="text"
+                      required
+                      value={newUser.username}
+                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                      placeholder="username"
+                    />
                   </div>
+
                   <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      {showEditUser ? 'Новый пароль (необязательно)' : 'Пароль'}
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Роль</label>
+                    <select
+                      value={newUser.role}
+                      onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                    >
+                      <option value="ADMIN">Администратор</option>
+                      <option value="MANAGER">Менеджер</option>
+                      <option value="SELLER">Продавец</option>
+                      <option value="CUSTOMER">Клиент</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">
+                      {showEditUser ? 'Новый пароль (необяз.)' : 'Пароль'}
                     </label>
-                    <div className="relative">
-                      <Lock size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="password"
-                        required={!showEditUser}
-                        value={newUser.password}
-                        onChange={e => setNewUser({...newUser, password: e.target.value})}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                    <p className="mt-1.5 text-[11px] font-medium leading-5 text-slate-400">
-                      Минимум 8 символов: большая, маленькая буква и цифра.
-                    </p>
+                    <input
+                      type="password"
+                      required={!showEditUser}
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                      placeholder="••••••••"
+                    />
                   </div>
+
                   <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Повтор нового пароля</label>
-                    <div className="relative">
-                      <Lock size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="password"
-                        required={!showEditUser || Boolean(newUser.password)}
-                        value={newUser.confirmPassword}
-                        onChange={e => setNewUser({...newUser, confirmPassword: e.target.value})}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-4 font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                        placeholder="••••••••"
-                      />
-                    </div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">Повтор пароля</label>
+                    <input
+                      type="password"
+                      required={!showEditUser || Boolean(newUser.password)}
+                      value={newUser.confirmPassword}
+                      onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                      placeholder="••••••••"
+                    />
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Роль</label>
-                    <div className="relative">
-                      <Shield size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <select
-                        value={newUser.role}
-                        onChange={e => setNewUser({...newUser, role: e.target.value})}
-                        className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                      >
-                        <option value="ADMIN">Админ</option>
-                        <option value="MANAGER">Менеджер</option>
-                        <option value="SELLER">Продавец</option>
-                        <option value="CUSTOMER">Клиент</option>
-                      </select>
-                      <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    </div>
-                  </div>
+
                   {warehouses.length > 1 && (
-                    <div>
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Склад</label>
-                      <div className="relative">
-                        <Warehouse size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <select
-                          value={newUser.warehouseId}
-                          onChange={e => setNewUser({...newUser, warehouseId: e.target.value})}
-                          className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                        >
-                          <option value="">Все склады</option>
-                          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                        </select>
-                        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">Склад доступа</label>
+                      <select
+                        value={newUser.warehouseId}
+                        onChange={(e) => setNewUser({ ...newUser, warehouseId: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                      >
+                        <option value="">Все склады</option>
+                        {warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
-                  {String(newUser.role || '').toUpperCase() !== 'CUSTOMER' && String(newUser.role || '').toUpperCase() !== 'ADMIN' && (
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:col-span-2">
-                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        <ShieldAlert size={14} className="text-slate-400" />
-                        Дополнительные права
-                      </label>
-                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 shadow-xs">
-                        <span className="text-sm font-medium text-slate-700">Может отменять накладные</span>
-                        <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+
+                  {String(newUser.role || '').toUpperCase() === 'CUSTOMER' && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">Привязать к клиенту</label>
+                      <select
+                        value={newUser.customerId}
+                        onChange={(e) => setNewUser({ ...newUser, customerId: e.target.value })}
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                      >
+                        <option value="">Выберите клиента</option>
+                        {customerOptions.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {String(newUser.role || '').toUpperCase() !== 'CUSTOMER' &&
+                    String(newUser.role || '').toUpperCase() !== 'ADMIN' && (
+                      <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Дополнительные права</p>
+                        <label className="flex items-center justify-between text-xs font-medium text-slate-700 cursor-pointer">
+                          <span>Может отменять накладные</span>
                           <input
                             type="checkbox"
                             checked={newUser.canCancelInvoices}
-                            onChange={e => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
-                            className="peer sr-only"
+                            onChange={(e) => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                           />
-                          <span className="absolute inset-0 rounded-full bg-slate-200 transition-colors peer-checked:bg-violet-500" />
-                          <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-white px-3.5 py-2.5 shadow-xs">
-                        <span className="text-sm font-medium text-slate-700">Может удалять данные</span>
-                        <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+                        </label>
+                        <label className="flex items-center justify-between text-xs font-medium text-slate-700 cursor-pointer">
+                          <span>Может удалять данные</span>
                           <input
                             type="checkbox"
                             checked={newUser.canDeleteData}
-                            onChange={e => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
-                            className="peer sr-only"
+                            onChange={(e) => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                           />
-                          <span className="absolute inset-0 rounded-full bg-slate-200 transition-colors peer-checked:bg-violet-500" />
-                          <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                  {String(newUser.role || '').toUpperCase() === 'CUSTOMER' && (
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Клиент</label>
-                      <div className="relative">
-                        <User size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <select
-                          value={newUser.customerId}
-                          onChange={e => setNewUser({...newUser, customerId: e.target.value})}
-                          required
-                          className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/60 py-3.5 pl-11 pr-10 font-medium text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
-                        >
-                          <option value="">Выберите клиента</option>
-                          {customerOptions.map(customer => (
-                            <option key={customer.id} value={customer.id}>{customer.name}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        </label>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
 
-                <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end sm:gap-3 sm:pt-6">
-                  <button type="button" onClick={closeUserModal} className="rounded-2xl px-6 py-3 font-semibold text-slate-500 transition-all hover:bg-slate-50">Отмена</button>
-                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-linear-to-br from-violet-500 to-violet-600 px-8 py-3 font-semibold text-white shadow-lg shadow-violet-500/25 transition-all hover:shadow-xl hover:shadow-violet-500/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={closeUserModal}
+                    className="rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingForm}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                  >
                     {isSubmittingForm ? 'Сохранение...' : showEditUser ? 'Сохранить' : 'Создать'}
                   </button>
                 </div>
@@ -883,8 +1511,9 @@ export default function SettingsView() {
         )}
       </AnimatePresence>
 
+      {/* CONFIRMATION & 2FA MODALS */}
       <React.Suspense fallback={null}>
-        <ConfirmationModal 
+        <ConfirmationModal
           key={selectedWarehouse?.id || 'delete-warehouse'}
           isOpen={Boolean(showDeleteWarehouseConfirm && selectedWarehouse)}
           onClose={closeDeleteWarehouseConfirm}
@@ -910,633 +1539,15 @@ export default function SettingsView() {
         />
       </React.Suspense>
 
-      {activeTab === 'warehouses' && (
-        <div className="space-y-5">
-          <div className="overflow-hidden rounded-[28px] border border-sky-100 bg-linear-to-br from-sky-50 via-white to-slate-50 shadow-[0_16px_40px_-30px_rgba(14,165,233,0.24)]">
-            <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-[1.4fr_0.9fr]">
-              <div className="rounded-3xl border border-white/80 bg-white/80 p-5 backdrop-blur">
-                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/20 ring-4 ring-sky-100">
-                  <Warehouse size={26} />
-                </div>
-                <h3 className="mt-4 text-2xl font-medium tracking-tight text-slate-900">Склады и точки</h3>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Управляйте филиалами, адресами и основным складом в одном аккуратном списке.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Всего складов</p>
-                  <p className="mt-2 text-xl font-medium text-slate-900">{warehouses.length}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Основной склад</p>
-                  <p className="mt-2 text-xl font-medium text-slate-900">{warehouses.find((warehouse) => warehouse.isDefault)?.name || 'Не выбран'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
-          {paginatedWarehouses.map(w => (
-            <div key={w.id} className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-8">
-              <div className="mb-6 flex items-start justify-between sm:mb-8">
-                <div className="rounded-2xl bg-sky-100 p-4 text-sky-700 shadow-inner transition-all duration-500 group-hover:bg-sky-500 group-hover:text-white">
-                  <Warehouse size={28} />
-                </div>
-                <div className="flex space-x-1 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
-                  <button 
-                    onClick={() => {
-                      setSelectedWarehouse(w);
-                      setWarehouseForm({ 
-                        name: w.name || '', 
-                        city: w.city || '', 
-                        address: w.address || '',
-                        phone: w.phone || ''
-                      });
-                      setShowEditWarehouse(true);
-                    }}
-                    className="p-3 bg-white text-slate-400 hover:text-slate-700 rounded-xl shadow-sm border border-slate-100 transition-all"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button 
-                    type="button"
-                    disabled={isDeletingWarehouse}
-                    onClick={() => {
-                      openDeleteWarehouseConfirm(w);
-                    }}
-                    className="p-3 bg-white text-slate-400 hover:text-rose-600 rounded-xl shadow-sm border border-slate-100 transition-all disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <h3 className="wrap-break-word text-xl font-semibold text-slate-900">{w.name}</h3>
-                {w.isDefault && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-                    <Star size={12} />
-                    Основной
-                  </span>
-                )}
-              </div>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-start text-slate-500 font-medium">
-                  <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 text-slate-400">
-                    <MapPin size={16} />
-                  </div>
-                  <span className="wrap-break-word">{[w.city, w.address].filter(Boolean).join(', ') || 'Адрес не указан'}</span>
-                </div>
-                <div className="flex items-start text-slate-500 font-medium">
-                  <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 text-slate-400">
-                    <Phone size={16} />
-                  </div>
-                  <span className="wrap-break-word">{w.phone || 'Телефон не указан'}</span>
-                </div>
-                {isAdmin && !w.isDefault && (
-                  <button
-                    type="button"
-                    onClick={() => handleSetDefaultWarehouse(w.id)}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-100"
-                  >
-                    <Star size={16} />
-                    Сделать основным
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          <button 
-            onClick={() => { resetWarehouseForm(); setShowAddWarehouse(true); }}
-            className="flex flex-col items-center justify-center space-y-4 rounded-3xl border-2 border-dashed border-sky-200 p-8 text-sky-300 transition-all group hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-          >
-            <div className="rounded-3xl bg-sky-50 p-5 transition-all duration-500 group-hover:bg-white group-hover:shadow-lg">
-              <Plus size={32} />
-            </div>
-            <span className="font-semibold uppercase tracking-widest text-sm">Добавить склад</span>
-          </button>
-        </div>
-
-          {warehouses.length > warehousesPageSize && (
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <PaginationControls
-                currentPage={warehousePage}
-                totalPages={warehousesTotalPages}
-                totalItems={warehouses.length}
-                pageSize={warehousesPageSize}
-                onPageChange={setWarehousePage}
-                className="border-t-0"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'users' && (
-        <div className="space-y-6">
-          <div className="overflow-hidden rounded-[28px] border border-violet-100 bg-linear-to-br from-violet-50 via-white to-slate-50 shadow-[0_16px_40px_-30px_rgba(124,58,237,0.28)]">
-            <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-[1.35fr_0.85fr]">
-              <div className="rounded-3xl border border-white/80 bg-white/80 p-5 backdrop-blur">
-                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-lg shadow-violet-500/20 ring-4 ring-violet-100">
-                  <Users size={26} />
-                </div>
-                <h2 className="mt-4 text-2xl font-medium tracking-tight text-slate-900">Пользователи системы</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  Управляйте ролями, складами доступа и статусом двухфакторной защиты в одном месте.
-                </p>
-              </div>
-              {isAdmin && (
-                <div className="rounded-3xl border border-white/80 bg-white/80 p-4 backdrop-blur">
-                  <button
-                    onClick={() => setShowAddUser(true)}
-                    className="inline-flex min-h-22 w-full items-center justify-center gap-2.5 rounded-[18px] bg-violet-500 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-600 active:scale-95"
-                  >
-                    <Plus size={18} />
-                    <span>Добавить пользователя</span>
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-3 border-t border-violet-100/80 bg-white/70 p-5 sm:grid-cols-3 sm:p-6">
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Всего пользователей</p>
-                <p className="mt-2 text-xl font-medium text-slate-900">{users.length}</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600">2FA включена</p>
-                <p className="mt-2 text-xl font-medium text-emerald-700">{enabledTwoFactorCount}</p>
-              </div>
-              <div className="rounded-2xl border border-violet-100 bg-violet-50/80 px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-600">Администраторы</p>
-                <p className="mt-2 text-xl font-medium text-violet-700">{adminCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4 md:hidden">
-            {users.map(u => (
-              <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
-                      {u.username[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-xl font-semibold text-slate-900">{u.username}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          {u.warehouse?.name || 'Все склады'}
-                        </span>
-                        <span className={clsx(
-                          "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
-                          String(u.role || '').toUpperCase() === 'ADMIN'
-                            ? 'bg-violet-100 text-violet-700'
-                            : String(u.role || '').toUpperCase() === 'MANAGER'
-                              ? 'bg-sky-100 text-sky-700'
-                              : 'bg-slate-100 text-slate-600'
-                        )}>
-                          {u.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {isAdmin && (
-                    <button
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setNewUser({
-                          username: u.username || '',
-                          password: '',
-                          confirmPassword: '',
-                          role: u.role || 'SELLER',
-                          warehouseId: u.warehouseId ? String(u.warehouseId) : '',
-                          customerId: u.customerId ? String(u.customerId) : '',
-                          canCancelInvoices: !!u.canCancelInvoices,
-                          canDeleteData: !!u.canDeleteData
-                        });
-                        setShowEditUser(true);
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500"
-                    >
-                      <Edit size={18} />
-                    </button>
-                  )}
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Роль</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{u.role}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">2FA</p>
-                    <p className={`mt-1 text-sm font-medium ${u.twoFactorEnabled ? 'text-emerald-600' : 'text-slate-900'}`}>
-                      {u.twoFactorEnabled ? 'Включена' : 'Выключена'}
-                    </p>
-                  </div>
-                </div>
-                {isAdmin && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setShowDeleteUserConfirm(true);
-                      }}
-                      className="rounded-2xl border border-rose-100 px-4 py-3 text-rose-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm md:block">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                <tr>
-                  <th className="px-10 py-6">Пользователь</th>
-                  <th className="px-10 py-6">Роль</th>
-                  <th className="px-10 py-6">2FA</th>
-                  <th className="px-10 py-6 text-right">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {users.map(u => (
-                  <tr key={u.id} className="group transition-colors hover:bg-violet-50/20">
-                    <td className="px-10 py-6">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-semibold text-lg group-hover:bg-slate-900 group-hover:text-white transition-all duration-500">
-                          {u.username[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900 text-lg">{u.username}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                              {u.warehouse?.name || 'Все склады'}
-                            </span>
-                            <span className={clsx(
-                              "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
-                              String(u.role || '').toUpperCase() === 'ADMIN'
-                                ? 'bg-violet-100 text-violet-700'
-                                : String(u.role || '').toUpperCase() === 'MANAGER'
-                                  ? 'bg-sky-100 text-sky-700'
-                                  : 'bg-slate-100 text-slate-600'
-                            )}>
-                              {u.role}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center space-x-3">
-                        <div className={clsx(
-                          "p-2 rounded-xl",
-                          u.role === 'ADMIN' ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'
-                        )}>
-                          <Shield size={18} />
-                        </div>
-                        <span className="font-semibold text-slate-600 tracking-tight">{u.role}</span>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center space-x-3">
-                        <div className={clsx(
-                          'p-2 rounded-xl',
-                          u.twoFactorEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'
-                        )}>
-                          <ShieldCheck size={18} />
-                        </div>
-                        <span className={clsx(
-                          'font-semibold tracking-tight',
-                          u.twoFactorEnabled ? 'text-emerald-600' : 'text-slate-500'
-                        )}>
-                          {u.twoFactorEnabled ? 'Включена' : 'Выключена'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6 text-right">
-                      <div className="flex justify-end space-x-2 opacity-100 transition-all duration-300 sm:opacity-0 sm:group-hover:opacity-100">
-                        {isAdmin ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setShowUserTwoFactorModal(true);
-                            }}
-                            className="text-slate-300 hover:text-violet-600 p-3 hover:bg-violet-50 rounded-xl transition-all"
-                            title="Управлять 2FA"
-                          >
-                            <ShieldCheck size={20} />
-                          </button>
-                        ) : null}
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setNewUser({
-                                username: u.username || '',
-                                password: '',
-                                confirmPassword: '',
-                                role: u.role || 'SELLER',
-                                warehouseId: u.warehouseId ? String(u.warehouseId) : '',
-                                customerId: u.customerId ? String(u.customerId) : '',
-                                canCancelInvoices: !!u.canCancelInvoices,
-                                canDeleteData: !!u.canDeleteData
-                              });
-                              setShowEditUser(true);
-                            }}
-                            className="text-slate-300 hover:text-slate-700 p-3 hover:bg-slate-100 rounded-xl transition-all"
-                          >
-                            <Edit size={20} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setShowDeleteUserConfirm(true);
-                            }}
-                            className="text-slate-300 hover:text-rose-600 p-3 hover:bg-rose-50 rounded-xl transition-all"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       <UserTwoFactorModal
         isOpen={showUserTwoFactorModal}
         user={selectedUser}
-        onClose={() => {
-          closeUserTwoFactor();
-        }}
+        onClose={closeUserTwoFactor}
         onUpdated={() => {
+          closeUserTwoFactor();
           fetchData();
         }}
       />
-
-      {activeTab === 'profile' && (
-        <div className="max-w-4xl space-y-8">
-          <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-linear-to-br from-emerald-50 via-white to-slate-50 shadow-[0_16px_40px_-30px_rgba(16,185,129,0.28)]">
-            <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-[1.4fr_0.9fr]">
-              <div className="rounded-3xl border border-white/80 bg-white/80 p-5 backdrop-blur">
-                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 ring-4 ring-emerald-100">
-                  <User size={26} />
-                </div>
-                <h3 className="mt-4 text-2xl font-medium tracking-tight text-slate-900">Мой профиль</h3>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Изменяйте данные входа и держите аккаунт защищённым без лишних переходов между экранами.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Текущий логин</p>
-                  <p className="mt-2 text-xl font-medium text-slate-900">{profileForm.username || '—'}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Склад доступа</p>
-                  <p className="mt-2 text-xl font-medium text-slate-900">{currentUserWarehouseLabel}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
-            <h3 className="mb-8 flex items-center space-x-3 text-2xl font-medium text-slate-900">
-              <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
-                <Shield size={28} />
-              </div>
-              <span>Данные входа</span>
-            </h3>
-            <form onSubmit={handleUpdateProfile} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Логин</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={profileForm.username}
-                  onChange={e => setProfileForm({...profileForm, username: e.target.value})}
-                  className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Новый пароль (оставьте пустым, если не хотите менять)</label>
-                <input 
-                  type="password" 
-                  value={profileForm.password}
-                  onChange={e => setProfileForm({...profileForm, password: e.target.value})}
-                  className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                  placeholder="••••••••"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Повтор нового пароля</label>
-                <input 
-                  type="password" 
-                  required={Boolean(profileForm.password)}
-                  value={profileForm.confirmPassword}
-                  onChange={e => setProfileForm({...profileForm, confirmPassword: e.target.value})}
-                  className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-slate-300/40 focus:border-slate-300 transition-all font-medium" 
-                  placeholder="••••••••"
-                />
-              </div>
-              <div className="pt-4">
-                <button type="submit" disabled={isSubmittingForm} className="w-full rounded-2xl bg-emerald-500 py-5 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
-                  {isSubmittingForm ? 'Сохранение...' : 'Сохранить изменения'}
-                </button>
-              </div>
-            </form>
-          </div>
-          <TwoFactorSettingsCard currentUser={currentUser} />
-        </div>
-      )}
-      {activeTab === 'general' && (
-          <div className="max-w-5xl space-y-8">
-            <div className="overflow-hidden rounded-[28px] border border-amber-100 bg-linear-to-br from-amber-50 via-white to-slate-50 shadow-[0_16px_40px_-30px_rgba(245,158,11,0.28)]">
-              <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-[1.4fr_0.9fr]">
-                <div className="rounded-3xl border border-white/80 bg-white/80 p-5 backdrop-blur">
-                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/20 ring-4 ring-amber-100">
-                    <SettingsIcon size={26} />
-                  </div>
-                  <h3 className="mt-4 text-2xl font-medium tracking-tight text-slate-900">Общие настройки</h3>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                    Здесь находятся реквизиты компании для печати, параметры каталога и важные системные напоминания.
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Предпросмотр печати</p>
-                  <div className="mt-3 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-700">
-                    {companyPreviewLines.length > 0 ? (
-                      companyPreviewLines.map((line) => (
-                        <p key={line} className="wrap-break-word">{line}</p>
-                      ))
-                    ) : (
-                      <p className="text-slate-400">Данные компании пока не заполнены</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-10 rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
-              <div>
-                <h3 className="flex items-center space-x-3 text-2xl font-medium text-slate-900">
-                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                    <MapPin size={28} />
-                  </div>
-                  <span>Данные компании для печати</span>
-                </h3>
-                <p className="text-slate-500 mt-3 font-medium">Эти данные будут подставляться в печатную накладную. После изменения новые данные будут печататься автоматически.</p>
-              </div>
-
-              <form id="company-profile-form" onSubmit={handleSaveCompanyProfile} className="space-y-5">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Название компании</label>
-                    <input
-                      type="text"
-                      required
-                      value={companyProfile.name}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, name: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder='Например: ООО "Имдоди Шифо"'
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Страна</label>
-                    <input
-                      type="text"
-                      value={companyProfile.country}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, country: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder="Республика Таджикистан"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Область / регион</label>
-                    <input
-                      type="text"
-                      value={companyProfile.region}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, region: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder="Согдийская область"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Город</label>
-                    <input
-                      type="text"
-                      value={companyProfile.city}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, city: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder="г. Истаравшан"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Телефон</label>
-                    <input
-                      type="text"
-                      value={companyProfile.phone}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, phone: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder="+992..."
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Адрес</label>
-                    <input
-                      type="text"
-                      value={companyProfile.addressLine}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, addressLine: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium"
-                      placeholder="Дж. Гули Сурх, т/ц Хочи Хаит"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 uppercase tracking-widest">Примечание</label>
-                    <textarea
-                      rows={3}
-                      value={companyProfile.note}
-                      onChange={(e) => setCompanyProfile({ ...companyProfile, note: e.target.value })}
-                      className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-emerald-300/30 focus:border-emerald-300 transition-all font-medium resize-none"
-                      placeholder="Дополнительная строка для печати, если нужна"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button type="submit" disabled={isSubmittingForm} className="rounded-2xl bg-emerald-500 px-6 py-4 font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
-                    {isSubmittingForm ? 'Сохранение...' : 'Сохранить данные компании'}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div className="space-y-10 rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
-              <div>
-                <h3 className="flex items-center space-x-3 text-2xl font-medium text-slate-900">
-                <div className="p-3 bg-slate-100 text-slate-700 rounded-2xl">
-                  <Eye size={28} />
-                </div>
-                <span>Видимость цен в каталоге</span>
-              </h3>
-              <p className="text-slate-500 mt-3 font-medium">Выберите, кто может видеть цены товаров в публичном каталоге.</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5">
-              {[
-                { id: 'everyone', label: 'Всем', desc: 'Цены видны всем посетителям каталога' },
-                { id: 'in_stock', label: 'Только при наличии', desc: 'Цены видны только для товаров, которые есть на складе' },
-                { id: 'nobody', label: 'Никому', desc: 'Цены скрыты для всех посетителей' }
-              ].map(option => (
-                <button 
-                  key={option.id}
-                  onClick={() => handleUpdateSetting('priceVisibility', option.id)}
-                  className={`flex items-center justify-between p-8 rounded-4xl border-2 transition-all text-left group ${settings.priceVisibility === option.id ? 'border-amber-400 bg-amber-50/80' : 'border-slate-50 hover:border-amber-100 hover:bg-amber-50/40'}`}
-                >
-                  <div>
-                    <p className="font-semibold text-slate-900 text-lg">{option.label}</p>
-                    <p className="text-sm text-slate-500 font-medium mt-1">{option.desc}</p>
-                  </div>
-                  <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${settings.priceVisibility === option.id ? 'bg-amber-500 border-amber-500 shadow-lg shadow-amber-500/20' : 'border-slate-200'}`}>
-                    {settings.priceVisibility === option.id && <CheckCircle2 size={18} className="text-white" />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.18)] sm:p-10">
-            <h3 className="mb-8 flex items-center space-x-3 text-2xl font-medium text-slate-900">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
-                <Lock size={28} />
-              </div>
-              <span>Безопасность</span>
-            </h3>
-            <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 flex items-start space-x-4">
-              <Shield className="text-rose-600 shrink-0 mt-1" size={24} />
-              <p className="text-sm text-rose-700 font-medium leading-relaxed">
-                Некоторые настройки прав доступа могут повлиять на целостность данных. Рекомендуется выдавать права на удаление только доверенным администраторам.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-            </div>
-          </div>
-        </section>
-      </div>
     </div>
   );
 }
