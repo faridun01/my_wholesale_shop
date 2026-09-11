@@ -371,22 +371,34 @@ export default function CustomerView() {
     setCurrentPage(1);
   }, [searchTerm, segmentFilter, sortBy]);
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const openEditCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData({
+      customerType: customer.customerType || 'individual',
+      name: customer.name || '',
+      customerCategory: customer.customerCategory || '',
+      companyName: customer.companyName || '',
+      contactName: customer.contactName || '',
+      phone: customer.phone || '',
+      country: customer.country || 'Таджикистан',
+      region: customer.region || '',
+      city: customer.city || '',
+      address: customer.address || '',
+      notes: customer.notes || '',
+    });
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
-        {/* Top Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        {/* Top Header for Desktop */}
+        <div className="hidden lg:flex lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Клиенты</h1>
             <p className="mt-0.5 text-xs text-slate-500">База клиентов, детальные акты сверки и истории продаж по накладным.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={handlePrintAllReconciliation}
@@ -410,8 +422,43 @@ export default function CustomerView() {
           </div>
         </div>
 
-        {/* Sub Navigation Tabs */}
-        <div className="flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
+        {/* Mobile Header Bar: Tabs + Quick Actions */}
+        <div className="flex items-center justify-between gap-2 lg:hidden">
+          <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white p-1 shadow-xs">
+            <NavLink to="/customers" end className={sectionTabClassName}>
+              Клиенты
+            </NavLink>
+            <NavLink to="/customers/debts" className={sectionTabClassName}>
+              Долги
+            </NavLink>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handlePrintAllReconciliation}
+              disabled={isPrintingReconciliation || customers.length === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              title="Общий акт сверки"
+            >
+              <Printer size={14} />
+            </button>
+            <button
+              onClick={() => {
+                setSelectedCustomer(null);
+                setFormData(emptyForm);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+            >
+              <Plus size={14} />
+              <span>Новый</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Tabs */}
+        <div className="hidden lg:flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
           <NavLink to="/customers" end className={sectionTabClassName}>
             База клиентов
           </NavLink>
@@ -421,145 +468,163 @@ export default function CustomerView() {
         </div>
 
         {/* Search & Filter Toolbar */}
-        <div className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-xs space-y-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-2xl lg:rounded-[28px] border border-slate-200/70 bg-white p-2.5 sm:p-4 shadow-xs space-y-2 sm:space-y-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3 sm:gap-3">
             <div className="relative md:col-span-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
                 type="text"
-                placeholder="Поиск по имени или телефону..."
-                className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                placeholder={customers.length > 0 ? `Поиск среди ${customers.length} клиентов...` : 'Поиск по имени или телефону...'}
+                className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2 sm:py-2.5 pl-10 pr-8 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Очистить"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <select
-              value={segmentFilter}
-              onChange={(e) => setSegmentFilter(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-            >
-              <option value="all">Все категории</option>
-              <option value="VIP">VIP</option>
-              <option value="Постоянный">Постоянный</option>
-              <option value="Обычный">Обычный</option>
-              <option value="Новый">Новый</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-            >
-              <option value="strength">Сильные сверху</option>
-              <option value="invoices">По числу накладных</option>
-              {isAdmin && <option value="amount">По сумме покупок</option>}
-              {isAdmin && <option value="balance">По долгу</option>}
-              <option value="lastPurchase">По последней покупке</option>
-            </select>
+
+            <div className="grid grid-cols-2 gap-2 md:col-span-2">
+              <select
+                value={segmentFilter}
+                onChange={(e) => setSegmentFilter(e.target.value)}
+                className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+              >
+                <option value="all">Все категории</option>
+                <option value="VIP">VIP</option>
+                <option value="Постоянный">Постоянный</option>
+                <option value="Обычный">Обычный</option>
+                <option value="Новый">Новый</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+              >
+                <option value="strength">Сильные сверху</option>
+                <option value="invoices">По накладным</option>
+                {isAdmin && <option value="amount">По покупкам</option>}
+                {isAdmin && <option value="balance">По долгу</option>}
+                <option value="lastPurchase">По последней</option>
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Customer Cards Grid */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {paginatedCustomers.map((customer) => (
             <motion.div layout key={customer.id} className="h-full">
-              <div className="flex h-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+              <div className="flex h-full flex-col justify-between rounded-2xl sm:rounded-[28px] border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
                 <div>
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 font-semibold">
-                      <User size={22} strokeWidth={2} />
+                  {/* Top Row: Avatar + Name + Badges + Edit/Delete */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-sky-50 text-sky-600 font-bold text-xs sm:text-base">
+                      {(customer.name || 'К').slice(0, 1).toUpperCase()}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setFormData({
-                            customerType: customer.customerType || 'individual',
-                            name: customer.name || '',
-                            customerCategory: customer.customerCategory || '',
-                            companyName: customer.companyName || '',
-                            contactName: customer.contactName || '',
-                            phone: customer.phone || '',
-                            country: customer.country || 'Таджикистан',
-                            region: customer.region || '',
-                            city: customer.city || '',
-                            address: customer.address || '',
-                            notes: customer.notes || '',
-                          });
-                          setIsModalOpen(true);
-                        }}
-                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                        title="Редактировать"
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setShowDeleteConfirm(true);
-                        }}
-                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                        title="Удалить"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <h3 className="truncate text-xs sm:text-base font-bold text-slate-900 leading-snug">
+                          {customer.name}
+                        </h3>
+                        <div className="flex items-center gap-0.5 shrink-0 -mr-1 -mt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditCustomer(customer)}
+                            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                            title="Редактировать"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setShowDeleteConfirm(true);
+                            }}
+                            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                            title="Удалить"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                        {customer.customerCategory && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-600">
+                            {customer.customerCategory}
+                          </span>
+                        )}
+                        <span className={`inline-flex rounded px-1.5 py-0.2 text-[10px] font-semibold ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
+                          {customer.customer_segment || 'Новый'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <h3 className="text-base font-semibold tracking-tight text-slate-900 line-clamp-1">{customer.name}</h3>
-                  
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {customer.customerCategory && (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
-                        {customer.customerCategory}
-                      </span>
-                    )}
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${segmentTone[customer.customer_segment || ''] || 'bg-slate-100 text-slate-600'}`}>
-                      {customer.customer_segment || 'Новый'}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-xs text-slate-500">
-                    <div className="flex items-center gap-2">
-                      <Phone size={14} className="text-slate-400 shrink-0" />
-                      <span className="truncate">{customer.phone || 'Нет телефона'}</span>
+                  {/* Phone and Address */}
+                  {(customer.phone || customer.address) && (
+                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                      {customer.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone size={12} className="text-slate-400 shrink-0" />
+                          <a href={`tel:${customer.phone}`} className="truncate hover:text-slate-900 hover:underline">
+                            {customer.phone}
+                          </a>
+                        </div>
+                      )}
+                      {customer.address && (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin size={12} className="text-slate-400 shrink-0" />
+                          <span className="truncate text-slate-400">{customer.address}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-slate-400 shrink-0" />
-                      <span className="truncate">{customer.address || 'Нет адреса'}</span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Financial Stats Box */}
-                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-[#f4f5fb] p-3 text-center">
+                  <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-[#f8f9fc] p-2 sm:p-3 text-center">
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Накладные</p>
-                      <p className="mt-0.5 text-xs font-semibold text-slate-900">{formatMoneyByRole(customer.total_invoiced, true)}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Покупки</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 truncate">{formatMoneyByRole(customer.total_invoiced, true)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплачено</p>
-                      <p className="mt-0.5 text-xs font-semibold text-emerald-600">{formatMoneyByRole(customer.total_paid, true)}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Оплачено</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-bold text-emerald-600 truncate">{formatMoneyByRole(customer.total_paid, true)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Долг</p>
-                      <p className={`mt-0.5 text-xs font-semibold ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Долг</p>
+                      <p className={`mt-0.5 text-xs sm:text-sm font-bold truncate ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-2">
+                {/* Actions row */}
+                <div className="mt-2.5 grid grid-cols-2 gap-2">
                   <button
+                    type="button"
                     onClick={() => openStatement(customer)}
-                    className="flex items-center justify-center gap-1.5 rounded-full bg-slate-900 py-2 px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+                    className="flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full bg-slate-900 py-1.5 sm:py-2 px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 active:scale-[0.99]"
                   >
-                    <FileText size={14} />
+                    <FileText size={13} />
                     <span>Накладные</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handlePrintCustomerReconciliation(customer)}
-                    className="flex items-center justify-center gap-1.5 rounded-full border border-slate-200/70 bg-white py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
+                    className="flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border border-slate-200/80 bg-white py-1.5 sm:py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
                   >
-                    <Printer size={14} />
-                    <span>Детальный акт</span>
+                    <Printer size={13} />
+                    <span>Акт сверки</span>
                   </button>
                 </div>
               </div>

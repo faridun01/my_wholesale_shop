@@ -1,4 +1,15 @@
-import { ChevronDown, ChevronUp, Image as ImageIcon } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  ChevronDown,
+  History,
+  Image as ImageIcon,
+  Layers,
+  Package,
+  Pencil,
+  PlusCircle,
+  Trash2,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { formatMoney, formatPercent } from '../../utils/format';
 import { handleBrokenImage, resolveMediaUrl } from '../../utils/media';
@@ -33,15 +44,6 @@ interface ProductsMobileListProps {
   onDeleteProduct: (product: any) => void;
 }
 
-const mobileMetricBaseClass =
-  'min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)]';
-
-const MobileMetricLabel = ({ children }: { children: string }) => (
-  <p className="wrap-break-word text-[9px] font-black uppercase leading-3 tracking-[0.12em] text-slate-400">
-    {children}
-  </p>
-);
-
 export default function ProductsMobileList({
   products,
   totalItems,
@@ -65,12 +67,28 @@ export default function ProductsMobileList({
   onDeleteProduct,
 }: ProductsMobileListProps) {
   return (
-    <div className="space-y-3 p-3 md:hidden">
-      {products.map((product, index) => (
-        <div key={`mobile-${product.id ?? product.name}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-xs">
-          <div className="border-b border-slate-100 bg-[#f4f5fb] p-3.5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/70 bg-white">
+    <div className="space-y-2.5 p-2.5 md:hidden">
+      {products.map((product, index) => {
+        const isExpanded = expandedMobileActionsId === Number(product.id);
+        const stockBreakdown = getStockBreakdown(product);
+        const isLowStock = Number(product.stock || 0) <= Number(product.minStock || 0);
+        const efficiency = getProductEfficiencyMetrics(product);
+
+        const activeBatches = (product.batches || [])
+          .filter((batch: any) => Number(batch.remainingQuantity) > 0)
+          .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const currentBatch = activeBatches[0];
+        const costPrice = currentBatch ? currentBatch.costPrice : product.costPrice;
+
+        return (
+          <div
+            key={`mobile-${product.id ?? product.name}-${index}`}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all hover:border-slate-300 hover:shadow-xs"
+          >
+            {/* Top row: Photo with micro-badge, title, tags, actions button */}
+            <div className="flex items-start gap-2.5">
+              {/* Product Photo with modern micro-badge */}
+              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-slate-100 shadow-2xs">
                 {product.photoUrl ? (
                   <img
                     src={resolveMediaUrl(product.photoUrl, product.id)}
@@ -80,194 +98,205 @@ export default function ProductsMobileList({
                     onError={(event) => handleBrokenImage(event, product.id)}
                   />
                 ) : (
-                  <ImageIcon className="text-slate-400" size={18} />
+                  <Package className="text-slate-300" size={20} />
                 )}
+                <span className="absolute bottom-0 right-0 rounded-tl-md bg-slate-900/70 px-1 py-0.2 text-[8px] font-mono font-bold text-white">
+                  #{(currentPage - 1) * pageSize + index + 1}
+                </span>
               </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 wrap-break-word text-sm font-semibold leading-snug text-slate-900">
-                    {formatProductName(product.name)}
-                  </p>
-                  <span className="shrink-0 rounded-full bg-slate-200/60 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                    #{(currentPage - 1) * pageSize + index + 1}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-600">
-                    {product.category?.name || 'Без категории'}
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-500">
-                    {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
-                  </span>
-                  {getDuplicateHintCount(product) > 0 && (
+
+              {/* Product Info */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-[13px] font-bold text-slate-900 leading-snug">
+                      {formatProductName(product.name)}
+                    </h4>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
+                        {product.category?.name || 'Без категории'}
+                      </span>
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-500">
+                        {selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}
+                      </span>
+                      {getDuplicateHintCount(product) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenMergeModal(product)}
+                          className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700"
+                        >
+                          Дубликат
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions toggle button */}
+                  {isAdmin && !isAggregateMode && (
                     <button
-                      onClick={() => onOpenMergeModal(product)}
-                      className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700"
+                      type="button"
+                      onClick={() => onToggleActions(Number(product.id))}
+                      className={clsx(
+                        'flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all active:scale-95',
+                        isExpanded
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                          : 'border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-slate-100 active:bg-slate-200'
+                      )}
+                      title="Действия с товаром"
                     >
-                      Дубликат
+                      <span>Действия</span>
+                      <ChevronDown
+                        size={11}
+                        className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')}
+                      />
                     </button>
                   )}
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-2 p-3">
-            <div
-              className={clsx(
-                'rounded-lg border px-3 py-2.5',
-                product.stock <= product.minStock ? 'border-rose-200 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/60'
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p
-                      className={clsx(
-                        'text-[10px] font-semibold uppercase tracking-[0.18em]',
-                        product.stock <= product.minStock ? 'text-rose-500' : 'text-emerald-600'
-                      )}
-                    >
-                      Остаток
-                    </p>
-                    <span
-                      className={clsx(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                        product.stock <= product.minStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                      )}
-                    >
-                      {product.stock <= product.minStock ? 'Низкий' : 'В норме'}
-                    </span>
-                  </div>
-                  <p
-                    className={clsx(
-                      'mt-1 whitespace-pre-line wrap-break-word text-[17px] font-semibold leading-5',
-                      product.stock <= product.minStock ? 'text-rose-700' : 'text-slate-900'
-                    )}
-                  >
-                    {getStockBreakdown(product).primary}
-                  </p>
-                  {getStockBreakdown(product).secondary && (
-                    <p
-                      className={clsx(
-                        'mt-1 wrap-break-word text-[11px] font-medium',
-                        product.stock <= product.minStock ? 'text-rose-500' : 'text-slate-500'
-                      )}
-                    >
-                      {getStockBreakdown(product).secondary}
-                    </p>
-                  )}
-                </div>
-                <div
+            {/* Core Row: Stock Status Pill on Left, Selling Price on Right */}
+            <div className="mt-2.5 flex items-center justify-between gap-2">
+              {/* Stock Status Pill */}
+              <div
+                className={clsx(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border font-medium min-w-0',
+                  isLowStock
+                    ? 'border-rose-200/80 bg-rose-50 text-rose-700'
+                    : 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                )}
+              >
+                <span
                   className={clsx(
-                    'mt-1 h-2.5 w-2.5 shrink-0 rounded-full',
-                    product.stock <= product.minStock
-                      ? 'bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.12)]'
-                      : 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
+                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                    isLowStock ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
                   )}
                 />
+                <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Остаток:</span>
+                <span className="font-bold">{stockBreakdown.primary}</span>
+                {stockBreakdown.secondary && (
+                  <span className="text-[10px] opacity-70 truncate max-w-[80px]">({stockBreakdown.secondary})</span>
+                )}
+                {isLowStock && (
+                  <span className="shrink-0 rounded bg-rose-200/70 px-1 py-0.2 text-[9px] font-bold text-rose-800">
+                    {Number(product.stock || 0) <= 0 ? 'Нет' : 'Мало'}
+                  </span>
+                )}
+              </div>
+
+              {/* Price */}
+              <div className="text-right shrink-0">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+                  Цена
+                </span>
+                <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900">
+                  {isAggregateMode ? '—' : formatMoney(product.sellingPrice)}
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className={mobileMetricBaseClass}>
-                <MobileMetricLabel>Продажа</MobileMetricLabel>
-                <p className="mt-1.5 wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
-                  {isAggregateMode ? '-' : formatMoney(product.sellingPrice)}
-                </p>
-              </div>
-              <div className={mobileMetricBaseClass}>
-                <MobileMetricLabel>Приход</MobileMetricLabel>
-                <p className="mt-1.5 wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
-                  {product.totalIncoming}{' '}
-                  <span className="text-[10px] uppercase text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
-                </p>
-              </div>
-              {isAdmin && (
-                <div className={mobileMetricBaseClass}>
-                  <MobileMetricLabel>Закупка</MobileMetricLabel>
-                  <div className="mt-1.5 flex flex-col">
-                    {isAggregateMode ? (
-                      <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">-</p>
-                    ) : (
-                      <>
-                        <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
-                          {(() => {
-                            const activeBatches = (product.batches || [])
-                              .filter((batch: any) => Number(batch.remainingQuantity) > 0)
-                              .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-                            const currentBatch = activeBatches[0];
-                            return formatMoney(currentBatch ? currentBatch.costPrice : product.costPrice);
-                          })()}
-                        </p>
-                        <p className="mt-1 wrap-break-word text-[10px] font-medium text-slate-400">
-                          Посл: {formatMoney(product.costPrice)}
-                        </p>
-                      </>
-                    )}
-                  </div>
+            {/* Admin Wholesale Metrics Strip */}
+            {isAdmin && (
+              <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-slate-100 bg-[#f8f9fc] p-1.5 text-center">
+                <div className="px-1">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Закупка</p>
+                  <p className="mt-0.5 text-xs font-bold text-slate-700 truncate">
+                    {isAggregateMode ? '—' : formatMoney(costPrice)}
+                  </p>
                 </div>
-              )}
-              {isAdmin && (
-                <div className={mobileMetricBaseClass}>
-                  <MobileMetricLabel>Рентабельность</MobileMetricLabel>
-                  <div className="mt-1.5 flex flex-col items-start">
-                    <p className="wrap-break-word text-[17px] font-bold leading-5 text-slate-900">
-                      {isAggregateMode ? '-' : formatPercent(getProductEfficiencyMetrics(product).marginPercent, 1)}
-                    </p>
-                    {!isAggregateMode && (
-                      <span className={clsx('mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-tight', getProductEfficiencyMetrics(product).className)}>
-                        {getProductEfficiencyMetrics(product).label}
-                      </span>
+                <div className="border-x border-slate-200/60 px-1">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Маржа</p>
+                  <p
+                    className={clsx(
+                      'mt-0.5 text-xs font-bold truncate',
+                      efficiency.className?.includes('rose') ? 'text-rose-600' : 'text-emerald-600'
                     )}
-                  </div>
+                  >
+                    {isAggregateMode ? '—' : formatPercent(efficiency.marginPercent, 1)}
+                  </p>
                 </div>
-              )}
-            </div>
+                <div className="px-1">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Приход</p>
+                  <p className="mt-0.5 text-xs font-bold text-slate-700 truncate">
+                    {product.totalIncoming} {normalizeDisplayBaseUnit(product.unit || 'шт')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Collapsible Actions Menu */}
+            {isExpanded && isAdmin && !isAggregateMode && (
+              <div className="mt-2.5 space-y-1 rounded-xl border border-slate-200/90 bg-slate-50/50 p-1.5 animate-in fade-in-50 duration-150">
+                {[
+                  {
+                    label: 'Изменить товар',
+                    icon: Pencil,
+                    handler: onEditProduct,
+                    color: 'text-slate-700 hover:bg-white',
+                  },
+                  {
+                    label: 'Оформить приход',
+                    icon: PlusCircle,
+                    handler: onRestockProduct,
+                    color: 'text-emerald-700 hover:bg-emerald-50',
+                  },
+                  {
+                    label: 'История товара',
+                    icon: History,
+                    handler: onShowHistory,
+                    color: 'text-sky-700 hover:bg-sky-50',
+                  },
+                  {
+                    label: 'Списать товар',
+                    icon: AlertCircle,
+                    handler: onOpenWriteOffModal,
+                    disabled: Number(product.stock || 0) <= 0,
+                    color: 'text-amber-700 hover:bg-amber-50',
+                  },
+                  {
+                    label: 'Посмотреть партии',
+                    icon: Layers,
+                    handler: onShowBatches,
+                    color: 'text-violet-700 hover:bg-violet-50',
+                  },
+                  ...(canTransferProducts
+                    ? [
+                        {
+                          label: 'Перенести товар',
+                          icon: ArrowLeftRight,
+                          handler: onTransferProduct,
+                          color: 'text-indigo-700 hover:bg-indigo-50',
+                        },
+                      ]
+                    : []),
+                  {
+                    label: 'Удалить товар',
+                    icon: Trash2,
+                    handler: onDeleteProduct,
+                    color: 'text-rose-600 hover:bg-rose-50',
+                  },
+                ].map(({ label, icon: Icon, handler, disabled, color }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => (handler as (p: any) => void)(product)}
+                    disabled={disabled}
+                    className={clsx(
+                      'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors',
+                      disabled ? 'cursor-not-allowed text-slate-300' : color
+                    )}
+                  >
+                    <Icon size={14} className="shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    <ChevronDown size={12} className="-rotate-90 opacity-40" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-
-          {isAdmin && !isAggregateMode && (
-            <div className="border-t border-slate-200 p-3">
-              <button
-                type="button"
-                onClick={() => onToggleActions(Number(product.id))}
-                className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-white"
-              >
-                <span>Действия</span>
-                {expandedMobileActionsId === Number(product.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-
-              {expandedMobileActionsId === Number(product.id) && (
-                <div className="mt-2 max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80">
-                  {[
-                    ['Изменить товар', onEditProduct, 'hover:bg-violet-50 hover:text-violet-700'],
-                    ['Оформить приход', onRestockProduct, 'hover:bg-emerald-50 hover:text-emerald-700'],
-                    ['Открыть историю', onShowHistory, 'hover:bg-sky-50 hover:text-sky-700'],
-                    ['Списать товар', onOpenWriteOffModal, 'hover:bg-amber-50 hover:text-amber-700'],
-                    ['Посмотреть партии', onShowBatches, 'hover:bg-violet-50 hover:text-violet-700'],
-                    ...(canTransferProducts ? [['Перенести товар', onTransferProduct, 'hover:bg-amber-50 hover:text-amber-700']] : []),
-                    ['Удалить товар', onDeleteProduct, 'hover:bg-rose-50 hover:text-rose-700'],
-                  ].map(([label, handler, hoverClass], actionIndex) => (
-                    <button
-                      key={String(label)}
-                      onClick={() => (handler as (nextProduct: any) => void)(product)}
-                      disabled={label === 'Списать товар' && Number(product.stock || 0) <= 0}
-                      className={clsx(
-                        'flex w-full items-center justify-between bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400',
-                        actionIndex < 6 && 'border-b border-slate-200/80',
-                        hoverClass
-                      )}
-                    >
-                      <span>{String(label)}</span>
-                      <ChevronDown size={14} className="-rotate-90 text-slate-300" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       {totalItems === 0 && !isLoading && <ProductsEmptyState variant="mobile" />}
     </div>

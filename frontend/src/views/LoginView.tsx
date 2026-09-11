@@ -47,8 +47,9 @@ export default function LoginView() {
       }
 
       const sessionUser = await getSessionUser();
-      setAuthSession(null, sessionUser || result.user);
-      navigate('/');
+      const finalUser = sessionUser || result.user;
+      setAuthSession(null, finalUser);
+      navigate(String(finalUser?.role || '').toUpperCase() === 'CUSTOMER' ? '/catalog' : '/pos');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Ошибка входа');
     } finally {
@@ -67,8 +68,9 @@ export default function LoginView() {
         code: twoFactorCode,
       });
       const sessionUser = await getSessionUser();
-      setAuthSession(null, sessionUser || result.user);
-      navigate('/');
+      const finalUser = sessionUser || result.user;
+      setAuthSession(null, finalUser);
+      navigate(String(finalUser?.role || '').toUpperCase() === 'CUSTOMER' ? '/catalog' : '/pos');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Ошибка проверки двухфакторной аутентификации');
     } finally {

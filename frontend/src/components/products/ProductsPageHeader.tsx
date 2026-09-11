@@ -23,6 +23,7 @@ export default function ProductsPageHeader({
     <PageHeader
       title="Товары"
       description="Управление ассортиментом, ценами и остатками."
+      hideTitleOnMobile
       actions={
         <>
           <Button

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Clock, Printer, Search, Store } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Phone, Printer, Search, Store, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Badge, Card } from '../components/UI';
@@ -61,7 +61,7 @@ const getDebtFilterLabel = (filter: Exclude<DebtFilter, 'all'>) => {
 const filterTabs: Array<{ key: DebtFilter; label: string }> = [
   { key: 'all', label: 'Все' },
   { key: 'paid', label: 'Оплачено' },
-  { key: 'partial', label: 'Частично оплачено' },
+  { key: 'partial', label: 'Частично' },
   { key: 'unpaid', label: 'Не оплачено' },
 ];
 
@@ -78,7 +78,7 @@ type SortMode = (typeof sortOptions)[number]['value'];
 
 const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
   [
-    'inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold transition-all',
+    'inline-flex items-center rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold transition-all',
     isActive ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
   ].join(' ');
 
@@ -547,8 +547,8 @@ export default function CustomerDebtsView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
-        {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        {/* Desktop Header */}
+        <div className="hidden lg:flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Долги и оплаты</h1>
             <p className="mt-0.5 text-xs text-slate-500">Финансовая аналитика по клиентам на основе оформленных накладных.</p>
@@ -586,8 +586,49 @@ export default function CustomerDebtsView() {
           </div>
         </div>
 
-        {/* Sub Navigation Tabs */}
-        <div className="flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
+        {/* Mobile Header Bar: Tabs + Quick Actions */}
+        <div className="flex items-center justify-between gap-2 lg:hidden">
+          <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white p-1 shadow-xs">
+            <NavLink to="/customers" end className={sectionTabClassName}>
+              Клиенты
+            </NavLink>
+            <NavLink to="/customers/debts" className={sectionTabClassName}>
+              Долги
+            </NavLink>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {warehouses.length > 1 && (
+              <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-xs">
+                <Store size={12} className="text-slate-400 shrink-0" />
+                <select
+                  value={selectedWarehouseId}
+                  onChange={(e) => handleWarehouseSelect(e.target.value)}
+                  className="bg-transparent outline-none cursor-pointer max-w-[80px] truncate text-[11px]"
+                >
+                  {isAdmin && <option value="">Все</option>}
+                  {warehouses.map((wh) => (
+                    <option key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={isExportingInvoices || filteredCustomers.length === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              title="Печать акта сверки"
+            >
+              <Printer size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Sub Navigation Tabs */}
+        <div className="hidden lg:flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
           <NavLink to="/customers" end className={sectionTabClassName}>
             База клиентов
           </NavLink>
@@ -596,8 +637,8 @@ export default function CustomerDebtsView() {
           </NavLink>
         </div>
 
-        {/* Metric Summary Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Desktop Metric Summary Cards */}
+        <div className="hidden lg:grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs">
             <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Общий долг</p>
             <p className="mt-2 text-xl font-bold tracking-tight text-rose-600">{formatMoneyByRole(summary.totalDebt)}</p>
@@ -620,16 +661,39 @@ export default function CustomerDebtsView() {
           </div>
         </div>
 
-        {/* Desktop Table & Filter Controls Container */}
-        <div className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-xs space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-1.5">
+        {/* Mobile Metric Summary: Compact 2-column cards */}
+        <div className="grid grid-cols-2 gap-2 lg:hidden">
+          <div className="rounded-2xl border border-rose-100 bg-white p-2.5 shadow-xs">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Общий долг</p>
+            <p className="mt-0.5 text-base font-bold tracking-tight text-rose-600 truncate">{formatMoneyByRole(summary.totalDebt)}</p>
+            {isAdmin && (
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                С долгом: <span className="font-semibold text-rose-600">{formatCount(summary.unpaidCount + summary.partialCount)}</span>
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-white p-2.5 shadow-xs">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Сумма оплат</p>
+            <p className="mt-0.5 text-base font-bold tracking-tight text-emerald-600 truncate">{formatMoneyByRole(summary.totalPaid)}</p>
+            {isAdmin && (
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                Оплачено: <span className="font-semibold text-emerald-600">{formatCount(summary.fullyPaidCount)}</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Table & Filter Controls Container */}
+        <div className="rounded-2xl lg:rounded-[28px] border border-slate-200/70 bg-white p-2.5 sm:p-4 lg:p-5 shadow-xs space-y-3 sm:space-y-4">
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+            {/* Horizontal Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 sm:flex-wrap">
               {(isAdmin ? filterTabs : filterTabs.slice(0, 1)).map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setStatusFilter(tab.key)}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold shrink-0 transition-all ${
                     statusFilter === tab.key
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'
@@ -637,7 +701,7 @@ export default function CustomerDebtsView() {
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
                       statusFilter === tab.key
                         ? 'bg-white/20 text-white'
                         : 'bg-slate-200/60 text-slate-600'
@@ -649,21 +713,32 @@ export default function CustomerDebtsView() {
               ))}
             </div>
 
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            {/* Search and Sort */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative flex-1 sm:w-64">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <input
                   type="text"
                   placeholder="Поиск клиента..."
-                  className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2.5 pl-10 pr-4 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                  className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] py-2 sm:py-2.5 pl-10 pr-8 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Очистить"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortMode)}
-                className="rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -674,16 +749,16 @@ export default function CustomerDebtsView() {
             </div>
           </div>
 
-          <div className="space-y-3 pt-1 md:hidden">
+          {/* Mobile Customer Debt Cards */}
+          <div className="space-y-2 pt-1 md:hidden">
             {paginatedCustomers.length === 0 ? (
-              <p className="py-10 text-center text-xs font-medium text-slate-400">
+              <p className="py-8 text-center text-xs font-medium text-slate-400">
                 По текущим фильтрам клиентов не найдено.
               </p>
             ) : (
               paginatedCustomers.map((customer) => {
                 const aggregateStatus = getCustomerPaymentStatus(customer);
                 const displayStatus = statusFilter === 'all' ? aggregateStatus : statusFilter;
-                const statusMeta = customerPaymentStatusMeta[displayStatus];
                 const warehouseNames =
                   Array.isArray(customer.warehouse_names) && customer.warehouse_names.length > 0
                     ? customer.warehouse_names.join(', ')
@@ -711,63 +786,97 @@ export default function CustomerDebtsView() {
                       : getCustomerDebtTotal(customer);
 
                 return (
-                  <div key={`mobile-debt-${customer.id}`} className="rounded-2xl border border-slate-100 bg-[#f4f5fb]/60 p-4 shadow-xs">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900">{customer.name}</p>
-                        <p className="mt-0.5 truncate text-xs text-slate-400">{warehouseNames}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">{customer.phone || '—'}</p>
+                  <div key={`mobile-debt-${customer.id}`} className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-3 shadow-xs space-y-2">
+                    {/* Top Row: Name, Phone & Status Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs sm:text-sm font-bold text-slate-900">{customer.name}</p>
+                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
+                          {customer.phone ? (
+                            <a
+                              href={`tel:${customer.phone}`}
+                              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 hover:underline"
+                            >
+                              <Phone size={10} className="text-slate-400" />
+                              <span>{customer.phone}</span>
+                            </a>
+                          ) : (
+                            <span>{warehouseNames}</span>
+                          )}
+                          {customer.phone && warehouseNames !== '---' && (
+                            <>
+                              <span className="text-slate-300">•</span>
+                              <span className="truncate text-slate-400">{warehouseNames}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
+
                       {isAdmin ? (
                         <span
-                          title={statusMeta.label}
                           className={clsx(
-                            'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border shadow-xs',
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shrink-0 border',
                             displayStatus === 'paid'
-                              ? 'border-emerald-200/80 bg-emerald-50 text-emerald-600'
+                              ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
                               : displayStatus === 'partial'
-                                ? 'border-amber-200/80 bg-amber-50 text-amber-600'
-                                : 'border-rose-200/80 bg-rose-50 text-rose-500'
+                                ? 'border-amber-200/80 bg-amber-50 text-amber-700'
+                                : 'border-rose-200/80 bg-rose-50 text-rose-700'
                           )}
                         >
                           {displayStatus === 'paid' ? (
-                            <CheckCircle2 size={15} />
+                            <CheckCircle2 size={11} />
                           ) : displayStatus === 'partial' ? (
-                            <Clock size={15} />
+                            <Clock size={11} />
                           ) : (
-                            <AlertCircle size={15} />
+                            <AlertCircle size={11} />
                           )}
+                          <span>
+                            {displayStatus === 'paid' ? 'Оплачено' : displayStatus === 'partial' ? 'Частично' : 'Долг'}
+                          </span>
                         </span>
                       ) : (
                         <span className="shrink-0 text-xs text-slate-400">Скрыто</span>
                       )}
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Накладных</p>
-                        <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatCount(visibleInvoiceCount)}</p>
+                    {/* Financial Stats Strip */}
+                    <div className="grid grid-cols-3 gap-1 rounded-lg sm:rounded-xl border border-slate-100 bg-[#f8f9fc] p-1.5 sm:p-2 text-center">
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Купил ({formatCount(visibleInvoiceCount)})
+                        </p>
+                        <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 truncate">
+                          {formatMoneyByRole(visiblePurchasedTotal)}
+                        </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Купил всего</p>
-                        <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatMoneyByRole(visiblePurchasedTotal)}</p>
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Оплатил</p>
+                        <p className="mt-0.5 text-xs sm:text-sm font-bold text-emerald-600 truncate">
+                          {formatMoneyByRole(visiblePaidTotal)}
+                        </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Оплатил всего</p>
-                        <p className="mt-0.5 text-sm font-semibold text-emerald-600">{formatMoneyByRole(visiblePaidTotal)}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Долг</p>
-                        <p className={clsx('mt-0.5 text-sm font-semibold', isAdmin && visibleDebtTotal > 0 ? 'text-rose-600' : 'text-slate-900')}>
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Долг</p>
+                        <p
+                          className={clsx(
+                            'mt-0.5 text-xs sm:text-sm font-bold truncate',
+                            isAdmin && visibleDebtTotal > 0 ? 'text-rose-600' : 'text-slate-900'
+                          )}
+                        >
                           {formatMoneyByRole(visibleDebtTotal)}
                         </p>
                       </div>
                     </div>
 
-                    <p className="mt-3 text-[11px] text-slate-400">
-                      Последняя покупка:{' '}
-                      {customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString('ru-RU') : 'Нет покупок'}
-                    </p>
+                    {/* Footer Row: Last purchase date */}
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-0.5 pt-0.5">
+                      <span>
+                        Последняя покупка:{' '}
+                        <span className="text-slate-600 font-medium">
+                          {customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString('ru-RU') : 'Нет'}
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 );
               })

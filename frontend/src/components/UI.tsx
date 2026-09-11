@@ -337,11 +337,20 @@ export interface PageHeaderProps {
   description?: string;
   actions?: React.ReactNode;
   badges?: React.ReactNode;
+  className?: string;
+  hideTitleOnMobile?: boolean;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, actions, badges }) => (
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
+export const PageHeader: React.FC<PageHeaderProps> = ({
+  title,
+  description,
+  actions,
+  badges,
+  className,
+  hideTitleOnMobile,
+}) => (
+  <div className={clsx('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
+    <div className={clsx(hideTitleOnMobile && 'hidden lg:block')}>
       <div className="flex items-center gap-3">
         <h1 className="text-page-title">{title}</h1>
         {badges && <div className="flex items-center gap-2">{badges}</div>}

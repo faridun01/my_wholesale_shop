@@ -23,6 +23,7 @@ const RemindersView = React.lazy(() => import('./views/RemindersView'));
 const HistoryView = React.lazy(() => import('./views/HistoryView'));
 const POSView = React.lazy(() => import('./views/POSView'));
 const CustomerOrdersView = React.lazy(() => import('./views/CustomerOrdersView'));
+const MenuView = React.lazy(() => import('./views/MenuView'));
 
 const RouteLoading = () => (
   <div className="flex min-h-[40vh] items-center justify-center">
@@ -47,19 +48,10 @@ const StaffRoute = ({ children }: { children: React.ReactNode }) => {
   return isCustomerUser(user) ? <Navigate to="/catalog" replace /> : <>{children}</>;
 };
 
-/** Mobile and desktop use different default landing pages: on mobile every
- * role lands on the fast Sales/checkout screen, while desktop admins keep the
- * Dashboard overview. Breakpoint matches the `lg:` (1024px) cutoff used
- * everywhere else in the shell (Sidebar, MobileBottomNav). */
-const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth < 1024;
-
 const RootRoute = () => {
   const user = getCurrentUser();
   if (isCustomerUser(user)) {
     return <Navigate to="/catalog" replace />;
-  }
-  if (isAdminUser(user)) {
-    return isMobileViewport() ? <Navigate to="/pos" replace /> : <DashboardView />;
   }
   return <Navigate to="/pos" replace />;
 };
@@ -195,6 +187,15 @@ export default function App() {
         >
           <Route path="/" element={<RootRoute />} />
           <Route
+            path="/dashboard"
+            element={
+              <AdminRoute>
+                <DashboardView />
+              </AdminRoute>
+            }
+          />
+          <Route path="/menu" element={<MenuView />} />
+          <Route
             path="/products"
             element={
               <StaffRoute>
@@ -246,7 +247,7 @@ export default function App() {
           />
           <Route
             path="/analytics"
-            element={<Navigate to="/" replace />}
+            element={<Navigate to="/dashboard" replace />}
           />
           <Route
             path="/reports"

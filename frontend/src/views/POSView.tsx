@@ -1250,7 +1250,7 @@ export default function POSView() {
           </div>
         </div>
 
-        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' && 'pb-40 lg:pb-5')}>
+        <div className={clsx('flex flex-1 flex-col space-y-3 py-3 lg:space-y-4 lg:px-5 lg:py-5', activeTab === 'cart' && 'pb-28 lg:pb-5')}>
           <div className="grid grid-cols-2 gap-1.5 rounded-full bg-[#e8eaf2] p-1.5 text-xs lg:hidden">
             <button
               onClick={() => setActiveTab('products')}

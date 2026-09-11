@@ -408,13 +408,13 @@ export default function SalesView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-4 overflow-hidden lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="hidden lg:flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Продажи</h1>
             <p className="mt-0.5 text-xs text-slate-500">Управление накладными и заказами клиентов.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="hidden items-center gap-3 rounded-full bg-white px-4 py-1.5 border border-slate-200/60 shadow-xs lg:flex">
+            <div className="flex items-center gap-3 rounded-full bg-white px-4 py-1.5 border border-slate-200/60 shadow-xs">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
                 {(user.username || 'A').slice(0, 1).toUpperCase()}
               </div>
@@ -455,6 +455,9 @@ export default function SalesView() {
 
       <SalesInvoicesSection
         isAdmin={isAdmin}
+        warehouses={warehouses}
+        selectedWarehouseId={selectedWarehouseId}
+        setSelectedWarehouseId={setSelectedWarehouseId}
         invoicesCount={invoices.length}
         search={search}
         setSearch={setSearch}

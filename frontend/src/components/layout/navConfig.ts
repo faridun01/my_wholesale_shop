@@ -27,8 +27,8 @@ export const navItems: NavItem[] = [
   ...(SHOW_CUSTOMER_ORDERS
     ? [{ to: '/customer-orders', icon: ShoppingBag, label: 'Заказы клиентов', section: 'Отношения' }]
     : []),
-  { to: '/', icon: LayoutDashboard, label: 'Дашборд', section: 'Управление' },
-  { to: '/pos', icon: ShoppingCart, label: 'POS терминал', section: 'Управление' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Дашборд', section: 'Управление' },
+  { to: '/pos', icon: ShoppingBag, label: 'Продажа', section: 'Управление' },
   { to: '/catalog', icon: BookOpen, label: 'Каталог', section: 'Управление' },
   { to: '/products', icon: Package, label: 'Товары', section: 'Управление' },
   { to: '/sales', icon: History, label: 'История продаж', section: 'Управление' },
@@ -53,7 +53,8 @@ export function getFilteredNavItems(user: AppUser): NavItem[] {
 
       if (
         !isAdmin &&
-        (item.to === '/' ||
+        (item.to === '/dashboard' ||
+          item.to === '/' ||
           item.to === '/expenses' ||
           item.to === '/analytics' ||
           item.to === '/reports' ||
