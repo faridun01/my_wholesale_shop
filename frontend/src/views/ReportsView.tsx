@@ -1653,8 +1653,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="rounded-l-2xl py-3 px-4">Дата</th>
-                  <th className="py-3 px-4">Товар</th>
+                  <th className="rounded-l-2xl py-3 px-4">Товар</th>
                   <th className="py-3 px-4">Кол-во</th>
                   {reportType === 'sales' && (
                     <>
@@ -1686,9 +1685,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {paginatedDetailRows.map((row, index) => (
                   <tr key={`${row.date}-${row.product_name}-${index}`} className="transition-colors hover:bg-slate-50/80">
-                    <td className="py-2.5 px-4 text-slate-500 tabular-nums">{new Date(row.date).toLocaleDateString('ru-RU')}</td>
-                    <td className="py-2.5 px-4 font-semibold text-slate-900 min-w-[130px] max-w-[220px]" title={formatProductName(row.product_name)}>
-                      <div className="line-clamp-2 leading-snug">{formatProductName(row.product_name)}</div>
+                    <td className="py-2.5 px-4 font-semibold text-slate-900 leading-snug break-words min-w-[180px]">
+                      {formatProductName(row.product_name)}
                     </td>
                     <td className="py-2.5 px-4 font-medium text-slate-900 tabular-nums">{row.quantity}</td>
                     {reportType === 'sales' && (
@@ -1751,7 +1749,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                 {!filteredReportData.length && (
                   <tr>
                     <td
-                      colSpan={reportType === 'profit' ? 6 : reportType === 'sales' ? 5 : reportType === 'returns' ? 4 : 10}
+                      colSpan={reportType === 'profit' ? 5 : reportType === 'sales' ? 4 : reportType === 'returns' ? 3 : 9}
                       className="py-12 text-center text-xs font-medium text-slate-400"
                     >
                       Нет данных за выбранный период
