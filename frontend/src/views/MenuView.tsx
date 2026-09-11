@@ -90,35 +90,10 @@ export default function MenuView() {
     : 'bg-emerald-100 text-emerald-700 border-emerald-200';
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg px-4 pt-4 pb-28 sm:pb-32 font-sans">
+    <div className="mx-auto max-w-lg px-4 pt-3 pb-4 font-sans">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-slate-900">Меню</h1>
-        <span className={clsx('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold', roleBadgeStyle)}>
-          <Shield size={12} />
-          {roleName}
-        </span>
-      </div>
-
-      {/* User Profile Card */}
-      <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-lg font-bold text-white shadow-md shadow-slate-900/10">
-            {user.username ? user.username[0].toUpperCase() : <User size={20} />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold text-slate-900">{user.username || 'Пользователь'}</p>
-            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-              {user.warehouse?.name && (
-                <span className="inline-flex items-center gap-1 text-slate-600">
-                  <Warehouse size={13} className="text-slate-400" />
-                  {user.warehouse.name}
-                  {user.warehouse.city ? ` (${user.warehouse.city})` : ''}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Primary Section: Dashboard (Admin Only) */}
@@ -307,9 +282,9 @@ export default function MenuView() {
         </>
       )}
 
-      {/* Section: App & Actions */}
-      <div className="mb-5">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Приложение</h2>
+      {/* Section: App & User Session */}
+      <div className="mb-3">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Сессия и аккаунт</h2>
         <div className="space-y-2">
           {!isStandalone && !isInstalled && (
             <button
@@ -336,6 +311,30 @@ export default function MenuView() {
               <ChevronRight size={18} className="text-accent-500" />
             </button>
           )}
+
+          {/* User Profile Card (admin) placed right before logout */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-sm font-bold text-white shadow-xs">
+                {user.username ? user.username[0].toUpperCase() : <User size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-bold text-slate-900">{user.username || 'Пользователь'}</p>
+                  <span className={clsx('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold', roleBadgeStyle)}>
+                    <Shield size={10} />
+                    {roleName}
+                  </span>
+                </div>
+                {user.warehouse?.name && (
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 truncate">
+                    <Warehouse size={12} className="text-slate-400 shrink-0" />
+                    <span className="truncate">{user.warehouse.name}{user.warehouse.city ? ` (${user.warehouse.city})` : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           <button
             type="button"
