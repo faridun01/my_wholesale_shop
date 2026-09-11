@@ -569,7 +569,174 @@ export default function CatalogView() {
 
       <AnimatePresence>{cartNotice && <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="fixed bottom-4 left-4 right-4 z-50 rounded-3xl border border-emerald-100 bg-white p-4 shadow-2xl sm:left-auto sm:w-[min(92vw,420px)] sm:p-5"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm font-medium text-slate-900">{cartNotice.count > 0 ? 'Товар добавлен' : 'Нужно выбрать склад'}</p><p className="mt-1 wrap-break-word text-sm leading-6 text-slate-500">{cartNotice.productName}</p>{cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">В корзине: {cartNotice.count}</p>}</div><button onClick={() => setCartNotice(null)} className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"><X size={16} /></button></div><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"><button onClick={() => setCartNotice(null)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50">Остаться</button>{cartNotice.count > 0 ? <button onClick={() => { setCartNotice(null); navigate('/pos'); }} className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600">Перейти в корзину</button> : <button onClick={() => setCartNotice(null)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800">Понятно</button>}</div></motion.div>}</AnimatePresence>
 
-      <AnimatePresence>{showDetails && selectedProduct && (() => { const stockParts = getProductStockParts(selectedProduct); const desktopActionsVisible = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true; return <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 lg:p-6"><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDetails(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" /><motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-white shadow-2xl"><div className="grid max-h-[85vh] overflow-y-auto lg:grid-cols-[1fr_1fr]"><div className="flex items-center justify-center bg-slate-50 p-3 sm:p-4"><div className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">{selectedProduct.photoUrl ? <img src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)} alt={selectedProduct.name} className="max-h-45 max-w-full rounded-xl object-contain sm:max-h-55 lg:max-h-70" referrerPolicy="no-referrer" onError={(event) => handleBrokenImage(event, selectedProduct.id)} /> : <div className="flex h-45 w-full items-center justify-center rounded-xl bg-slate-100 text-slate-300 sm:h-55 lg:h-70"><Package size={44} /></div>}</div></div><div className="flex flex-col p-3 sm:p-4 lg:p-5"><div className="flex items-start justify-between gap-3"><span className="max-w-[70%] wrap-break-word rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 sm:px-3 sm:py-1.5">{selectedProduct.category?.name || 'Без категории'}</span><button onClick={() => setShowDetails(false)} className="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"><X size={16} /></button></div><h2 className="mt-3 wrap-break-word text-sm font-semibold leading-tight tracking-tight text-slate-900 sm:text-base lg:mt-4 lg:text-lg">{formatProductName(selectedProduct.name)}</h2><div className="mt-3 grid gap-2.5 sm:mt-4 lg:gap-3"><div className="grid gap-2.5 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-center gap-2.5"><div className="rounded-xl bg-white p-2 text-slate-500 shadow-sm"><Layers size={15} /></div><div className="min-w-0"><p className="text-[9px] font-medium uppercase tracking-[0.18em] text-slate-400">Остаток</p><div className={shell('mt-1 inline-flex rounded-xl px-2.5 py-1.5', stockParts.isOutOfStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700')}><div className="flex min-w-0 flex-col"><span className="wrap-break-word text-xs font-semibold tracking-tight sm:text-sm">{stockParts.primary}</span>{stockParts.secondary ? <span className="mt-1 wrap-break-word text-[10px] font-medium opacity-90">{stockParts.secondary}</span> : null}</div></div></div></div></div><div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-center gap-2.5"><div className="rounded-xl bg-white p-2 text-slate-500 shadow-sm"><Warehouse size={15} /></div><div className="min-w-0"><p className="text-[9px] font-medium uppercase tracking-[0.18em] text-slate-400">Склад</p><p className="mt-1 wrap-break-word text-[11px] text-slate-900 sm:text-xs">{selectedProduct.warehouse?.name || 'Основной склад'}</p></div></div></div></div></div><div className="mt-4 lg:mt-auto"><button type="button" onClick={() => setMobileActionsOpen((prev) => !prev)} className="inline-flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-700 lg:hidden"><span>{mobileActionsOpen ? 'Скрыть действия' : 'Открыть действия'}</span><ChevronRight size={16} className={shell('transition-transform duration-200', mobileActionsOpen ? 'rotate-90' : '')} /></button><AnimatePresence initial={false}>{(mobileActionsOpen || desktopActionsVisible) && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden"><div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1"><button onClick={() => { handleAddToSale(selectedProduct); if (selectedWarehouseId) { setShowDetails(false); setMobileActionsOpen(false); } }} disabled={selectedProduct.stock <= 0 || !selectedWarehouseId} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3.5 py-2.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"><ShoppingCart size={15} /><span>В продажу</span><ChevronRight size={15} /></button><button onClick={() => { if (window.innerWidth < 1024) { setMobileActionsOpen(false); return; } setShowDetails(false); }} className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">{window.innerWidth < 1024 ? 'Свернуть' : 'Закрыть'}</button></div></motion.div>}</AnimatePresence></div></div></div></motion.div></div>; })()}</AnimatePresence>
+      <AnimatePresence>
+        {showDetails && selectedProduct && (() => {
+          const stockParts = getProductStockParts(selectedProduct);
+          const commerce = getProductCommercialStats(selectedProduct);
+          const showPrice = shouldShowPrice(selectedProduct);
+          const isOutOfStock = stockParts.isOutOfStock || Number(selectedProduct.stock || 0) <= 0;
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowDetails(false)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+
+              <motion.div
+                initial={{ y: 20, opacity: 0, scale: 0.98 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.98 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-t-[28px] sm:rounded-3xl bg-white shadow-2xl"
+              >
+                <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
+
+                <div className="flex items-center justify-between gap-3 px-4 pt-3 sm:px-6 sm:pt-5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                      {selectedProduct.category?.name || 'Без категории'}
+                    </span>
+                    {selectedProduct.warehouse?.name && (
+                      <span className="rounded-lg bg-slate-100/70 px-2 py-1 text-[11px] font-medium text-slate-500">
+                        {selectedProduct.warehouse.name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowDetails(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    title="Закрыть"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto px-4 py-3 sm:px-6 sm:py-4 space-y-3.5">
+                  {selectedProduct.photoUrl ? (
+                    <div className="flex h-44 sm:h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/70 p-2">
+                      <img
+                        src={resolveMediaUrl(selectedProduct.photoUrl, selectedProduct.id)}
+                        alt={selectedProduct.name}
+                        className="h-full w-full rounded-xl object-contain"
+                        referrerPolicy="no-referrer"
+                        onError={(event) => handleBrokenImage(event, selectedProduct.id)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900">
+                      {formatProductName(selectedProduct.name)}
+                    </h2>
+                  </div>
+
+                  <div className="flex items-baseline justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Цена продажи
+                      </span>
+                      <div className="mt-0.5 flex items-baseline gap-1.5">
+                        <span className="font-mono text-2xl font-black tracking-tight text-slate-900 tabular-nums">
+                          {showPrice ? formatMoney(commerce.salePrice) : 'Скрыта'}
+                        </span>
+                        {showPrice && <span className="text-xs font-bold text-slate-400">TJS</span>}
+                      </div>
+                    </div>
+
+                    {isAdmin && commerce.marginPercent > 0 && (
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Рентабельность
+                        </span>
+                        <span className="mt-0.5 inline-flex items-center rounded-lg bg-emerald-100/90 px-2 py-0.5 font-mono text-xs font-bold text-emerald-700">
+                          +{commerce.marginPercent.toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-2xs">
+                      <div className="flex items-center gap-1.5">
+                        <Layers size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Остаток
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span
+                          className={clsx(
+                            'h-2 w-2 shrink-0 rounded-full',
+                            isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500'
+                          )}
+                        />
+                        <span
+                          className={clsx(
+                            'font-mono text-sm font-bold',
+                            isOutOfStock ? 'text-rose-600' : 'text-slate-800'
+                          )}
+                        >
+                          {stockParts.primary}
+                        </span>
+                      </div>
+                      {stockParts.secondary && (
+                        <p className="mt-0.5 text-[10px] text-slate-400">{stockParts.secondary}</p>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-2xs">
+                      <div className="flex items-center gap-1.5">
+                        <Warehouse size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Склад
+                        </span>
+                      </div>
+                      <p className="mt-1.5 truncate text-sm font-bold text-slate-800">
+                        {selectedProduct.warehouse?.name || 'Основной склад'}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">Локация остатка</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:px-6">
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => {
+                        handleAddToSale(selectedProduct);
+                        if (selectedWarehouseId) {
+                          setShowDetails(false);
+                        }
+                      }}
+                      disabled={isOutOfStock || !selectedWarehouseId}
+                      className={clsx(
+                        'flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all active:scale-[0.99]',
+                        isOutOfStock || !selectedWarehouseId
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-slate-900 text-white hover:bg-slate-800 shadow-xs'
+                      )}
+                    >
+                      <ShoppingCart size={16} />
+                      <span>{isOutOfStock ? 'Нет в наличии' : 'В продажу'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowDetails(false)}
+                      className="flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 }
