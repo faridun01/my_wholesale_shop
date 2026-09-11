@@ -619,7 +619,7 @@ export default function CustomerDebtsView() {
               type="button"
               onClick={handlePrint}
               disabled={isExportingInvoices || filteredCustomers.length === 0}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
               title="Печать акта сверки"
             >
               <Printer size={14} />

@@ -13,6 +13,7 @@ import {
   Receipt,
   RotateCcw,
   Search,
+  Share2,
   Trash2,
   X,
 } from 'lucide-react';
@@ -72,7 +73,7 @@ type SalesInvoicesSectionProps = {
   openEditInvoiceModal: (invoice: any) => void;
   fetchInvoiceDetails: (id: number) => Promise<void>;
   handleQuickPrintInvoice: (id: number) => Promise<void>;
-  handleDeleteInvoice: (id: number) => Promise<void>;
+  handleDeleteInvoice: (target: any) => void;
 };
 
 function SalesRowActions({
@@ -225,10 +226,24 @@ function SalesRowActions({
               setIsOpen(false);
               handleQuickPrintInvoice(inv.id);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="hidden md:flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
           >
             <Printer size={14} className="text-slate-400" />
             <span>Печать</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async (e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+              const { shareInvoicePdf } = await import('../../utils/print/salesInvoicePdf');
+              await shareInvoicePdf(inv);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+          >
+            <Share2 size={14} className="text-slate-400" />
+            <span>Скачать / Поделиться PDF</span>
           </button>
 
           {isAdmin && (
@@ -239,7 +254,7 @@ function SalesRowActions({
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsOpen(false);
-                  handleDeleteInvoice(inv.id);
+                  handleDeleteInvoice(inv);
                 }}
                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
               >
@@ -660,30 +675,50 @@ const SalesInvoicesSection = ({
                 </div>
               )}
 
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fetchInvoiceDetails(inv.id);
-                  }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 px-3 text-xs font-semibold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-[0.98]"
-                >
-                  <Receipt size={14} />
-                  <span>Посмотреть накладную</span>
-                </button>
+              <div className={clsx('mt-3 grid gap-1.5', isAdmin ? 'grid-cols-3' : 'grid-cols-1')}>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (paymentDisabled) return;
+                      setSelectedInvoice(inv);
+                      setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
+                      setShowPaymentModal(true);
+                    }}
+                    disabled={paymentDisabled}
+                    className={clsx(
+                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                      paymentDisabled
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white'
+                    )}
+                  >
+                    <Banknote size={14} />
+                    <span className="truncate">Оплата</span>
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQuickPrintInvoice(inv.id);
-                  }}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98]"
-                  title="Печать"
-                >
-                  <Printer size={15} />
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (returnDisabled) return;
+                      void openReturnInvoiceModal(inv);
+                    }}
+                    disabled={returnDisabled}
+                    className={clsx(
+                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                      returnDisabled
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                        : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'
+                    )}
+                  >
+                    <RotateCcw size={14} />
+                    <span className="truncate">Возврат</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -693,10 +728,15 @@ const SalesInvoicesSection = ({
                       expandedMobileInvoiceId === inv.id ? null : inv.id
                     );
                   }}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98]"
-                  title="Действия"
+                  className={clsx(
+                    'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                    expandedMobileInvoiceId === inv.id
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  )}
                 >
-                  <MoreVertical size={15} />
+                  <MoreVertical size={14} />
+                  <span className="truncate">Ещё</span>
                 </button>
               </div>
 
@@ -717,76 +757,40 @@ const SalesInvoicesSection = ({
                     <span>Детали накладной</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (paymentDisabled) return;
-                      setExpandedMobileInvoiceId(null);
-                      setSelectedInvoice(inv);
-                      setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
-                      setShowPaymentModal(true);
-                    }}
-                    disabled={paymentDisabled}
-                    className={clsx(
-                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                      paymentDisabled
-                        ? 'cursor-not-allowed text-slate-300'
-                        : 'text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100'
-                    )}
-                  >
-                    <Banknote size={15} className={paymentDisabled ? 'text-slate-300' : 'text-emerald-600'} />
-                    <span>Оплата</span>
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canEditInvoice(inv)) return;
+                        setExpandedMobileInvoiceId(null);
+                        openEditInvoiceModal(inv);
+                      }}
+                      disabled={!canEditInvoice(inv)}
+                      title={getEditBlockedReason(inv)}
+                      className={clsx(
+                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
+                        canEditInvoice(inv)
+                          ? 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
+                          : 'cursor-not-allowed text-slate-300'
+                      )}
+                    >
+                      <Pencil size={15} className={canEditInvoice(inv) ? 'text-slate-500' : 'text-slate-300'} />
+                      <span>Изменить</span>
+                    </button>
+                  )}
+
 
                   <button
                     type="button"
-                    onClick={() => {
-                      if (returnDisabled) return;
+                    onClick={async () => {
                       setExpandedMobileInvoiceId(null);
-                      void openReturnInvoiceModal(inv);
-                    }}
-                    disabled={returnDisabled}
-                    className={clsx(
-                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                      returnDisabled
-                        ? 'cursor-not-allowed text-slate-300'
-                        : 'text-amber-700 hover:bg-amber-50 active:bg-amber-100'
-                    )}
-                  >
-                    <RotateCcw size={15} className={returnDisabled ? 'text-slate-300' : 'text-amber-600'} />
-                    <span>Возврат</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canEditInvoice(inv)) return;
-                      setExpandedMobileInvoiceId(null);
-                      openEditInvoiceModal(inv);
-                    }}
-                    disabled={!canEditInvoice(inv)}
-                    title={getEditBlockedReason(inv)}
-                    className={clsx(
-                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                      canEditInvoice(inv)
-                        ? 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
-                        : 'cursor-not-allowed text-slate-300'
-                    )}
-                  >
-                    <Pencil size={15} className={canEditInvoice(inv) ? 'text-slate-500' : 'text-slate-300'} />
-                    <span>Изменить</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpandedMobileInvoiceId(null);
-                      handleQuickPrintInvoice(inv.id);
+                      const { shareInvoicePdf } = await import('../../utils/print/salesInvoicePdf');
+                      await shareInvoicePdf(inv);
                     }}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
                   >
-                    <Printer size={15} className="text-slate-500" />
-                    <span>Печать</span>
+                    <Share2 size={15} className="text-slate-500" />
+                    <span>Поделиться (PDF)</span>
                   </button>
 
                   {isAdmin && (
@@ -796,7 +800,7 @@ const SalesInvoicesSection = ({
                         type="button"
                         onClick={() => {
                           setExpandedMobileInvoiceId(null);
-                          handleDeleteInvoice(inv.id);
+                          handleDeleteInvoice(inv);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 active:bg-rose-100 text-left"
                       >

@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Search, Plus, Edit2, Trash2, FileText, Phone, MapPin, X, User, Printer } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { clsx } from 'clsx';
+import { Search, Plus, Edit2, Trash2, FileText, Phone, MapPin, X, User, Printer, Share2, Receipt, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
 import { formatCount, formatMoney, formatTransactionReason } from '../utils/format';
+import { formatProductName } from '../utils/productName';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
-import { useMemo } from 'react';
 import { getCurrentUser, isAdminUser } from '../utils/userAccess';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -58,12 +59,76 @@ export default function CustomerView() {
   const [selectedInvoice, setSelectedInvoice] = useState<StatementInvoice | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [statementData, setStatementData] = useState<StatementInvoice[]>([]);
+  const [statementFilter, setStatementFilter] = useState<'all' | 'unpaid' | 'paid'>('all');
+  const [statementSearch, setStatementSearch] = useState('');
   const [formData, setFormData] = useState(emptyForm);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isPrintingReconciliation, setIsPrintingReconciliation] = useState(false);
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const PAYMENT_EPSILON = CUSTOMER_PAYMENT_EPSILON;
+
+  const getCustomerInvoiceBadge = (inv: StatementInvoice) => {
+    const balance = Number(inv.invoiceBalance ?? 0);
+    const netAmount = Number(inv.netAmount ?? 0);
+    const paid = Math.max(0, netAmount - balance);
+
+    if (inv.cancelled) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
+          Отменена
+        </span>
+      );
+    }
+    if (balance <= PAYMENT_EPSILON) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Оплачено
+        </span>
+      );
+    }
+    if (paid > PAYMENT_EPSILON) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          Частично
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200/60">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+        Не оплачено
+      </span>
+    );
+  };
+
+  const filteredStatementInvoices = useMemo(() => {
+    return statementData.filter((inv) => {
+      const balance = Number(inv.invoiceBalance ?? 0);
+      const isUnpaid = balance > PAYMENT_EPSILON;
+      if (statementFilter === 'unpaid' && !isUnpaid) return false;
+      if (statementFilter === 'paid' && isUnpaid) return false;
+      if (statementSearch.trim()) {
+        const q = statementSearch.trim().toLowerCase();
+        const matchId = String(inv.id).includes(q);
+        const matchDate = new Date(inv.createdAt).toLocaleDateString('ru-RU').toLowerCase().includes(q);
+        const matchWh = String(inv.warehouse?.name || '').toLowerCase().includes(q);
+        return matchId || matchDate || matchWh;
+      }
+      return true;
+    });
+  }, [statementData, statementFilter, statementSearch, PAYMENT_EPSILON]);
+
+  const unpaidStatementCount = useMemo(() => {
+    return statementData.filter((inv) => Number(inv.invoiceBalance ?? 0) > PAYMENT_EPSILON).length;
+  }, [statementData, PAYMENT_EPSILON]);
+
+  const paidStatementCount = useMemo(() => {
+    return statementData.filter((inv) => Number(inv.invoiceBalance ?? 0) <= PAYMENT_EPSILON).length;
+  }, [statementData, PAYMENT_EPSILON]);
+
   const { customerCategories, paginatedCustomers, sortedCustomers, totalPages } = useCustomerList({
     currentPage,
     customers,
@@ -208,6 +273,8 @@ export default function CustomerView() {
 
   const openStatement = async (customer: Customer) => {
     setSelectedCustomer(customer);
+    setStatementFilter('all');
+    setStatementSearch('');
 
     try {
       const res = await client.get(`/customers/${customer.id}/history`);
@@ -218,9 +285,38 @@ export default function CustomerView() {
     }
   };
 
-  const openInvoiceDetails = (invoice: StatementInvoice) => {
+  const openInvoiceDetails = async (invoice: StatementInvoice) => {
     setSelectedInvoice(invoice);
     setIsInvoiceDetailsOpen(true);
+    try {
+      const res = await client.get(`/invoices/${invoice.id}`);
+      if (res.data) {
+        setSelectedInvoice((prev) => {
+          if (!prev || prev.id !== invoice.id) return prev;
+          return {
+            ...prev,
+            ...res.data,
+            invoiceBalance: prev.invoiceBalance ?? (Number(res.data.netAmount || 0) - Number(res.data.paidAmount || 0)),
+            paymentEvents: prev.paymentEvents?.length ? prev.paymentEvents : (res.data.payments || []).map((p: any) => ({
+              id: p.id,
+              amount: p.amount,
+              method: p.method,
+              createdAt: p.createdAt,
+              staff_name: p.user?.username || '—',
+            })),
+            returnEvents: prev.returnEvents?.length ? prev.returnEvents : (res.data.returns || []).map((r: any) => ({
+              id: r.id,
+              totalValue: r.totalValue,
+              reason: r.reason,
+              createdAt: r.createdAt,
+              staff_name: r.user?.username || '—',
+            })),
+          };
+        });
+      }
+    } catch {
+      // ignore
+    }
   };
 
   const handlePrintInvoiceDirect = async (invoice: StatementInvoice) => {
@@ -438,7 +534,7 @@ export default function CustomerView() {
               type="button"
               onClick={handlePrintAllReconciliation}
               disabled={isPrintingReconciliation || customers.length === 0}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
               title="Общий акт сверки"
             >
               <Printer size={14} />
@@ -621,7 +717,7 @@ export default function CustomerView() {
                   <button
                     type="button"
                     onClick={() => handlePrintCustomerReconciliation(customer)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border border-slate-200/80 bg-white py-1.5 sm:py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
+                    className="hidden md:flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border border-slate-200/80 bg-white py-1.5 sm:py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
                   >
                     <Printer size={13} />
                     <span>Акт сверки</span>
@@ -661,71 +757,86 @@ export default function CustomerView() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeCustomerModal}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
               />
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
+                className="relative flex max-h-[92vh] sm:max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl border border-slate-200/90"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-600 text-white">
-                      <User size={18} />
+                {/* Compact Modal Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f8f9fc] px-4 py-2.5 sm:px-5 sm:py-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white shadow-2xs shrink-0">
+                      <User size={15} />
                     </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
                         {selectedCustomer ? 'Редактировать клиента' : 'Новый клиент'}
                       </h3>
-                      <p className="text-xs text-slate-500">Введите персональные и контактные данные клиента.</p>
+                      <p className="hidden sm:block text-[11px] text-slate-400 truncate">Контактные данные и реквизиты</p>
                     </div>
                   </div>
-                  <button onClick={closeCustomerModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
-                    <X size={18} />
+                  <button
+                    type="button"
+                    onClick={closeCustomerModal}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  >
+                    <X size={15} />
                   </button>
                 </div>
+
                 <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
-                  <div className="space-y-4 overflow-y-auto p-6">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-700">Тип клиента</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, customerType: 'individual', companyName: '' })}
-                          className={`rounded-full py-2.5 px-4 text-xs font-semibold transition-all ${formData.customerType === 'individual' ? 'bg-slate-900 text-white shadow-xs' : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'}`}
-                        >
-                          Частное лицо
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, customerType: 'company' })}
-                          className={`rounded-full py-2.5 px-4 text-xs font-semibold transition-all ${formData.customerType === 'company' ? 'bg-slate-900 text-white shadow-xs' : 'border border-slate-200/70 bg-[#f4f5fb] text-slate-700 hover:bg-slate-100'}`}
-                        >
-                          Компания
-                        </button>
-                      </div>
+                  <div className="space-y-2.5 overflow-y-auto p-3.5 sm:p-4">
+                    {/* Compact Segmented Control */}
+                    <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100/90 text-xs font-semibold gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, customerType: 'individual', companyName: '' })}
+                        className={clsx(
+                          'rounded-lg py-1.5 px-3 transition-all text-xs font-semibold',
+                          formData.customerType === 'individual'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-800'
+                        )}
+                      >
+                        Частное лицо
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, customerType: 'company' })}
+                        className={clsx(
+                          'rounded-lg py-1.5 px-3 transition-all text-xs font-semibold',
+                          formData.customerType === 'company'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-800'
+                        )}
+                      >
+                        Компания
+                      </button>
                     </div>
 
                     {formData.customerType === 'company' && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-700">Название компании</label>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500">Название компании *</label>
                         <input
                           required
-                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                           value={formData.companyName}
                           onChange={(e) => setFormData({ ...formData, companyName: e.target.value, name: e.target.value })}
+                          placeholder="ООО «Пример»"
                         />
                       </div>
                     )}
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-700">
-                        {formData.customerType === 'company' ? 'Контактное лицо' : 'Имя клиента'}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-500">
+                        {formData.customerType === 'company' ? 'Контактное лицо' : 'Имя клиента *'}
                       </label>
                       <input
                         required={formData.customerType !== 'company'}
-                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                         value={formData.customerType === 'company' ? formData.contactName : formData.name}
                         onChange={(e) =>
                           setFormData(
@@ -734,15 +845,26 @@ export default function CustomerView() {
                               : { ...formData, name: e.target.value, contactName: e.target.value },
                           )
                         }
+                        placeholder={formData.customerType === 'company' ? 'ФИО представителя' : 'ФИО клиента'}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-700">Категория</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500">Телефон</label>
+                        <input
+                          className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="+992..."
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500">Категория</label>
                         <input
                           list="customer-category-options"
-                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                           value={formData.customerCategory}
                           onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
                           placeholder="VIP, Оптовик..."
@@ -753,66 +875,64 @@ export default function CustomerView() {
                           ))}
                         </datalist>
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-700">Телефон</label>
-                        <input
-                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        />
-                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-700">Регион</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500">Город</label>
                         <input
-                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
-                          value={formData.region}
-                          onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-700">Город</label>
-                        <input
-                          className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                          className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                           value={formData.city}
                           onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                          placeholder="Душанбе..."
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500">Регион</label>
+                        <input
+                          className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
+                          value={formData.region}
+                          onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                          placeholder="РРП..."
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-700">Адрес</label>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-500">Адрес</label>
                       <input
-                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white"
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        placeholder="Улица, дом, ориентир..."
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-slate-700">Заметки</label>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-500">Заметки</label>
                       <textarea
                         rows={2}
-                        className="w-full rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-4 py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                        className="w-full rounded-xl border border-slate-200/90 bg-[#f8f9fb] px-3 py-1.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-slate-400 focus:bg-white resize-none"
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        placeholder="Дополнительная информация о клиенте..."
                       />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+                  {/* Compact Modal Footer */}
+                  <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 sm:px-5 sm:py-3">
                     <button
                       type="button"
                       onClick={closeCustomerModal}
-                      className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                      className="flex-1 rounded-xl border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 active:scale-[0.99]"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
                       disabled={isSavingCustomer}
-                      className="flex-1 rounded-full bg-slate-900 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex-1 rounded-xl bg-slate-900 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.99]"
                     >
                       {isSavingCustomer ? 'Сохранение...' : 'Сохранить'}
                     </button>
@@ -831,104 +951,270 @@ export default function CustomerView() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeStatementModal}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
               />
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]"
+                initial={{ y: '100%', opacity: 0.5 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0.5 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="relative flex h-[92vh] sm:h-auto sm:max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-200/90 bg-white shadow-2xl"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-8 py-6">
-                  <div>
-                    <h3 className="text-xl font-semibold tracking-tight text-slate-900">{selectedCustomer.name}</h3>
-                    <p className="mt-0.5 text-xs text-slate-500">История и баланс строятся только по накладным.</p>
+                {/* Mobile grab handle */}
+                <div className="mx-auto mt-2.5 h-1.5 w-12 shrink-0 rounded-full bg-slate-300 sm:hidden" />
+
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                      <Receipt size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                        {selectedCustomer.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <span>Накладные ({statementData.length})</span>
+                        {selectedCustomer.phone && (
+                          <>
+                            <span>•</span>
+                            <a href={`tel:${selectedCustomer.phone}`} className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900">
+                              <Phone size={11} />
+                              <span>{selectedCustomer.phone}</span>
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
+
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => handlePrintCustomerReconciliation(selectedCustomer, statementData)}
-                      className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50"
+                      className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                      title="Печать акта сверки"
                     >
-                      <Printer size={15} />
-                      <span>Детальный акт</span>
+                      <Printer size={14} />
+                      <span>Акт сверки</span>
                     </button>
-                    <button onClick={closeStatementModal} className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700">
-                      <X size={18} />
+                    <button
+                      type="button"
+                      onClick={closeStatementModal}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors active:scale-95"
+                      title="Закрыть"
+                    >
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
 
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Всего по накладным</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoneyByRole(selectedCustomer.total_invoiced)}</p>
+                {/* Financial Summary Strip */}
+                <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 sm:px-6 sm:py-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 sm:p-3 text-center shadow-xs">
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Сумма накладных</p>
+                      <p className="mt-0.5 font-mono text-xs sm:text-base font-bold tabular-nums text-slate-900 truncate">
+                        {formatMoneyByRole(selectedCustomer.total_invoiced)}
+                      </p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Всего оплачено</p>
-                      <p className="mt-1 text-lg font-semibold text-emerald-600">{formatMoneyByRole(selectedCustomer.total_paid)}</p>
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 sm:p-3 text-center shadow-xs">
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Всего оплачено</p>
+                      <p className="mt-0.5 font-mono text-xs sm:text-base font-bold tabular-nums text-emerald-600 truncate">
+                        {formatMoneyByRole(selectedCustomer.total_paid)}
+                      </p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xs">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Текущий долг</p>
-                      <p className="mt-1 text-lg font-semibold text-rose-600">{formatMoneyByRole(selectedCustomer.balance)}</p>
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 sm:p-3 text-center shadow-xs">
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Текущий долг</p>
+                      <p className={clsx(
+                        'mt-0.5 font-mono text-xs sm:text-base font-bold tabular-nums truncate',
+                        Number(selectedCustomer.balance || 0) > PAYMENT_EPSILON ? 'text-rose-600' : 'text-slate-700'
+                      )}>
+                        {formatMoneyByRole(selectedCustomer.balance)}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-8">
-                  <div className="space-y-3">
-                    {statementData.length === 0 && (
-                      <div className="rounded-2xl bg-[#f4f5fb] p-8 text-center text-xs font-medium text-slate-500">
-                        У клиента пока нет накладных.
-                      </div>
-                    )}
+                {/* Filter & Search Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-4 py-2 sm:px-6">
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => setStatementFilter('all')}
+                      className={clsx(
+                        'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                        statementFilter === 'all'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      )}
+                    >
+                      Все ({statementData.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatementFilter('unpaid')}
+                      className={clsx(
+                        'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                        statementFilter === 'unpaid'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60'
+                      )}
+                    >
+                      <span>С долгом</span>
+                      <span>({unpaidStatementCount})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatementFilter('paid')}
+                      className={clsx(
+                        'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                        statementFilter === 'paid'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
+                      )}
+                    >
+                      <span>Оплачено</span>
+                      <span>({paidStatementCount})</span>
+                    </button>
+                  </div>
 
-                    {statementData.map((invoice) => (
-                      <div
-                        key={invoice.id}
-                        onClick={() => openInvoiceDetails(invoice)}
-                        className="flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-4 transition-all hover:bg-white hover:shadow-xs sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 font-semibold">
-                            <FileText size={18} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">Накладная #{invoice.id}</p>
-                            <p className="text-xs text-slate-400">
+                  {statementData.length > 3 && (
+                    <div className="relative min-w-[140px] sm:w-56">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={statementSearch}
+                        onChange={(e) => setStatementSearch(e.target.value)}
+                        placeholder="Поиск по № или дате..."
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1 pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Invoices List */}
+                <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50/40 p-3.5 sm:p-6">
+                  {filteredStatementInvoices.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs font-medium text-slate-500">
+                      {statementData.length === 0
+                        ? 'У клиента пока нет накладных.'
+                        : 'Нет накладных, соответствующих выбранному фильтру.'}
+                    </div>
+                  ) : (
+                    filteredStatementInvoices.map((invoice) => {
+                      const balance = Number(invoice.invoiceBalance ?? 0);
+                      const netAmount = Number(invoice.netAmount ?? 0);
+                      const paid = Math.max(0, netAmount - balance);
+                      const paymentsCount = invoice.paymentEvents?.length || 0;
+                      const returnsCount = invoice.returnEvents?.length || 0;
+
+                      return (
+                        <div
+                          key={invoice.id}
+                          onClick={() => openInvoiceDetails(invoice)}
+                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs hover:border-slate-300 hover:shadow-md transition-all active:scale-[0.99]"
+                        >
+                          {/* Top Row: Number & Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs sm:text-sm font-bold text-slate-900">
+                                Накладная #{invoice.id}
+                              </span>
+                              {getCustomerInvoiceBadge(invoice)}
+                            </div>
+                            <span className="font-mono text-[11px] text-slate-400">
                               {new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
                                 day: 'numeric',
-                                month: 'long',
+                                month: 'short',
                                 year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit',
                               })}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-slate-500">
-                              Оплаты: {formatCount(invoice.paymentEvents?.length || 0)} · Возвраты: {formatCount(invoice.returnEvents?.length || 0)}
-                            </p>
+                            </span>
+                          </div>
+
+                          {/* 3-Column Financial Strip */}
+                          <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center">
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Сумма</p>
+                              <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-slate-900">
+                                {formatMoneyByRole(netAmount)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Оплачено</p>
+                              <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">
+                                {formatMoneyByRole(paid)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Остаток</p>
+                              <p className={clsx(
+                                'mt-0.5 font-mono text-xs font-bold tabular-nums',
+                                balance > PAYMENT_EPSILON ? 'text-rose-600' : 'text-slate-400'
+                              )}>
+                                {formatMoneyByRole(balance)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Bottom Row: Metadata & Actions */}
+                          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
+                              {invoice.warehouse?.name && (
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 truncate max-w-[140px]">
+                                  {invoice.warehouse.name}
+                                </span>
+                              )}
+                              {paymentsCount > 0 && (
+                                <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  Оплат: {paymentsCount}
+                                </span>
+                              )}
+                              {returnsCount > 0 && (
+                                <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                  Возвратов: {returnsCount}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => openInvoiceDetails(invoice)}
+                                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-slate-800 active:scale-95"
+                              >
+                                <Eye size={13} />
+                                <span>Посмотреть</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const { shareInvoicePdf } = await import('../utils/print/salesInvoicePdf');
+                                  await shareInvoicePdf(invoice);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors active:scale-95"
+                                title="Поделиться PDF"
+                              >
+                                <Share2 size={13} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handlePrintInvoiceDirect(invoice)}
+                                className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors active:scale-95"
+                                title="Печать"
+                              >
+                                <Printer size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-4">
-                          <div className="text-right">
-                            <p className="text-sm font-semibold text-slate-900">{formatMoneyByRole(invoice.netAmount)}</p>
-                            <p className="mt-0.5 text-[11px] text-slate-500">Остаток: {formatMoneyByRole(invoice.invoiceBalance)}</p>
-                          </div>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handlePrintInvoiceDirect(invoice);
-                            }}
-                            className="flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                          >
-                            <Printer size={14} />
-                            <span>Печать</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      );
+                    })
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -943,102 +1229,199 @@ export default function CustomerView() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeInvoiceDetailsModal}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
               />
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl sm:rounded-xl"
+                initial={{ y: '100%', opacity: 0.5 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0.5 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="relative flex h-[92vh] sm:h-auto sm:max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-200/90 bg-white shadow-2xl"
               >
-                <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f4f5fb] text-slate-700">
-                      <FileText size={16} />
+                {/* Mobile grab handle */}
+                <div className="mx-auto mt-2.5 h-1.5 w-12 shrink-0 rounded-full bg-slate-300 sm:hidden" />
+
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-800">
+                      <Receipt size={18} />
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-900">Накладная #{selectedInvoice.id}</h3>
-                      <p className="text-[11px] text-slate-500">{new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                          Накладная #{selectedInvoice.id}
+                        </h3>
+                        <div className="shrink-0 scale-90 sm:scale-100 origin-left">
+                          {getCustomerInvoiceBadge(selectedInvoice)}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}
+                      </p>
                     </div>
                   </div>
-                  <button onClick={closeInvoiceDetailsModal} className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-[#f4f5fb] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
-                    <X size={14} />
-                  </button>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
+                      className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+                      title="Печать"
+                    >
+                      <Printer size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { shareInvoicePdf } = await import('../utils/print/salesInvoicePdf');
+                        await shareInvoicePdf(selectedInvoice);
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+                      title="Поделиться (PDF)"
+                    >
+                      <Share2 size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeInvoiceDetailsModal}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+                      title="Закрыть"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex-1 space-y-3 overflow-y-auto bg-white p-5">
-                  <div className="rounded-lg border border-slate-200 p-3 text-xs text-slate-500">
-                    <span>Склад: </span>
-                    <span className="font-semibold text-slate-900">{selectedInvoice.warehouse?.name || '---'}</span>
+                {/* Modal Body */}
+                <div className="flex-1 space-y-3.5 overflow-y-auto bg-white p-3.5 sm:p-5">
+                  {/* Requisites Card */}
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Клиент</span>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {selectedInvoice.customer_name || selectedCustomer?.name || 'Обычный клиент'}
+                        </p>
+                        {(selectedInvoice.customer_phone || selectedCustomer?.phone) && (
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            {selectedInvoice.customer_phone || selectedCustomer?.phone}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Склад</span>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {selectedInvoice.warehouse?.name || '---'}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-slate-500 truncate">
+                          {selectedInvoice.warehouse?.address || 'Без адреса'}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Сотрудник</span>
+                        <p className="text-xs font-semibold text-slate-800">
+                          {selectedInvoice.staff_name || selectedInvoice.user?.username || 'admin'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Товары</h4>
-                    <div className="overflow-hidden rounded-lg border border-slate-200">
-                      <div className="space-y-2 p-2 sm:hidden">
-                        {selectedInvoice.items?.map((item) => {
-                          const quantityInfo = getInvoiceItemQuantityParts(item);
+                  {/* Items Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Товары в накладной ({selectedInvoice.items?.length || 0})
+                      </h4>
+                    </div>
 
-                          return (
-                            <div key={item.id} className="rounded-lg border border-slate-100 bg-[#f4f5fb]/50 p-2">
-                              <p className="wrap-break-word text-xs font-medium text-slate-900">{item.product?.name}</p>
-                              <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[11px]">
-                                <div className="rounded-lg bg-white px-2 py-1.5">
-                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Кол-во</p>
-                                  <p className="mt-0.5 whitespace-nowrap text-[11px] font-semibold text-slate-700">{quantityInfo.primary}</p>
-                                  {quantityInfo.secondary && (
-                                    <p className="mt-0.5 whitespace-nowrap text-[9px] text-slate-400">{quantityInfo.secondary}</p>
-                                  )}
-                                </div>
-                                <div className="rounded-lg bg-white px-2 py-1.5">
-                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Цена</p>
-                                  <p className="mt-0.5 text-[11px] font-semibold text-slate-900">{formatMoney(item.sellingPrice)}</p>
-                                </div>
-                                <div className="rounded-lg bg-white px-2 py-1.5">
-                                  <p className="text-[8px] uppercase tracking-wider text-slate-400">Итого</p>
-                                  <p className="mt-0.5 text-[11px] font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
-                                </div>
-                              </div>
-                              {Number(item.returnedQty || 0) > 0 && (
-                                <p className="mt-1.5 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700">
-                                  Возвращено: {formatCount(item.returnedQty || 0)}
+                    {/* Mobile Items Cards */}
+                    <div className="space-y-2 md:hidden">
+                      {selectedInvoice.items?.map((item: any, idx: number) => {
+                        const quantityInfo = getInvoiceItemQuantityParts(item);
+                        const lineTotal = Number(item.totalPrice) || (Number(item.quantity || 0) * Number(item.sellingPrice || 0));
+                        const returnedQty = Number(item.returnedQty || 0);
+
+                        return (
+                          <div key={item.id || idx} className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs">
+                            <div className="flex items-start gap-2">
+                              <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-500">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-slate-900 leading-snug">
+                                  {formatProductName(item.product_name || item.product?.name)}
                                 </p>
-                              )}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                      <table className="hidden w-full border-collapse text-left text-[11px] sm:table">
+
+                            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
+                              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Кол-во</p>
+                                <p className="mt-0.5 font-bold text-slate-800 text-xs">{quantityInfo.primary}</p>
+                                {quantityInfo.secondary && (
+                                  <p className="mt-0.5 text-[9px] text-slate-400">{quantityInfo.secondary}</p>
+                                )}
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Цена</p>
+                                <p className="mt-0.5 font-bold text-slate-900 text-xs">{formatMoney(item.sellingPrice)}</p>
+                              </div>
+                              <div className="rounded-lg bg-slate-100/80 p-2 text-center">
+                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500">Итого</p>
+                                <p className="mt-0.5 font-bold text-slate-900 text-xs">{formatMoney(lineTotal)}</p>
+                              </div>
+                            </div>
+
+                            {returnedQty > PAYMENT_EPSILON && (
+                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-800">
+                                Возвращено: {formatCount(returnedQty)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Desktop Items Table */}
+                    <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200">
+                      <table className="w-full border-collapse text-left text-[11px]">
                         <thead>
-                          <tr className="border-b border-slate-200 bg-[#f4f5fb] text-[9px] font-medium uppercase tracking-wider text-slate-500">
-                            <th className="px-3 py-1.5">Товар</th>
-                            <th className="px-3 py-1.5">Кол-во</th>
-                            <th className="px-3 py-1.5">Цена</th>
-                            <th className="px-3 py-1.5 text-right">Итого</th>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                            <th className="px-3 py-2 w-10">№</th>
+                            <th className="px-3 py-2">Товар</th>
+                            <th className="px-3 py-2">Кол-во</th>
+                            <th className="px-3 py-2">Цена</th>
+                            <th className="px-3 py-2 text-right">Итого</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {selectedInvoice.items?.map((item) => {
+                          {selectedInvoice.items?.map((item: any, idx: number) => {
                             const quantityInfo = getInvoiceItemQuantityParts(item);
+                            const lineTotal = Number(item.totalPrice) || (Number(item.quantity || 0) * Number(item.sellingPrice || 0));
+                            const returnedQty = Number(item.returnedQty || 0);
 
                             return (
-                              <tr key={item.id} className="hover:bg-[#f4f5fb]/50 transition-colors">
-                                <td className="px-3 py-1.5">
-                                  <p className="font-medium text-slate-900">{item.product?.name}</p>
+                              <tr key={item.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-3 py-2 font-mono text-slate-400">{idx + 1}</td>
+                                <td className="px-3 py-2">
+                                  <p className="font-semibold text-slate-900">{formatProductName(item.product_name || item.product?.name)}</p>
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-slate-500">
+                                <td className="whitespace-nowrap px-3 py-2 text-slate-500">
                                   <p className="whitespace-nowrap text-[11px] font-semibold text-slate-700">{quantityInfo.primary}</p>
                                   {quantityInfo.secondary && (
                                     <p className="mt-0.5 whitespace-nowrap text-[9px] text-slate-400">{quantityInfo.secondary}</p>
                                   )}
-                                  {Number(item.returnedQty || 0) > 0 && (
-                                    <div className="mt-1 inline-flex rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5">
-                                      <span className="text-[9px] font-semibold text-amber-700">Возвращено: {formatCount(item.returnedQty || 0)}</span>
-                                    </div>
+                                  {returnedQty > PAYMENT_EPSILON && (
+                                    <span className="mt-1 inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-700">
+                                      Возвращено: {formatCount(returnedQty)}
+                                    </span>
                                   )}
                                 </td>
-                                <td className="px-3 py-1.5 font-medium text-slate-700">{formatMoney(item.sellingPrice)}</td>
-                                <td className="px-3 py-1.5 text-right font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</td>
+                                <td className="px-3 py-2 font-medium text-slate-700">{formatMoney(item.sellingPrice)}</td>
+                                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatMoney(lineTotal)}</td>
                               </tr>
                             );
                           })}
@@ -1047,46 +1430,62 @@ export default function CustomerView() {
                     </div>
                   </div>
 
+                  {/* Totals Summary */}
                   <div className="flex justify-end">
-                    <div className="w-full max-w-70 space-y-1 rounded-lg border border-slate-200 p-3 text-[11px]">
+                    <div className="w-full max-w-sm space-y-1.5 rounded-xl border border-slate-200/90 bg-slate-50/50 p-3 text-xs">
                       <div className="flex items-center justify-between text-slate-500">
-                        <span>Сумма</span>
-                        <span className="font-medium text-slate-900">{formatMoneyByRole(selectedInvoice.totalAmount)}</span>
+                        <span>Сумма без скидки</span>
+                        <span className="font-medium text-slate-900">{formatMoneyByRole(selectedInvoice.totalAmount || selectedInvoice.netAmount)}</span>
                       </div>
+
                       {Number(selectedInvoice.discount || 0) > 0 && (
-                        <div className="flex items-center justify-between text-rose-500">
+                        <div className="flex items-center justify-between text-rose-600">
                           <span>Скидка ({selectedInvoice.discount}%)</span>
                           <span className="font-medium">-{formatMoneyByRole(getInvoiceDiscountAmount(selectedInvoice))}</span>
                         </div>
                       )}
+
                       {Number(selectedInvoice.returnedAmount || 0) > 0 && (
-                        <div className="flex items-center justify-between text-amber-600">
-                          <span>Возвраты</span>
+                        <div className="flex items-center justify-between text-amber-700">
+                          <span>Возврат</span>
                           <span className="font-semibold">-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 text-xs font-semibold text-slate-900">
-                        <span>Итого</span>
-                        <span className="text-sm font-bold text-slate-900">{formatMoneyByRole(selectedInvoice.netAmount)}</span>
+
+                      <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 text-xs font-bold text-slate-900">
+                        <span>ИТОГО К ОПЛАТЕ</span>
+                        <span className="font-mono text-sm font-bold text-slate-900">{formatMoneyByRole(selectedInvoice.netAmount)}</span>
                       </div>
+
                       <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-slate-500">
                         <span>Оплачено</span>
-                        <span className="font-semibold text-emerald-600">{formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
+                        <span className="font-mono font-bold text-emerald-600">
+                          {formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}
+                        </span>
                       </div>
+
                       <div className="flex items-center justify-between text-slate-500">
-                        <span>Остаток</span>
-                        <span className="font-semibold text-rose-600">{formatMoneyByRole(selectedInvoice.invoiceBalance)}</span>
+                        <span>Остаток долга</span>
+                        <span className={clsx(
+                          'font-mono font-bold',
+                          Number(selectedInvoice.invoiceBalance || 0) > PAYMENT_EPSILON ? 'text-rose-600' : 'text-slate-400'
+                        )}>
+                          {formatMoneyByRole(selectedInvoice.invoiceBalance)}
+                        </span>
                       </div>
                     </div>
                   </div>
 
+                  {/* Payment Events */}
                   {Boolean(selectedInvoice.paymentEvents?.length) && (
-                    <div className="space-y-1.5">
-                      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Оплаты по накладной</h4>
-                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <div className="space-y-1.5 pt-1">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        История оплат ({selectedInvoice.paymentEvents!.length})
+                      </h4>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="w-full text-left text-[11px]">
                           <thead>
-                            <tr className="border-b border-slate-200 bg-[#f4f5fb] text-slate-500">
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold">
                               <th className="px-3 py-1.5">Дата</th>
                               <th className="px-3 py-1.5">Сумма</th>
                               <th className="px-3 py-1.5">Сотрудник</th>
@@ -1094,18 +1493,21 @@ export default function CustomerView() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {selectedInvoice.paymentEvents!.map((payment) => {
+                            {selectedInvoice.paymentEvents!.map((payment: any) => {
                               const isRefund = Number(payment.amount || 0) < 0;
                               return (
-                              <tr key={payment.id}>
-                                <td className="px-3 py-1.5 text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
-                                <td className={`px-3 py-1.5 font-semibold ${isRefund ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                  {isRefund ? '−' : ''}{formatMoneyByRole(Math.abs(Number(payment.amount || 0)))}
-                                  {isRefund && <span className="ml-1.5 rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-500">Возврат</span>}
-                                </td>
-                                <td className="px-3 py-1.5 text-slate-500">{payment.staff_name}</td>
-                                <td className="px-3 py-1.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">{payment.method}</td>
-                              </tr>
+                                <tr key={payment.id}>
+                                  <td className="px-3 py-1.5 text-slate-500 font-mono text-[10px]">
+                                    {new Date(payment.createdAt).toLocaleString('ru-RU')}
+                                  </td>
+                                  <td className={`px-3 py-1.5 font-bold ${isRefund ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {isRefund ? '−' : ''}{formatMoneyByRole(Math.abs(Number(payment.amount || 0)))}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-slate-600">{payment.staff_name}</td>
+                                  <td className="px-3 py-1.5 text-right text-[10px] font-bold uppercase text-slate-500">
+                                    {payment.method}
+                                  </td>
+                                </tr>
                               );
                             })}
                           </tbody>
@@ -1114,26 +1516,33 @@ export default function CustomerView() {
                     </div>
                   )}
 
+                  {/* Return Events */}
                   {Boolean(selectedInvoice.returnEvents?.length) && (
-                    <div className="space-y-1.5">
-                      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Возвраты по накладной</h4>
-                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <div className="space-y-1.5 pt-1">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                        История возвратов ({selectedInvoice.returnEvents!.length})
+                      </h4>
+                      <div className="overflow-x-auto rounded-xl border border-amber-200 bg-amber-50/40">
                         <table className="w-full text-left text-[11px]">
                           <thead>
-                            <tr className="border-b border-slate-200 bg-[#f4f5fb] text-slate-500">
+                            <tr className="border-b border-amber-200 bg-amber-100/50 text-amber-800 font-semibold">
                               <th className="px-3 py-1.5">Дата</th>
                               <th className="px-3 py-1.5">Сумма</th>
                               <th className="px-3 py-1.5">Причина</th>
-                              <th className="px-3 py-1.5">Сотрудник</th>
+                              <th className="px-3 py-1.5 text-right">Сотрудник</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {selectedInvoice.returnEvents!.map((itemReturn) => (
+                          <tbody className="divide-y divide-amber-100">
+                            {selectedInvoice.returnEvents!.map((itemReturn: any) => (
                               <tr key={itemReturn.id}>
-                                <td className="px-3 py-1.5 text-slate-500">{new Date(itemReturn.createdAt).toLocaleString('ru-RU')}</td>
-                                <td className="px-3 py-1.5 font-semibold text-rose-600">-{formatMoneyByRole(itemReturn.totalValue)}</td>
-                                <td className="max-w-xs wrap-break-word px-3 py-1.5 text-slate-500">{formatTransactionReason(itemReturn.reason)}</td>
-                                <td className="px-3 py-1.5 text-slate-500">{itemReturn.staff_name}</td>
+                                <td className="px-3 py-1.5 text-slate-500 font-mono text-[10px]">
+                                  {new Date(itemReturn.createdAt).toLocaleString('ru-RU')}
+                                </td>
+                                <td className="px-3 py-1.5 font-bold text-rose-600">
+                                  -{formatMoneyByRole(itemReturn.totalValue)}
+                                </td>
+                                <td className="px-3 py-1.5 text-slate-600">{formatTransactionReason(itemReturn.reason)}</td>
+                                <td className="px-3 py-1.5 text-right text-slate-500">{itemReturn.staff_name}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1142,17 +1551,36 @@ export default function CustomerView() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3">
+
+                {/* Sticky Modal Footer */}
+                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
+                      className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                    >
+                      <Printer size={14} />
+                      <span>Печать</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { shareInvoicePdf } = await import('../utils/print/salesInvoicePdf');
+                        await shareInvoicePdf(selectedInvoice);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                    >
+                      <Share2 size={14} />
+                      <span>Поделиться (PDF)</span>
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-900 hover:text-white"
-                  >
-                    <Printer size={14} />
-                    <span>Печать</span>
-                  </button>
-                  <button
+                    type="button"
                     onClick={closeInvoiceDetailsModal}
-                    className="rounded-full border border-slate-200 bg-[#f4f5fb] px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+                    className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
                   >
                     Закрыть
                   </button>

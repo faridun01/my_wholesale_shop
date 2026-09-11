@@ -19,7 +19,8 @@ import {
   Printer,
   Ban,
   Phone,
-  Share2
+  Share2,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -33,6 +34,7 @@ import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
 import { Badge, Button, IconButton } from '../components/UI';
 import SalesInvoicesSection from '../components/sales/SalesInvoicesSection';
+import DeleteInvoiceModal from '../components/sales/DeleteInvoiceModal';
 import useSalesEditInvoice from '../components/sales/useSalesEditInvoice';
 import useSalesInvoiceActions from '../components/sales/useSalesInvoiceActions';
 import useSalesListData from '../components/sales/useSalesListData';
@@ -335,11 +337,103 @@ export default function SalesView() {
     fetchInvoices,
   });
 
+  const [returnSearch, setReturnSearch] = useState('');
+
+  const handleCloseReturnModal = () => {
+    setReturnSearch('');
+    closeReturnModal();
+  };
+
+  const filteredReturnItems = React.useMemo(() => {
+    const query = returnSearch.trim().toLowerCase();
+    if (!query) return returnItems;
+    return returnItems.filter((item: ReturnInvoiceItem) => {
+      const name = getReturnItemDisplayName(item).toLowerCase();
+      const sku = String(item?.product?.sku || '').toLowerCase();
+      const brand = String(item?.brandSnapshot || item?.product?.brand || '').toLowerCase();
+      return name.includes(query) || sku.includes(query) || brand.includes(query);
+    });
+  }, [returnItems, returnSearch]);
+
+  const returnStats = React.useMemo(() => {
+    let activeCount = 0;
+    let totalUnits = 0;
+    let totalRefund = 0;
+
+    for (const item of returnItems) {
+      const rawQty = Number(item.returnQty || 0);
+      if (rawQty > 0) {
+        activeCount++;
+        const packaging = getReturnItemPackaging(item);
+        const units = item.returnMode === 'package' && packaging
+          ? rawQty * packaging.unitsPerPackage
+          : rawQty;
+        totalUnits += units;
+
+        const itemDiscount = Number(item.discount || 0);
+        const globalDiscount = Number(selectedInvoice?.discount || 0);
+        const basePrice = Number(item.sellingPrice ?? item.price ?? 0);
+        const unitPriceAfterDiscount = basePrice * (1 - itemDiscount / 100) * (1 - globalDiscount / 100);
+        totalRefund += unitPriceAfterDiscount * units;
+      }
+    }
+
+    return {
+      activeCount,
+      totalUnits,
+      totalRefund,
+    };
+  }, [returnItems, selectedInvoice]);
+
+  const handleFillAllReturns = () => {
+    setReturnItems((current) =>
+      current.map((item) => {
+        const remainingUnits = getReturnItemRemainingUnits(item);
+        const packaging = getReturnItemPackaging(item);
+        if (item.returnMode === 'package' && packaging) {
+          const maxPackages = Math.floor(remainingUnits / packaging.unitsPerPackage);
+          return { ...item, returnQty: String(maxPackages) };
+        }
+        return { ...item, returnQty: String(remainingUnits) };
+      })
+    );
+  };
+
+  const handleResetAllReturns = () => {
+    setReturnItems((current) => current.map((item) => ({ ...item, returnQty: '' })));
+  };
+
+  const updateReturnItemMode = (itemId: number, mode: 'package' | 'unit') => {
+    setReturnItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? { ...item, returnMode: mode, returnQty: '' }
+          : item
+      )
+    );
+  };
+
+  const updateReturnItemQty = (itemId: number, qty: string) => {
+    setReturnItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? { ...item, returnQty: qty }
+          : item
+      )
+    );
+  };
+
   const {
     fetchInvoiceDetails,
     handleDeleteInvoice,
     handlePrintInvoice,
     handleQuickPrintInvoice,
+    invoiceToDelete,
+    closeDeleteInvoiceModal,
+    confirmDeleteInvoice,
+    isDeletingInvoice,
+    deleteInvoiceError,
+    needsForceDelete,
   } = useSalesInvoiceActions({
     selectedInvoice,
     setSelectedInvoice,
@@ -349,6 +443,7 @@ export default function SalesView() {
     closePaymentModal,
     closeReturnModal,
     fetchInvoices,
+    invoices,
   });
 
   const handleShareInvoice = async (invoice: any) => {
@@ -1025,6 +1120,21 @@ export default function SalesView() {
                     </button>
                   )}
 
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteInvoice(selectedInvoice);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-colors"
+                      title="Удалить накладную"
+                    >
+                      <Trash2 size={15} />
+                      <span className="hidden sm:inline">Удалить накладную</span>
+                      <span className="sm:hidden">Удалить</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={closeDetailsModal}
@@ -1559,171 +1669,363 @@ export default function SalesView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={closeReturnModal}
-            className="fixed inset-0 z-60 flex items-end justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+            onClick={handleCloseReturnModal}
+            className="fixed inset-0 z-60 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-xs sm:items-center sm:p-4"
           >
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+              initial={{ y: '100%', opacity: 0.6 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0.6 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-[#9fb7d5] bg-white shadow-2xl"
+              className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl border border-slate-200/90 bg-white shadow-2xl"
             >
-              <div className="flex items-center justify-between border-b border-[#b7c2ce] bg-[linear-gradient(180deg,#ffffff_0%,#dde5ee_100%)] px-4 py-3">
-                <div className="flex items-center space-x-4">
-                  <div className="rounded border border-[#d6c07a] bg-[#fff8dc] p-2 text-[#7a5a00]">
-                    <RotateCcw size={24} />
+              {/* Mobile Drag Indicator */}
+              <div className="flex justify-center pt-2.5 pb-1 sm:hidden">
+                <div className="h-1.5 w-10 rounded-full bg-slate-300" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 shadow-2xs">
+                    <RotateCcw size={20} />
                   </div>
-                  <h3 className="text-xl font-semibold text-[#1f2933]">Оформить возврат</h3>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
+                      Оформить возврат
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
+                      Накладная №{selectedInvoice.id} {selectedInvoice.customer_name ? `· ${selectedInvoice.customer_name}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <button onClick={closeReturnModal} className="flex h-8 w-8 items-center justify-center rounded border border-[#9fb7d5] bg-white text-[#23527c] transition-colors hover:bg-[#eaf2fb]">
-                  <X size={24} />
+                <button
+                  type="button"
+                  onClick={handleCloseReturnModal}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:scale-95 transition-all"
+                  aria-label="Закрыть"
+                >
+                  <X size={19} />
                 </button>
               </div>
               
-              <div className="flex-1 space-y-4 overflow-y-auto bg-[#f3f5f7] p-3 sm:p-4">
-                <div className="grid gap-2 rounded border border-[#c8d2df] bg-white p-3 md:grid-cols-3">
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#48627f]">Накладная</p>
-                    <p className="mt-1 text-sm font-semibold text-[#1f2933]">#{selectedInvoice.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#48627f]">Клиент</p>
-                    <p className="mt-1 wrap-break-word text-sm font-semibold text-[#1f2933]">{selectedInvoice.customer_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#48627f]">Дата</p>
-                    <p className="mt-1 text-sm font-medium text-[#1f2933]">{new Date(selectedInvoice.createdAt).toLocaleDateString('ru-RU')}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="ml-1 text-sm font-semibold text-[#32465a]">Выберите товары для возврата</h4>
-                  <div className="overflow-x-auto rounded border border-[#b7c2ce] bg-white">
-                    <table className="w-full min-w-190 table-fixed border-collapse text-left text-sm">
-                      <colgroup>
-                        <col className="w-[36%]" />
-                        <col className="w-[30%]" />
-                        <col className="w-[34%]" />
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-[#b7c2ce] bg-[#dbe5f1] text-[12px] font-semibold text-[#32465a]">
-                          <th className="px-3 py-2">Товар</th>
-                          <th className="px-3 py-2">Продано / доступно</th>
-                          <th className="px-3 py-2">Возврат</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#d5dde6]">
-                        {returnItems.map((item: ReturnInvoiceItem, idx: number) => {
-                          const quantityInfo = getInvoiceItemQuantityParts(item);
-                          const packaging = getReturnItemPackaging(item);
-                          const remainingUnits = getReturnItemRemainingUnits(item);
-                          const maxPackages = packaging ? Math.floor(remainingUnits / packaging.unitsPerPackage) : 0;
-                          const inputMax = item.returnMode === 'package' ? maxPackages : remainingUnits;
-                          const itemMeta = [
-                            `Строка #${idx + 1}`,
-                            item?.product?.sku ? `Артикул: ${item.product.sku}` : null,
-                            item?.brandSnapshot || item?.product?.brand ? `Бренд: ${item.brandSnapshot || item.product.brand}` : null,
-                          ].filter(Boolean).join(' Â· ');
-
-                          return (
-                            <tr key={item.id} className="even:bg-[#fbfcfd]">
-                              <td className="px-3 py-3 align-top">
-                                <p className="mb-1 text-[10px] font-medium text-[#6b7b8d]">
-                                  {itemMeta}
-                                </p>
-                                <p className="wrap-break-word text-sm font-semibold leading-5 text-[#1f2933]">
-                                  {getReturnItemDisplayName(item)}
-                                </p>
-                              </td>
-                              <td className="px-3 py-3 align-top text-[11px] text-[#48627f]">
-                                <p className="whitespace-nowrap text-xs font-semibold text-[#1f2933]">{quantityInfo.primary}</p>
-                                {quantityInfo.secondary && (
-                                  <p className="mt-0.5 whitespace-nowrap text-[10px] text-[#6b7b8d]">{quantityInfo.secondary}</p>
-                                )}
-                                <p className="mt-2 inline-flex rounded border border-[#c8d2df] bg-[#f7f9fb] px-2 py-1 text-[10px] text-[#48627f]">
-                                  Доступно: {packaging ? `${maxPackages} ${packaging.packageName} или ` : ''}{formatCount(remainingUnits)} {packaging?.baseUnitName || 'шт'}
-                                </p>
-                              </td>
-                              <td className="px-3 py-3 align-top">
-                                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_120px] gap-2">
-                                  {packaging ? (
-                                    <select
-                                      value={item.returnMode}
-                                      onChange={(e) => {
-                                        const newItems = [...returnItems] as ReturnInvoiceItem[];
-                                        newItems[idx] = {
-                                          ...newItems[idx],
-                                          returnMode: e.target.value === 'package' ? 'package' : 'unit',
-                                          returnQty: '',
-                                        };
-                                        setReturnItems(newItems);
-                                      }}
-                                      className="h-9 w-full min-w-0 rounded border border-[#9fb7d5] bg-white px-2 text-xs font-medium text-[#1f2933] outline-none focus:border-[#4f81bd]"
-                                    >
-                                      <option value="package">{packaging.packageName}</option>
-                                      <option value="unit">{packaging.baseUnitName}</option>
-                                    </select>
-                                  ) : null}
-                                  <input 
-                                    type="number" 
-                                    min="0"
-                                    step="0.01"
-                                    max={inputMax}
-                                    value={item.returnQty}
-                                    onChange={(e) => {
-                                      const newItems = [...returnItems] as ReturnInvoiceItem[];
-                                      newItems[idx] = {
-                                        ...newItems[idx],
-                                        returnQty: e.target.value,
-                                      };
-                                      setReturnItems(newItems);
-                                    }}
-                                    placeholder={item.returnMode === 'package' ? 'Кол-во коробок' : 'Кол-во шт'}
-                                    className={clsx(
-                                      'h-9 w-full min-w-0 rounded border border-[#9fb7d5] bg-white px-2 text-center text-sm font-semibold text-[#1f2933] outline-none focus:border-[#4f81bd]',
-                                      !packaging && 'col-span-2'
-                                    )}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+              <div className="flex-1 space-y-3 sm:space-y-4 overflow-y-auto bg-slate-50/50 p-3.5 sm:p-5">
+                {/* Invoice summary strip */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-3.5 shadow-2xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
+                    <div>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Накладная</p>
+                      <p className="mt-0.5 font-mono text-xs sm:text-sm font-bold text-slate-900">№{selectedInvoice.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Клиент</p>
+                      <p className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-slate-900" title={selectedInvoice.customer_name}>
+                        {selectedInvoice.customer_name || 'Розничный покупатель'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Дата продажи</p>
+                      <p className="mt-0.5 text-xs sm:text-sm font-medium text-slate-700">
+                        {new Date(selectedInvoice.createdAt).toLocaleDateString('ru-RU')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Сумма накладной</p>
+                      <p className="mt-0.5 font-mono text-xs sm:text-sm font-bold text-slate-900">
+                        {formatMoney(selectedInvoice.netAmount ?? selectedInvoice.totalValue ?? 0)}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded border border-[#c8d2df] bg-white p-3">
-                  <label className="ml-1 text-sm font-semibold text-[#32465a]">Причина возврата</label>
+                {/* Return Items Section */}
+                <div className="space-y-2.5 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">Товары для возврата</p>
+                      <p className="text-[11px] sm:text-xs text-slate-500">Укажите количество для возврата на склад.</p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {returnItems.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleFillAllReturns}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 active:scale-95"
+                          >
+                            <span>Вернуть всё</span>
+                          </button>
+                          {returnStats.activeCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleResetAllReturns}
+                              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 active:scale-95"
+                            >
+                              <span>Очистить</span>
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <span className="rounded-xl bg-slate-200/70 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                        {returnItems.length} поз.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Search inside return items */}
+                  {returnItems.length > 2 && (
+                    <div className="relative">
+                      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={returnSearch}
+                        onChange={(e) => setReturnSearch(e.target.value)}
+                        placeholder="Поиск товара по названию, артикулу..."
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </div>
+                  )}
+
+                  {/* Cards List */}
+                  <div className="space-y-2.5 sm:space-y-3">
+                    {filteredReturnItems.map((item: ReturnInvoiceItem) => {
+                      const originalIndex = returnItems.findIndex((entry) => entry.id === item.id);
+                      const quantityInfo = getInvoiceItemQuantityParts(item);
+                      const packaging = getReturnItemPackaging(item);
+                      const remainingUnits = getReturnItemRemainingUnits(item);
+                      const maxPackages = packaging ? Math.floor(remainingUnits / packaging.unitsPerPackage) : 0;
+                      const inputMax = item.returnMode === 'package' ? maxPackages : remainingUnits;
+                      const isFilled = Number(item.returnQty || 0) > 0;
+
+                      const itemDiscount = Number(item.discount || 0);
+                      const globalDiscount = Number(selectedInvoice?.discount || 0);
+                      const basePrice = Number(item.sellingPrice ?? item.price ?? 0);
+                      const unitPriceAfterDiscount = basePrice * (1 - itemDiscount / 100) * (1 - globalDiscount / 100);
+                      const itemUnits = item.returnMode === 'package' && packaging
+                        ? Number(item.returnQty || 0) * packaging.unitsPerPackage
+                        : Number(item.returnQty || 0);
+                      const lineRefund = unitPriceAfterDiscount * itemUnits;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={clsx(
+                            'rounded-2xl border p-3 sm:p-3.5 transition-all shadow-2xs',
+                            isFilled
+                              ? 'border-amber-300 bg-amber-50/40 ring-1 ring-amber-300/60 shadow-xs'
+                              : 'border-slate-200/90 bg-white hover:border-slate-300'
+                          )}
+                        >
+                          {/* Top Row: index & available badge */}
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                Строка #{originalIndex + 1}
+                              </span>
+                              {item?.product?.sku && (
+                                <span className="text-[10px] text-slate-400">· Арт: {item.product.sku}</span>
+                              )}
+                              {(item?.brandSnapshot || item?.product?.brand) && (
+                                <span className="text-[10px] text-slate-400 truncate max-w-[120px]">· {item.brandSnapshot || item.product.brand}</span>
+                              )}
+                            </div>
+
+                            <span className={clsx(
+                              'rounded-full px-2.5 py-0.5 text-[10px] font-semibold shrink-0',
+                              isFilled ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                            )}>
+                              Доступно: {packaging && maxPackages > 0 ? `${maxPackages} ${packaging.packageName} / ` : ''}{formatCount(remainingUnits)} {packaging?.baseUnitName || 'шт'}
+                            </span>
+                          </div>
+
+                          {/* Product Title */}
+                          <p className="wrap-break-word text-xs sm:text-sm font-semibold leading-snug text-slate-900">
+                            {getReturnItemDisplayName(item)}
+                          </p>
+
+                          {/* Financial strip */}
+                          <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center text-xs">
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Продано</p>
+                              <p className="mt-0.5 font-bold text-slate-800 text-[11px] sm:text-xs truncate">{quantityInfo.primary}</p>
+                              {quantityInfo.secondary && (
+                                <p className="mt-0.5 text-[9px] text-slate-400 truncate">{quantityInfo.secondary}</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Цена за ед.</p>
+                              <p className="mt-0.5 font-mono font-bold text-slate-800 text-[11px] sm:text-xs">{formatMoney(basePrice)}</p>
+                              {(itemDiscount > 0 || globalDiscount > 0) && (
+                                <p className="mt-0.5 text-[9px] text-emerald-600 font-medium truncate">со скидкой: {formatMoney(unitPriceAfterDiscount)}</p>
+                              )}
+                            </div>
+                            <div className="border-l border-slate-200 pl-1">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">К возврату</p>
+                              <p className={clsx("mt-0.5 font-mono font-bold text-[11px] sm:text-xs truncate", isFilled ? "text-rose-600" : "text-slate-400")}>
+                                {isFilled ? `-${formatMoney(lineRefund)}` : '0 TJS'}
+                              </p>
+                              {isFilled && (
+                                <p className="text-[9px] text-amber-700 font-medium truncate">
+                                  {formatCount(itemUnits)} {packaging?.baseUnitName || 'шт'}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Controls Row */}
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
+                            {packaging && (
+                              <div className="w-full sm:w-48 shrink-0">
+                                <select
+                                  value={item.returnMode}
+                                  onChange={(e) => updateReturnItemMode(item.id, e.target.value as 'package' | 'unit')}
+                                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-800 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                                >
+                                  <option value="package">{packaging.packageName} ({packaging.unitsPerPackage} {packaging.baseUnitName})</option>
+                                  <option value="unit">{packaging.baseUnitName}</option>
+                                </select>
+                              </div>
+                            )}
+
+                            <div className="relative flex-1 flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                step={item.returnMode === 'package' ? '1' : '0.01'}
+                                max={inputMax}
+                                value={item.returnQty}
+                                onChange={(e) => updateReturnItemQty(item.id, e.target.value)}
+                                placeholder={item.returnMode === 'package' ? `Кол-во ${packaging?.packageName || 'упаковок'}` : `Кол-во ${packaging?.baseUnitName || 'шт'}`}
+                                className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => updateReturnItemQty(item.id, String(inputMax))}
+                                disabled={inputMax <= 0}
+                                className="h-9 shrink-0 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40"
+                                title="Вернуть максимум"
+                              >
+                                Макс ({inputMax})
+                              </button>
+
+                              {isFilled && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateReturnItemQty(item.id, '')}
+                                  className="h-9 w-9 shrink-0 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
+                                  title="Сбросить"
+                                >
+                                  <X size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {!filteredReturnItems.length && (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-xs sm:text-sm text-slate-500">
+                        {returnItems.length === 0
+                          ? 'По этой накладной нет товаров, доступных для возврата.'
+                          : 'По вашему запросу товары не найдены.'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Summary Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-3.5 shadow-2xs">
+                  <div className="grid gap-2 sm:gap-3 grid-cols-2 sm:grid-cols-4">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Позиций к возврату</p>
+                      <p className="mt-0.5 text-sm sm:text-base font-bold text-slate-900">
+                        {returnStats.activeCount} из {returnItems.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Всего единиц</p>
+                      <p className="mt-0.5 text-sm sm:text-base font-bold text-slate-900">
+                        {formatCount(returnStats.totalUnits)} шт
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Сумма возврата</p>
+                      <p className="mt-0.5 font-mono text-sm sm:text-base font-bold text-rose-600">
+                        {returnStats.totalRefund > 0 ? `-${formatMoney(returnStats.totalRefund)}` : '0 TJS'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-amber-500 bg-amber-500 p-2.5 text-white shadow-xs">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-amber-100">Итого к возврату</p>
+                      <p className="mt-0.5 font-mono text-sm sm:text-base font-bold text-white truncate">
+                        {returnStats.totalRefund > 0 ? `-${formatMoney(returnStats.totalRefund)}` : '0 TJS'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason Card */}
+                <div className="rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-3.5 shadow-2xs">
+                  <label className="text-xs sm:text-sm font-semibold text-slate-800">Причина возврата</label>
                   <textarea 
                     value={returnReason}
                     onChange={(e) => setReturnReason(e.target.value)}
-                    className="mt-2 min-h-21.5 w-full rounded border border-[#9fb7d5] bg-white px-3 py-2 text-sm font-medium text-[#1f2933] outline-none transition-colors focus:border-[#4f81bd]"
-                    placeholder="Укажите причину возврата..."
+                    rows={2}
+                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="Укажите причину возврата (брак, излишек, отказ покупателя)..."
                   />
                 </div>
               </div>
               
-              <div className="flex flex-col-reverse gap-2 border-t border-[#b7c2ce] bg-[#eef3f8] px-4 py-3 sm:flex-row">
+              {/* Sticky Footer */}
+              <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-4 sm:flex-row">
                 <button 
-                  onClick={closeReturnModal}
-                  className="flex-1 rounded border border-[#9fb7d5] bg-white px-4 py-2 text-sm font-medium text-[#1f3f63] transition-colors hover:bg-[#eaf2fb]"
+                  type="button"
+                  onClick={handleCloseReturnModal}
+                  className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs"
                 >
                   Отмена
                 </button>
                 <button 
+                  type="button"
                   onClick={handleReturn}
-                  disabled={isReturning || returnItems.every((item: ReturnInvoiceItem) => !item.returnQty || parseFloat(item.returnQty) === 0)}
-                  className="flex-1 rounded border border-[#8f6f18] bg-[#ffd966] px-4 py-2 text-sm font-semibold text-[#2f2f2f] transition-colors hover:bg-[#ffc83d] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isReturning || returnStats.totalUnits <= 0}
+                  className="flex-[1.4] sm:flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-500 px-4 text-xs sm:text-sm font-semibold text-white shadow-sm shadow-amber-200 hover:bg-amber-600 active:bg-amber-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isReturning ? 'Оформление...' : 'Оформить возврат'}
+                  {isReturning ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Оформление...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw size={16} />
+                      <span>
+                        {returnStats.totalRefund > 0
+                          ? `Оформить возврат (${formatMoney(returnStats.totalRefund)})`
+                          : 'Оформить возврат'}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DeleteInvoiceModal
+        isOpen={Boolean(invoiceToDelete)}
+        onClose={closeDeleteInvoiceModal}
+        invoice={invoiceToDelete}
+        isDeleting={isDeletingInvoice}
+        error={deleteInvoiceError}
+        needsForceDelete={needsForceDelete}
+        onConfirm={confirmDeleteInvoice}
+      />
       </div>
     </div>
   );

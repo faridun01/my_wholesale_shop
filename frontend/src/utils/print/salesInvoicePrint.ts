@@ -22,18 +22,53 @@ const normalizeAddressLine = (value: unknown) =>
 const formatMoneyWithoutCurrency = (value: unknown) => formatMoney(value, '').trim();
 const roundMoneyValue = (value: number) => roundMoney(value);
 
-interface SalesInvoicePrintOptions {
+export interface SalesInvoicePrintOptions {
   invoice: any;
-  statusLabel: string;
-  subtotal: number;
-  discountAmount: number;
-  netAmount: number;
-  balanceAmount: number;
-  changeAmount: number;
-  appliedPaidAmount: number;
+  statusLabel?: string;
+  subtotal?: number;
+  discountAmount?: number;
+  netAmount?: number;
+  balanceAmount?: number;
+  changeAmount?: number;
+  appliedPaidAmount?: number;
 }
 
-function formatDateTime(value: unknown) {
+export interface PreparedSalesInvoiceItem {
+  index: number;
+  productName: string;
+  unitName: string;
+  quantity: number;
+  quantityFormatted: string;
+  price: number;
+  priceFormatted: string;
+  lineTotal: number;
+  lineTotalFormatted: string;
+  quantityNote: string;
+}
+
+export interface PreparedSalesInvoiceData {
+  invoiceId: number | string;
+  invoiceDateLabel: string;
+  companyName: string;
+  customerName: string;
+  items: PreparedSalesInvoiceItem[];
+  subtotalBeforeDiscount: number;
+  subtotalBeforeDiscountFormatted: string;
+  totalDiscountAmount: number;
+  totalDiscountAmountFormatted: string;
+  returnedAmount: number;
+  returnedAmountFormatted: string;
+  paidAmount: number;
+  paidAmountFormatted: string;
+  balanceDue: number;
+  balanceDueFormatted: string;
+  finalTotalAmount: number;
+  finalTotalAmountFormatted: string;
+  totalQuantity: number;
+  totalQuantityFormatted: string;
+}
+
+export function formatDateTime(value: unknown) {
   const date = value ? new Date(String(value)) : new Date();
   if (Number.isNaN(date.getTime())) {
     return new Date().toLocaleDateString('ru-RU');
@@ -42,7 +77,7 @@ function formatDateTime(value: unknown) {
   return date.toLocaleDateString('ru-RU');
 }
 
-function getItemBaseUnits(item: any) {
+export function getItemBaseUnits(item: any) {
   const totalBaseUnits = Number(item?.totalBaseUnits);
   if (Number.isFinite(totalBaseUnits) && totalBaseUnits > 0) return totalBaseUnits;
 
@@ -59,7 +94,7 @@ function getItemBaseUnits(item: any) {
   return 0;
 }
 
-function getQuantityText(item: any) {
+export function getQuantityText(item: any) {
   const packageQuantity = Number(item?.packageQuantity || 0);
   const packageName = String(item?.packageNameSnapshot || item?.packageName || '').trim();
   const baseUnitName = String(item?.baseUnitNameSnapshot || item?.baseUnitName || item?.unit || 'шт').trim() || 'шт';
@@ -72,52 +107,41 @@ function getQuantityText(item: any) {
   return [`${quantity} ${baseUnitName}`];
 }
 
-export function printSalesInvoice({
-  invoice,
-  subtotal,
-  discountAmount,
-  netAmount: providedNetAmount,
-}: SalesInvoicePrintOptions) {
-  if (typeof window === 'undefined' || !invoice) {
-    return { ok: false, reason: 'invalid' as const };
+export function getUnitPrice(item: any) {
+  const explicitOriginalPrice = Number(
+    item?.originalSellingPrice ?? item?.originalUnitPrice ?? item?.sellingPriceBeforeDiscount ?? item?.listPrice,
+  );
+  if (Number.isFinite(explicitOriginalPrice) && explicitOriginalPrice > 0) return explicitOriginalPrice;
+  return Number(item?.sellingPrice || 0);
+}
+
+export function getDiscountedUnitPrice(item: any) {
+  const originalPrice = getUnitPrice(item);
+  const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
+  if (lineDiscountPercent > 0) {
+    return ceilMoney(originalPrice * (1 - lineDiscountPercent / 100));
   }
 
-  const printWindow = window.open('', '_blank', 'width=980,height=900');
-  if (!printWindow) {
-    return { ok: false, reason: 'blocked' as const };
+  return Number(item?.sellingPrice || 0);
+}
+
+export function getLineTotalBeforeInvoiceDiscount(item: any) {
+  const storedLineTotal = Number(item?.totalPrice);
+  if (Number.isFinite(storedLineTotal) && storedLineTotal >= 0) {
+    return roundMoneyValue(storedLineTotal);
   }
 
-  const invoiceItems = Array.isArray(invoice.items) ? invoice.items : [];
-  const invoiceDateLabel = formatDateTime(invoice.createdAt);
-  const customerName = invoice.customer_name || 'Обычный клиент';
-  const companyName = invoice.company_name || 'Организация';
+  return roundMoneyValue(getItemBaseUnits(item) * getDiscountedUnitPrice(item));
+}
 
-  const getUnitPrice = (item: any) => {
-    const explicitOriginalPrice = Number(
-      item?.originalSellingPrice ?? item?.originalUnitPrice ?? item?.sellingPriceBeforeDiscount ?? item?.listPrice,
-    );
-    if (Number.isFinite(explicitOriginalPrice) && explicitOriginalPrice > 0) return explicitOriginalPrice;
-    return Number(item?.sellingPrice || 0);
-  };
-
-  const getDiscountedUnitPrice = (item: any) => {
-    const originalPrice = getUnitPrice(item);
-    const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
-    if (lineDiscountPercent > 0) {
-      return ceilMoney(originalPrice * (1 - lineDiscountPercent / 100));
-    }
-
-    return Number(item?.sellingPrice || 0);
-  };
-
-  const getLineTotalBeforeInvoiceDiscount = (item: any) => {
-    const storedLineTotal = Number(item?.totalPrice);
-    if (Number.isFinite(storedLineTotal) && storedLineTotal >= 0) {
-      return roundMoneyValue(storedLineTotal);
-    }
-
-    return roundMoneyValue(getItemBaseUnits(item) * getDiscountedUnitPrice(item));
-  };
+export function prepareSalesInvoiceData(
+  invoice: any,
+  options?: Partial<SalesInvoicePrintOptions>,
+): PreparedSalesInvoiceData {
+  const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  const invoiceDateLabel = formatDateTime(invoice?.createdAt);
+  const customerName = invoice?.customer_name || invoice?.customer?.name || 'Обычный клиент';
+  const companyName = invoice?.company_name || 'Организация';
 
   const subtotalBeforeDiscount = invoiceItems.length
     ? roundMoneyValue(
@@ -126,43 +150,86 @@ export function printSalesInvoice({
           0,
         ),
       )
-    : Math.max(0, Number(subtotal || 0));
+    : Math.max(0, Number(options?.subtotal || 0));
+
   const itemsNetAmount = invoiceItems.length
     ? roundMoneyValue(invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalBeforeInvoiceDiscount(item), 0))
-    : roundMoneyValue(Math.max(0, Number(subtotal || 0) - Number(discountAmount || 0)));
-  const returnedAmount = Math.max(0, Number(invoice.returnedAmount || 0));
-  const storedInvoiceNetAmount = Math.max(0, Number(providedNetAmount || invoice?.netAmount || 0));
+    : roundMoneyValue(Math.max(0, Number(options?.subtotal || 0) - Number(options?.discountAmount || 0)));
+
+  const returnedAmount = Math.max(0, Number(invoice?.returnedAmount || 0));
+  const storedInvoiceNetAmount = Math.max(0, Number(options?.netAmount || invoice?.netAmount || 0));
   const finalTotalAmount = storedInvoiceNetAmount > 0
     ? storedInvoiceNetAmount
     : roundMoneyValue(Math.max(0, itemsNetAmount - returnedAmount));
+
   const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - (finalTotalAmount + returnedAmount)));
-  const paidAmount = Math.max(0, Number(invoice.paidAmount || 0));
+  const paidAmount = Math.max(0, Number(invoice?.paidAmount || 0));
   const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - paidAmount));
   const totalQuantity = invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item), 0);
 
-  const rows = invoiceItems
-    .map((item: any, index: number) => {
-      const productName = formatProductName(item.product_name || item.productNameSnapshot || item.product?.name || 'Товар');
-      const unitName = String(item?.baseUnitNameSnapshot || item?.baseUnitName || item?.unit || 'шт').trim() || 'шт';
-      const quantity = getItemBaseUnits(item);
-      const lineTotal = getLineTotalBeforeInvoiceDiscount(item);
-      const price = quantity > 0 ? roundMoneyValue(lineTotal / quantity) : getDiscountedUnitPrice(item);
+  const items: PreparedSalesInvoiceItem[] = invoiceItems.map((item: any, index: number) => {
+    const productName = formatProductName(item.product_name || item.productNameSnapshot || item.product?.name || 'Товар');
+    const unitName = String(item?.baseUnitNameSnapshot || item?.baseUnitName || item?.unit || 'шт').trim() || 'шт';
+    const quantity = getItemBaseUnits(item);
+    const lineTotal = getLineTotalBeforeInvoiceDiscount(item);
+    const price = quantity > 0 ? roundMoneyValue(lineTotal / quantity) : getDiscountedUnitPrice(item);
+    const noteLines = getQuantityText(item);
 
-      return `
+    return {
+      index: index + 1,
+      productName,
+      unitName,
+      quantity,
+      quantityFormatted: formatCount(quantity),
+      price,
+      priceFormatted: formatMoneyWithoutCurrency(price),
+      lineTotal,
+      lineTotalFormatted: formatMoneyWithoutCurrency(lineTotal),
+      quantityNote: noteLines.join('\n'),
+    };
+  });
+
+  return {
+    invoiceId: invoice?.id || '—',
+    invoiceDateLabel,
+    companyName,
+    customerName,
+    items,
+    subtotalBeforeDiscount,
+    subtotalBeforeDiscountFormatted: formatMoneyWithoutCurrency(subtotalBeforeDiscount),
+    totalDiscountAmount,
+    totalDiscountAmountFormatted: formatMoneyWithoutCurrency(totalDiscountAmount),
+    returnedAmount,
+    returnedAmountFormatted: formatMoneyWithoutCurrency(returnedAmount),
+    paidAmount,
+    paidAmountFormatted: formatMoneyWithoutCurrency(paidAmount),
+    balanceDue,
+    balanceDueFormatted: formatMoneyWithoutCurrency(balanceDue),
+    finalTotalAmount,
+    finalTotalAmountFormatted: formatMoneyWithoutCurrency(finalTotalAmount),
+    totalQuantity,
+    totalQuantityFormatted: formatMoneyWithoutCurrency(totalQuantity),
+  };
+}
+
+export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
+  const rows = data.items
+    .map(
+      (item) => `
         <tr>
-          <td class="center">${index + 1}</td>
-          <td>${escapeHtml(productName)}</td>
-          <td class="center">${escapeHtml(unitName)}</td>
-          <td class="right">${escapeHtml(formatCount(quantity))}</td>
-          <td class="right">${escapeHtml(formatMoneyWithoutCurrency(price))}</td>
-          <td class="right">${escapeHtml(formatMoneyWithoutCurrency(lineTotal))}</td>
-          <td class="small">${getQuantityText(item).map((line) => escapeHtml(line)).join('<br>')}</td>
+          <td class="center">${item.index}</td>
+          <td>${escapeHtml(item.productName)}</td>
+          <td class="center">${escapeHtml(item.unitName)}</td>
+          <td class="right">${escapeHtml(item.quantityFormatted)}</td>
+          <td class="right">${escapeHtml(item.priceFormatted)}</td>
+          <td class="right">${escapeHtml(item.lineTotalFormatted)}</td>
+          <td class="small">${item.quantityNote ? item.quantityNote.split('\n').map(escapeHtml).join('<br>') : ''}</td>
         </tr>
-      `;
-    })
+      `,
+    )
     .join('');
 
-  const html = `
+  return `
     <!doctype html>
     <html lang="ru">
       <head>
@@ -288,16 +355,16 @@ export function printSalesInvoice({
       </head>
       <body>
         <div class="sheet">
-          <div class="title">Товарная накладная № ${escapeHtml(invoice.id)} от ${escapeHtml(invoiceDateLabel)}</div>
+          <div class="title">Товарная накладная № ${escapeHtml(data.invoiceId)} от ${escapeHtml(data.invoiceDateLabel)}</div>
 
           <table class="requisites">
             <tr>
               <td class="req-label">Организация</td>
-              <td>${escapeHtml(companyName)}</td>
+              <td>${escapeHtml(data.companyName)}</td>
             </tr>
             <tr>
               <td class="req-label">Покупатель</td>
-              <td>${escapeHtml(customerName)}</td>
+              <td>${escapeHtml(data.customerName)}</td>
             </tr>
           </table>
 
@@ -319,17 +386,17 @@ export function printSalesInvoice({
           </table>
 
           <table class="totals">
-            <tr><td class="label">Сумма без скидки</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(subtotalBeforeDiscount))}</td></tr>
-            <tr><td class="label">Скидка</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(totalDiscountAmount))}</td></tr>
-            ${returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(returnedAmount))}</td></tr>` : ''}
-            ${paidAmount > 0 ? `<tr><td class="label">Оплачено</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(paidAmount))}</td></tr>` : ''}
-            ${paidAmount > 0 ? `<tr><td class="label">Остаток</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(balanceDue))}</td></tr>` : ''}
-            <tr class="grand"><td>Итого</td><td class="right">${escapeHtml(formatMoneyWithoutCurrency(finalTotalAmount))}</td></tr>
+            <tr><td class="label">Сумма без скидки</td><td class="right">${escapeHtml(data.subtotalBeforeDiscountFormatted)}</td></tr>
+            <tr><td class="label">Скидка</td><td class="right">${escapeHtml(data.totalDiscountAmountFormatted)}</td></tr>
+            ${data.returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(data.returnedAmountFormatted)}</td></tr>` : ''}
+            ${data.paidAmount > 0 ? `<tr><td class="label">Оплачено</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
+            ${data.paidAmount > 0 ? `<tr><td class="label">Остаток</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}
+            <tr class="grand"><td>Итого</td><td class="right">${escapeHtml(data.finalTotalAmountFormatted)}</td></tr>
           </table>
 
           <div class="summary-text">
-            Всего отпущено ${escapeHtml(formatMoneyWithoutCurrency(totalQuantity))} единиц, на сумму
-            <strong>${escapeHtml(formatMoneyWithoutCurrency(finalTotalAmount))}</strong>.
+            Всего отпущено ${escapeHtml(data.totalQuantityFormatted)} единиц, на сумму
+            <strong>${escapeHtml(data.finalTotalAmountFormatted)}</strong>.
           </div>
 
           <div class="signatures">
@@ -350,6 +417,20 @@ export function printSalesInvoice({
       </body>
     </html>
   `;
+}
+
+export function printSalesInvoice(options: SalesInvoicePrintOptions) {
+  if (typeof window === 'undefined' || !options.invoice) {
+    return { ok: false, reason: 'invalid' as const };
+  }
+
+  const printWindow = window.open('', '_blank', 'width=980,height=900');
+  if (!printWindow) {
+    return { ok: false, reason: 'blocked' as const };
+  }
+
+  const data = prepareSalesInvoiceData(options.invoice, options);
+  const html = buildSalesInvoiceHtml(data);
 
   printWindow.document.open();
   printWindow.document.write(html);

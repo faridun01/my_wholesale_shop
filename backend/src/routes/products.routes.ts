@@ -666,6 +666,17 @@ router.delete('/:id', async (req, res, next) => {
       return res.json({ success: true, hardDeleted: true });
     }
 
+    const remainingStock = product.batches.reduce(
+      (sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0),
+      0
+    );
+
+    if (remainingStock > 0) {
+      return res.status(400).json({
+        error: `Нельзя скрыть товар: на складе ещё остаётся ${remainingStock} ${product.baseUnitName || product.unit || 'шт'}. Сначала спишите остаток или перенесите его на другой склад.`,
+      });
+    }
+
     await prisma.product.update({
       where: { id: productId },
       data: {

@@ -241,6 +241,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const [isSubmittingWriteoffAction, setIsSubmittingWriteoffAction] = useState(false);
 
   const [summarySearchTerm, setSummarySearchTerm] = useState('');
+  const [summarySortBy, setSummarySortBy] = useState<'revenue' | 'profit' | 'quantity'>('revenue');
+  const [summaryPage, setSummaryPage] = useState(1);
+  const summaryPageSize = 10;
   const [detailSearchTerm, setDetailSearchTerm] = useState('');
 
   const user = React.useMemo(() => getCurrentUser(), []);
@@ -336,6 +339,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   useEffect(() => {
     setDetailPage(1);
   }, [dateRange, reportType, selectedWarehouseId]);
+
+  useEffect(() => {
+    setSummaryPage(1);
+  }, [dateRange, reportType, selectedWarehouseId, summarySearchTerm, summarySortBy]);
 
   useEffect(() => {
     if (detailPage > detailTotalPages) {
@@ -1292,22 +1299,45 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     const raw = reportType === 'sales' || reportType === 'profit'
       ? buildProductSalesSummaryData(reportData)
       : [];
-    if (!summarySearchTerm.trim()) {
-      return raw;
+    let list = raw;
+    if (summarySearchTerm.trim()) {
+      const term = summarySearchTerm.trim().toLowerCase();
+      list = raw.filter((row) => row.name.toLowerCase().includes(term));
     }
-    const term = summarySearchTerm.trim().toLowerCase();
-    return raw.filter((row) => row.name.toLowerCase().includes(term));
-  }, [reportData, reportType, summarySearchTerm]);
-  const productSalesSummaryTotals = productSalesSummaryForView.reduce(
-    (totals, row) => ({
-      quantity: totals.quantity + Number(row.quantity || 0),
-      salesCount: totals.salesCount + Number(row.salesCount || 0),
-      costTotal: totals.costTotal + Number(row.costTotal || 0),
-      revenue: totals.revenue + Number(row.revenue || 0),
-      profit: totals.profit + Number(row.profit || 0),
-    }),
-    { quantity: 0, salesCount: 0, costTotal: 0, revenue: 0, profit: 0 },
-  );
+    return [...list].sort((a, b) => {
+      if (summarySortBy === 'profit') {
+        return b.profit - a.profit;
+      }
+      if (summarySortBy === 'quantity') {
+        return b.quantity - a.quantity;
+      }
+      return b.revenue - a.revenue;
+    });
+  }, [reportData, reportType, summarySearchTerm, summarySortBy]);
+
+  const productSalesSummaryTotals = useMemo(() => {
+    return productSalesSummaryForView.reduce(
+      (totals, row) => ({
+        quantity: totals.quantity + Number(row.quantity || 0),
+        salesCount: totals.salesCount + Number(row.salesCount || 0),
+        costTotal: totals.costTotal + Number(row.costTotal || 0),
+        revenue: totals.revenue + Number(row.revenue || 0),
+        profit: totals.profit + Number(row.profit || 0),
+      }),
+      { quantity: 0, salesCount: 0, costTotal: 0, revenue: 0, profit: 0 },
+    );
+  }, [productSalesSummaryForView]);
+
+  const summaryTotalPages = Math.max(1, Math.ceil(productSalesSummaryForView.length / summaryPageSize));
+  const paginatedSummaryRows = useMemo(() => {
+    return productSalesSummaryForView.slice((summaryPage - 1) * summaryPageSize, summaryPage * summaryPageSize);
+  }, [productSalesSummaryForView, summaryPage, summaryPageSize]);
+
+  useEffect(() => {
+    if (summaryPage > summaryTotalPages) {
+      setSummaryPage(summaryTotalPages);
+    }
+  }, [summaryPage, summaryTotalPages]);
 
   return (
     <div className="app-page-shell min-h-full font-sans">
@@ -1495,38 +1525,233 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           <Panel
             title="Сводка по товарам"
             headerActions={
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:flex-initial flex items-center">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                {/* Search */}
+                <div className="relative flex-1 sm:flex-initial flex items-center min-w-[130px]">
                   <Search size={13} className="absolute left-2.5 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Поиск товара..."
                     value={summarySearchTerm}
-                    onChange={(e) => setSummarySearchTerm(e.target.value)}
-                    className="w-full sm:w-48 rounded-xl sm:rounded-full border border-slate-200/70 bg-[#f4f5fb] pl-7 pr-7 py-1 text-xs font-medium text-slate-700 outline-none transition-all focus:sm:w-64 focus:border-slate-300 focus:bg-white"
+                    onChange={(e) => {
+                      setSummarySearchTerm(e.target.value);
+                      setSummaryPage(1);
+                    }}
+                    className="w-full sm:w-44 rounded-xl border border-slate-200/70 bg-[#f4f5fb] pl-7 pr-7 py-1 text-xs font-medium text-slate-700 outline-none transition-all focus:sm:w-56 focus:border-slate-300 focus:bg-white"
                   />
                   {summarySearchTerm && (
-                    <button onClick={() => setSummarySearchTerm('')} className="absolute right-2 text-slate-400 hover:text-slate-600">
+                    <button
+                      onClick={() => {
+                        setSummarySearchTerm('');
+                        setSummaryPage(1);
+                      }}
+                      className="absolute right-2 text-slate-400 hover:text-slate-600"
+                    >
                       <X size={12} />
                     </button>
                   )}
                 </div>
+
+                {/* Quick Sort Tabs */}
+                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100/70 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSummarySortBy('revenue')}
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-all ${
+                      summarySortBy === 'revenue'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Сортировка по выручке"
+                  >
+                    Выручка
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSummarySortBy('profit')}
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-all ${
+                      summarySortBy === 'profit'
+                        ? 'bg-white text-emerald-700 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Сортировка по прибыли"
+                  >
+                    Прибыль
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSummarySortBy('quantity')}
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-all ${
+                      summarySortBy === 'quantity'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Сортировка по количеству"
+                  >
+                    Кол-во
+                  </button>
+                </div>
+
+                {/* Excel button */}
                 <button
                   type="button"
                   onClick={handleExportExcel}
                   disabled={isExcelExporting || !reportData.length}
-                  className="flex items-center gap-1 rounded-xl sm:rounded-full border border-emerald-200 bg-emerald-50 px-2.5 sm:px-3.5 py-1 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 shrink-0"
+                  className="flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 sm:px-3 py-1 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 shrink-0"
                 >
                   <FileSpreadsheet size={13} />
-                  <span>Excel</span>
+                  <span className="hidden sm:inline">Excel</span>
                 </button>
               </div>
             }
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11px] sm:text-xs">
+            {/* Summary Mini KPIs Strip */}
+            {productSalesSummaryForView.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <div className="rounded-xl border border-slate-200/70 bg-[#f8f9fc] p-2 sm:p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Продано</p>
+                  <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 truncate">
+                    {formatCount(productSalesSummaryTotals.quantity)} шт
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {formatCount(productSalesSummaryTotals.salesCount)} продаж ({productSalesSummaryForView.length} поз.)
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200/70 bg-[#f8f9fc] p-2 sm:p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Выручка</p>
+                  <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 truncate" title={formatMoney(productSalesSummaryTotals.revenue)}>
+                    {formatMoney(productSalesSummaryTotals.revenue)}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    Сумма продаж
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/70 p-2 sm:p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">Прибыль</p>
+                  <p className="mt-0.5 text-xs sm:text-sm font-bold text-emerald-700 truncate" title={formatMoney(productSalesSummaryTotals.profit)}>
+                    {formatMoney(productSalesSummaryTotals.profit)}
+                  </p>
+                  <p className="text-[10px] text-emerald-600/80 truncate">
+                    Чистый доход
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200/70 bg-[#f8f9fc] p-2 sm:p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Себестоимость</p>
+                  <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-700 truncate" title={formatMoney(productSalesSummaryTotals.costTotal)}>
+                    {formatMoney(productSalesSummaryTotals.costTotal)}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    Затраты на товар
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Cards View */}
+            <div className="space-y-2 md:hidden">
+              {paginatedSummaryRows.map((row, index) => {
+                const globalIndex = (summaryPage - 1) * summaryPageSize + index + 1;
+                const quantity = Number(row.quantity || 0);
+                const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
+                const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
+                const profitPerUnit = quantity > 0 ? row.profit / quantity : 0;
+                const marginPercent = row.revenue > 0 ? (row.profit / row.revenue) * 100 : 0;
+
+                return (
+                  <article
+                    key={`product-summary-mobile-${row.name}-${index}`}
+                    className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs space-y-2 transition-all hover:border-slate-300"
+                  >
+                    {/* Header: Rank + Name + Quantity Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <span
+                          className={`shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold ${
+                            globalIndex === 1
+                              ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300/60'
+                              : globalIndex === 2
+                                ? 'bg-slate-200 text-slate-700'
+                                : globalIndex === 3
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {globalIndex}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-xs text-slate-900 leading-snug break-words">
+                            {row.name}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {row.salesCount} {row.salesCount === 1 ? 'продажа' : row.salesCount < 5 ? 'продажи' : 'продаж'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-800 tabular-nums">
+                        {formatCount(quantity)} шт
+                      </span>
+                    </div>
+
+                    {/* Financials Strip: Revenue | Profit | Margin */}
+                    <div className="grid grid-cols-3 rounded-xl border border-slate-100 bg-[#f8f9fc] p-2 text-center">
+                      <div>
+                        <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Выручка</p>
+                        <p className="mt-0.5 text-xs font-bold text-slate-900 truncate" title={formatMoney(row.revenue)}>
+                          {formatMoney(row.revenue)}
+                        </p>
+                      </div>
+                      <div className="border-x border-slate-200/60 px-1">
+                        <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Прибыль</p>
+                        <p
+                          className={`mt-0.5 text-xs font-bold truncate ${
+                            row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'
+                          }`}
+                          title={formatMoney(row.profit)}
+                        >
+                          {formatMoney(row.profit)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Маржа</p>
+                        <p
+                          className={`mt-0.5 text-xs font-bold truncate ${
+                            marginPercent < 0 ? 'text-rose-600' : 'text-emerald-600'
+                          }`}
+                        >
+                          {marginPercent.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Unit Prices: Sale / Cost / Profit per item */}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-500">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>Цена: <strong className="font-semibold text-slate-800">{formatMoney(salePerUnit)}</strong></span>
+                        <span>·</span>
+                        <span>Себест: <span className="font-medium text-slate-600">{formatMoney(costPerUnit)}</span></span>
+                      </div>
+                      <div className="shrink-0">
+                        <span className={profitPerUnit < 0 ? 'font-semibold text-rose-600' : 'font-semibold text-emerald-600'}>
+                          {profitPerUnit > 0 ? '+' : ''}{formatMoney(profitPerUnit)} / шт
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {!productSalesSummaryForView.length && (
+                <div className="py-8 text-center text-xs font-medium text-slate-400">
+                  Нет данных о продажах за выбранный период
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-slate-100 bg-[#f4f5fb] text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     <th className="rounded-l-xl py-2 px-2.5 text-center">№</th>
                     <th className="py-2 px-2.5">Товар</th>
                     <th className="py-2 px-2.5 text-right">Продано</th>
@@ -1540,7 +1765,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {productSalesSummaryForView.map((row, index) => {
+                  {paginatedSummaryRows.map((row, index) => {
+                    const globalIndex = (summaryPage - 1) * summaryPageSize + index + 1;
                     const quantity = Number(row.quantity || 0);
                     const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
                     const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
@@ -1548,20 +1774,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
                     return (
                       <tr key={`${row.name}-${index}`} className="transition-colors hover:bg-slate-50/80">
-                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-medium text-slate-400">{index + 1}</td>
-                        <td className="py-1.5 sm:py-2 px-2.5 font-semibold text-slate-900 min-w-[140px] leading-snug break-words">
+                        <td className="py-2 px-2.5 text-center font-medium text-slate-400">{globalIndex}</td>
+                        <td className="py-2 px-2.5 font-semibold text-slate-900 min-w-[140px] leading-snug break-words">
                           {row.name}
                         </td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right font-medium text-slate-900 tabular-nums">{formatCount(quantity)}</td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatCount(row.salesCount)}</td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(costPerUnit)}</td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(salePerUnit)}</td>
-                        <td className={`py-1.5 sm:py-2 px-2.5 text-right font-semibold tabular-nums ${profitPerUnit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <td className="py-2 px-2.5 text-right font-medium text-slate-900 tabular-nums">{formatCount(quantity)}</td>
+                        <td className="py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatCount(row.salesCount)}</td>
+                        <td className="py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(costPerUnit)}</td>
+                        <td className="py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(salePerUnit)}</td>
+                        <td className={`py-2 px-2.5 text-right font-semibold tabular-nums ${profitPerUnit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {formatMoney(profitPerUnit)}
                         </td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(row.costTotal)}</td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right font-semibold text-slate-900 tabular-nums">{formatMoney(row.revenue)}</td>
-                        <td className={`py-1.5 sm:py-2 px-2.5 text-right font-semibold tabular-nums ${row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <td className="py-2 px-2.5 text-right text-slate-500 tabular-nums">{formatMoney(row.costTotal)}</td>
+                        <td className="py-2 px-2.5 text-right font-semibold text-slate-900 tabular-nums">{formatMoney(row.revenue)}</td>
+                        <td className={`py-2 px-2.5 text-right font-semibold tabular-nums ${row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {formatMoney(row.profit)}
                         </td>
                       </tr>
@@ -1595,6 +1821,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {productSalesSummaryForView.length > summaryPageSize && (
+              <div className="mt-3 border-t border-slate-100 pt-2">
+                <PaginationControls
+                  currentPage={summaryPage}
+                  totalPages={summaryTotalPages}
+                  totalItems={productSalesSummaryForView.length}
+                  pageSize={summaryPageSize}
+                  onPageChange={setSummaryPage}
+                  className="border-t-0"
+                />
+              </div>
+            )}
           </Panel>
         )}
 

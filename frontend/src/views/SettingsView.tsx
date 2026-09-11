@@ -467,7 +467,7 @@ export default function SettingsView() {
             </div>
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate">Настройки системы</h1>
-              <p className="text-xs text-slate-500 truncate">Склады, доступ, безопасность и реквизиты компании</p>
+              <p className="hidden sm:block text-xs text-slate-500 truncate">Склады, доступ, безопасность и реквизиты компании</p>
             </div>
           </div>
 

@@ -184,15 +184,16 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
 
     const userId = req.user!.id;
     const invoiceId = Number(req.params.id);
-    const result = await InvoiceService.cancelInvoice(invoiceId, userId, { force: true });
-    
+    const force = String(req.query.force || '').toLowerCase() === 'true';
+    const result = await InvoiceService.cancelInvoice(invoiceId, userId, { force });
+
     await AuditService.log({
       userId,
       action: 'CANCEL_INVOICE',
       entity: 'Invoice',
       entityId: invoiceId,
       ipAddress: req.ip,
-      details: { forced: true },
+      details: { forced: force },
     });
 
     res.json(result);
@@ -255,7 +256,8 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     }
 
     if (!invoice.cancelled) {
-      await InvoiceService.cancelInvoice(invoiceId, req.user!.id, { force: true });
+      const force = String(req.query.force || '').toLowerCase() === 'true';
+      await InvoiceService.cancelInvoice(invoiceId, req.user!.id, { force });
     }
 
     res.json({ success: true });

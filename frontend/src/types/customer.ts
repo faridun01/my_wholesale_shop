@@ -65,9 +65,16 @@ export interface StatementInvoice {
   paidAmount: number;
   returnedAmount: number;
   status: string;
-  warehouse?: { name?: string };
+  cancelled?: boolean;
+  warehouse?: { name?: string; address?: string };
+  customer_name?: string;
+  customer_phone?: string;
+  customer?: { name?: string; phone?: string; address?: string };
+  staff_name?: string;
+  user?: { id?: number; username?: string; name?: string };
   items?: StatementItem[];
   invoiceBalance: number;
   paymentEvents: StatementPayment[];
   returnEvents: StatementReturn[];
 }
+
