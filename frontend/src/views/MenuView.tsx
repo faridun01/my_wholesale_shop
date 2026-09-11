@@ -9,7 +9,6 @@ import {
   CreditCard,
   Download,
   History,
-  LayoutDashboard,
   LogOut,
   Package,
   Settings,
@@ -115,33 +114,6 @@ export default function MenuView() {
       <div className="mb-3 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-slate-900">Меню</h1>
       </div>
-
-      {/* Primary Section: Dashboard (Admin Only) */}
-      {isAdmin && (
-        <div className="mb-5">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Аналитика</h2>
-          <Link
-            to="/dashboard"
-            className="group flex items-center justify-between rounded-2xl border border-violet-200/80 bg-gradient-to-r from-violet-50 via-indigo-50/50 to-white p-4 transition-all hover:border-violet-300 hover:shadow-md active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-600/25 transition-transform group-hover:scale-105">
-                <LayoutDashboard size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-slate-900">Дашборд</span>
-                  <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
-                    Главное
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600">Сводка продаж, выручка, прибыль и склад</p>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-violet-400 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-      )}
 
       {/* Customer Mode Sections */}
       {isCustomer ? (
