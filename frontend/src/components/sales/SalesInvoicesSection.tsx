@@ -583,12 +583,20 @@ const SalesInvoicesSection = ({
           const hasReturns = hasInvoiceReturns(inv);
 
           return (
-            <div key={`mobile-invoice-${inv.id}`} className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs">
+            <div
+              key={`mobile-invoice-${inv.id}`}
+              onClick={() => fetchInvoiceDetails(inv.id)}
+              className="group rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition-all hover:border-slate-300 hover:shadow-sm cursor-pointer active:scale-[0.99]"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-bold text-slate-900">№{inv.id}</span>
                     <span className="font-mono text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleDateString('ru-RU')}</span>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 opacity-80 group-hover:opacity-100">
+                      <Eye size={10} />
+                      Накладная
+                    </span>
                   </div>
                   <p className="mt-1 text-[13px] font-semibold text-slate-900 leading-snug">{inv.customer_name}</p>
                   {inv.warehouse?.name && (
@@ -606,7 +614,7 @@ const SalesInvoicesSection = ({
                 </div>
               </div>
 
-              <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-slate-100 bg-slate-50/70 p-2 text-center">
+              <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Сумма</p>
                   <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</p>
@@ -622,147 +630,166 @@ const SalesInvoicesSection = ({
               </div>
 
               {hasReturns && (
-                <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2.5">
+                <div className="mt-2.5 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Возврат оформлен</p>
                       <p className="mt-0.5 text-xs text-amber-700">
-                        {returnedItemsCount > 0 ? `Позиций: ${formatCount(returnedItemsCount)}` : 'Подробности в деталях'}
+                        {returnedItemsCount > 0 ? `Позиций: ${formatCount(returnedItemsCount)}` : 'Подробности в накладной'}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-rose-600">-{formatMoney(returnedAmount)}</p>
+                    <p className="shrink-0 text-xs font-bold text-rose-600">-{formatMoney(returnedAmount)}</p>
                   </div>
                 </div>
               )}
 
-              <div className="mt-3">
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setExpandedMobileInvoiceId(
-                      expandedMobileInvoiceId === inv.id ? null : inv.id
-                    )
-                  }
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200/90 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fetchInvoiceDetails(inv.id);
+                  }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 px-3 text-xs font-semibold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-[0.98]"
                 >
-                  <span className="flex items-center gap-2">
-                    <MoreVertical size={15} className="text-slate-400" />
-                    <span>Действия</span>
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={clsx(
-                      'text-slate-400 transition-transform duration-200',
-                      expandedMobileInvoiceId === inv.id && 'rotate-180 text-slate-700'
-                    )}
-                  />
+                  <Receipt size={14} />
+                  <span>Посмотреть накладную</span>
                 </button>
 
-                {expandedMobileInvoiceId === inv.id && (
-                  <div className="mt-2 space-y-1 overflow-hidden rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (paymentDisabled) return;
-                        setExpandedMobileInvoiceId(null);
-                        setSelectedInvoice(inv);
-                        setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
-                        setShowPaymentModal(true);
-                      }}
-                      disabled={paymentDisabled}
-                      className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                        paymentDisabled
-                          ? 'cursor-not-allowed text-slate-300'
-                          : 'text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100'
-                      )}
-                    >
-                      <Banknote size={15} className={paymentDisabled ? 'text-slate-300' : 'text-emerald-600'} />
-                      <span>Оплата</span>
-                    </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuickPrintInvoice(inv.id);
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98]"
+                  title="Печать"
+                >
+                  <Printer size={15} />
+                </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (returnDisabled) return;
-                        setExpandedMobileInvoiceId(null);
-                        void openReturnInvoiceModal(inv);
-                      }}
-                      disabled={returnDisabled}
-                      className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                        returnDisabled
-                          ? 'cursor-not-allowed text-slate-300'
-                          : 'text-amber-700 hover:bg-amber-50 active:bg-amber-100'
-                      )}
-                    >
-                      <RotateCcw size={15} className={returnDisabled ? 'text-slate-300' : 'text-amber-600'} />
-                      <span>Возврат</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!canEditInvoice(inv)) return;
-                        setExpandedMobileInvoiceId(null);
-                        openEditInvoiceModal(inv);
-                      }}
-                      disabled={!canEditInvoice(inv)}
-                      title={getEditBlockedReason(inv)}
-                      className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
-                        canEditInvoice(inv)
-                          ? 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
-                          : 'cursor-not-allowed text-slate-300'
-                      )}
-                    >
-                      <Pencil size={15} className={canEditInvoice(inv) ? 'text-slate-500' : 'text-slate-300'} />
-                      <span>Изменить</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExpandedMobileInvoiceId(null);
-                        fetchInvoiceDetails(inv.id);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
-                    >
-                      <Eye size={15} className="text-slate-500" />
-                      <span>Детали</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExpandedMobileInvoiceId(null);
-                        handleQuickPrintInvoice(inv.id);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
-                    >
-                      <Printer size={15} className="text-slate-500" />
-                      <span>Печать</span>
-                    </button>
-
-                    {isAdmin && (
-                      <>
-                        <div className="my-1 border-t border-slate-100" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedMobileInvoiceId(null);
-                            handleDeleteInvoice(inv.id);
-                          }}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 active:bg-rose-100 text-left"
-                        >
-                          <Trash2 size={15} className="text-rose-500" />
-                          <span>Удалить накладную</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedMobileInvoiceId(
+                      expandedMobileInvoiceId === inv.id ? null : inv.id
+                    );
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98]"
+                  title="Действия"
+                >
+                  <MoreVertical size={15} />
+                </button>
               </div>
+
+              {expandedMobileInvoiceId === inv.id && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-2 space-y-1 overflow-hidden rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedMobileInvoiceId(null);
+                      fetchInvoiceDetails(inv.id);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
+                  >
+                    <Eye size={15} className="text-slate-500" />
+                    <span>Детали накладной</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (paymentDisabled) return;
+                      setExpandedMobileInvoiceId(null);
+                      setSelectedInvoice(inv);
+                      setPaymentAmount(String(toFixedNumber(getInvoiceBalance(inv))));
+                      setShowPaymentModal(true);
+                    }}
+                    disabled={paymentDisabled}
+                    className={clsx(
+                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
+                      paymentDisabled
+                        ? 'cursor-not-allowed text-slate-300'
+                        : 'text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100'
+                    )}
+                  >
+                    <Banknote size={15} className={paymentDisabled ? 'text-slate-300' : 'text-emerald-600'} />
+                    <span>Оплата</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (returnDisabled) return;
+                      setExpandedMobileInvoiceId(null);
+                      void openReturnInvoiceModal(inv);
+                    }}
+                    disabled={returnDisabled}
+                    className={clsx(
+                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
+                      returnDisabled
+                        ? 'cursor-not-allowed text-slate-300'
+                        : 'text-amber-700 hover:bg-amber-50 active:bg-amber-100'
+                    )}
+                  >
+                    <RotateCcw size={15} className={returnDisabled ? 'text-slate-300' : 'text-amber-600'} />
+                    <span>Возврат</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEditInvoice(inv)) return;
+                      setExpandedMobileInvoiceId(null);
+                      openEditInvoiceModal(inv);
+                    }}
+                    disabled={!canEditInvoice(inv)}
+                    title={getEditBlockedReason(inv)}
+                    className={clsx(
+                      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
+                      canEditInvoice(inv)
+                        ? 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
+                        : 'cursor-not-allowed text-slate-300'
+                    )}
+                  >
+                    <Pencil size={15} className={canEditInvoice(inv) ? 'text-slate-500' : 'text-slate-300'} />
+                    <span>Изменить</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedMobileInvoiceId(null);
+                      handleQuickPrintInvoice(inv.id);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
+                  >
+                    <Printer size={15} className="text-slate-500" />
+                    <span>Печать</span>
+                  </button>
+
+                  {isAdmin && (
+                    <>
+                      <div className="my-1 border-t border-slate-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExpandedMobileInvoiceId(null);
+                          handleDeleteInvoice(inv.id);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 active:bg-rose-100 text-left"
+                      >
+                        <Trash2 size={15} className="text-rose-500" />
+                        <span>Удалить накладную</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
