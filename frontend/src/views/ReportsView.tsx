@@ -1473,6 +1473,24 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           })}
         </div>
 
+        <React.Suspense
+          fallback={
+            <section className="flex flex-col gap-4 sm:gap-5">
+              <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
+              <ChartSkeleton variant="pie" heightClassName="h-[320px]" />
+            </section>
+          }
+        >
+          <ReportsCharts
+            chartData={chartData}
+            pieData={pieData}
+            reportType={reportType}
+            currentMeta={currentMeta}
+            pieColors={PIE_COLORS}
+            panel={Panel}
+          />
+        </React.Suspense>
+
         {(reportType === 'sales' || reportType === 'profit') && (
           <Panel
             title="Сводка по товарам"
@@ -1579,24 +1597,6 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             </div>
           </Panel>
         )}
-
-        <React.Suspense
-          fallback={
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
-              <ChartSkeleton variant="bar" heightClassName="h-[392px]" />
-              <ChartSkeleton variant="pie" heightClassName="h-[392px]" />
-            </section>
-          }
-        >
-          <ReportsCharts
-            chartData={chartData}
-            pieData={pieData}
-            reportType={reportType}
-            currentMeta={currentMeta}
-            pieColors={PIE_COLORS}
-            panel={Panel}
-          />
-        </React.Suspense>
 
         <Panel
           title="Детализация транзакций"

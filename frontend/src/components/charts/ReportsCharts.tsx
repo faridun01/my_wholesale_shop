@@ -86,7 +86,7 @@ export default function ReportsCharts({
   const Panel = panel;
 
   return (
-    <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_360px]">
+    <section className="flex flex-col gap-4 sm:gap-5">
       <Panel title={currentMeta.chartTitle}>
         <div className="h-64 sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -112,42 +112,44 @@ export default function ReportsCharts({
       </Panel>
 
       <Panel title={currentMeta.pieTitle}>
-        <div className="h-55">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={78} paddingAngle={4} dataKey="value">
-                {pieData.map((item, index) => (
-                  <Cell key={`${item.name}-${index}`} fill={pieColors[index % pieColors.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip content={<PieTooltip reportType={reportType} />} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] items-center gap-4 lg:gap-8">
+          <div className="h-56 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={82} paddingAngle={4} dataKey="value">
+                  {pieData.map((item, index) => (
+                    <Cell key={`${item.name}-${index}`} fill={pieColors[index % pieColors.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip content={<PieTooltip reportType={reportType} />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-        <div className="space-y-2">
-          {pieData.map((item, index) => {
-            const fullName = formatProductName(item.name);
-            return (
-              <div
-                key={item.name}
-                className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm cursor-pointer rounded-xl p-1.5 transition-colors hover:bg-slate-50"
-                title={`${fullName} • ${reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}`}
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="h-3 w-3 shrink-0 rounded-full transition-transform group-hover:scale-110" style={{ backgroundColor: pieColors[index % pieColors.length] }} />
-                  <span className="wrap-break-word text-[13px] font-medium leading-5 text-slate-700 group-hover:text-slate-900">
-                    {fullName}
+          <div className="space-y-2">
+            {pieData.map((item, index) => {
+              const fullName = formatProductName(item.name);
+              return (
+                <div
+                  key={item.name}
+                  className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm cursor-pointer rounded-xl p-1.5 transition-colors hover:bg-slate-50"
+                  title={`${fullName} • ${reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}`}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="h-3 w-3 shrink-0 rounded-full transition-transform group-hover:scale-110" style={{ backgroundColor: pieColors[index % pieColors.length] }} />
+                    <span className="wrap-break-word text-[13px] font-medium leading-5 text-slate-700 group-hover:text-slate-900">
+                      {fullName}
+                    </span>
+                  </div>
+                  <span className="whitespace-nowrap text-right font-semibold tabular-nums text-slate-900">
+                    {reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}
                   </span>
                 </div>
-                <span className="whitespace-nowrap text-right font-semibold tabular-nums text-slate-900">
-                  {reportType === 'returns' ? formatCount(item.value) : formatMoney(item.value)}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {!pieData.length && <div className="py-8 text-center text-sm text-slate-400">Нет данных для отображения</div>}
+            {!pieData.length && <div className="py-8 text-center text-sm text-slate-400">Нет данных для отображения</div>}
+          </div>
         </div>
       </Panel>
     </section>
