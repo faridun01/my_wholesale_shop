@@ -37,7 +37,11 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
     const syncViewport = (event?: MediaQueryListEvent) => {
-      setIsDesktopViewport(event ? event.matches : mediaQuery.matches);
+      const isDesktop = event ? event.matches : mediaQuery.matches;
+      setIsDesktopViewport(isDesktop);
+      if (isDesktop && isOpen) {
+        onClose();
+      }
     };
 
     syncViewport();
@@ -49,7 +53,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
 
     mediaQuery.addListener(syncViewport);
     return () => mediaQuery.removeListener(syncViewport);
-  }, []);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!hasStoredSession()) return;

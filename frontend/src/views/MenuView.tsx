@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   Banknote,
   BarChart3,
@@ -49,6 +49,22 @@ export default function MenuView() {
   const isAdmin = isAdminUser(user);
   const isCustomer = isCustomerUser(user);
 
+  const defaultDesktopRoute = isAdmin ? '/dashboard' : isCustomer ? '/catalog' : '/pos';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        navigate(defaultDesktopRoute, { replace: true });
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [defaultDesktopRoute, navigate]);
+
   const [remindersCount, setRemindersCount] = useState(0);
   const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall } = usePWAInstall();
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
@@ -88,6 +104,10 @@ export default function MenuView() {
     : isCustomer
     ? 'bg-sky-100 text-sky-700 border-sky-200'
     : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+
+  if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+    return <Navigate to={defaultDesktopRoute} replace />;
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-3 pb-4 font-sans">

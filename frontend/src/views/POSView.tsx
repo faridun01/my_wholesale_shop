@@ -248,6 +248,34 @@ export default function POSView() {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
+
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleViewportChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const desktop = e.matches;
+      setIsDesktop(desktop);
+      if (!desktop) {
+        setIsCartExpanded(false);
+      }
+    };
+
+    handleViewportChange(mediaQuery);
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleViewportChange);
+      return () => mediaQuery.removeEventListener('change', handleViewportChange);
+    }
+
+    mediaQuery.addListener(handleViewportChange);
+    return () => mediaQuery.removeListener(handleViewportChange);
+  }, []);
+
   const [productSearch, setProductSearch] = useState('');
   const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
@@ -1331,11 +1359,11 @@ export default function POSView() {
 
             <aside
               className={clsx(
-                'w-full shrink-0',
+                'w-full shrink-0 lg:w-auto',
                 activeTab === 'cart' ? 'block' : 'hidden lg:block',
               )}
               style={{
-                width: !isCartExpanded && typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${cartWidth}px` : undefined,
+                width: !isCartExpanded && isDesktop ? `${cartWidth}px` : undefined,
               }}
             >
               <div
