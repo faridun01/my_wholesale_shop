@@ -1517,8 +1517,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                     <th className="py-2 px-2.5 text-right">Прибыль/шт</th>
                     <th className="py-2 px-2.5 text-right">Сумма себест.</th>
                     <th className="py-2 px-2.5 text-right">Сумма продаж</th>
-                    <th className="py-2 px-2.5 text-right">Общая прибыль</th>
-                    <th className="rounded-r-xl py-2 px-2.5 text-right">Рентаб.</th>
+                    <th className="rounded-r-xl py-2 px-2.5 text-right">Общая прибыль</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1527,16 +1526,6 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                     const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
                     const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
                     const profitPerUnit = quantity > 0 ? row.profit / quantity : 0;
-                    const margin = row.revenue > 0 ? (row.profit / row.revenue) * 100 : 0;
-
-                    const marginBadgeClass =
-                      margin >= 20
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                        : margin >= 10
-                          ? 'bg-sky-50 text-sky-700 border border-sky-200/60'
-                          : margin >= 0
-                            ? 'bg-slate-100 text-slate-700 border border-slate-200/60'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200/60';
 
                     return (
                       <tr key={`${row.name}-${index}`} className="transition-colors hover:bg-slate-50/80">
@@ -1556,17 +1545,12 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                         <td className={`py-1.5 sm:py-2 px-2.5 text-right font-semibold tabular-nums ${row.profit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {formatMoney(row.profit)}
                         </td>
-                        <td className="py-1.5 sm:py-2 px-2.5 text-right">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold tabular-nums ${marginBadgeClass}`}>
-                            {formatPercent(margin, 1)}
-                          </span>
-                        </td>
                       </tr>
                     );
                   })}
                   {productSalesSummaryForView.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-xs font-medium text-slate-400">
+                      <td colSpan={10} className="py-8 text-center text-xs font-medium text-slate-400">
                         Нет данных о продажах за выбранный период
                       </td>
                     </tr>
@@ -1586,10 +1570,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                       </td>
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.costTotal)}</td>
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.revenue)}</td>
-                      <td className="py-2 px-2.5 text-right text-emerald-700 tabular-nums">{formatMoney(productSalesSummaryTotals.profit)}</td>
-                      <td className="py-2 px-2.5 text-right rounded-r-xl tabular-nums">
-                        {formatPercent(productSalesSummaryTotals.revenue > 0 ? (productSalesSummaryTotals.profit / productSalesSummaryTotals.revenue) * 100 : 0, 1)}
-                      </td>
+                      <td className="py-2 px-2.5 text-right text-emerald-700 tabular-nums rounded-r-xl">{formatMoney(productSalesSummaryTotals.profit)}</td>
                     </tr>
                   )}
                 </tbody>
