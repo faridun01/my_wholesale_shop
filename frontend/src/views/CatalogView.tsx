@@ -410,7 +410,7 @@ export default function CatalogView() {
                     <div>
                       <h3
                         title={formatProductName(product.name)}
-                        className="line-clamp-2 text-xs sm:text-sm font-bold leading-tight text-slate-900 min-h-[2rem]"
+                        className="text-xs sm:text-sm font-bold leading-snug text-slate-900 break-words"
                       >
                         {formatProductName(product.name)}
                       </h3>
@@ -502,7 +502,7 @@ export default function CatalogView() {
                   <div className="min-w-0 flex-1">
                     <h3
                       title={formatProductName(product.name)}
-                      className="truncate text-xs sm:text-sm font-bold text-slate-900 leading-snug"
+                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug break-words"
                     >
                       {formatProductName(product.name)}
                     </h3>
@@ -629,7 +629,7 @@ export default function CatalogView() {
                   ) : null}
 
                   <div>
-                    <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900">
+                    <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900 break-words">
                       {formatProductName(selectedProduct.name)}
                     </h2>
                   </div>
