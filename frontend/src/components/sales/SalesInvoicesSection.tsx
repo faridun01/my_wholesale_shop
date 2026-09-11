@@ -513,7 +513,24 @@ const SalesInvoicesSection = ({
       </div>
 
       {/* Desktop Filters (md: and up) */}
-      <div className="mt-3 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 md:grid md:grid-cols-2 xl:grid-cols-5">
+      <div className={clsx(
+        'mt-3 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 md:grid md:grid-cols-2',
+        isAdmin && warehouses && warehouses.length > 1 ? 'xl:grid-cols-6' : 'xl:grid-cols-5'
+      )}>
+        {isAdmin && warehouses && warehouses.length > 1 && setSelectedWarehouseId && (
+          <select
+            value={selectedWarehouseId || ''}
+            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+          >
+            <option value="">Все склады</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}

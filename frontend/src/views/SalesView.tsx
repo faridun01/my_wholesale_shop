@@ -470,52 +470,7 @@ export default function SalesView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-4 overflow-hidden lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
-        <div className="hidden lg:flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Продажи</h1>
-            <p className="mt-0.5 text-xs text-slate-500">Управление накладными и заказами клиентов.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3 rounded-full bg-white px-4 py-1.5 border border-slate-200/60 shadow-xs">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                {(user.username || 'A').slice(0, 1).toUpperCase()}
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-medium text-slate-900">{user.username || 'Admin'}</p>
-                <p className="text-[10px] text-slate-400">{user.role || 'ADMIN'}</p>
-              </div>
-            </div>
-
-            {isAdmin && (
-              <>
-                {warehouses.length > 1 && (
-                  <select
-                    value={selectedWarehouseId}
-                    onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                    disabled={!isAdmin}
-                    className="min-w-44 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 outline-none shadow-xs transition-colors focus:border-slate-300"
-                  >
-                    <option value="">Все склады</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  onClick={() => navigate('/pos')}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
-                >
-                  <Plus size={16} />
-                  <span>Новая продажа</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-      <SalesInvoicesSection
+        <SalesInvoicesSection
         isAdmin={isAdmin}
         warehouses={warehouses}
         selectedWarehouseId={selectedWarehouseId}
