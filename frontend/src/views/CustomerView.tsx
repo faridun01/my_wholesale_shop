@@ -1106,7 +1106,7 @@ export default function CustomerView() {
                   </div>
 
                   {statementData.length > 3 && (
-                    <div className="relative min-w-[140px] sm:w-56">
+                    <div className="relative min-w-35 sm:w-56">
                       <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
@@ -1192,7 +1192,7 @@ export default function CustomerView() {
                           <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
                               {invoice.warehouse?.name && (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 truncate max-w-[140px]">
+                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 truncate max-w-35">
                                   <WarehouseIcon size={11} className="text-slate-400 shrink-0" />
                                   <span className="truncate">{invoice.warehouse.name}</span>
                                 </span>
