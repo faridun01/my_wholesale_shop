@@ -6,6 +6,7 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
 import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
+import { getLineCost, getLineNetRevenue } from './reports.helpers.js';
 
 const router = Router();
 
@@ -32,13 +33,18 @@ router.get('/', async (req: AuthRequest, res, next) => {
       userId: access.isAdmin ? undefined : (access.userId ?? -1),
     };
 
+    // saleAllocations (real per-batch cost) are only pulled for admins, since they're
+    // the only ones who see totalProfit below — avoids the extra join for every
+    // regular staff request against this hot, paginated list.
     const [invoices, total] = await Promise.all([
       prisma.invoice.findMany({
         where,
         include: {
           customer: true,
           user: true,
-          items: true,
+          items: access.isAdmin
+            ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
+            : true,
         },
         skip,
         take: limit,
@@ -51,15 +57,18 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
     res.json(
       invoices.map((inv: any) => {
-        const totalProfit = inv.items.reduce((sum: number, item: any) => {
-          return sum + (item.sellingPrice - item.costPrice) * (item.quantity - item.returnedQty);
-        }, 0);
+        // Same revenue/cost methodology as the Reports "Прибыль" endpoint
+        // (proportional net revenue per line + real batch-allocation cost), so an
+        // invoice's profit never disagrees depending on which screen shows it.
+        const totalProfit = access.isAdmin
+          ? inv.items.reduce((sum: number, item: any) => sum + (getLineNetRevenue(inv, item) - getLineCost(item)), 0)
+          : undefined;
 
         return {
           ...inv,
           customer_name: inv.customerNameSnapshot || inv.customer?.name || 'Клиент',
           staff_name: inv.user?.username || '—',
-          totalProfit: String(req.user?.role || '').toUpperCase() === 'ADMIN' ? totalProfit : undefined,
+          totalProfit,
         };
       }),
     );

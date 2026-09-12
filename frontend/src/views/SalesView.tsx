@@ -1265,7 +1265,7 @@ export default function SalesView() {
                     <h3 className="text-sm sm:text-base font-black tracking-tight text-slate-900 leading-tight">
                       Изменить накладную
                     </h3>
-                    <p className="text-[11px] font-semibold text-slate-500 truncate max-w-[200px] sm:max-w-md">
+                    <p className="text-[11px] font-semibold text-slate-500 truncate max-w-50 sm:max-w-md">
                       №{selectedInvoice.id} {selectedInvoice.customer_name ? `· ${selectedInvoice.customer_name}` : ''}
                     </p>
                   </div>
@@ -1743,7 +1743,7 @@ export default function SalesView() {
                       <h3 className="text-sm sm:text-base font-black tracking-tight text-slate-900 leading-tight">
                         Принять оплату
                       </h3>
-                      <p className="text-[11px] font-semibold text-slate-500 truncate max-w-[200px] sm:max-w-xs mt-0.5">
+                      <p className="text-[11px] font-semibold text-slate-500 truncate max-w-50 sm:max-w-xs mt-0.5">
                         Накладная №{selectedInvoice.id} {selectedInvoice.customer_name ? `· ${selectedInvoice.customer_name}` : ''}
                       </p>
                     </div>
@@ -1865,7 +1865,7 @@ export default function SalesView() {
                         <button
                           type="button"
                           onClick={() => setPaymentAmount(String(toFixedNumber(balance)))}
-                          className="h-7 flex-1 min-w-[120px] rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-600 hover:text-white transition-all active:scale-95 text-center truncate"
+                          className="h-7 flex-1 min-w-30 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-600 hover:text-white transition-all active:scale-95 text-center truncate"
                         >
                           Полная ({formatMoney(balance)})
                         </button>
@@ -2118,7 +2118,7 @@ export default function SalesView() {
                                 <span className="text-[10px] text-slate-400">· Арт: {item.product.sku}</span>
                               )}
                               {(item?.brandSnapshot || item?.product?.brand) && (
-                                <span className="text-[10px] text-slate-400 truncate max-w-[120px]">· {item.brandSnapshot || item.product.brand}</span>
+                                <span className="text-[10px] text-slate-400 truncate max-w-30">· {item.brandSnapshot || item.product.brand}</span>
                               )}
                             </div>
 

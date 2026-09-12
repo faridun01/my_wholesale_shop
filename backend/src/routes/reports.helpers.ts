@@ -1,3 +1,5 @@
+export const MONEY_EPSILON = 0.0001;
+
 type DateRangeInput = {
   start?: unknown;
   end?: unknown;
@@ -85,6 +87,57 @@ export const buildInventoryWhere = (options: {
 
   return where;
 };
+
+// Shared line-level revenue/cost methodology, used by both the sales/profit
+// reports and the invoice list's per-invoice profit figure, so the two never
+// drift onto different definitions of "profit" for the same invoice again.
+export function getRemainingQuantity(item: any) {
+  return Math.max(0, Number(item?.quantity || 0) - Number(item?.returnedQty || 0));
+}
+
+function getRemainingSubtotal(items: any[]) {
+  return items.reduce((sum, item) => sum + Number(item.sellingPrice || 0) * getRemainingQuantity(item), 0);
+}
+
+export function getLineNetRevenue(invoice: any, item: any) {
+  const remainingQty = getRemainingQuantity(item);
+  if (remainingQty <= 0) return 0;
+
+  const remainingSubtotal = getRemainingSubtotal(invoice.items || []);
+  const lineRemainingSubtotal = Number(item.sellingPrice || 0) * remainingQty;
+  const invoiceNetAmount = Number(invoice.netAmount || 0);
+
+  if (remainingSubtotal <= MONEY_EPSILON) {
+    return lineRemainingSubtotal;
+  }
+
+  if (invoiceNetAmount <= MONEY_EPSILON) {
+    return lineRemainingSubtotal;
+  }
+
+  return (lineRemainingSubtotal / remainingSubtotal) * invoiceNetAmount;
+}
+
+export function getLineCost(item: any) {
+  const remainingQty = getRemainingQuantity(item);
+  if (remainingQty <= 0) return 0;
+
+  // StockService.deallocateStock already shrinks/deletes SaleAllocation rows by the
+  // returned quantity on every return, so summing the *current* allocations already
+  // yields the cost of just the remaining (post-return) quantity — re-scaling it by
+  // remainingQty/originalQty here would apply the return ratio a second time and
+  // understate cost (overstate profit) for any partially-returned line.
+  const allocatedCost = Array.isArray(item.saleAllocations)
+    ? item.saleAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.batch?.costPrice || 0) * Number(alloc.quantity || 0), 0)
+    : 0;
+
+  if (allocatedCost > MONEY_EPSILON) {
+    return allocatedCost;
+  }
+
+  const averageCost = Number(item.costPrice || 0);
+  return averageCost * remainingQty;
+}
 
 export const buildInvoiceLineReportRows = ({
   invoices,
