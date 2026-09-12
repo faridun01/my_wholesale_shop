@@ -1,6 +1,6 @@
 import React from 'react';
 import { RotateCcw, X, AlertCircle, Minus, Plus, FileText, CheckCircle2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { clsx } from 'clsx';
 
 interface ProductReturnWriteOffModalProps {
@@ -51,14 +51,14 @@ export default function ProductReturnWriteOffModal({
   return (
     <AnimatePresence>
       {isOpen && transaction && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
           className="fixed inset-0 z-100 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-xs sm:items-center sm:p-4"
         >
-          <motion.div
+          <m.div
             initial={{ scale: 0.95, opacity: 0, y: 16 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 16 }}
@@ -250,8 +250,8 @@ export default function ProductReturnWriteOffModal({
                 </button>
               </div>
             </form>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

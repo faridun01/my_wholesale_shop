@@ -25,7 +25,7 @@ import {
   Layers,
   MapPin
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
@@ -618,14 +618,14 @@ export default function SalesView() {
 
       <AnimatePresence>
         {showDetailsModal && selectedInvoice && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeDetailsModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-xs sm:items-center sm:p-4"
           >
-            <motion.div
+            <m.div
               initial={{ y: '100%', opacity: 0.5 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0.5 }}
@@ -1228,21 +1228,21 @@ export default function SalesView() {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showEditModal && selectedInvoice && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeEditModal}
             className="fixed inset-0 z-60 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-xs sm:items-center sm:p-3"
           >
-            <motion.div
+            <m.div
               initial={{ scale: 0.96, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 12 }}
@@ -1694,8 +1694,8 @@ export default function SalesView() {
                   )}
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -1713,14 +1713,14 @@ export default function SalesView() {
           const projectedPaidPercent = totalAmount > 0 ? Math.min(100, Math.round(((alreadyPaid + numericAmount) / totalAmount) * 100)) : 0;
 
           return (
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closePaymentModal}
               className="fixed inset-0 z-60 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-xs sm:items-center sm:p-3"
             >
-              <motion.div
+              <m.div
                 initial={{ scale: 0.96, opacity: 0, y: 12 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.96, opacity: 0, y: 12 }}
@@ -1947,22 +1947,22 @@ export default function SalesView() {
                     )}
                   </button>
                 </div>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           );
         })()}
       </AnimatePresence>
 
       <AnimatePresence>
         {showReturnModal && selectedInvoice && (
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleCloseReturnModal}
             className="fixed inset-0 z-60 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-xs sm:items-center sm:p-4"
           >
-            <motion.div 
+            <m.div 
               initial={{ y: '100%', opacity: 0.6 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0.6 }}
@@ -2302,8 +2302,8 @@ export default function SalesView() {
                   )}
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 

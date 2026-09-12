@@ -27,7 +27,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import toast from 'react-hot-toast';
 import client from '../api/client';
 import PaginationControls from '../components/common/PaginationControls';
@@ -734,7 +734,7 @@ export default function RemindersView() {
 
                 <AnimatePresence>
                   {statusDropdownOpen && (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0, y: 6, scale: 0.97 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 6, scale: 0.97 }}
@@ -807,7 +807,7 @@ export default function RemindersView() {
                           );
                         })}
                       </div>
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -847,7 +847,7 @@ export default function RemindersView() {
 
                 <AnimatePresence>
                   {categoryDropdownOpen && (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0, y: 6, scale: 0.97 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 6, scale: 0.97 }}
@@ -938,7 +938,7 @@ export default function RemindersView() {
                           );
                         })}
                       </div>
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -1043,9 +1043,8 @@ export default function RemindersView() {
                             const priorityMeta = PRIORITY_META[bucket];
 
                             return (
-                              <motion.div
+                              <m.div
                                 key={reminder.id}
-                                layout
                                 initial={{ opacity: 0, y: 6 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.98 }}
@@ -1157,7 +1156,7 @@ export default function RemindersView() {
                                     </button>
                                   )}
                                 </div>
-                              </motion.div>
+                              </m.div>
                             );
                           })}
                         </AnimatePresence>
@@ -1350,14 +1349,14 @@ export default function RemindersView() {
         {/* Create / Edit Task Modal */}
         <AnimatePresence>
           {showModal && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
               className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             >
-              <motion.div
+              <m.div
                 initial={{ scale: 0.96, opacity: 0, y: 16 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.96, opacity: 0, y: 16 }}
@@ -1532,8 +1531,8 @@ export default function RemindersView() {
                     </div>
                   </div>
                 </form>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

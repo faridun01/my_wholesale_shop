@@ -26,7 +26,7 @@ import {
   Wallet,
   ChevronRight,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
 import client from '../api/client';
@@ -643,7 +643,7 @@ export default function CustomerView() {
         {/* Customer Cards Grid */}
         <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {paginatedCustomers.map((customer) => (
-            <motion.div layout key={customer.id} className="h-full">
+            <m.div key={customer.id} className="h-full">
               <div className="flex h-full flex-col justify-between rounded-2xl sm:rounded-[28px] border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
                 <div>
                   {/* Top Row: Avatar + Name + Badges + Edit/Delete */}
@@ -750,7 +750,7 @@ export default function CustomerView() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           ))}
         </div>
 
@@ -778,14 +778,14 @@ export default function CustomerView() {
         <AnimatePresence>
           {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeCustomerModal}
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
               />
-              <motion.div
+              <m.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
@@ -964,7 +964,7 @@ export default function CustomerView() {
                     </button>
                   </div>
                 </form>
-              </motion.div>
+              </m.div>
             </div>
           )}
         </AnimatePresence>
@@ -972,14 +972,14 @@ export default function CustomerView() {
         <AnimatePresence>
           {isStatementOpen && selectedCustomer && (
             <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeStatementModal}
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
               />
-              <motion.div
+              <m.div
                 initial={{ y: '100%', opacity: 0.5 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: '100%', opacity: 0.5 }}
@@ -1246,7 +1246,7 @@ export default function CustomerView() {
                     })
                   )}
                 </div>
-              </motion.div>
+              </m.div>
             </div>
           )}
         </AnimatePresence>
@@ -1254,14 +1254,14 @@ export default function CustomerView() {
         <AnimatePresence>
           {isInvoiceDetailsOpen && selectedInvoice && (
             <div className="fixed inset-0 z-60 flex items-end justify-center p-0 sm:items-center sm:p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeInvoiceDetailsModal}
                 className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
               />
-              <motion.div
+              <m.div
                 initial={{ y: '100%', opacity: 0.8 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: '100%', opacity: 0.8 }}
@@ -1658,7 +1658,7 @@ export default function CustomerView() {
                     Закрыть
                   </button>
                 </div>
-              </motion.div>
+              </m.div>
             </div>
           )}
         </AnimatePresence>

@@ -1,6 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { LazyMotion } from 'motion/react';
 import { Toaster } from 'react-hot-toast';
+
+// Deferred: only fetched once the first `m.*` element actually mounts, instead
+// of being part of the eager entry chunk every visitor downloads up front.
+const loadMotionFeatures = () => import('./lib/motionFeatures').then((mod) => mod.domAnimation);
 import { Loader2 } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
 import MobileBottomNav from './components/layout/MobileBottomNav';
@@ -159,6 +164,7 @@ export default function App() {
   }
 
   return (
+    <LazyMotion features={loadMotionFeatures} strict>
     <Router>
       <Toaster
         position="top-right"
@@ -295,5 +301,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </LazyMotion>
   );
 }

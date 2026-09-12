@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRightLeft, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import {
   formatCountWithUnit,
   normalizeDisplayBaseUnit,
@@ -48,14 +48,14 @@ export default function ProductTransferModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
         >
-      <motion.div
+      <m.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         onClick={(event) => event.stopPropagation()}
@@ -197,8 +197,8 @@ export default function ProductTransferModal({
             </button>
           </div>
         </form>
-      </motion.div>
-        </motion.div>
+      </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

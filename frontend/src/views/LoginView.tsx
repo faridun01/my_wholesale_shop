@@ -18,7 +18,7 @@ import {
   User,
   Warehouse,
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { setAuthSession } from '../utils/authStorage';
 
 export default function LoginView() {
@@ -91,7 +91,7 @@ export default function LoginView() {
       <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-200/50 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-indigo-200/50 blur-3xl" />
 
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
@@ -186,14 +186,14 @@ export default function LoginView() {
             </div>
 
             {error && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-5 flex items-center gap-2.5 rounded-2xl border border-rose-200/80 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 shadow-xs"
               >
                 <AlertCircle size={16} className="shrink-0 text-rose-500" />
                 <span>{error}</span>
-              </motion.div>
+              </m.div>
             )}
 
             {!twoFactorToken ? (
@@ -320,7 +320,7 @@ export default function LoginView() {
             )}
           </div>
         </section>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import {
   ChevronRight,
   Filter,
@@ -360,7 +360,7 @@ export default function CatalogView() {
               const isOutOfStock = stockParts.isOutOfStock;
 
               return (
-                <motion.div
+                <m.div
                   key={product.id}
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -464,7 +464,7 @@ export default function CatalogView() {
                       </button>
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -477,7 +477,7 @@ export default function CatalogView() {
               const isOutOfStock = stockParts.isOutOfStock;
 
               return (
-                <motion.div
+                <m.div
                   key={product.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -556,7 +556,7 @@ export default function CatalogView() {
                       <span className="hidden sm:inline">В продажу</span>
                     </button>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -571,7 +571,7 @@ export default function CatalogView() {
         />
       </div>
 
-      <AnimatePresence>{cartNotice && <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="fixed bottom-4 left-4 right-4 z-50 rounded-3xl border border-emerald-100 bg-white p-4 shadow-2xl sm:left-auto sm:w-[min(92vw,420px)] sm:p-5"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm font-medium text-slate-900">{cartNotice.count > 0 ? 'Товар добавлен' : 'Нужно выбрать склад'}</p><p className="mt-1 wrap-break-word text-sm leading-6 text-slate-500">{cartNotice.productName}</p>{cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">В корзине: {cartNotice.count}</p>}</div><button onClick={() => setCartNotice(null)} className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"><X size={16} /></button></div><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"><button onClick={() => setCartNotice(null)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50">Остаться</button>{cartNotice.count > 0 ? <button onClick={() => { setCartNotice(null); navigate('/pos'); }} className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600">Перейти в корзину</button> : <button onClick={() => setCartNotice(null)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800">Понятно</button>}</div></motion.div>}</AnimatePresence>
+      <AnimatePresence>{cartNotice && <m.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="fixed bottom-4 left-4 right-4 z-50 rounded-3xl border border-emerald-100 bg-white p-4 shadow-2xl sm:left-auto sm:w-[min(92vw,420px)] sm:p-5"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm font-medium text-slate-900">{cartNotice.count > 0 ? 'Товар добавлен' : 'Нужно выбрать склад'}</p><p className="mt-1 wrap-break-word text-sm leading-6 text-slate-500">{cartNotice.productName}</p>{cartNotice.count > 0 && <p className="mt-2 text-xs text-slate-400">В корзине: {cartNotice.count}</p>}</div><button onClick={() => setCartNotice(null)} className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"><X size={16} /></button></div><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"><button onClick={() => setCartNotice(null)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50">Остаться</button>{cartNotice.count > 0 ? <button onClick={() => { setCartNotice(null); navigate('/pos'); }} className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm text-white transition-colors hover:bg-emerald-600">Перейти в корзину</button> : <button onClick={() => setCartNotice(null)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white transition-colors hover:bg-slate-800">Понятно</button>}</div></m.div>}</AnimatePresence>
 
       <AnimatePresence>
         {showDetails && selectedProduct && (() => {
@@ -582,7 +582,7 @@ export default function CatalogView() {
 
           return (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -590,7 +590,7 @@ export default function CatalogView() {
                 className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               />
 
-              <motion.div
+              <m.div
                 initial={{ y: 20, opacity: 0, scale: 0.98 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 exit={{ y: 20, opacity: 0, scale: 0.98 }}
@@ -736,7 +736,7 @@ export default function CatalogView() {
                     </button>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             </div>
           );
         })()}

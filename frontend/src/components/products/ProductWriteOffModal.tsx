@@ -17,7 +17,7 @@ import {
   Tag,
   Boxes,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { clsx } from 'clsx';
 import { formatProductName } from '../../utils/productName';
 import { getStockBreakdown, normalizeDisplayBaseUnit } from '../../utils/productsViewUtils';
@@ -107,14 +107,14 @@ export default function ProductWriteOffModal({
   return (
     <AnimatePresence>
       {isOpen && selectedProduct && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
           className="fixed inset-0 z-100 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-xs sm:items-center sm:p-4"
         >
-          <motion.div
+          <m.div
             initial={{ scale: 0.95, opacity: 0, y: 16 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 16 }}
@@ -426,8 +426,8 @@ export default function ProductWriteOffModal({
                 </button>
               </div>
             </form>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

@@ -26,7 +26,7 @@ import {
   FileText,
   AlertCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { getCurrentUser } from '../utils/userAccess';
@@ -1373,14 +1373,14 @@ export default function SettingsView() {
       {/* MODAL: ADD / EDIT WAREHOUSE */}
       <AnimatePresence>
         {(showAddWarehouse || showEditWarehouse) && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeWarehouseModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-xs sm:items-center sm:p-4"
           >
-            <motion.div
+            <m.div
               initial={{ scale: 0.94, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
@@ -1472,22 +1472,22 @@ export default function SettingsView() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* MODAL: ADD / EDIT USER */}
       <AnimatePresence>
         {(showAddUser || showEditUser) && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeUserModal}
             className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2 backdrop-blur-xs sm:items-center sm:p-4"
           >
-            <motion.div
+            <m.div
               initial={{ scale: 0.94, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               onClick={(e) => e.stopPropagation()}
@@ -1664,8 +1664,8 @@ export default function SettingsView() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
