@@ -19,7 +19,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import toast from 'react-hot-toast';
 import client from '../api/client';
 import { logout } from '../api/auth.api';
 import { clearAuthSession, hasStoredSession } from '../utils/authStorage';
@@ -77,7 +76,6 @@ export default function MenuView() {
       // ignore
     } finally {
       clearAuthSession();
-      toast.success('Вы успешно вышли');
       navigate('/login');
     }
   };

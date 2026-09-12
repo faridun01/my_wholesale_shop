@@ -114,7 +114,7 @@ export default function POSProductList({
       <div className="mt-2 hidden grid-cols-[36px_minmax(0,1fr)_120px_100px_44px] rounded-xl bg-slate-100/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 md:grid">
         <div className="text-center">№</div>
         <div>Товар</div>
-        <div className="text-center">Остаток</div>
+        <div className="text-center">Доступно</div>
         <div className="text-right pr-3">Цена</div>
         <div className="text-center"></div>
       </div>
@@ -152,32 +152,42 @@ export default function POSProductList({
                   </div>
                 </div>
 
-                <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100/90 pt-2">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-mono text-sm font-extrabold text-slate-900 tabular-nums">
-                      {formatMoney(product.sellingPrice)}
+                <div className="mt-2 flex items-end justify-between gap-2 border-t border-slate-100/90 pt-2">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 leading-none">
+                      Цена
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-400">TJS</span>
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="font-mono text-sm font-extrabold text-slate-900 tabular-nums">
+                        {formatMoney(product.sellingPrice)}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">TJS</span>
+                    </div>
                   </div>
 
-                  <div
-                    className={clsx(
-                      'inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium border font-mono',
-                      isOutOfStock
-                        ? 'border-rose-200/70 bg-rose-50/60 text-rose-700'
-                        : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700'
-                    )}
-                  >
-                    <span
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 leading-none">
+                      Доступно
+                    </span>
+                    <div
                       className={clsx(
-                        'h-1.5 w-1.5 rounded-full shrink-0',
-                        isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500'
+                        'mt-1 inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium border font-mono',
+                        isOutOfStock
+                          ? 'border-rose-200/70 bg-rose-50/60 text-rose-700'
+                          : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700'
                       )}
-                    />
-                    <span className="text-[11px] font-bold">{stockParts.primary}</span>
-                    {stockParts.secondary ? (
-                      <span className="text-[10px] font-medium text-emerald-600/90">{stockParts.secondary}</span>
-                    ) : null}
+                    >
+                      <span
+                        className={clsx(
+                          'h-1.5 w-1.5 rounded-full shrink-0',
+                          isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500'
+                        )}
+                      />
+                      <span className="text-[11px] font-bold">{stockParts.primary}</span>
+                      {stockParts.secondary ? (
+                        <span className="text-[10px] font-medium text-emerald-600/90">{stockParts.secondary}</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
