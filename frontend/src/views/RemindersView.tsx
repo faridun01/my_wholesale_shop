@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Bell,
@@ -6,6 +6,7 @@ import {
   Calendar as CalendarIcon,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -230,6 +231,37 @@ export default function RemindersView() {
   const [activeMonth, setActiveMonth] = useState(() => startOfDay(new Date()));
   const [currentPage, setCurrentPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dropdown menus state
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setStatusDropdownOpen(false);
+        setCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const fetchReminders = async () => {
     try {
@@ -470,6 +502,24 @@ export default function RemindersView() {
     { key: 'completed', label: 'Выполнены', count: groupedReminders.completed.length },
   ];
 
+  const currentTab = reminderTabs.find((t) => t.key === filterTab) || reminderTabs[0];
+  const CurrentStatusIcon =
+    currentTab.key === 'all'
+      ? Layers
+      : currentTab.key === 'today'
+      ? Clock3
+      : currentTab.key === 'overdue'
+      ? AlertCircle
+      : currentTab.key === 'upcoming'
+      ? CalendarIcon
+      : CheckCircle2;
+
+  const isAllCategory = selectedCategory === 'all';
+  const currentCategoryMeta = TYPE_META[selectedCategory];
+  const CurrentCategoryIcon = isAllCategory ? Filter : currentCategoryMeta?.icon || Filter;
+  const currentCategoryLabel = isAllCategory ? 'Все категории' : currentCategoryMeta?.label || 'Категория';
+  const currentCategoryCount = isAllCategory ? reminders.length : categoryCounts[selectedCategory] || 0;
+
   return (
     <div className="min-h-screen bg-[#f4f5fb]/80 p-3 sm:p-5 lg:p-6 font-sans">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
@@ -645,38 +695,253 @@ export default function RemindersView() {
           </div>
         </div>
 
-        {/* Filter Navigation Tabs + Category Chips */}
+        {/* Filter Navigation: Dropdown Menus */}
         <div className="space-y-2.5">
-          <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-2xs">
-            <div className="flex items-center gap-1 shrink-0">
-              {reminderTabs.map((tab) => {
-                const isActive = filterTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setFilterTab(tab.key as typeof filterTab)}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Dropdown 1: Статус задач */}
+              <div className="relative" ref={statusDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusDropdownOpen(!statusDropdownOpen);
+                    setCategoryDropdownOpen(false);
+                  }}
+                  className={clsx(
+                    'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all active:scale-95 shadow-2xs',
+                    filterTab !== 'all'
+                      ? 'border-slate-800 bg-slate-900 text-white shadow-xs'
+                      : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  )}
+                >
+                  <CurrentStatusIcon size={14} className={filterTab !== 'all' ? 'text-white' : 'text-slate-500'} />
+                  <span>{currentTab.label}</span>
+                  <span
                     className={clsx(
-                      'flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 whitespace-nowrap',
-                      isActive
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                      'rounded-full px-1.5 py-0.5 text-[10px] font-black font-mono leading-none',
+                      filterTab !== 'all'
+                        ? 'bg-white/20 text-white'
+                        : currentTab.badgeTone || 'bg-white text-slate-700 border border-slate-200/80'
                     )}
                   >
-                    <span>{tab.label}</span>
-                    <span
-                      className={clsx(
-                        'rounded-full px-2 py-0.5 text-[10px] font-black font-mono leading-none',
-                        isActive
-                          ? 'bg-white/20 text-white'
-                          : tab.badgeTone || 'bg-slate-100 text-slate-600'
-                      )}
+                    {currentTab.count}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={clsx('transition-transform duration-200 text-slate-400', statusDropdownOpen && 'rotate-180')}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {statusDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute left-0 top-full mt-1.5 z-50 w-56 sm:w-60 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-xl shadow-slate-900/10"
                     >
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
+                      <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Статус задач
+                      </div>
+                      <div className="space-y-0.5">
+                        {reminderTabs.map((tab) => {
+                          const isSelected = filterTab === tab.key;
+                          const TabIcon =
+                            tab.key === 'all'
+                              ? Layers
+                              : tab.key === 'today'
+                              ? Clock3
+                              : tab.key === 'overdue'
+                              ? AlertCircle
+                              : tab.key === 'upcoming'
+                              ? CalendarIcon
+                              : CheckCircle2;
+
+                          return (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => {
+                                setFilterTab(tab.key as typeof filterTab);
+                                setStatusDropdownOpen(false);
+                              }}
+                              className={clsx(
+                                'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs font-bold transition-all text-left',
+                                isSelected
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <TabIcon
+                                  size={14}
+                                  className={clsx(
+                                    isSelected
+                                      ? 'text-white'
+                                      : tab.key === 'overdue'
+                                      ? 'text-rose-500'
+                                      : tab.key === 'today'
+                                      ? 'text-amber-500'
+                                      : tab.key === 'completed'
+                                      ? 'text-emerald-500'
+                                      : 'text-slate-400'
+                                  )}
+                                />
+                                <span className="truncate">{tab.label}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span
+                                  className={clsx(
+                                    'rounded-full px-1.5 py-0.5 text-[10px] font-mono font-black',
+                                    isSelected
+                                      ? 'bg-white/20 text-white'
+                                      : tab.badgeTone || 'bg-slate-100 text-slate-600'
+                                  )}
+                                >
+                                  {tab.count}
+                                </span>
+                                {isSelected && <Check size={13} className="text-white" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Dropdown 2: Категория */}
+              <div className="relative" ref={categoryDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryDropdownOpen(!categoryDropdownOpen);
+                    setStatusDropdownOpen(false);
+                  }}
+                  className={clsx(
+                    'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all active:scale-95 shadow-2xs',
+                    selectedCategory !== 'all'
+                      ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                      : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  )}
+                >
+                  <CurrentCategoryIcon size={14} className={selectedCategory !== 'all' ? 'text-white' : 'text-slate-500'} />
+                  <span>{currentCategoryLabel}</span>
+                  <span
+                    className={clsx(
+                      'rounded-full px-1.5 py-0.5 text-[10px] font-black font-mono leading-none',
+                      selectedCategory !== 'all'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-white text-slate-700 border border-slate-200/80'
+                    )}
+                  >
+                    {currentCategoryCount}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={clsx('transition-transform duration-200 text-slate-400', categoryDropdownOpen && 'rotate-180')}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {categoryDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute left-0 top-full mt-1.5 z-50 w-60 sm:w-64 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-xl shadow-slate-900/10"
+                    >
+                      <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Категория задач
+                      </div>
+                      <div className="space-y-0.5">
+                        {/* All Categories Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory('all');
+                            setCategoryDropdownOpen(false);
+                          }}
+                          className={clsx(
+                            'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs font-bold transition-all text-left',
+                            selectedCategory === 'all'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Filter size={14} className={selectedCategory === 'all' ? 'text-white' : 'text-slate-400'} />
+                            <span className="truncate">Все категории</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={clsx(
+                                'rounded-full px-1.5 py-0.5 text-[10px] font-mono font-black',
+                                selectedCategory === 'all'
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-slate-100 text-slate-600'
+                              )}
+                            >
+                              {reminders.length}
+                            </span>
+                            {selectedCategory === 'all' && <Check size={13} className="text-white" />}
+                          </div>
+                        </button>
+
+                        {/* Individual Categories */}
+                        {Object.entries(TYPE_META).map(([key, meta]) => {
+                          const Icon = meta.icon;
+                          const isSelected = selectedCategory === key;
+                          const count = categoryCounts[key] || 0;
+
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategory(key);
+                                setCategoryDropdownOpen(false);
+                              }}
+                              className={clsx(
+                                'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs font-bold transition-all text-left',
+                                isSelected
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Icon
+                                  size={14}
+                                  className={clsx(
+                                    isSelected ? 'text-white' : meta.tone?.split(' ')[0] || 'text-slate-500'
+                                  )}
+                                />
+                                <span className="truncate">{meta.label}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span
+                                  className={clsx(
+                                    'rounded-full px-1.5 py-0.5 text-[10px] font-mono font-black',
+                                    isSelected
+                                      ? 'bg-white/20 text-white'
+                                      : 'bg-slate-100 text-slate-600'
+                                  )}
+                                >
+                                  {count}
+                                </span>
+                                {isSelected && <Check size={13} className="text-white" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Active Filters Clear Button */}
@@ -689,61 +954,13 @@ export default function RemindersView() {
                   setSelectedCalendarDate(null);
                   setSearchTerm('');
                 }}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/80 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 transition-colors mr-1"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 transition-colors shadow-2xs active:scale-95"
                 title="Сбросить все фильтры"
               >
-                <RotateCcw size={12} />
+                <RotateCcw size={13} />
                 <span>Сбросить фильтры</span>
               </button>
             )}
-          </div>
-
-          {/* Category Chips Bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
-              className={clsx(
-                'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shrink-0',
-                selectedCategory === 'all'
-                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-              )}
-            >
-              <Filter size={12} />
-              <span>Все категории</span>
-            </button>
-
-            {Object.entries(TYPE_META).map(([key, meta]) => {
-              const Icon = meta.icon;
-              const isSelected = selectedCategory === key;
-              const count = categoryCounts[key] || 0;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedCategory(isSelected ? 'all' : key)}
-                  className={clsx(
-                    'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shrink-0',
-                    isSelected
-                      ? 'bg-slate-900 text-white shadow-xs font-bold'
-                      : clsx('border bg-white text-slate-700 hover:bg-slate-50', meta.badgeTone)
-                  )}
-                >
-                  <Icon size={13} className={isSelected ? 'text-white' : ''} />
-                  <span>{meta.label}</span>
-                  <span
-                    className={clsx(
-                      'rounded-full px-1.5 py-0.2 text-[10px] font-black font-mono',
-                      isSelected ? 'bg-white/20 text-white' : 'bg-white text-slate-700 border border-slate-200/60'
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
           </div>
 
           {/* Active Date Filter Notice */}
