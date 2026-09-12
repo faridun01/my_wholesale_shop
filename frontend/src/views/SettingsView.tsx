@@ -141,6 +141,7 @@ export default function SettingsView() {
   const [newUser, setNewUser] = useState(emptyUserForm);
   const [warehousePage, setWarehousePage] = useState(1);
 
+  const [showProfileCurrentPassword, setShowProfileCurrentPassword] = useState(false);
   const [showProfilePassword, setShowProfilePassword] = useState(false);
   const [showProfileConfirmPassword, setShowProfileConfirmPassword] = useState(false);
   const [showUserPassword, setShowUserPassword] = useState(false);
@@ -148,6 +149,7 @@ export default function SettingsView() {
 
   const [profileForm, setProfileForm] = useState({
     username: '',
+    currentPassword: '',
     password: '',
     confirmPassword: ''
   });
@@ -193,6 +195,7 @@ export default function SettingsView() {
     fetchData();
     setProfileForm({
       username: currentUser.username || '',
+      currentPassword: '',
       password: '',
       confirmPassword: ''
     });
@@ -474,6 +477,10 @@ export default function SettingsView() {
     if (isSubmittingForm) return;
     try {
       if (profileForm.password) {
+        if (!profileForm.currentPassword) {
+          toast.error('Укажите текущий пароль, чтобы задать новый');
+          return;
+        }
         if (profileForm.password !== profileForm.confirmPassword) {
           toast.error('Пароли не совпадают');
           return;
@@ -489,7 +496,10 @@ export default function SettingsView() {
 
       setIsSubmittingForm(true);
       const data: any = { username: profileForm.username };
-      if (profileForm.password) data.password = profileForm.password;
+      if (profileForm.password) {
+        data.password = profileForm.password;
+        data.currentPassword = profileForm.currentPassword;
+      }
 
       const res = await client.put(`/auth/users/${currentUser.id}`, data);
       toast.success('Профиль обновлен. Пожалуйста, войдите снова, если вы изменили логин или пароль.');
@@ -497,7 +507,8 @@ export default function SettingsView() {
       const updatedUser = { ...currentUser, ...res.data };
       updateStoredUser(updatedUser);
 
-      setProfileForm({ ...profileForm, password: '', confirmPassword: '' });
+      setProfileForm({ ...profileForm, currentPassword: '', password: '', confirmPassword: '' });
+      setShowProfileCurrentPassword(false);
       setShowProfilePassword(false);
       setShowProfileConfirmPassword(false);
     } catch (err: any) {
@@ -1276,6 +1287,30 @@ export default function SettingsView() {
                     onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
                   />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Текущий пароль <span className="text-slate-400 font-normal">(нужен, чтобы задать новый)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showProfileCurrentPassword ? 'text' : 'password'}
+                      value={profileForm.currentPassword}
+                      onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3 pr-10 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileCurrentPassword(!showProfileCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                      title={showProfileCurrentPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    >
+                      {showProfileCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
