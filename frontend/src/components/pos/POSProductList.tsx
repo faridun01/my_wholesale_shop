@@ -165,7 +165,7 @@ export default function POSProductList({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p
-                        className="whitespace-normal wrap-break-word text-[13.5px] font-bold leading-snug text-slate-900 line-clamp-2"
+                        className="whitespace-normal wrap-break-word text-[13.5px] sm:text-[14px] font-bold leading-snug text-slate-900"
                         style={{ overflowWrap: 'anywhere' }}
                       >
                         {formatProductName(product.name)}
@@ -213,7 +213,7 @@ export default function POSProductList({
                       />
                       <span
                         className={clsx(
-                          'font-mono text-xs font-black tabular-nums leading-tight truncate',
+                          'font-mono text-xs font-black tabular-nums leading-tight whitespace-nowrap',
                           isOutOfStock ? 'text-rose-700' : 'text-slate-800'
                         )}
                       >
@@ -279,7 +279,7 @@ export default function POSProductList({
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-2">
                     <p
-                      className="whitespace-normal wrap-break-word text-xs font-medium leading-snug text-slate-900"
+                      className="whitespace-normal wrap-break-word text-xs sm:text-[13px] font-bold leading-snug text-slate-900"
                       style={{ overflowWrap: 'anywhere' }}
                     >
                       {formatProductName(product.name)}

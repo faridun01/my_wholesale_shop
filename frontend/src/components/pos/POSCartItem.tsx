@@ -102,7 +102,7 @@ export default function POSCartItem({
           </span>
           <div className="min-w-0 flex-1">
             <p
-              className="whitespace-normal wrap-break-word text-xs sm:text-[13px] font-black text-slate-900 leading-tight line-clamp-2"
+              className="whitespace-normal wrap-break-word text-xs sm:text-[13px] font-black text-slate-900 leading-snug"
               style={{ overflowWrap: 'anywhere' }}
             >
               {formatProductName(item.name)}

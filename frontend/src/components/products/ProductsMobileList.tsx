@@ -11,7 +11,6 @@ import {
   Sparkles,
   Tag,
   Trash2,
-  Warehouse,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { formatMoney, formatPercent } from '../../utils/format';
@@ -96,82 +95,67 @@ export default function ProductsMobileList({
                   : 'border-slate-200/80 shadow-[0_2px_12px_rgba(15,23,42,0.04)] hover:border-slate-300/90 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]'
             )}
           >
-            {/* Top row: Photo, Title, Tags, Actions button */}
-            <div className="flex items-start gap-3">
-              {/* Product Photo / Icon with soft shadow & gradient */}
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-linear-to-br from-slate-50 via-slate-100/70 to-slate-100 shadow-2xs">
-                {product.photoUrl ? (
-                  <img
-                    src={resolveMediaUrl(product.photoUrl, product.id)}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    referrerPolicy="no-referrer"
-                    onError={(event) => handleBrokenImage(event, product.id)}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-indigo-50/90 via-slate-50 to-emerald-50/60 text-slate-500">
-                    <Package size={24} className="opacity-75" />
-                  </div>
+            {/* 1. Product Name: First at the top, full width without cramping */}
+            <h4 className="text-[14.5px] sm:text-[15.5px] font-black text-slate-900 leading-snug tracking-tight break-words">
+              {formatProductName(product.name)}
+            </h4>
+
+            {/* 2. Sub-row: Photo thumbnail & Category on the left, Menu button on the right */}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                {/* Visual Thumbnail: product photo if available, or clean compact box icon */}
+                <div className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-100/90 shadow-2xs">
+                  {product.photoUrl ? (
+                    <img
+                      src={resolveMediaUrl(product.photoUrl, product.id)}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(event) => handleBrokenImage(event, product.id)}
+                    />
+                  ) : (
+                    <Package size={14} className="text-slate-400" />
+                  )}
+                </div>
+
+                {/* Category Chip */}
+                <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/80 px-2 py-0.5 text-[10.5px] font-bold text-indigo-700 max-w-[180px] truncate shadow-2xs">
+                  <Tag size={10} className="shrink-0 text-indigo-500" />
+                  <span className="truncate">{product.category?.name || 'Без категории'}</span>
+                </span>
+
+                {getDuplicateHintCount(product) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenMergeModal(product)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-linear-to-r from-amber-100 to-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs transition-transform active:scale-95 animate-pulse"
+                  >
+                    <Sparkles size={10} className="text-amber-600" />
+                    <span>Дубликат</span>
+                  </button>
                 )}
               </div>
 
-              {/* Product Info & Action Button */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-[14px] sm:text-[15px] font-black text-slate-900 leading-snug tracking-tight break-words">
-                      {formatProductName(product.name)}
-                    </h4>
-
-                    {/* Meta Chips: Category & Warehouse */}
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2 py-0.5 text-[10px] font-bold text-indigo-700 max-w-[140px] truncate shadow-2xs">
-                        <Tag size={10} className="shrink-0 text-indigo-500" />
-                        <span className="truncate">{product.category?.name || 'Без категории'}</span>
-                      </span>
-
-                      <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200/70 bg-slate-50/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600 max-w-[130px] truncate shadow-2xs">
-                        <Warehouse size={10} className="shrink-0 text-slate-400" />
-                        <span className="truncate">{selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}</span>
-                      </span>
-
-                      {getDuplicateHintCount(product) > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenMergeModal(product)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-linear-to-r from-amber-100 to-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs transition-transform active:scale-95 animate-pulse"
-                        >
-                          <Sparkles size={10} className="text-amber-600" />
-                          <span>Дубликат</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Top Right: Full Actions Menu Toggle */}
-                  {isAdmin && !isAggregateMode && (
-                    <div className="flex items-center shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => onToggleActions(Number(product.id))}
-                        className={clsx(
-                          'inline-flex h-8 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-all duration-150 active:scale-95 shadow-2xs',
-                          isExpanded
-                            ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                            : 'border-slate-200/90 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                        )}
-                        title="Действия с товаром"
-                      >
-                        <span>Меню</span>
-                        <ChevronDown
-                          size={12}
-                          className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')}
-                        />
-                      </button>
-                    </div>
+              {/* Repositioned Actions Menu Button */}
+              {isAdmin && !isAggregateMode && (
+                <button
+                  type="button"
+                  onClick={() => onToggleActions(Number(product.id))}
+                  className={clsx(
+                    'inline-flex h-7.5 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-all duration-150 active:scale-95 shadow-2xs',
+                    isExpanded
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                      : 'border-slate-200/90 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   )}
-                </div>
-              </div>
+                  title="Действия с товаром"
+                >
+                  <span>Меню</span>
+                  <ChevronDown
+                    size={13}
+                    className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')}
+                  />
+                </button>
+              )}
             </div>
 
             {/* Core Data Row: Stock Status on Left, Selling Price on Right */}
