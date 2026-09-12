@@ -270,6 +270,13 @@ export class AuthService {
     });
   }
 
+  static async verifyCurrentPassword(userId: number, currentPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.active || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw createHttpError(INVALID_CREDENTIALS_ERROR, 401);
+    }
+  }
+
   static async updateUser(id: number, data: any) {
     const updateData: any = { ...data };
     if (typeof data.username === 'string') {

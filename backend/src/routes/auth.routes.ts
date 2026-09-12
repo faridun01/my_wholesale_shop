@@ -139,8 +139,9 @@ router.post('/public-register', async (req, res, next) => {
 router.put(
   '/users/:id',
   authenticate,
+  passwordChangeRateLimit,
   validateRequest({ params: userIdParamSchema, body: updateUserBodySchema }),
-  async (req, res, next) => {
+  async (req: AuthRequest, res, next) => {
   try {
     const targetId = Number(req.params.id);
     const currentUser = (req as any).user;
@@ -159,8 +160,26 @@ router.put(
       delete updateData.canDeleteData;
     }
 
+    // A non-admin setting a NEW password for their OWN account through this generic
+    // profile endpoint must prove they know the current one first — otherwise a
+    // stolen session/token (XSS, leaked cookie) could silently lock the real owner
+    // out permanently with a single request, bypassing the protection that
+    // /change-password already enforces for the exact same action. An admin
+    // resetting someone else's password is a different, intentionally-unprotected path.
+    const currentPassword = updateData.currentPassword;
+    delete updateData.currentPassword;
+    if (!isAdmin && updateData.password) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Укажите текущий пароль, чтобы задать новый' });
+      }
+      await AuthService.verifyCurrentPassword(targetId, currentPassword);
+    }
+
     const user = await AuthService.updateUser(targetId, updateData);
     invalidateUserCache(targetId);
+    if (!isAdmin && req.body.password) {
+      await resetRateLimit(passwordChangeRateLimitKey(req));
+    }
     res.json(user);
   } catch (error) {
     next(error);

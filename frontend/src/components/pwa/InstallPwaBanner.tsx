@@ -17,28 +17,6 @@ export default function InstallPwaBanner() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleAutoShowOnLogin = () => {
-      const alreadyInstalled =
-        isStandalone ||
-        isInstalled ||
-        (typeof window !== 'undefined' && localStorage.getItem('pwa_is_installed') === 'true');
-
-      if (!alreadyInstalled && window.innerWidth >= 1024) {
-        setTimeout(() => {
-          setIsModalOpen(true);
-        }, 500);
-      }
-    };
-
-    window.addEventListener('app-logged-in', handleAutoShowOnLogin);
-    return () => {
-      window.removeEventListener('app-logged-in', handleAutoShowOnLogin);
-    };
-  }, [isStandalone, isInstalled]);
-
   // If already running inside standalone window or installed & dismissed, do not render banner
   if (isStandalone || isInstalled || isDismissed) {
     return null;

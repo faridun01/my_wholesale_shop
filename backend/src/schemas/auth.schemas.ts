@@ -24,6 +24,10 @@ export const updateUserBodySchema = z
   .object({
     username: z.string().trim().min(1).optional(),
     password: z.string().min(1).optional(),
+    // Only required/checked when a non-admin sets a new password for their own
+    // account (see PUT /users/:id) — an admin resetting someone else's password
+    // never needs it.
+    currentPassword: z.string().min(1).optional(),
     phone: z.string().trim().min(1).optional(),
     role: z.string().trim().min(1).optional(),
     warehouseId: z.coerce.number().int().positive().nullable().optional(),

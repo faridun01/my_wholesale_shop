@@ -54,6 +54,42 @@ export const saveStandaloneState = () => {
   saveInstalledState();
 };
 
+// Immediate evaluation on script load so flags are primed before any React render
+if (typeof window !== 'undefined') {
+  try {
+    if (
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.matchMedia?.('(display-mode: window-controls-overlay)')?.matches ||
+      window.matchMedia?.('(display-mode: minimal-ui)')?.matches ||
+      window.matchMedia?.('(display-mode: fullscreen)')?.matches ||
+      (window.navigator as any)?.standalone === true ||
+      document.referrer?.startsWith('android-app://') ||
+      window.location.search?.includes('source=pwa')
+    ) {
+      hasEverBeenStandalone = true;
+      hasEverBeenInstalled = true;
+      saveStandaloneState();
+    } else if (
+      localStorage.getItem(STORAGE_KEY_INSTALLED) === 'true' ||
+      sessionStorage.getItem(STORAGE_KEY_INSTALLED) === 'true' ||
+      readCookie(STORAGE_KEY_INSTALLED) === 'true'
+    ) {
+      hasEverBeenInstalled = true;
+    }
+
+    if ('getInstalledRelatedApps' in navigator && typeof (navigator as any).getInstalledRelatedApps === 'function') {
+      (navigator as any)
+        .getInstalledRelatedApps()
+        .then((apps: any[]) => {
+          if (Array.isArray(apps) && apps.length > 0) {
+            saveInstalledState();
+          }
+        })
+        .catch(() => {});
+    }
+  } catch (_) {}
+}
+
 export const checkIsStandalone = (): boolean => {
   if (hasEverBeenStandalone) return true;
   if (typeof window === 'undefined') return false;
