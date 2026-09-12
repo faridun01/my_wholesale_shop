@@ -296,6 +296,8 @@ export default function ProductsDesktopTable({
                         alt={product.name}
                         className="h-full w-full object-cover"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                         onError={(event) => handleBrokenImage(event, product.id)}
                       />
                     ) : (

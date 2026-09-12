@@ -147,20 +147,30 @@ router.get('/', async (req, res, next) => {
       active: true,
       warehouseId: warehouseId ?? undefined,
     };
+
+    // The catalog only ever renders category/warehouse *names* and never the
+    // price history at all — for callers that opt in (?fields=minimal), select
+    // just those instead of the full related rows, since this list can return
+    // hundreds of products per request. Other callers (admin Products view,
+    // POS) are unaffected — they don't pass this flag.
+    const minimalFields = req.query.fields === 'minimal';
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { 
-          category: true, 
-          warehouse: true,
+        include: {
+          category: minimalFields ? { select: { name: true } } : true,
+          warehouse: minimalFields ? { select: { name: true } } : true,
           packagings: {
             where: { active: true },
             orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { unitsPerPackage: 'asc' }],
           },
-          priceHistory: {
-            take: 2,
-            orderBy: { createdAt: 'desc' }
-          },
+          ...(minimalFields ? {} : {
+            priceHistory: {
+              take: 2,
+              orderBy: { createdAt: 'desc' as const }
+            },
+          }),
           batches: warehouseId ? {
             where: { warehouseId: Number(warehouseId) }
           } : false

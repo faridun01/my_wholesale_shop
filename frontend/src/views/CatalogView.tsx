@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
-import { getProducts } from '../api/products.api';
+import { getCatalogProducts } from '../api/products.api';
 import { getPublicSettings } from '../api/settings-reference.api';
 import { getWarehouses } from '../api/warehouses.api';
 import PaginationControls from '../components/common/PaginationControls';
@@ -102,7 +102,7 @@ export default function CatalogView() {
 
   useEffect(() => {
     setLoading(true);
-    getProducts(selectedWarehouseId ? Number(selectedWarehouseId) : undefined)
+    getCatalogProducts(selectedWarehouseId ? Number(selectedWarehouseId) : undefined)
       .then((data) => setProducts(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }, [selectedWarehouseId]);
@@ -369,13 +369,15 @@ export default function CatalogView() {
                   className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all hover:border-slate-300 hover:shadow-md active:scale-[0.99]"
                 >
                   {/* Photo Container */}
-                  <div className="relative flex h-28 sm:h-40 w-full shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 p-2 sm:p-3">
+                  <div className="relative flex h-28 sm:h-40 w-full shrink-0 items-center justify-center overflow-hidden bg-linear-to-br from-slate-50 to-slate-100 p-2 sm:p-3">
                     {product.photoUrl ? (
                       <img
                         src={resolveMediaUrl(product.photoUrl, product.id)}
                         alt={product.name}
                         className="max-h-full max-w-full rounded-xl object-contain transition-transform duration-300 group-hover:scale-105"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                         onError={(event) => handleBrokenImage(event, product.id)}
                       />
                     ) : (
@@ -410,7 +412,7 @@ export default function CatalogView() {
                     <div>
                       <h3
                         title={formatProductName(product.name)}
-                        className="text-xs sm:text-sm font-bold leading-snug text-slate-900 break-words"
+                        className="text-xs sm:text-sm font-bold leading-snug text-slate-900 wrap-break-word"
                       >
                         {formatProductName(product.name)}
                       </h3>
@@ -491,6 +493,8 @@ export default function CatalogView() {
                         alt={product.name}
                         className="max-h-full max-w-full rounded-lg object-contain"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                         onError={(event) => handleBrokenImage(event, product.id)}
                       />
                     ) : (
@@ -502,7 +506,7 @@ export default function CatalogView() {
                   <div className="min-w-0 flex-1">
                     <h3
                       title={formatProductName(product.name)}
-                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug break-words"
+                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug wrap-break-word"
                     >
                       {formatProductName(product.name)}
                     </h3>
@@ -629,7 +633,7 @@ export default function CatalogView() {
                   ) : null}
 
                   <div>
-                    <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900 break-words">
+                    <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900 wrap-break-word">
                       {formatProductName(selectedProduct.name)}
                     </h2>
                   </div>

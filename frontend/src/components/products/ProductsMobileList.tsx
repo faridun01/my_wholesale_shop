@@ -96,7 +96,7 @@ export default function ProductsMobileList({
             )}
           >
             {/* 1. Product Name: First at the top, full width without cramping */}
-            <h4 className="text-[14.5px] sm:text-[15.5px] font-black text-slate-900 leading-snug tracking-tight break-words">
+            <h4 className="text-[14.5px] sm:text-[15.5px] font-black text-slate-900 leading-snug tracking-tight wrap-break-word">
               {formatProductName(product.name)}
             </h4>
 
@@ -111,6 +111,8 @@ export default function ProductsMobileList({
                       alt={product.name}
                       className="h-full w-full object-cover"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      decoding="async"
                       onError={(event) => handleBrokenImage(event, product.id)}
                     />
                   ) : (
@@ -119,7 +121,7 @@ export default function ProductsMobileList({
                 </div>
 
                 {/* Category Chip */}
-                <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/80 px-2 py-0.5 text-[10.5px] font-bold text-indigo-700 max-w-[180px] truncate shadow-2xs">
+                <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/80 px-2 py-0.5 text-[10.5px] font-bold text-indigo-700 max-w-45 truncate shadow-2xs">
                   <Tag size={10} className="shrink-0 text-indigo-500" />
                   <span className="truncate">{product.category?.name || 'Без категории'}</span>
                 </span>
@@ -366,7 +368,7 @@ export default function ProductsMobileList({
                         'group flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-150 active:scale-[0.96] shadow-2xs',
                         cardBg,
                         disabled
-                          ? 'cursor-not-allowed opacity-40 grayscale-[60%]'
+                          ? 'cursor-not-allowed opacity-40 grayscale-60'
                           : 'hover:shadow-xs'
                       )}
                     >

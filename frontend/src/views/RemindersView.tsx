@@ -1073,7 +1073,7 @@ export default function RemindersView() {
                                     )}
                                     title={reminder.isCompleted ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
                                   >
-                                    <Check size={14} className={reminder.isCompleted ? 'stroke-[3]' : ''} />
+                                    <Check size={14} className={reminder.isCompleted ? 'stroke-3' : ''} />
                                   </button>
 
                                   {/* Content */}

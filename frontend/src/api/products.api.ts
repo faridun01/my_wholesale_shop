@@ -7,6 +7,16 @@ export const getProducts = async (warehouseId?: number) => {
   return response.data;
 };
 
+// Trimmed response (no price history, category/warehouse name only) for views
+// that just list/display products — e.g. the customer-facing catalog — rather
+// than manage them.
+export const getCatalogProducts = async (warehouseId?: number) => {
+  const response = await client.get('/products', {
+    params: { warehouseId, fields: 'minimal' }
+  });
+  return response.data;
+};
+
 export const createProduct = async (data: any) => {
   const response = await client.post('/products', data);
   return response.data;

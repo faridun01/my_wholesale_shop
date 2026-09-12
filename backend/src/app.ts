@@ -71,12 +71,21 @@ app.use('/api/customer-orders', authenticate, customerOrderRoutes);
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 import { uploadImage } from './middlewares/upload.middleware.js';
+import { resizeUploadedImage } from './utils/image-resize.js';
 app.post('/api/upload', authenticate, (req, res, next) => {
-  uploadImage.single('photo')(req, res, (err: any) => {
+  uploadImage.single('photo')(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({ error: err.message || 'Ошибка загрузки файла' });
     }
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    try {
+      await resizeUploadedImage(req.file.path, req.file.mimetype);
+    } catch {
+      // Resizing is a best-effort optimization — if it fails, still serve the
+      // original upload rather than failing the whole request.
+    }
+
     res.json({ photoUrl: `/uploads/${req.file.filename}` });
   });
 });

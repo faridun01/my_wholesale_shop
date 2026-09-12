@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { ChevronRight, Banknote, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getProducts } from '../api/products.api';
+import { getCatalogProducts } from '../api/products.api';
 import { createInvoice } from '../api/invoices.api';
 import { getCustomers } from '../api/customers.api';
 import { getWarehouses } from '../api/warehouses.api';
@@ -509,7 +509,7 @@ export default function POSView() {
       return;
     }
 
-    getProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined)
+    getCatalogProducts(effectiveWarehouseId ? Number(effectiveWarehouseId) : undefined)
       .then((data) => {
         const normalizedProducts = Array.isArray(data) ? data : [];
         setProducts(

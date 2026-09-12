@@ -9,6 +9,15 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мой Склад</title>
+    <!-- Loaded as a real <link> (not CSS @import) so the browser can discover and
+         start fetching fonts immediately, in parallel with the app bundle, instead
+         of waiting for index.css to load and parse first. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <!-- PWA meta tags -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0f9f6e" />
