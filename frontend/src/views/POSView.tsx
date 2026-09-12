@@ -752,7 +752,6 @@ export default function POSView() {
   const handleConfirmClearCart = () => {
     setCart([]);
     setShowClearCartModal(false);
-    toast.success('Корзина очищена');
   };
 
   const updateQuantity = (id: number, quantity: number) => {
@@ -1363,6 +1362,7 @@ export default function POSView() {
                 canAddProductFromList={canAddProductFromList}
                 getProductStockParts={getProductStockParts}
                 onClose={() => navigate('/sales')}
+                cart={cart}
               />
             </section>
 

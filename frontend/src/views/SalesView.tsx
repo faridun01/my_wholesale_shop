@@ -1341,7 +1341,8 @@ export default function SalesView() {
                     const index = editInvoiceItems.findIndex((entry) => entry.key === item.key);
                     const selectedProduct = getEditProductMeta(item.productId);
                     const itemMaxAllowedQuantity = getEditItemMaxAllowedQuantity(item, editInvoiceItems);
-                    const selectedPackagingForRow = getEditItemPackaging(item);
+                    const bulkPackaging = getEditItemDefaultBulkPackaging(item);
+                    const selectedPackagingForRow = bulkPackaging || getEditItemPackaging(item);
                     const unitsPerPackageForRow = Math.max(0, Number(selectedPackagingForRow?.unitsPerPackage || 0));
                     const maxPackageCount =
                       selectedPackagingForRow && unitsPerPackageForRow > 0
@@ -1478,40 +1479,17 @@ export default function SalesView() {
                           </button>
                         </div>
 
-                        {/* Bottom Line: Mode, Quantities, Price, Discount, Total */}
+                        {/* Bottom Line: Quantities, Price, Discount, Total */}
                         <div className="grid grid-cols-2 sm:flex sm:items-center sm:gap-2 gap-2 pt-0.5">
-                          {/* Sale Mode Selector */}
-                          <div className="sm:w-28 shrink-0">
-                            <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
-                              Тип
-                            </label>
-                            <select
-                              value={item.selectedPackagingId ? 'bulk' : 'piece'}
-                              onChange={(e) => {
-                                const bulkPackaging = getEditItemDefaultBulkPackaging(item);
-                                const isBulk = e.target.value === 'bulk' && bulkPackaging;
-                                updateNormalizedEditInvoiceItem(item.key, {
-                                  selectedPackagingId: isBulk ? Number(bulkPackaging?.id || '') : '',
-                                  packageQuantityInput: isBulk ? (item.packageQuantityInput || '1') : '0',
-                                  extraUnitQuantityInput: isBulk ? item.extraUnitQuantityInput || '0' : item.quantity || '1',
-                                });
-                              }}
-                              disabled={!selectedProduct}
-                              className="h-7.5 w-full rounded-lg border border-slate-200 bg-slate-50/70 px-2 text-xs font-bold text-slate-900 outline-none transition-all focus:bg-white focus:border-indigo-500 shadow-2xs disabled:opacity-40"
-                            >
-                              <option value="piece">Розница</option>
-                              {getEditItemDefaultBulkPackaging(item) && (
-                                <option value="bulk">Оптом</option>
-                              )}
-                            </select>
-                          </div>
-
-                          {/* Quantity Inputs */}
-                          {item.selectedPackagingId ? (
-                            <div className="flex items-center gap-1 sm:w-44 shrink-0">
+                          {/* Direct Quantity Inputs (Упаковки и Штуки напрямую без селектора Тип) */}
+                          {bulkPackaging ? (
+                            <div className="flex items-center gap-1.5 sm:w-52 shrink-0">
                               <div className="flex-1 min-w-0">
-                                <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 truncate">
-                                  Упак
+                                <label
+                                  className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 truncate"
+                                  title={`${bulkPackaging.packageName} (${bulkPackaging.unitsPerPackage} ${item.baseUnitName || 'шт'})`}
+                                >
+                                  {bulkPackaging.packageName || 'Упак'} ({bulkPackaging.unitsPerPackage} {item.baseUnitName || 'шт'})
                                 </label>
                                 <input
                                   type="number"
@@ -1519,15 +1497,20 @@ export default function SalesView() {
                                   max={maxPackageCount}
                                   step="1"
                                   value={item.packageQuantityInput}
-                                  onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { packageQuantityInput: e.target.value })}
-                                  placeholder="Упак"
+                                  onChange={(e) =>
+                                    updateNormalizedEditInvoiceItem(item.key, {
+                                      selectedPackagingId: Number(bulkPackaging.id),
+                                      packageQuantityInput: e.target.value,
+                                    })
+                                  }
+                                  placeholder="0"
                                   disabled={!selectedProduct}
                                   className="h-7.5 w-full rounded-lg border border-slate-200 bg-white px-2 font-mono text-xs font-bold text-slate-900 outline-none transition-all focus:border-indigo-500 shadow-2xs disabled:opacity-40"
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 truncate">
-                                  +Шт
+                                  + {item.baseUnitName || 'Шт'}
                                 </label>
                                 <input
                                   type="number"
@@ -1538,16 +1521,19 @@ export default function SalesView() {
                                   onChange={(e) => {
                                     const v = e.target.value;
                                     const intV = v === '' ? '' : String(Math.max(0, Math.floor(Number(v) || 0)));
-                                    updateNormalizedEditInvoiceItem(item.key, { extraUnitQuantityInput: intV });
+                                    updateNormalizedEditInvoiceItem(item.key, {
+                                      selectedPackagingId: Number(bulkPackaging.id),
+                                      extraUnitQuantityInput: intV,
+                                    });
                                   }}
-                                  placeholder="+Шт"
+                                  placeholder="0"
                                   disabled={!selectedProduct}
                                   className="h-7.5 w-full rounded-lg border border-slate-200 bg-white px-2 font-mono text-xs font-bold text-slate-900 outline-none transition-all focus:border-indigo-500 shadow-2xs disabled:opacity-40"
                                 />
                               </div>
                             </div>
                           ) : (
-                            <div className="sm:w-32 shrink-0">
+                            <div className="sm:w-36 shrink-0">
                               <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
                                 Кол-во ({item.baseUnitName || 'шт'})
                               </label>
@@ -1560,9 +1546,13 @@ export default function SalesView() {
                                 onChange={(e) => {
                                   const v = e.target.value;
                                   const intV = v === '' ? '' : String(Math.max(0, Math.floor(Number(v) || 0)));
-                                  updateNormalizedEditInvoiceItem(item.key, { extraUnitQuantityInput: intV });
+                                  updateNormalizedEditInvoiceItem(item.key, {
+                                    selectedPackagingId: '',
+                                    packageQuantityInput: '0',
+                                    extraUnitQuantityInput: intV,
+                                  });
                                 }}
-                                placeholder="Кол-во"
+                                placeholder="0"
                                 disabled={!selectedProduct}
                                 className="h-7.5 w-full rounded-lg border border-slate-200 bg-white px-2 font-mono text-xs font-bold text-slate-900 outline-none transition-all focus:border-indigo-500 shadow-2xs disabled:opacity-40"
                               />

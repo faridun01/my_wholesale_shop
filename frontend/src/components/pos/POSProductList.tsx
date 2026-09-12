@@ -1,6 +1,6 @@
 import { startTransition } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { Plus, Search, Warehouse, X } from 'lucide-react';
+import { Check, Plus, Search, Warehouse, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { formatMoney } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
@@ -24,6 +24,7 @@ type POSProductListProps = {
   canAddProductFromList: (product: any) => boolean;
   getProductStockParts: (product: any, fallbackBaseUnitName?: string) => ProductStockParts;
   onClose: () => void;
+  cart?: any[];
 };
 
 export default function POSProductList({
@@ -40,7 +41,13 @@ export default function POSProductList({
   canAddProductFromList,
   getProductStockParts,
   onClose,
+  cart = [],
 }: POSProductListProps) {
+  const getCartItemQuantity = (productId: number) => {
+    if (!cart || !Array.isArray(cart)) return 0;
+    const item = cart.find((entry) => Number(entry.id) === Number(productId));
+    return item ? Number(item.quantity || 0) : 0;
+  };
   return (
     <div className="flex flex-col overflow-visible rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs lg:h-full lg:min-h-0 lg:overflow-hidden lg:rounded-2xl lg:p-4">
       <div className="flex flex-col gap-2.5 border-b border-slate-100 pb-3">
@@ -123,71 +130,126 @@ export default function POSProductList({
         ref={productListRef}
         className="bg-white lg:max-h-[calc(100vh-190px)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1 lg:[&::-webkit-scrollbar]:w-1.5 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:bg-slate-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full hover:lg:[&::-webkit-scrollbar-thumb]:bg-slate-400"
       >
-        <div className="space-y-2 py-1 md:hidden">
+        <div className="space-y-2.5 py-1 md:hidden">
           {filteredProducts.map((product, index) => {
             const stockParts = getProductStockParts(product, product.unit);
             const isOutOfStock = Number(product.stock || 0) <= 0;
+            const inCartQuantity = getCartItemQuantity(product.id);
+            const isInCart = inCartQuantity > 0;
 
             return (
               <div
                 key={`mobile-pos-${product.id}`}
                 onClick={() => canAddProductFromList(product) && handleAddFromList(product)}
                 className={clsx(
-                  'rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs transition-all active:scale-[0.99] active:bg-slate-50',
+                  'relative overflow-hidden rounded-2xl border bg-white p-3 shadow-2xs transition-all duration-150 select-none',
+                  isInCart
+                    ? 'border-emerald-300/90 bg-emerald-50/15 shadow-xs ring-1 ring-emerald-500/20'
+                    : 'border-slate-200/80 hover:border-slate-300',
                   highlightedProductId === Number(product.id) && 'ring-2 ring-emerald-500 bg-emerald-50/40',
-                  canAddProductFromList(product) ? 'cursor-pointer select-none' : 'opacity-60 cursor-not-allowed',
+                  canAddProductFromList(product)
+                    ? 'cursor-pointer active:scale-[0.985] active:bg-slate-50/80'
+                    : 'opacity-60 cursor-not-allowed',
                 )}
               >
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-5.5 min-w-5.5 shrink-0 items-center justify-center rounded-md bg-slate-100 px-1 font-mono text-[11px] font-bold text-slate-600">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="whitespace-normal wrap-break-word text-[13px] font-semibold leading-snug text-slate-900 line-clamp-2"
-                      style={{ overflowWrap: 'anywhere' }}
+                {/* Header: Номер, Название, Бейдж количества в чеке */}
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <span
+                      className={clsx(
+                        'flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg font-mono text-[11px] font-extrabold mt-0.5',
+                        isInCart ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                      )}
                     >
-                      {formatProductName(product.name)}
-                    </p>
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="whitespace-normal wrap-break-word text-[13.5px] font-bold leading-snug text-slate-900 line-clamp-2"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {formatProductName(product.name)}
+                      </p>
+                    </div>
                   </div>
+
+                  {isInCart && (
+                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-300/80 px-2 py-0.5 text-[10px] font-extrabold shadow-2xs">
+                      <Check size={11} strokeWidth={3} />
+                      {inCartQuantity} {product.unit || 'шт'}
+                    </span>
+                  )}
                 </div>
 
-                <div className="mt-2 flex items-end justify-between gap-2 border-t border-slate-100/90 pt-2">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 leading-none">
+                {/* Информационная панель: Цена + Доступно + Кнопка добавления */}
+                <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-slate-50/90 border border-slate-100 p-2 sm:p-2.5">
+                  {/* Блок «Цена» */}
+                  <div className="flex flex-col min-w-0 pl-0.5">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-none">
                       Цена
                     </span>
                     <div className="mt-1 flex items-baseline gap-1">
-                      <span className="font-mono text-sm font-extrabold text-slate-900 tabular-nums">
+                      <span className="font-mono text-sm sm:text-[15px] font-black text-slate-950 tabular-nums">
                         {formatMoney(product.sellingPrice)}
                       </span>
-                      <span className="text-[10px] font-semibold text-slate-400">TJS</span>
+                      <span className="text-[10px] font-extrabold text-slate-400">TJS</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end shrink-0">
-                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 leading-none">
+                  {/* Тонкий разделитель */}
+                  <div className="h-6 w-px bg-slate-200/80 shrink-0 mx-1" />
+
+                  {/* Блок «Доступно» */}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-none">
                       Доступно
                     </span>
-                    <div
-                      className={clsx(
-                        'mt-1 inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium border font-mono',
-                        isOutOfStock
-                          ? 'border-rose-200/70 bg-rose-50/60 text-rose-700'
-                          : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700'
-                      )}
-                    >
+                    <div className="mt-1 flex items-center gap-1.5 min-w-0">
                       <span
                         className={clsx(
-                          'h-1.5 w-1.5 rounded-full shrink-0',
-                          isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500'
+                          'h-2 w-2 rounded-full shrink-0',
+                          isOutOfStock ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'
                         )}
                       />
-                      <span className="text-[11px] font-bold">{stockParts.primary}</span>
-                      {stockParts.secondary ? (
-                        <span className="text-[10px] font-medium text-emerald-600/90">{stockParts.secondary}</span>
-                      ) : null}
+                      <span
+                        className={clsx(
+                          'font-mono text-xs font-black tabular-nums leading-tight truncate',
+                          isOutOfStock ? 'text-rose-700' : 'text-slate-800'
+                        )}
+                      >
+                        {stockParts.primary}
+                      </span>
+                      {stockParts.secondary && (
+                        <span className="rounded bg-white px-1 py-0.2 text-[9.5px] font-bold text-slate-500 border border-slate-200/70 shadow-2xs shrink-0">
+                          {stockParts.secondary}
+                        </span>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Кнопка быстрого добавления в чек */}
+                  <div className="shrink-0 pl-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canAddProductFromList(product)) {
+                          handleAddFromList(product);
+                        }
+                      }}
+                      disabled={!canAddProductFromList(product)}
+                      className={clsx(
+                        'flex h-8 w-8 items-center justify-center rounded-xl shadow-xs transition-all active:scale-90',
+                        isOutOfStock
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : isInCart
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/25'
+                            : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
+                      )}
+                      title="Добавить в чек"
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -198,6 +260,8 @@ export default function POSProductList({
         <div className="hidden flex-col md:flex">
           {filteredProducts.map((product, index) => {
             const stockParts = getProductStockParts(product, product.unit);
+            const inCartQuantity = getCartItemQuantity(product.id);
+            const isInCart = inCartQuantity > 0;
 
             return (
               <div
@@ -205,6 +269,7 @@ export default function POSProductList({
                 onClick={() => handleAddFromList(product)}
                 className={clsx(
                   'grid grid-cols-[36px_minmax(0,1fr)_120px_100px_44px] items-center border-b border-slate-100 px-3 py-2 transition-colors hover:bg-slate-50',
+                  isInCart && 'bg-emerald-50/30',
                   highlightedProductId === Number(product.id) && 'bg-emerald-50/70',
                   canAddProductFromList(product) ? 'cursor-pointer' : '',
                 )}
@@ -212,12 +277,19 @@ export default function POSProductList({
                 <div className="text-center font-mono text-[11px] text-slate-400">{index + 1}</div>
 
                 <div className="min-w-0 pr-2">
-                  <p
-                    className="whitespace-normal wrap-break-word text-xs font-medium leading-snug text-slate-900"
-                    style={{ overflowWrap: 'anywhere' }}
-                  >
-                    {formatProductName(product.name)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p
+                      className="whitespace-normal wrap-break-word text-xs font-medium leading-snug text-slate-900"
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
+                      {formatProductName(product.name)}
+                    </p>
+                    {isInCart && (
+                      <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800 border border-emerald-200">
+                        <Check size={9} strokeWidth={3} /> {inCartQuantity}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-center">
@@ -240,9 +312,14 @@ export default function POSProductList({
                     }}
                     disabled={!canAddProductFromList(product)}
                     title="Добавить в корзину"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs transition-all hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-20"
+                    className={clsx(
+                      'flex h-7 w-7 items-center justify-center rounded-lg shadow-xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-20',
+                      isInCart
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        : 'bg-slate-900 text-white hover:bg-slate-800'
+                    )}
                   >
-                    <Plus size={14} />
+                    <Plus size={14} strokeWidth={2.5} />
                   </button>
                 </div>
               </div>
