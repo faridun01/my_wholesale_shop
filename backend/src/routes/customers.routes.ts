@@ -89,112 +89,36 @@ const getCustomerSegment = (params: {
   return 'Новый';
 };
 
+// `stats` (from buildCustomerInvoiceStats) is only absent when the customer has zero
+// invoices in the requested scope, in which case every total is legitimately zero —
+// there is no other source of invoice data attached to `customer` at any call site.
 const mapCustomerWithTotals = (customer: any) => {
   const stats = customer.invoiceStats;
-  if (stats) {
-    const totalInvoiced = Number(stats.totalInvoiced || 0);
-    const totalPaid = Number(stats.totalPaid || 0);
-    const balance = Number(stats.balance || 0);
-    const invoiceCount = Number(stats.invoiceCount || 0);
-    const averageInvoice = invoiceCount > 0 ? totalInvoiced / invoiceCount : 0;
-
-    const { invoiceStats, ...customerData } = customer;
-    return {
-      ...customerData,
-      total_invoiced: totalInvoiced,
-      total_paid: totalPaid,
-      balance,
-      invoice_count: invoiceCount,
-      paid_invoice_count: Number(stats.paidInvoiceCount || 0),
-      partial_invoice_count: Number(stats.partialInvoiceCount || 0),
-      unpaid_invoice_count: Number(stats.unpaidInvoiceCount || 0),
-      paid_invoiced_total: Number(stats.paidInvoicedTotal || 0),
-      paid_collected_total: Number(stats.paidCollectedTotal || 0),
-      partial_invoiced_total: Number(stats.partialInvoicedTotal || 0),
-      partial_collected_total: Number(stats.partialCollectedTotal || 0),
-      unpaid_invoiced_total: Number(stats.unpaidInvoicedTotal || 0),
-      average_invoice: averageInvoice,
-      customer_segment: getCustomerSegment({ totalInvoiced, invoiceCount, averageInvoice }),
-      last_purchase_at: stats.lastPurchaseAt ? new Date(stats.lastPurchaseAt).toISOString() : null,
-      warehouse_names: Array.isArray(stats.warehouseNames) ? stats.warehouseNames.filter(Boolean) : [],
-    };
-  }
-
-  const invoices = Array.isArray(customer.invoices) ? customer.invoices : [];
-  const totalInvoiced = invoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
-  const totalPaid = invoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
-    0,
-  );
-  const balance = invoices.reduce((sum: number, invoice: any) => sum + getInvoiceBalance(invoice), 0);
-  const paidInvoices = invoices.filter((invoice: any) => getInvoiceBalance(invoice) <= PAYMENT_EPSILON);
-  const partialInvoices = invoices.filter((invoice: any) => {
-    const invoicePaidAmount = Math.max(0, Number(invoice.paidAmount || 0));
-    const invoiceBalance = getInvoiceBalance(invoice);
-    return invoicePaidAmount > PAYMENT_EPSILON && invoiceBalance > PAYMENT_EPSILON;
-  });
-  const unpaidInvoices = invoices.filter((invoice: any) => {
-    const invoicePaidAmount = Math.max(0, Number(invoice.paidAmount || 0));
-    const invoiceBalance = getInvoiceBalance(invoice);
-    return invoicePaidAmount <= PAYMENT_EPSILON && invoiceBalance > PAYMENT_EPSILON;
-  });
-  const paidInvoicedTotal = paidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
-  const paidCollectedTotal = paidInvoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
-    0,
-  );
-  const partialInvoicedTotal = partialInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
-  const partialCollectedTotal = partialInvoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.paidAmount || 0),
-    0,
-  );
-  const unpaidInvoicedTotal = unpaidInvoices.reduce((sum: number, invoice: any) => sum + Number(invoice.netAmount || 0), 0);
-  const paidInvoiceCount = invoices.filter((invoice: any) => getInvoiceBalance(invoice) <= PAYMENT_EPSILON).length;
-  const partialInvoiceCount = partialInvoices.length;
-  const unpaidInvoiceCount = unpaidInvoices.length;
-  const invoiceCount = invoices.length;
+  const totalInvoiced = Number(stats?.totalInvoiced || 0);
+  const totalPaid = Number(stats?.totalPaid || 0);
+  const balance = Number(stats?.balance || 0);
+  const invoiceCount = Number(stats?.invoiceCount || 0);
   const averageInvoice = invoiceCount > 0 ? totalInvoiced / invoiceCount : 0;
-  const customerSegment = getCustomerSegment({
-    totalInvoiced,
-    invoiceCount,
-    averageInvoice,
-  });
-  const lastPurchaseAt = invoices.reduce((latest: string | null, invoice: any) => {
-    const current = invoice?.createdAt ? new Date(invoice.createdAt).toISOString() : null;
-    if (!current) {
-      return latest;
-    }
-    if (!latest) {
-      return current;
-    }
-    return new Date(current).getTime() > new Date(latest).getTime() ? current : latest;
-  }, null);
-  const warehouseNames = Array.from(
-    new Set(
-      invoices
-        .map((invoice: any) => String(invoice?.warehouse?.name || '').trim())
-        .filter(Boolean),
-    ),
-  );
 
+  const { invoiceStats, ...customerData } = customer;
   return {
-    ...customer,
+    ...customerData,
     total_invoiced: totalInvoiced,
     total_paid: totalPaid,
     balance,
     invoice_count: invoiceCount,
-    paid_invoice_count: paidInvoiceCount,
-    partial_invoice_count: partialInvoiceCount,
-    unpaid_invoice_count: unpaidInvoiceCount,
-    paid_invoiced_total: paidInvoicedTotal,
-    paid_collected_total: paidCollectedTotal,
-    partial_invoiced_total: partialInvoicedTotal,
-    partial_collected_total: partialCollectedTotal,
-    unpaid_invoiced_total: unpaidInvoicedTotal,
+    paid_invoice_count: Number(stats?.paidInvoiceCount || 0),
+    partial_invoice_count: Number(stats?.partialInvoiceCount || 0),
+    unpaid_invoice_count: Number(stats?.unpaidInvoiceCount || 0),
+    paid_invoiced_total: Number(stats?.paidInvoicedTotal || 0),
+    paid_collected_total: Number(stats?.paidCollectedTotal || 0),
+    partial_invoiced_total: Number(stats?.partialInvoicedTotal || 0),
+    partial_collected_total: Number(stats?.partialCollectedTotal || 0),
+    unpaid_invoiced_total: Number(stats?.unpaidInvoicedTotal || 0),
     average_invoice: averageInvoice,
-    customer_segment: customerSegment,
-    last_purchase_at: lastPurchaseAt,
-    warehouse_names: warehouseNames,
+    customer_segment: getCustomerSegment({ totalInvoiced, invoiceCount, averageInvoice }),
+    last_purchase_at: stats?.lastPurchaseAt ? new Date(stats.lastPurchaseAt).toISOString() : null,
+    warehouse_names: Array.isArray(stats?.warehouseNames) ? stats.warehouseNames.filter(Boolean) : [],
   };
 };
 

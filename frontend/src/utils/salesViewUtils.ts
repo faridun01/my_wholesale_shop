@@ -55,7 +55,7 @@ export const getProductStockParts = (product: EditProductOption) => {
       ? `${formatCount(packageCount)} ${packageName}${extraUnits > 0 ? ` +${formatCount(extraUnits)} ${baseUnitName}` : ''}`
       : `${formatCount(totalStock)} ${baseUnitName}`;
   const secondary = packageCount > 0
-    ? `${formatCount(packageCount)}*${formatCount(unitsPerPackage)}=${formatCount(packageCount * unitsPerPackage)} ${baseUnitName}`
+    ? `${formatCount(packageCount)}x${formatCount(unitsPerPackage)}=${formatCount(packageCount * unitsPerPackage)} ${baseUnitName}`
     : '';
 
   return { primary, secondary };
@@ -197,7 +197,7 @@ export const getInvoiceItemQuantityParts = (item: any) => {
 
   if (packageQuantity > 0 && unitsPerPackage > 0) {
     const packagedUnits = packageQuantity * unitsPerPackage;
-    let secondary = `${formatCount(packageQuantity)}*${formatCount(unitsPerPackage)}=${formatCount(packagedUnits)} ${baseUnitName}`;
+    let secondary = `${formatCount(packageQuantity)}x${formatCount(unitsPerPackage)}=${formatCount(packagedUnits)} ${baseUnitName}`;
     if (extraUnitQuantity > 0) {
       secondary += ` +${formatCount(extraUnitQuantity)} ${baseUnitName}`;
     }

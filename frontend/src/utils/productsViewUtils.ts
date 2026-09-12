@@ -222,6 +222,7 @@ const pluralizeRu = (count: number, forms: [string, string, string]) => {
 };
 
 export const formatCountWithUnit = (count: number, unit: string) => {
+  const intCount = Math.round(Number(count) || 0);
   const normalized = String(unit || '').trim().toLowerCase();
   const formsMap: Record<string, [string, string, string]> = {
     'шт': ['шт', 'шт', 'шт'],
@@ -237,11 +238,11 @@ export const formatCountWithUnit = (count: number, unit: string) => {
   };
 
   const forms = formsMap[normalized] || [unit, unit, unit];
-  return `${count} ${pluralizeRu(count, forms)}`;
+  return `${intCount} ${pluralizeRu(intCount, forms)}`;
 };
 
 export const getStockBreakdown = (product: any) => {
-  const totalUnits = Number(product?.stock || 0);
+  const totalUnits = Math.round(Number(product?.stock || 0));
   const preferredPackaging = getPreferredPackaging(product);
   const unitsPerPackage = Number(preferredPackaging?.unitsPerPackage || 0);
   const packageName = preferredPackaging?.packageName || preferredPackaging?.name || '';
@@ -255,7 +256,7 @@ export const getStockBreakdown = (product: any) => {
   }
 
   const packageCount = Math.floor(totalUnits / unitsPerPackage);
-  const remainderUnits = totalUnits % unitsPerPackage;
+  const remainderUnits = Math.round(totalUnits % unitsPerPackage);
   const piecesLabel = displayBaseUnit;
   const normalizedPackageName = normalizeOcrPackageName(packageName || 'упаковка');
 

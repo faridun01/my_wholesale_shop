@@ -146,28 +146,28 @@ const useSalesEditInvoice = ({
     const isEmpty = !item && !product;
     const totalUnits =
       item?.totalBaseUnits !== undefined && item?.totalBaseUnits !== null
-        ? Math.max(0, Number(item.totalBaseUnits) || 0)
+        ? Math.max(0, Math.floor(Number(item.totalBaseUnits) || 0))
         : item?.quantity !== undefined && item?.quantity !== null
-          ? Math.max(0, Number(item.quantity) || 0)
+          ? Math.max(0, Math.floor(Number(item.quantity) || 0))
           : isEmpty
             ? 0
             : defaultPackaging
-              ? Number(defaultPackaging.unitsPerPackage || 0)
+              ? Math.floor(Number(defaultPackaging.unitsPerPackage || 0))
               : 1;
     const selectedPackaging = existingPackaging || defaultPackaging;
     const usePackaging = Boolean(selectedPackaging && Number(selectedPackaging.unitsPerPackage || 0) > 1);
-    const unitsPerPackage = usePackaging ? Number(selectedPackaging?.unitsPerPackage || 0) : 0;
+    const unitsPerPackage = usePackaging ? Math.floor(Number(selectedPackaging?.unitsPerPackage || 0)) : 0;
     const packageQuantity =
       item?.packageQuantity !== undefined && item?.packageQuantity !== null
-        ? Math.max(0, Number(item.packageQuantity) || 0)
+        ? Math.max(0, Math.floor(Number(item.packageQuantity) || 0))
         : usePackaging && unitsPerPackage > 0
           ? Math.floor(totalUnits / unitsPerPackage)
           : 0;
     const extraUnitQuantity =
       item?.extraUnitQuantity !== undefined && item?.extraUnitQuantity !== null
-        ? Math.max(0, Number(item.extraUnitQuantity) || 0)
+        ? Math.max(0, Math.floor(Number(item.extraUnitQuantity) || 0))
         : usePackaging && unitsPerPackage > 0
-          ? totalUnits % unitsPerPackage
+          ? Math.round(totalUnits % unitsPerPackage)
           : totalUnits;
     const baseUnitName = normalizeDisplayBaseUnit(
       item?.unit || item?.baseUnitNameSnapshot || product?.baseUnitName || product?.unit || 'шт',
@@ -229,10 +229,10 @@ const useSalesEditInvoice = ({
 
   const normalizeEditInvoiceItem = (item: EditInvoiceItem): EditInvoiceItem => {
     const packaging = getEditItemPackaging(item);
-    const unitsPerPackage = Number(packaging?.unitsPerPackage || 0);
+    const unitsPerPackage = Math.floor(Number(packaging?.unitsPerPackage || 0));
     const packageQuantity = Math.max(0, Math.floor(Number(item.packageQuantityInput || 0) || 0));
-    const extraUnitQuantity = Math.max(0, Number(item.extraUnitQuantityInput || 0) || 0);
-    const totalUnits = packaging && unitsPerPackage > 0 ? packageQuantity * unitsPerPackage + extraUnitQuantity : extraUnitQuantity;
+    const extraUnitQuantity = Math.max(0, Math.floor(Number(item.extraUnitQuantityInput || 0) || 0));
+    const totalUnits = packaging && unitsPerPackage > 0 ? Math.round(packageQuantity * unitsPerPackage + extraUnitQuantity) : extraUnitQuantity;
 
     return {
       ...item,

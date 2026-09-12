@@ -50,8 +50,8 @@ function buildRequestedQuantityByProduct(
 
   for (const item of items) {
     const productId = Number(item.productId);
-    const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
-    requested.set(productId, roundMoney((requested.get(productId) || 0) + quantity));
+    const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
+    requested.set(productId, Math.round((requested.get(productId) || 0) + quantity));
   }
 
   return requested;
@@ -204,7 +204,7 @@ export class InvoiceService {
       // 1. Calculate totals
       let totalAmount = 0;
       for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
+        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
         if (quantity <= 0) {
@@ -270,11 +270,11 @@ export class InvoiceService {
 
         const packageQuantity =
           item.packageQuantity !== undefined && item.packageQuantity !== null
-            ? normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity')
+            ? Math.round(normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity'))
             : null;
         const extraUnitQuantity =
           item.extraUnitQuantity !== undefined && item.extraUnitQuantity !== null
-            ? normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity')
+            ? Math.round(normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity'))
             : 0;
         const baseUnitName = normalizeBaseUnitName(item.baseUnitName || packaging?.baseUnitName || product.baseUnitName || product.unit);
 
@@ -550,7 +550,7 @@ export class InvoiceService {
 
       let totalAmount = 0;
       for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
+        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
 
@@ -593,7 +593,7 @@ export class InvoiceService {
       });
 
       for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
+        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const product = productsById.get(Number(item.productId));
 
@@ -607,11 +607,11 @@ export class InvoiceService {
 
         const packageQuantity =
           item.packageQuantity !== undefined && item.packageQuantity !== null
-            ? normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity')
+            ? Math.round(normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity'))
             : null;
         const extraUnitQuantity =
           item.extraUnitQuantity !== undefined && item.extraUnitQuantity !== null
-            ? normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity')
+            ? Math.round(normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity'))
             : 0;
         const baseUnitName = normalizeBaseUnitName(item.baseUnitName || packaging?.baseUnitName || product.baseUnitName || product.unit);
 

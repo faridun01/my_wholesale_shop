@@ -25,7 +25,9 @@ export const formatMoney = (value: unknown, currency = '') => {
 export const formatCount = (value: unknown) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return '0';
-  return new Intl.NumberFormat('ru-RU').format(numeric);
+  return new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 0,
+  }).format(Math.round(numeric));
 };
 
 export const toFixedNumber = (value: unknown, digits = 2) => {

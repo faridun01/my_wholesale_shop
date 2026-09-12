@@ -7,6 +7,7 @@ import ProductRestockModal from './ProductRestockModal';
 import ProductReturnWriteOffModal from './ProductReturnWriteOffModal';
 import ProductTransferModal from './ProductTransferModal';
 import ProductWriteOffModal from './ProductWriteOffModal';
+import ProductDeleteModal from './ProductDeleteModal';
 
 const ProductHistoryModal = React.lazy(() => import('./ProductHistoryModal'));
 const ProductBatchesModal = React.lazy(() => import('./ProductBatchesModal'));
@@ -274,15 +275,13 @@ export default function ProductsModals(props: ProductsModalsProps) {
         onMergeTargetChange={setMergeTargetId}
       />
 
-      <React.Suspense fallback={null}>
-        <ConfirmationModal
-          isOpen={showDeleteConfirm}
-          onClose={closeDeleteConfirm}
-          onConfirm={handleConfirmDeleteProduct}
-          title="Удалить товар навсегда?"
-          message={`Товар "${formatProductName(selectedProduct?.name)}" будет удалён навсегда. Если он уже участвовал в продажах, система не даст удалить его полностью.`}
-        />
-      </React.Suspense>
+      <ProductDeleteModal
+        isOpen={showDeleteConfirm}
+        product={selectedProduct}
+        warehouses={warehouses}
+        onClose={closeDeleteConfirm}
+        onConfirm={handleConfirmDeleteProduct}
+      />
 
       <React.Suspense fallback={null}>
         <ConfirmationModal

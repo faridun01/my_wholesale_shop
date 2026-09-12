@@ -489,7 +489,7 @@ router.delete('/:id/payments/:paymentId', async (req: AuthRequest, res, next) =>
 
     const payment = await (prisma as any).expensePayment.findUnique({
       where: { id: paymentId },
-      select: { id: true, expenseId: true, amount: true },
+      select: { id: true, expenseId: true },
     });
 
     if (!payment || Number(payment.expenseId) !== expenseId) {
@@ -502,16 +502,6 @@ router.delete('/:id/payments/:paymentId', async (req: AuthRequest, res, next) =>
       `;
       if (!locked[0]) {
         throw Object.assign(new Error('Расход не найден'), { status: 404 });
-      }
-
-      const paymentAmount = Number(payment.amount || 0);
-      if (paymentAmount < 0) {
-        await tx.expense.update({
-          where: { id: expenseId },
-          data: {
-            amount: { increment: Math.abs(paymentAmount) },
-          },
-        });
       }
 
       await tx.expensePayment.delete({ where: { id: paymentId } });

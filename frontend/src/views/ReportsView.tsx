@@ -1527,7 +1527,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             headerActions={
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
                 {/* Search */}
-                <div className="relative flex-1 sm:flex-initial flex items-center min-w-[130px]">
+                <div className="relative flex-1 sm:flex-initial flex items-center min-w-32.5">
                   <Search size={13} className="absolute left-2.5 text-slate-400" />
                   <input
                     type="text"
@@ -1679,7 +1679,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                           {globalIndex}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-xs text-slate-900 leading-snug break-words">
+                          <h4 className="font-bold text-xs text-slate-900 leading-snug wrap-break-word">
                             {row.name}
                           </h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">
@@ -1775,7 +1775,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                     return (
                       <tr key={`${row.name}-${index}`} className="transition-colors hover:bg-slate-50/80">
                         <td className="py-2 px-2.5 text-center font-medium text-slate-400">{globalIndex}</td>
-                        <td className="py-2 px-2.5 font-semibold text-slate-900 min-w-[140px] leading-snug break-words">
+                        <td className="py-2 px-2.5 font-semibold text-slate-900 min-w-35 leading-snug wrap-break-word">
                           {row.name}
                         </td>
                         <td className="py-2 px-2.5 text-right font-medium text-slate-900 tabular-nums">{formatCount(quantity)}</td>
@@ -1907,7 +1907,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {paginatedDetailRows.map((row, index) => (
                   <tr key={`${row.date}-${row.product_name}-${index}`} className="transition-colors hover:bg-slate-50/80">
-                    <td className="py-1.5 sm:py-2 px-3 font-semibold text-slate-900 leading-snug break-words min-w-[150px] text-[11px] sm:text-xs">
+                    <td className="py-1.5 sm:py-2 px-3 font-semibold text-slate-900 leading-snug wrap-break-word min-w-37.5 text-[11px] sm:text-xs">
                       {formatProductName(row.product_name)}
                     </td>
                     <td className="py-1.5 sm:py-2 px-3 font-medium text-slate-900 tabular-nums">{row.quantity}</td>

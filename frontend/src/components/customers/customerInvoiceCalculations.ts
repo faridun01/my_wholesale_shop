@@ -75,7 +75,7 @@ export const getInvoiceItemQuantityParts = (item: StatementItem) => {
 
   if (packageQuantity > 0 && unitsPerPackage > 0) {
     const packagedUnits = packageQuantity * unitsPerPackage;
-    let secondary = `${formatCount(packageQuantity)}*${formatCount(unitsPerPackage)}=${formatCount(packagedUnits)} ${baseUnitName}`;
+    let secondary = `${formatCount(packageQuantity)}x${formatCount(unitsPerPackage)}=${formatCount(packagedUnits)} ${baseUnitName}`;
     if (extraUnitQuantity > 0) {
       secondary += ` +${formatCount(extraUnitQuantity)} ${baseUnitName}`;
     }

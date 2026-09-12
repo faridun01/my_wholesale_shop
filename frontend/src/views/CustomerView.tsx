@@ -1,6 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
-import { Search, Plus, Edit2, Trash2, FileText, Phone, MapPin, X, User, Printer, Share2, Receipt, Eye } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  FileText,
+  Phone,
+  MapPin,
+  X,
+  User,
+  Printer,
+  Share2,
+  Receipt,
+  Eye,
+  Clock,
+  Package,
+  Warehouse as WarehouseIcon,
+  CheckCircle2,
+  AlertCircle,
+  RotateCcw,
+  Calendar,
+  Layers,
+  CreditCard,
+  Wallet,
+  ChevronRight,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Card, Badge } from '../components/UI';
@@ -75,30 +100,31 @@ export default function CustomerView() {
 
     if (inv.cancelled) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500 border border-slate-200/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
           Отменена
         </span>
       );
     }
     if (balance <= PAYMENT_EPSILON) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/80 shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Оплачено
         </span>
       );
     }
     if (paid > PAYMENT_EPSILON) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/80 shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
           Частично
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200/60">
-        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200/80 shadow-2xs">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
         Не оплачено
       </span>
     );
@@ -1113,17 +1139,20 @@ export default function CustomerView() {
                         <div
                           key={invoice.id}
                           onClick={() => openInvoiceDetails(invoice)}
-                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs hover:border-slate-300 hover:shadow-md transition-all active:scale-[0.99]"
+                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.99]"
                         >
                           {/* Top Row: Number & Status */}
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs sm:text-sm font-bold text-slate-900">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                                <Receipt size={14} />
+                              </div>
+                              <span className="font-mono text-xs sm:text-sm font-black text-slate-900 truncate">
                                 Накладная #{invoice.id}
                               </span>
                               {getCustomerInvoiceBadge(invoice)}
                             </div>
-                            <span className="font-mono text-[11px] text-slate-400">
+                            <span className="font-mono text-[11px] text-slate-400 shrink-0">
                               {new Date(invoice.createdAt).toLocaleDateString('ru-RU', {
                                 day: 'numeric',
                                 month: 'short',
@@ -1135,7 +1164,7 @@ export default function CustomerView() {
                           </div>
 
                           {/* 3-Column Financial Strip */}
-                          <div className="mt-2.5 grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center">
+                          <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center">
                             <div>
                               <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Сумма</p>
                               <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-slate-900">
@@ -1151,7 +1180,7 @@ export default function CustomerView() {
                             <div>
                               <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Остаток</p>
                               <p className={clsx(
-                                'mt-0.5 font-mono text-xs font-bold tabular-nums',
+                                'mt-0.5 font-mono text-xs font-black tabular-nums',
                                 balance > PAYMENT_EPSILON ? 'text-rose-600' : 'text-slate-400'
                               )}>
                                 {formatMoneyByRole(balance)}
@@ -1163,17 +1192,18 @@ export default function CustomerView() {
                           <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
                               {invoice.warehouse?.name && (
-                                <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 truncate max-w-[140px]">
-                                  {invoice.warehouse.name}
+                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600 truncate max-w-[140px]">
+                                  <WarehouseIcon size={11} className="text-slate-400 shrink-0" />
+                                  <span className="truncate">{invoice.warehouse.name}</span>
                                 </span>
                               )}
                               {paymentsCount > 0 && (
-                                <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                                   Оплат: {paymentsCount}
                                 </span>
                               )}
                               {returnsCount > 0 && (
-                                <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                                   Возвратов: {returnsCount}
                                 </span>
                               )}
@@ -1183,7 +1213,7 @@ export default function CustomerView() {
                               <button
                                 type="button"
                                 onClick={() => openInvoiceDetails(invoice)}
-                                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-slate-800 active:scale-95"
+                                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-indigo-600 active:scale-95 shadow-2xs"
                               >
                                 <Eye size={13} />
                                 <span>Посмотреть</span>
@@ -1229,47 +1259,54 @@ export default function CustomerView() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeInvoiceDetailsModal}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
               />
               <motion.div
-                initial={{ y: '100%', opacity: 0.5 }}
+                initial={{ y: '100%', opacity: 0.8 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0.5 }}
+                exit={{ y: '100%', opacity: 0.8 }}
                 transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                className="relative flex h-[92vh] sm:h-auto sm:max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-200/90 bg-white shadow-2xl"
+                className="relative flex h-[94vh] sm:h-auto sm:max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200/90 bg-slate-50 shadow-2xl"
               >
-                {/* Mobile grab handle */}
-                <div className="mx-auto mt-2.5 h-1.5 w-12 shrink-0 rounded-full bg-slate-300 sm:hidden" />
+                {/* Decorative Top Accent Gradient Bar */}
+                <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-indigo-600 to-emerald-500 shrink-0" />
+
+                {/* Mobile Grab Indicator */}
+                <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-slate-300 sm:hidden" />
 
                 {/* Modal Header */}
-                <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-800">
-                      <Receipt size={18} />
+                <div className="flex items-center justify-between border-b border-slate-200/80 bg-white px-4 py-3 sm:px-6 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-slate-950 via-slate-800 to-indigo-950 text-white shadow-md shadow-indigo-950/20 ring-4 ring-indigo-50">
+                      <Receipt size={22} />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 truncate">
                           Накладная #{selectedInvoice.id}
                         </h3>
-                        <div className="shrink-0 scale-90 sm:scale-100 origin-left">
+                        <div className="shrink-0">
                           {getCustomerInvoiceBadge(selectedInvoice)}
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-400 font-mono">
-                        {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-slate-500 font-medium">
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-400">
+                          <Clock size={12} className="text-slate-400" />
+                          {new Date(selectedInvoice.createdAt).toLocaleString('ru-RU')}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
-                      className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
-                      title="Печать"
+                      className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-95 shadow-2xs"
+                      title="Распечатать накладную"
                     >
-                      <Printer size={15} />
+                      <Printer size={15} className="text-slate-600" />
+                      <span>Печать</span>
                     </button>
                     <button
                       type="button"
@@ -1277,107 +1314,114 @@ export default function CustomerView() {
                         const { shareInvoicePdf } = await import('../utils/print/salesInvoicePdf');
                         await shareInvoicePdf(selectedInvoice);
                       }}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
-                      title="Поделиться (PDF)"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200/90 bg-teal-50/80 px-3 py-2 text-xs font-bold text-teal-700 transition-all hover:bg-teal-100 active:scale-95 shadow-2xs"
+                      title="Поделиться накладной в PDF"
                     >
-                      <Share2 size={15} />
+                      <Share2 size={15} className="text-teal-600" />
+                      <span className="hidden sm:inline">PDF</span>
                     </button>
                     <button
                       type="button"
                       onClick={closeInvoiceDetailsModal}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:scale-95 shadow-2xs"
                       title="Закрыть"
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                   </div>
                 </div>
 
                 {/* Modal Body */}
-                <div className="flex-1 space-y-3.5 overflow-y-auto bg-white p-3.5 sm:p-5">
-                  {/* Requisites Card */}
-                  <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3">
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/50 p-3.5 sm:p-6">
+                  {/* Customer Info Card */}
+                  <div className="rounded-2xl border border-blue-100/90 bg-linear-to-br from-blue-50/50 via-white to-blue-50/20 p-3.5 shadow-2xs flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                        <User size={18} />
+                      </div>
                       <div className="min-w-0">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Клиент</span>
-                        <p className="text-xs font-bold text-slate-900 truncate">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800/80 block">
+                          Покупатель
+                        </span>
+                        <p className="text-sm font-bold text-slate-900 truncate">
                           {selectedInvoice.customer_name || selectedCustomer?.name || 'Обычный клиент'}
-                        </p>
-                        {(selectedInvoice.customer_phone || selectedCustomer?.phone) && (
-                          <p className="mt-0.5 text-[11px] text-slate-500">
-                            {selectedInvoice.customer_phone || selectedCustomer?.phone}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Склад</span>
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {selectedInvoice.warehouse?.name || '---'}
-                        </p>
-                        <p className="mt-0.5 text-[10px] text-slate-500 truncate">
-                          {selectedInvoice.warehouse?.address || 'Без адреса'}
-                        </p>
-                      </div>
-
-                      <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Сотрудник</span>
-                        <p className="text-xs font-semibold text-slate-800">
-                          {selectedInvoice.staff_name || selectedInvoice.user?.username || 'admin'}
                         </p>
                       </div>
                     </div>
+                    {(selectedInvoice.customer_phone || selectedCustomer?.phone) ? (
+                      <a
+                        href={`tel:${selectedInvoice.customer_phone || selectedCustomer?.phone}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 transition-colors bg-blue-100/70 hover:bg-blue-100 px-3 py-1.5 rounded-xl shrink-0"
+                      >
+                        <Phone size={13} className="shrink-0" />
+                        <span className="font-mono">{selectedInvoice.customer_phone || selectedCustomer?.phone}</span>
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">Телефон не указан</span>
+                    )}
                   </div>
 
-                  {/* Items Section */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Товары в накладной ({selectedInvoice.items?.length || 0})
-                      </h4>
+                  {/* Items in Invoice Section */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between px-0.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-200/80 text-slate-700">
+                          <Package size={14} />
+                        </div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                          Товары в накладной
+                        </h4>
+                        <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-black font-mono text-slate-700">
+                          {selectedInvoice.items?.length || 0}
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono font-black text-slate-900 sm:hidden">
+                        {formatMoneyByRole(selectedInvoice.netAmount)}
+                      </span>
                     </div>
 
                     {/* Mobile Items Cards */}
-                    <div className="space-y-2 md:hidden">
+                    <div className="space-y-2.5 md:hidden">
                       {selectedInvoice.items?.map((item: any, idx: number) => {
                         const quantityInfo = getInvoiceItemQuantityParts(item);
                         const lineTotal = Number(item.totalPrice) || (Number(item.quantity || 0) * Number(item.sellingPrice || 0));
                         const returnedQty = Number(item.returnedQty || 0);
 
                         return (
-                          <div key={item.id || idx} className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs">
-                            <div className="flex items-start gap-2">
-                              <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-500">
+                          <div key={item.id || idx} className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5">
+                            <div className="flex items-start gap-2.5">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-[10px] font-bold text-slate-500">
                                 {idx + 1}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold text-slate-900 leading-snug">
+                                <p className="text-xs font-bold text-slate-900 leading-snug">
                                   {formatProductName(item.product_name || item.product?.name)}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
-                              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2 text-center">
                                 <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Кол-во</p>
                                 <p className="mt-0.5 font-bold text-slate-800 text-xs">{quantityInfo.primary}</p>
                                 {quantityInfo.secondary && (
                                   <p className="mt-0.5 text-[9px] text-slate-400">{quantityInfo.secondary}</p>
                                 )}
                               </div>
-                              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2 text-center">
                                 <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Цена</p>
-                                <p className="mt-0.5 font-bold text-slate-900 text-xs">{formatMoney(item.sellingPrice)}</p>
+                                <p className="mt-0.5 font-bold text-slate-900 text-xs font-mono">{formatMoney(item.sellingPrice)}</p>
                               </div>
-                              <div className="rounded-lg bg-slate-100/80 p-2 text-center">
-                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500">Итого</p>
-                                <p className="mt-0.5 font-bold text-slate-900 text-xs">{formatMoney(lineTotal)}</p>
+                              <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2 text-center">
+                                <p className="text-[8px] font-bold uppercase tracking-wider text-indigo-500">Итого</p>
+                                <p className="mt-0.5 font-black text-indigo-950 text-xs font-mono">{formatMoney(lineTotal)}</p>
                               </div>
                             </div>
 
                             {returnedQty > PAYMENT_EPSILON && (
-                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-800">
-                                Возвращено: {formatCount(returnedQty)}
+                              <div className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-800">
+                                <RotateCcw size={11} className="shrink-0" />
+                                <span>Возвращено: {formatCount(returnedQty)}</span>
                               </div>
                             )}
                           </div>
@@ -1386,15 +1430,15 @@ export default function CustomerView() {
                     </div>
 
                     {/* Desktop Items Table */}
-                    <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200">
-                      <table className="w-full border-collapse text-left text-[11px]">
+                    <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
+                      <table className="w-full border-collapse text-left text-xs">
                         <thead>
-                          <tr className="border-b border-slate-200 bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                            <th className="px-3 py-2 w-10">№</th>
-                            <th className="px-3 py-2">Товар</th>
-                            <th className="px-3 py-2">Кол-во</th>
-                            <th className="px-3 py-2">Цена</th>
-                            <th className="px-3 py-2 text-right">Итого</th>
+                          <tr className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                            <th className="px-4 py-2.5 w-12 text-slate-400">№</th>
+                            <th className="px-4 py-2.5">Товар</th>
+                            <th className="px-4 py-2.5">Количество</th>
+                            <th className="px-4 py-2.5">Цена за ед.</th>
+                            <th className="px-4 py-2.5 text-right">Итого</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1404,24 +1448,25 @@ export default function CustomerView() {
                             const returnedQty = Number(item.returnedQty || 0);
 
                             return (
-                              <tr key={item.id || idx} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-3 py-2 font-mono text-slate-400">{idx + 1}</td>
-                                <td className="px-3 py-2">
-                                  <p className="font-semibold text-slate-900">{formatProductName(item.product_name || item.product?.name)}</p>
+                              <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="px-4 py-3 font-mono text-slate-400 text-xs">{idx + 1}</td>
+                                <td className="px-4 py-3">
+                                  <p className="font-bold text-slate-900">{formatProductName(item.product_name || item.product?.name)}</p>
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-500">
-                                  <p className="whitespace-nowrap text-[11px] font-semibold text-slate-700">{quantityInfo.primary}</p>
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                  <p className="font-bold text-slate-800">{quantityInfo.primary}</p>
                                   {quantityInfo.secondary && (
-                                    <p className="mt-0.5 whitespace-nowrap text-[9px] text-slate-400">{quantityInfo.secondary}</p>
+                                    <p className="mt-0.5 text-[10px] text-slate-400 font-medium">{quantityInfo.secondary}</p>
                                   )}
                                   {returnedQty > PAYMENT_EPSILON && (
-                                    <span className="mt-1 inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-700">
+                                    <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+                                      <RotateCcw size={9} />
                                       Возвращено: {formatCount(returnedQty)}
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2 font-medium text-slate-700">{formatMoney(item.sellingPrice)}</td>
-                                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatMoney(lineTotal)}</td>
+                                <td className="px-4 py-3 font-mono font-medium text-slate-700">{formatMoney(item.sellingPrice)}</td>
+                                <td className="px-4 py-3 text-right font-mono font-black text-slate-900">{formatMoney(lineTotal)}</td>
                               </tr>
                             );
                           })}
@@ -1430,82 +1475,117 @@ export default function CustomerView() {
                     </div>
                   </div>
 
-                  {/* Totals Summary */}
-                  <div className="flex justify-end">
-                    <div className="w-full max-w-sm space-y-1.5 rounded-xl border border-slate-200/90 bg-slate-50/50 p-3 text-xs">
+                  {/* Totals Summary & Receipt Details */}
+                  <div className="flex justify-end pt-1">
+                    <div className="w-full max-w-sm space-y-2 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs text-xs">
                       <div className="flex items-center justify-between text-slate-500">
                         <span>Сумма без скидки</span>
-                        <span className="font-medium text-slate-900">{formatMoneyByRole(selectedInvoice.totalAmount || selectedInvoice.netAmount)}</span>
+                        <span className="font-mono font-semibold text-slate-800">{formatMoneyByRole(selectedInvoice.totalAmount || selectedInvoice.netAmount)}</span>
                       </div>
 
                       {Number(selectedInvoice.discount || 0) > 0 && (
                         <div className="flex items-center justify-between text-rose-600">
-                          <span>Скидка ({selectedInvoice.discount}%)</span>
-                          <span className="font-medium">-{formatMoneyByRole(getInvoiceDiscountAmount(selectedInvoice))}</span>
+                          <span className="flex items-center gap-1">
+                            <span>Скидка</span>
+                            <span className="rounded-md bg-rose-50 px-1.5 py-0.2 font-mono text-[10px] font-bold border border-rose-200">
+                              -{selectedInvoice.discount}%
+                            </span>
+                          </span>
+                          <span className="font-mono font-bold">-{formatMoneyByRole(getInvoiceDiscountAmount(selectedInvoice))}</span>
                         </div>
                       )}
 
                       {Number(selectedInvoice.returnedAmount || 0) > 0 && (
                         <div className="flex items-center justify-between text-amber-700">
-                          <span>Возврат</span>
-                          <span className="font-semibold">-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
+                          <span>Возврат товаров</span>
+                          <span className="font-mono font-bold">-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 text-xs font-bold text-slate-900">
-                        <span>ИТОГО К ОПЛАТЕ</span>
-                        <span className="font-mono text-sm font-bold text-slate-900">{formatMoneyByRole(selectedInvoice.netAmount)}</span>
+                      {/* Grand Net Total */}
+                      <div className="flex items-center justify-between rounded-xl bg-slate-900 px-3.5 py-2.5 text-white shadow-xs">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">ИТОГО К ОПЛАТЕ</span>
+                        <span className="font-mono text-base font-black text-white">{formatMoneyByRole(selectedInvoice.netAmount)}</span>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-slate-500">
-                        <span>Оплачено</span>
-                        <span className="font-mono font-bold text-emerald-600">
+                      {/* Applied Paid */}
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 size={13} className="text-emerald-500" />
+                          <span>Оплачено</span>
+                        </span>
+                        <span className="font-mono font-bold text-emerald-600 text-sm">
                           {formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-slate-500">
-                        <span>Остаток долга</span>
-                        <span className={clsx(
-                          'font-mono font-bold',
-                          Number(selectedInvoice.invoiceBalance || 0) > PAYMENT_EPSILON ? 'text-rose-600' : 'text-slate-400'
-                        )}>
-                          {formatMoneyByRole(selectedInvoice.invoiceBalance)}
-                        </span>
+                      {/* Balance / Remaining Debt */}
+                      <div className="border-t border-slate-100 pt-2">
+                        {Number(selectedInvoice.invoiceBalance || 0) > PAYMENT_EPSILON ? (
+                          <div className="flex items-center justify-between rounded-xl border border-rose-200/80 bg-rose-50/70 px-3 py-2 text-rose-700">
+                            <span className="font-bold text-xs flex items-center gap-1">
+                              <AlertCircle size={13} />
+                              Остаток долга
+                            </span>
+                            <span className="font-mono font-black text-sm text-rose-600">
+                              {formatMoneyByRole(selectedInvoice.invoiceBalance)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-emerald-700">
+                            <span className="font-bold text-xs flex items-center gap-1">
+                              <CheckCircle2 size={13} />
+                              Статус долга
+                            </span>
+                            <span className="font-bold text-xs">
+                              Полностью оплачено
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Payment Events */}
                   {Boolean(selectedInvoice.paymentEvents?.length) && (
-                    <div className="space-y-1.5 pt-1">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        История оплат ({selectedInvoice.paymentEvents!.length})
-                      </h4>
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
-                        <table className="w-full text-left text-[11px]">
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
+                          <Wallet size={12} />
+                        </div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                          История оплат ({selectedInvoice.paymentEvents!.length})
+                        </h4>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
+                        <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold">
-                              <th className="px-3 py-1.5">Дата</th>
-                              <th className="px-3 py-1.5">Сумма</th>
-                              <th className="px-3 py-1.5">Сотрудник</th>
-                              <th className="px-3 py-1.5 text-right">Способ</th>
+                            <tr className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                              <th className="px-4 py-2">Дата</th>
+                              <th className="px-4 py-2">Сумма</th>
+                              <th className="px-4 py-2">Сотрудник</th>
+                              <th className="px-4 py-2 text-right">Способ</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {selectedInvoice.paymentEvents!.map((payment: any) => {
                               const isRefund = Number(payment.amount || 0) < 0;
                               return (
-                                <tr key={payment.id}>
-                                  <td className="px-3 py-1.5 text-slate-500 font-mono text-[10px]">
+                                <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-4 py-2.5 text-slate-500 font-mono text-[11px]">
                                     {new Date(payment.createdAt).toLocaleString('ru-RU')}
                                   </td>
-                                  <td className={`px-3 py-1.5 font-bold ${isRefund ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {isRefund ? '−' : ''}{formatMoneyByRole(Math.abs(Number(payment.amount || 0)))}
+                                  <td className={clsx(
+                                    'px-4 py-2.5 font-mono font-bold text-xs',
+                                    isRefund ? 'text-rose-600' : 'text-emerald-600'
+                                  )}>
+                                    {isRefund ? '−' : '+'}{formatMoneyByRole(Math.abs(Number(payment.amount || 0)))}
                                   </td>
-                                  <td className="px-3 py-1.5 text-slate-600">{payment.staff_name}</td>
-                                  <td className="px-3 py-1.5 text-right text-[10px] font-bold uppercase text-slate-500">
-                                    {payment.method}
+                                  <td className="px-4 py-2.5 text-slate-600 font-medium">{payment.staff_name}</td>
+                                  <td className="px-4 py-2.5 text-right">
+                                    <span className="inline-flex rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                                      {payment.method}
+                                    </span>
                                   </td>
                                 </tr>
                               );
@@ -1518,31 +1598,36 @@ export default function CustomerView() {
 
                   {/* Return Events */}
                   {Boolean(selectedInvoice.returnEvents?.length) && (
-                    <div className="space-y-1.5 pt-1">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
-                        История возвратов ({selectedInvoice.returnEvents!.length})
-                      </h4>
-                      <div className="overflow-x-auto rounded-xl border border-amber-200 bg-amber-50/40">
-                        <table className="w-full text-left text-[11px]">
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-amber-800">
+                          <RotateCcw size={12} />
+                        </div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-800">
+                          История возвратов ({selectedInvoice.returnEvents!.length})
+                        </h4>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-amber-200/90 bg-amber-50/40 shadow-2xs">
+                        <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="border-b border-amber-200 bg-amber-100/50 text-amber-800 font-semibold">
-                              <th className="px-3 py-1.5">Дата</th>
-                              <th className="px-3 py-1.5">Сумма</th>
-                              <th className="px-3 py-1.5">Причина</th>
-                              <th className="px-3 py-1.5 text-right">Сотрудник</th>
+                            <tr className="border-b border-amber-200/90 bg-amber-100/50 text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                              <th className="px-4 py-2">Дата</th>
+                              <th className="px-4 py-2">Сумма</th>
+                              <th className="px-4 py-2">Причина</th>
+                              <th className="px-4 py-2 text-right">Сотрудник</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-amber-100">
                             {selectedInvoice.returnEvents!.map((itemReturn: any) => (
-                              <tr key={itemReturn.id}>
-                                <td className="px-3 py-1.5 text-slate-500 font-mono text-[10px]">
+                              <tr key={itemReturn.id} className="hover:bg-amber-100/30 transition-colors">
+                                <td className="px-4 py-2.5 text-slate-500 font-mono text-[11px]">
                                   {new Date(itemReturn.createdAt).toLocaleString('ru-RU')}
                                 </td>
-                                <td className="px-3 py-1.5 font-bold text-rose-600">
+                                <td className="px-4 py-2.5 font-mono font-bold text-rose-600 text-xs">
                                   -{formatMoneyByRole(itemReturn.totalValue)}
                                 </td>
-                                <td className="px-3 py-1.5 text-slate-600">{formatTransactionReason(itemReturn.reason)}</td>
-                                <td className="px-3 py-1.5 text-right text-slate-500">{itemReturn.staff_name}</td>
+                                <td className="px-4 py-2.5 text-slate-700 font-medium">{formatTransactionReason(itemReturn.reason)}</td>
+                                <td className="px-4 py-2.5 text-right text-slate-500">{itemReturn.staff_name}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1553,34 +1638,22 @@ export default function CustomerView() {
                 </div>
 
                 {/* Sticky Modal Footer */}
-                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-between border-t border-slate-200/80 bg-white px-4 py-3 sm:px-6 shrink-0">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handlePrintInvoiceDirect(selectedInvoice)}
-                      className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs active:scale-95"
                     >
-                      <Printer size={14} />
+                      <Printer size={14} className="text-slate-600" />
                       <span>Печать</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const { shareInvoicePdf } = await import('../utils/print/salesInvoicePdf');
-                        await shareInvoicePdf(selectedInvoice);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
-                    >
-                      <Share2 size={14} />
-                      <span>Поделиться (PDF)</span>
                     </button>
                   </div>
 
                   <button
                     type="button"
                     onClick={closeInvoiceDetailsModal}
-                    className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+                    className="rounded-xl border border-slate-200 bg-slate-100 px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-all active:scale-95"
                   >
                     Закрыть
                   </button>

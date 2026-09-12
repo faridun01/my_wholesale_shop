@@ -7,8 +7,8 @@ import {
   Layers,
   Package,
   Pencil,
-  Plus,
   PlusCircle,
+  Sparkles,
   Tag,
   Trash2,
   Warehouse,
@@ -68,7 +68,7 @@ export default function ProductsMobileList({
   onDeleteProduct,
 }: ProductsMobileListProps) {
   return (
-    <div className="space-y-3 p-2.5 sm:p-3 md:hidden">
+    <div className="space-y-3.5 p-3 sm:p-4 md:hidden">
       {products.map((product, index) => {
         const isExpanded = expandedMobileActionsId === Number(product.id);
         const stockBreakdown = getStockBreakdown(product);
@@ -87,23 +87,30 @@ export default function ProductsMobileList({
         return (
           <div
             key={`mobile-${product.id ?? product.name}-${index}`}
-            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all hover:border-slate-300 hover:shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
+            className={clsx(
+              'group relative overflow-hidden rounded-3xl border bg-white p-4 transition-all duration-200',
+              isOutOfStock
+                ? 'border-slate-200/80 bg-linear-to-b from-white to-rose-50/20 shadow-xs'
+                : isLowStock
+                  ? 'border-amber-200/70 bg-linear-to-b from-white to-amber-50/20 shadow-xs hover:border-amber-300'
+                  : 'border-slate-200/80 shadow-[0_2px_12px_rgba(15,23,42,0.04)] hover:border-slate-300/90 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]'
+            )}
           >
-            {/* Top row: Photo, title, tags, actions button */}
+            {/* Top row: Photo, Title, Tags, Actions button */}
             <div className="flex items-start gap-3">
-              {/* Product Photo / Icon with soft gradient */}
-              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-slate-100/90 shadow-2xs">
+              {/* Product Photo / Icon with soft shadow & gradient */}
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-linear-to-br from-slate-50 via-slate-100/70 to-slate-100 shadow-2xs">
                 {product.photoUrl ? (
                   <img
                     src={resolveMediaUrl(product.photoUrl, product.id)}
                     alt={product.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     referrerPolicy="no-referrer"
                     onError={(event) => handleBrokenImage(event, product.id)}
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-600">
-                    <Package size={22} className="opacity-80" />
+                  <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-indigo-50/90 via-slate-50 to-emerald-50/60 text-slate-500">
+                    <Package size={24} className="opacity-75" />
                   </div>
                 )}
               </div>
@@ -112,18 +119,18 @@ export default function ProductsMobileList({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-[13px] sm:text-sm font-bold text-slate-900 leading-snug break-words">
+                    <h4 className="text-[14px] sm:text-[15px] font-black text-slate-900 leading-snug tracking-tight break-words">
                       {formatProductName(product.name)}
                     </h4>
 
                     {/* Meta Chips: Category & Warehouse */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 max-w-[130px] truncate">
-                        <Tag size={10} className="shrink-0 text-slate-400" />
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2 py-0.5 text-[10px] font-bold text-indigo-700 max-w-[140px] truncate shadow-2xs">
+                        <Tag size={10} className="shrink-0 text-indigo-500" />
                         <span className="truncate">{product.category?.name || 'Без категории'}</span>
                       </span>
 
-                      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200/60 bg-slate-50/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 max-w-[120px] truncate">
+                      <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200/70 bg-slate-50/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600 max-w-[130px] truncate shadow-2xs">
                         <Warehouse size={10} className="shrink-0 text-slate-400" />
                         <span className="truncate">{selectedWarehouseId ? product.warehouse?.name || 'Склад' : 'Все склады'}</span>
                       </span>
@@ -132,42 +139,32 @@ export default function ProductsMobileList({
                         <button
                           type="button"
                           onClick={() => onOpenMergeModal(product)}
-                          className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 transition-colors hover:bg-amber-100"
+                          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-linear-to-r from-amber-100 to-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-800 shadow-2xs transition-transform active:scale-95 animate-pulse"
                         >
-                          Дубликат
+                          <Sparkles size={10} className="text-amber-600" />
+                          <span>Дубликат</span>
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Top Right: Quick Actions Toggle */}
+                  {/* Top Right: Full Actions Menu Toggle */}
                   {isAdmin && !isAggregateMode && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* 1-tap quick restock button */}
-                      <button
-                        type="button"
-                        onClick={() => onRestockProduct(product)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200/80 bg-emerald-50/90 text-emerald-700 shadow-2xs transition-all hover:bg-emerald-100 active:scale-95"
-                        title="Быстрый приход"
-                      >
-                        <Plus size={14} className="stroke-[2.5]" />
-                      </button>
-
-                      {/* Full Actions Menu Toggle */}
+                    <div className="flex items-center shrink-0">
                       <button
                         type="button"
                         onClick={() => onToggleActions(Number(product.id))}
                         className={clsx(
-                          'flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-semibold transition-all active:scale-95',
+                          'inline-flex h-8 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-all duration-150 active:scale-95 shadow-2xs',
                           isExpanded
                             ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                            : 'border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
+                            : 'border-slate-200/90 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                         )}
                         title="Действия с товаром"
                       >
                         <span>Меню</span>
                         <ChevronDown
-                          size={11}
+                          size={12}
                           className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')}
                         />
                       </button>
@@ -178,154 +175,231 @@ export default function ProductsMobileList({
             </div>
 
             {/* Core Data Row: Stock Status on Left, Selling Price on Right */}
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-              {/* Stock Status Badge */}
-              <div
-                className={clsx(
-                  'inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-semibold shadow-2xs',
-                  isOutOfStock
-                    ? 'border-rose-200/80 bg-rose-50/80 text-rose-700'
-                    : isLowStock
-                      ? 'border-amber-200/80 bg-amber-50/80 text-amber-800'
-                      : 'border-emerald-200/70 bg-emerald-50/80 text-emerald-800'
-                )}
-              >
-                <span
+            <div className="mt-3.5 flex items-end justify-between gap-3 border-t border-slate-100/90 pt-3">
+              {/* Left: Stock Status Badge */}
+              <div className="flex flex-col gap-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Остаток на складе
+                </span>
+                <div
                   className={clsx(
-                    'h-2 w-2 shrink-0 rounded-full',
+                    'inline-flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-bold shadow-2xs transition-colors',
                     isOutOfStock
-                      ? 'bg-rose-500'
+                      ? 'border-rose-200 bg-rose-50/90 text-rose-800'
                       : isLowStock
-                        ? 'bg-amber-500 animate-pulse'
-                        : 'bg-emerald-500'
+                        ? 'border-amber-200 bg-amber-50/90 text-amber-900'
+                        : 'border-emerald-200/90 bg-emerald-50/90 text-emerald-900'
                   )}
-                />
-                <span className="font-bold">{stockBreakdown.primary}</span>
-                {stockBreakdown.secondary && (
-                  <span className="text-[10px] opacity-75 font-medium">({stockBreakdown.secondary})</span>
-                )}
-                {isOutOfStock && (
-                  <span className="ml-0.5 rounded bg-rose-200/70 px-1 py-0.2 text-[9px] font-bold uppercase text-rose-800">
-                    Нет
+                >
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    {isLowStock && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    )}
+                    <span
+                      className={clsx(
+                        'relative inline-flex h-2 w-2 rounded-full',
+                        isOutOfStock ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                      )}
+                    />
                   </span>
-                )}
-                {isLowStock && (
-                  <span className="ml-0.5 rounded bg-amber-200/70 px-1 py-0.2 text-[9px] font-bold uppercase text-amber-800">
-                    Мало
+                  <span className="font-mono text-xs sm:text-sm font-black tabular-nums tracking-tight">
+                    {stockBreakdown.primary}
                   </span>
-                )}
+                  {stockBreakdown.secondary && (
+                    <span className="rounded-md bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 shadow-2xs">
+                      {stockBreakdown.secondary}
+                    </span>
+                  )}
+                  {isOutOfStock && (
+                    <span className="rounded-md bg-rose-200/80 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-rose-900">
+                      Нет
+                    </span>
+                  )}
+                  {isLowStock && (
+                    <span className="rounded-md bg-amber-200/80 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-900">
+                      Мало
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Selling Price */}
+              {/* Right: Selling Price */}
               <div className="text-right shrink-0">
-                <div className="flex items-baseline justify-end gap-1">
-                  <span className="font-mono text-base font-extrabold text-slate-900 tabular-nums">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  Цена продажи
+                </span>
+                <div className="inline-flex items-baseline gap-1">
+                  <span className="font-mono text-base sm:text-lg font-black text-slate-950 tabular-nums tracking-tight">
                     {isAggregateMode ? '—' : formatMoney(product.sellingPrice)}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-400">TJS</span>
+                  <span className="text-[10px] font-black text-slate-400">
+                    TJS
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Admin Wholesale Metrics Strip (Закупка / Маржа / Приход) */}
             {isAdmin && (
-              <div className="mt-2.5 grid grid-cols-3 divide-x divide-slate-200/60 rounded-xl border border-slate-100 bg-[#f8f9fc] py-1.5 text-center shadow-2xs">
-                <div className="px-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Закупка</p>
-                  <p className="mt-0.5 font-mono text-xs font-bold text-slate-700 tabular-nums truncate">
+              <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200/70 rounded-2xl border border-slate-100 bg-linear-to-b from-slate-50/90 via-slate-50/50 to-slate-50/90 py-2 shadow-2xs">
+                <div className="px-2 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Закупка
+                  </p>
+                  <p className="mt-0.5 font-mono text-xs font-black text-slate-700 tabular-nums truncate">
                     {isAggregateMode ? '—' : formatMoney(costPrice)}
                   </p>
                 </div>
-                <div className="px-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Маржа</p>
-                  <p
-                    className={clsx(
-                      'mt-0.5 font-mono text-xs font-bold tabular-nums truncate',
-                      efficiency.className?.includes('rose') ? 'text-rose-600' : 'text-emerald-600'
-                    )}
-                  >
-                    {isAggregateMode ? '—' : `${efficiency.marginPercent > 0 ? '+' : ''}${formatPercent(efficiency.marginPercent, 1)}`}
+                <div className="px-2 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Маржа
                   </p>
+                  <div className="mt-0.5 flex items-center justify-center">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-xs font-black tabular-nums',
+                        efficiency.className?.includes('rose')
+                          ? 'bg-rose-50 text-rose-700'
+                          : 'bg-emerald-50 text-emerald-700'
+                      )}
+                    >
+                      {isAggregateMode ? '—' : `${efficiency.marginPercent > 0 ? '+' : ''}${formatPercent(efficiency.marginPercent, 1)}`}
+                    </span>
+                  </div>
                 </div>
-                <div className="px-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Приход</p>
-                  <p className="mt-0.5 font-mono text-xs font-bold text-slate-700 tabular-nums truncate">
-                    {product.totalIncoming} {normalizeDisplayBaseUnit(product.unit || 'шт')}
+                <div className="px-2 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                    Приход
+                  </p>
+                  <p className="mt-0.5 font-mono text-xs font-black text-slate-700 tabular-nums truncate">
+                    {product.totalIncoming} <span className="text-[10px] font-bold text-slate-400">{normalizeDisplayBaseUnit(product.unit || 'шт')}</span>
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Collapsible Actions Grid (2-column compact tactile tiles) */}
+            {/* Collapsible Actions Grid (Tactile luxury tiles) */}
             {isExpanded && isAdmin && !isAggregateMode && (
-              <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2 animate-in fade-in-50 duration-150">
-                {[
-                  {
-                    label: 'Приход',
-                    icon: PlusCircle,
-                    handler: onRestockProduct,
-                    iconBg: 'bg-emerald-100 text-emerald-700',
-                  },
-                  {
-                    label: 'Изменить',
-                    icon: Pencil,
-                    handler: onEditProduct,
-                    iconBg: 'bg-blue-100 text-blue-700',
-                  },
-                  {
-                    label: 'История',
-                    icon: History,
-                    handler: onShowHistory,
-                    iconBg: 'bg-sky-100 text-sky-700',
-                  },
-                  {
-                    label: 'Списать',
-                    icon: AlertCircle,
-                    handler: onOpenWriteOffModal,
-                    disabled: Number(product.stock || 0) <= 0,
-                    iconBg: 'bg-amber-100 text-amber-700',
-                  },
-                  {
-                    label: 'Партии',
-                    icon: Layers,
-                    handler: onShowBatches,
-                    iconBg: 'bg-violet-100 text-violet-700',
-                  },
-                  ...(canTransferProducts
-                    ? [
-                        {
-                          label: 'Перенести',
-                          icon: ArrowLeftRight,
-                          handler: onTransferProduct,
-                          iconBg: 'bg-indigo-100 text-indigo-700',
-                        },
-                      ]
-                    : []),
-                  {
-                    label: 'Удалить',
-                    icon: Trash2,
-                    handler: onDeleteProduct,
-                    iconBg: 'bg-rose-100 text-rose-700',
-                  },
-                ].map(({ label, icon: Icon, handler, disabled, iconBg }) => (
+              <div className="mt-3.5 overflow-hidden rounded-2xl border border-slate-200/90 bg-linear-to-b from-slate-50/90 via-slate-50/40 to-white p-3 shadow-inner animate-in fade-in-50 duration-150">
+                <div className="mb-2.5 flex items-center justify-between px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    Действия с товаром
+                  </span>
                   <button
-                    key={label}
                     type="button"
-                    onClick={() => (handler as (p: any) => void)(product)}
-                    disabled={disabled}
-                    className={clsx(
-                      'flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white p-2 text-left text-xs font-semibold shadow-2xs transition-all active:scale-95',
-                      disabled
-                        ? 'cursor-not-allowed opacity-40'
-                        : 'hover:border-slate-300 hover:bg-slate-50'
-                    )}
+                    onClick={() => onToggleActions(Number(product.id))}
+                    className="text-[11px] font-bold text-slate-400 hover:text-slate-800 transition-colors"
                   >
-                    <div className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-2xs', iconBg)}>
-                      <Icon size={14} />
-                    </div>
-                    <span className="truncate text-slate-800 font-medium">{label}</span>
+                    Свернуть
                   </button>
-                ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      label: 'Приход',
+                      subtitle: 'Поступление',
+                      icon: PlusCircle,
+                      handler: onRestockProduct,
+                      cardBg: 'bg-linear-to-br from-emerald-50/90 via-white to-emerald-50/30 border-emerald-200/90 hover:border-emerald-300 hover:bg-emerald-50/80',
+                      iconBg: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70',
+                      titleColor: 'text-slate-900 group-hover:text-emerald-950',
+                      subtitleColor: 'text-emerald-700/80',
+                    },
+                    {
+                      label: 'Изменить',
+                      subtitle: 'Редактировать',
+                      icon: Pencil,
+                      handler: onEditProduct,
+                      cardBg: 'bg-linear-to-br from-blue-50/90 via-white to-blue-50/30 border-blue-200/90 hover:border-blue-300 hover:bg-blue-50/80',
+                      iconBg: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200/70',
+                      titleColor: 'text-slate-900 group-hover:text-blue-950',
+                      subtitleColor: 'text-blue-700/80',
+                    },
+                    {
+                      label: 'История',
+                      subtitle: 'Движение товара',
+                      icon: History,
+                      handler: onShowHistory,
+                      cardBg: 'bg-linear-to-br from-sky-50/90 via-white to-sky-50/30 border-sky-200/90 hover:border-sky-300 hover:bg-sky-50/80',
+                      iconBg: 'bg-sky-100 text-sky-700 ring-1 ring-sky-200/70',
+                      titleColor: 'text-slate-900 group-hover:text-sky-950',
+                      subtitleColor: 'text-sky-700/80',
+                    },
+                    {
+                      label: 'Списать',
+                      subtitle: 'Списание со склада',
+                      icon: AlertCircle,
+                      handler: onOpenWriteOffModal,
+                      disabled: Number(product.stock || 0) <= 0,
+                      cardBg: 'bg-linear-to-br from-amber-50/90 via-white to-amber-50/30 border-amber-200/90 hover:border-amber-300 hover:bg-amber-50/80',
+                      iconBg: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200/70',
+                      titleColor: 'text-slate-900 group-hover:text-amber-950',
+                      subtitleColor: 'text-amber-700/80',
+                    },
+                    {
+                      label: 'Партии',
+                      subtitle: 'Партии (FIFO)',
+                      icon: Layers,
+                      handler: onShowBatches,
+                      cardBg: 'bg-linear-to-br from-violet-50/90 via-white to-violet-50/30 border-violet-200/90 hover:border-violet-300 hover:bg-violet-50/80',
+                      iconBg: 'bg-violet-100 text-violet-700 ring-1 ring-violet-200/70',
+                      titleColor: 'text-slate-900 group-hover:text-violet-950',
+                      subtitleColor: 'text-violet-700/80',
+                    },
+                    ...(canTransferProducts
+                      ? [
+                          {
+                            label: 'Перенести',
+                            subtitle: 'Между складами',
+                            icon: ArrowLeftRight,
+                            handler: onTransferProduct,
+                            cardBg: 'bg-linear-to-br from-indigo-50/90 via-white to-indigo-50/30 border-indigo-200/90 hover:border-indigo-300 hover:bg-indigo-50/80',
+                            iconBg: 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200/70',
+                            titleColor: 'text-slate-900 group-hover:text-indigo-950',
+                            subtitleColor: 'text-indigo-700/80',
+                          },
+                        ]
+                      : []),
+                    {
+                      label: 'Удалить',
+                      subtitle: 'Удалить позицию',
+                      icon: Trash2,
+                      handler: onDeleteProduct,
+                      cardBg: 'bg-linear-to-br from-rose-50/90 via-white to-rose-50/30 border-rose-200/90 hover:border-rose-300 hover:bg-rose-50/80',
+                      iconBg: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200/70',
+                      titleColor: 'text-rose-700 group-hover:text-rose-800',
+                      subtitleColor: 'text-rose-500/80',
+                    },
+                  ].map(({ label, subtitle, icon: Icon, handler, disabled, cardBg, iconBg, titleColor, subtitleColor }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => (handler as (p: any) => void)(product)}
+                      disabled={disabled}
+                      className={clsx(
+                        'group flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-150 active:scale-[0.96] shadow-2xs',
+                        cardBg,
+                        disabled
+                          ? 'cursor-not-allowed opacity-40 grayscale-[60%]'
+                          : 'hover:shadow-xs'
+                      )}
+                    >
+                      <div className={clsx('flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-2xs transition-transform duration-150 group-hover:scale-105', iconBg)}>
+                        <Icon size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className={clsx('block text-xs font-bold truncate leading-tight', titleColor)}>
+                          {label}
+                        </span>
+                        <span className={clsx('block text-[10px] truncate leading-tight mt-0.5 font-medium', subtitleColor)}>
+                          {subtitle}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

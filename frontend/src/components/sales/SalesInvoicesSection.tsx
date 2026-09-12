@@ -4,6 +4,7 @@ import {
   Banknote,
   Calendar,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Eye,
   Filter,
@@ -138,14 +139,14 @@ function SalesRowActions({
             }}
             disabled={paymentDisabled}
             className={clsx(
-              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              'flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-150 active:scale-90',
               paymentDisabled
                 ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white'
+                : 'border-emerald-200/90 bg-emerald-50/80 text-emerald-700 shadow-2xs hover:border-emerald-600 hover:bg-emerald-600 hover:text-white hover:shadow-xs'
             )}
             title="Принять оплату"
           >
-            <Banknote size={14} />
+            <Banknote size={15} />
           </button>
 
           <button
@@ -156,14 +157,14 @@ function SalesRowActions({
             }}
             disabled={returnDisabled}
             className={clsx(
-              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              'flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-150 active:scale-90',
               returnDisabled
                 ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'
+                : 'border-amber-200/90 bg-amber-50/80 text-amber-700 shadow-2xs hover:border-amber-500 hover:bg-amber-500 hover:text-white hover:shadow-xs'
             )}
-            title="Возврат"
+            title="Оформить возврат"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={15} />
           </button>
 
           <button
@@ -175,14 +176,14 @@ function SalesRowActions({
             }}
             disabled={!canEdit}
             className={clsx(
-              'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+              'flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-150 active:scale-90',
               canEdit
-                ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
+                ? 'border-indigo-100 bg-indigo-50/70 text-indigo-700 shadow-2xs hover:border-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-xs'
                 : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
             )}
-            title={canEdit ? 'Изменить продажу' : getEditBlockedReason(inv)}
+            title={canEdit ? 'Изменить накладную' : getEditBlockedReason(inv)}
           >
-            <Pencil size={14} />
+            <Pencil size={15} />
           </button>
         </>
       )}
@@ -194,18 +195,18 @@ function SalesRowActions({
           setIsOpen((prev) => !prev);
         }}
         className={clsx(
-          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
+          'flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-150 active:scale-90 shadow-2xs',
           isOpen
-            ? 'border-slate-900 bg-slate-900 text-white'
-            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+            ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
+            : 'border-slate-200/90 bg-white text-slate-500 hover:border-slate-900 hover:bg-slate-900 hover:text-white'
         )}
         title="Ещё действия"
       >
-        <MoreVertical size={14} />
+        <MoreVertical size={15} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl text-left">
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-56 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md text-left animate-in fade-in zoom-in-95 duration-150">
           <button
             type="button"
             onClick={(e) => {
@@ -213,10 +214,15 @@ function SalesRowActions({
               setIsOpen(false);
               fetchInvoiceDetails(inv.id);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Eye size={14} className="text-slate-400" />
-            <span>Просмотр</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 border border-sky-100 transition-colors group-hover:bg-sky-500 group-hover:text-white">
+              <Eye size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">Детали</span>
+              <span className="text-[10px] font-normal text-slate-400">Просмотр накладной</span>
+            </div>
           </button>
 
           <button
@@ -226,10 +232,15 @@ function SalesRowActions({
               setIsOpen(false);
               handleQuickPrintInvoice(inv.id);
             }}
-            className="hidden md:flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="hidden md:flex group w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Printer size={14} className="text-slate-400" />
-            <span>Печать</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 border border-slate-200/80 transition-colors group-hover:bg-slate-800 group-hover:text-white">
+              <Printer size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">Печать</span>
+              <span className="text-[10px] font-normal text-slate-400">Быстрая печать чека</span>
+            </div>
           </button>
 
           <button
@@ -240,10 +251,15 @@ function SalesRowActions({
               const { shareInvoicePdf } = await import('../../utils/print/salesInvoicePdf');
               await shareInvoicePdf(inv);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Share2 size={14} className="text-slate-400" />
-            <span>Скачать / Поделиться PDF</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-600 border border-teal-100 transition-colors group-hover:bg-teal-500 group-hover:text-white">
+              <Share2 size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">Поделиться PDF</span>
+              <span className="text-[10px] font-normal text-slate-400">Скачать или отправить</span>
+            </div>
           </button>
 
           {isAdmin && (
@@ -256,10 +272,15 @@ function SalesRowActions({
                   setIsOpen(false);
                   handleDeleteInvoice(inv);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+                className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
               >
-                <Trash2 size={14} className="text-rose-500" />
-                <span>Удалить</span>
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100/70 text-rose-600 border border-rose-200/80 transition-colors group-hover:bg-rose-500 group-hover:text-white">
+                  <Trash2 size={14} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="font-semibold text-rose-600">Удалить</span>
+                  <span className="text-[10px] font-normal text-rose-400">Безвозвратное удаление</span>
+                </div>
               </button>
             </>
           )}
@@ -315,19 +336,99 @@ const SalesInvoicesSection = ({
     setExpandedMobileInvoiceId(null);
   }, [currentPage, search, statusFilter, staffFilter, dateFrom, dateTo, selectedWarehouseId]);
 
+  const isWarehouseFilterActive = Boolean(
+    isAdmin &&
+    warehouses &&
+    warehouses.length > 1 &&
+    selectedWarehouseId
+  );
+
   const advancedFiltersCount =
-    (staffFilter !== 'all' ? 1 : 0) +
+    (staffFilter && staffFilter !== 'all' ? 1 : 0) +
     (dateFrom ? 1 : 0) +
     (dateTo ? 1 : 0) +
-    (selectedWarehouseId ? 1 : 0);
+    (isWarehouseFilterActive ? 1 : 0);
 
   const hasAnyActiveFilter =
     statusFilter !== 'all' ||
-    staffFilter !== 'all' ||
+    (Boolean(staffFilter) && staffFilter !== 'all') ||
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
-    Boolean(search) ||
-    Boolean(selectedWarehouseId);
+    Boolean(search?.trim()) ||
+    isWarehouseFilterActive;
+
+  const formatDateStr = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getTodayStr = () => formatDateStr(new Date());
+
+  const getYesterdayStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return formatDateStr(d);
+  };
+
+  const getDaysAgoStr = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return formatDateStr(d);
+  };
+
+  const getFirstDayOfMonthStr = () => {
+    const d = new Date();
+    d.setDate(1);
+    return formatDateStr(d);
+  };
+
+  const todayStr = getTodayStr();
+  const yesterdayStr = getYesterdayStr();
+  const weekAgoStr = getDaysAgoStr(6);
+  const firstDayOfMonthStr = getFirstDayOfMonthStr();
+
+  const isTodayPresetActive = dateFrom === todayStr && dateTo === todayStr;
+  const isYesterdayPresetActive = dateFrom === yesterdayStr && dateTo === yesterdayStr;
+  const isWeekPresetActive = dateFrom === weekAgoStr && dateTo === todayStr;
+  const isMonthPresetActive = dateFrom === firstDayOfMonthStr && dateTo === todayStr;
+
+  const handleDatePreset = (preset: 'today' | 'yesterday' | 'week' | 'month') => {
+    if (preset === 'today') {
+      if (isTodayPresetActive) {
+        setDateFrom('');
+        setDateTo('');
+      } else {
+        setDateFrom(todayStr);
+        setDateTo(todayStr);
+      }
+    } else if (preset === 'yesterday') {
+      if (isYesterdayPresetActive) {
+        setDateFrom('');
+        setDateTo('');
+      } else {
+        setDateFrom(yesterdayStr);
+        setDateTo(yesterdayStr);
+      }
+    } else if (preset === 'week') {
+      if (isWeekPresetActive) {
+        setDateFrom('');
+        setDateTo('');
+      } else {
+        setDateFrom(weekAgoStr);
+        setDateTo(todayStr);
+      }
+    } else if (preset === 'month') {
+      if (isMonthPresetActive) {
+        setDateFrom('');
+        setDateTo('');
+      } else {
+        setDateFrom(firstDayOfMonthStr);
+        setDateTo(todayStr);
+      }
+    }
+  };
 
   const renderSortLabel = (label: string, key: string) => (
     <button
@@ -347,24 +448,62 @@ const SalesInvoicesSection = ({
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs md:min-h-190">
       {/* Top Header - Desktop only */}
-      <div className="hidden md:flex flex-col gap-3 border-b border-slate-100 pb-3 sm:pb-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-base font-bold tracking-tight text-slate-900">Накладные продаж</h2>
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 font-mono">
-            {formatCount(invoicesCount)}
-          </span>
+      <div className="hidden md:flex flex-col gap-3 border-b border-slate-100 pb-3.5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold tracking-tight text-slate-900">Накладные</h2>
+            <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 font-mono">
+              {formatCount(invoicesCount)}
+            </span>
+          </div>
+
+          {/* Status Tabs on Desktop */}
+          <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 border border-slate-200/60">
+            {[
+              { key: 'all', label: 'Все' },
+              { key: 'paid', label: 'Оплачено', activeClass: 'bg-emerald-600 text-white shadow-xs' },
+              { key: 'partial', label: 'Частично', activeClass: 'bg-amber-500 text-white shadow-xs' },
+              { key: 'unpaid', label: 'Не оплачено', activeClass: 'bg-rose-600 text-white shadow-xs' },
+            ].map((status) => {
+              const isSelected = statusFilter === status.key;
+              return (
+                <button
+                  key={status.key}
+                  type="button"
+                  onClick={() => setStatusFilter(status.key as any)}
+                  className={clsx(
+                    'rounded-lg px-2.5 py-1 text-xs font-bold transition-all',
+                    isSelected
+                      ? status.activeClass || 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  )}
+                >
+                  {status.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Desktop Search Bar */}
-        <div className="relative hidden flex-1 max-w-md md:block">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+        <div className="relative hidden flex-1 max-w-xs md:block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
           <input
             type="text"
-            placeholder="Поиск по ID или клиенту..."
+            placeholder="Поиск по номеру или клиенту..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/80 pl-10 pr-4 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-8 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -490,26 +629,101 @@ const SalesInvoicesSection = ({
               </select>
             </div>
 
-            <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Период дат</label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">От</span>
+            <div className="space-y-2 rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={13} className="text-emerald-600" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Период дат</span>
+                </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors"
+                  >
+                    <X size={12} />
+                    <span>Сбросить даты</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Preset Buttons for 1-Tap Filter */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { key: 'today', label: 'Сегодня', active: isTodayPresetActive },
+                  { key: 'yesterday', label: 'Вчера', active: isYesterdayPresetActive },
+                  { key: 'week', label: '7 дней', active: isWeekPresetActive },
+                  { key: 'month', label: 'Месяц', active: isMonthPresetActive },
+                ].map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => handleDatePreset(preset.key as any)}
+                    className={clsx(
+                      'rounded-xl py-1.5 text-center text-xs font-bold transition-all active:scale-95 shadow-2xs',
+                      preset.active
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'border border-slate-200 bg-slate-50/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Manual Date Inputs */}
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <div className={clsx(
+                  'relative flex items-center rounded-xl border px-2.5 py-1.5 transition-all shadow-2xs',
+                  dateFrom
+                    ? 'border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                )}>
+                  <span className="text-[10px] font-black uppercase text-slate-400 mr-1.5 shrink-0">От</span>
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                    className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
                   />
+                  {dateFrom && (
+                    <button
+                      type="button"
+                      onClick={() => setDateFrom('')}
+                      className="ml-1 shrink-0 p-0.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
+                      title="Очистить дату «От»"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">До</span>
+
+                <div className={clsx(
+                  'relative flex items-center rounded-xl border px-2.5 py-1.5 transition-all shadow-2xs',
+                  dateTo
+                    ? 'border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                )}>
+                  <span className="text-[10px] font-black uppercase text-slate-400 mr-1.5 shrink-0">До</span>
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+                    className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
                   />
+                  {dateTo && (
+                    <button
+                      type="button"
+                      onClick={() => setDateTo('')}
+                      className="ml-1 shrink-0 p-0.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
+                      title="Очистить дату «До»"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -529,14 +743,14 @@ const SalesInvoicesSection = ({
 
       {/* Desktop Filters (md: and up) */}
       <div className={clsx(
-        'mt-3 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 md:grid md:grid-cols-2',
-        isAdmin && warehouses && warehouses.length > 1 ? 'xl:grid-cols-6' : 'xl:grid-cols-5'
+        'mt-3 hidden items-center gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-2.5 md:grid',
+        isAdmin && warehouses && warehouses.length > 1 ? 'md:grid-cols-5' : 'md:grid-cols-4'
       )}>
         {isAdmin && warehouses && warehouses.length > 1 && setSelectedWarehouseId && (
           <select
             value={selectedWarehouseId || ''}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
           >
             <option value="">Все склады</option>
             {warehouses.map((w) => (
@@ -546,21 +760,11 @@ const SalesInvoicesSection = ({
             ))}
           </select>
         )}
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
-        >
-          <option value="all">Все статусы</option>
-          <option value="paid">Оплачено</option>
-          <option value="partial">Частично</option>
-          <option value="unpaid">Не оплачено</option>
-        </select>
 
         <select
           value={staffFilter}
           onChange={(e) => setStaffFilter(e.target.value)}
-          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+          className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
         >
           <option value="all">Все сотрудники</option>
           {staffOptions.map((staffName) => (
@@ -570,24 +774,50 @@ const SalesInvoicesSection = ({
           ))}
         </select>
 
-        <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5">
+        <div className={clsx(
+          "flex h-9 items-center gap-2 rounded-xl border bg-white px-3 shadow-2xs transition-colors",
+          dateFrom ? "border-emerald-500 ring-1 ring-emerald-500/20" : "border-slate-200"
+        )}>
           <span className="text-[10px] font-bold uppercase text-slate-400">От</span>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+            className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
           />
+          {dateFrom && (
+            <button
+              type="button"
+              onClick={() => setDateFrom('')}
+              className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
+              title="Очистить"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
-        <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5">
+        <div className={clsx(
+          "flex h-9 items-center gap-2 rounded-xl border bg-white px-3 shadow-2xs transition-colors",
+          dateTo ? "border-emerald-500 ring-1 ring-emerald-500/20" : "border-slate-200"
+        )}>
           <span className="text-[10px] font-bold uppercase text-slate-400">До</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
+            className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
           />
+          {dateTo && (
+            <button
+              type="button"
+              onClick={() => setDateTo('')}
+              className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
+              title="Очистить"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         <button
@@ -595,13 +825,13 @@ const SalesInvoicesSection = ({
           onClick={clearInvoiceFilters}
           disabled={!hasAnyActiveFilter}
           className={clsx(
-            'flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all',
+            'flex h-9 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-all shadow-2xs active:scale-95',
             hasAnyActiveFilter
-              ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 shadow-xs'
-              : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+              ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:border-rose-300'
+              : 'cursor-not-allowed border-slate-200 bg-slate-50/60 text-slate-300'
           )}
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={13} />
           <span>Сбросить</span>
         </button>
       </div>
@@ -688,13 +918,13 @@ const SalesInvoicesSection = ({
                     }}
                     disabled={paymentDisabled}
                     className={clsx(
-                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-bold transition-all active:scale-[0.97]',
                       paymentDisabled
                         ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white'
+                        : 'border-emerald-200/90 bg-emerald-50/90 text-emerald-700 shadow-2xs active:bg-emerald-600 active:text-white'
                     )}
                   >
-                    <Banknote size={14} />
+                    <Banknote size={15} />
                     <span className="truncate">Оплата</span>
                   </button>
                 )}
@@ -709,13 +939,13 @@ const SalesInvoicesSection = ({
                     }}
                     disabled={returnDisabled}
                     className={clsx(
-                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                      'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-bold transition-all active:scale-[0.97]',
                       returnDisabled
                         ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                        : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'
+                        : 'border-amber-200/90 bg-amber-50/90 text-amber-700 shadow-2xs active:bg-amber-500 active:text-white'
                     )}
                   >
-                    <RotateCcw size={14} />
+                    <RotateCcw size={15} />
                     <span className="truncate">Возврат</span>
                   </button>
                 )}
@@ -729,21 +959,24 @@ const SalesInvoicesSection = ({
                     );
                   }}
                   className={clsx(
-                    'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-semibold transition-all active:scale-[0.98]',
+                    'flex items-center justify-center gap-1.5 rounded-xl border py-2.5 px-2 text-xs font-bold transition-all active:scale-[0.97]',
                     expandedMobileInvoiceId === inv.id
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                      : 'border-slate-200/90 bg-slate-100/80 text-slate-700 shadow-2xs hover:bg-slate-200/70'
                   )}
                 >
-                  <MoreVertical size={14} />
                   <span className="truncate">Ещё</span>
+                  <ChevronDown
+                    size={14}
+                    className={clsx('transition-transform duration-200', expandedMobileInvoiceId === inv.id && 'rotate-180')}
+                  />
                 </button>
               </div>
 
               {expandedMobileInvoiceId === inv.id && (
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-2 space-y-1 overflow-hidden rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-sm"
+                  className="mt-2.5 space-y-1.5 overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/60 p-2 shadow-inner animate-in fade-in duration-150"
                 >
                   <button
                     type="button"
@@ -751,10 +984,18 @@ const SalesInvoicesSection = ({
                       setExpandedMobileInvoiceId(null);
                       fetchInvoiceDetails(inv.id);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
+                    className="group flex w-full items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 text-left transition-all active:scale-[0.98] hover:border-slate-300 shadow-2xs"
                   >
-                    <Eye size={15} className="text-slate-500" />
-                    <span>Детали накладной</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 shadow-2xs border border-sky-100">
+                        <Eye size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Детали накладной</p>
+                        <p className="text-[10px] text-slate-400">Полный состав и статус</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
                   </button>
 
                   {isAdmin && (
@@ -768,17 +1009,31 @@ const SalesInvoicesSection = ({
                       disabled={!canEditInvoice(inv)}
                       title={getEditBlockedReason(inv)}
                       className={clsx(
-                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors text-left',
+                        'group flex w-full items-center justify-between rounded-xl border p-2.5 text-left transition-all active:scale-[0.98] shadow-2xs',
                         canEditInvoice(inv)
-                          ? 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
-                          : 'cursor-not-allowed text-slate-300'
+                          ? 'border-slate-200/80 bg-white hover:border-slate-300'
+                          : 'cursor-not-allowed border-slate-100 bg-slate-50/60 opacity-50'
                       )}
                     >
-                      <Pencil size={15} className={canEditInvoice(inv) ? 'text-slate-500' : 'text-slate-300'} />
-                      <span>Изменить</span>
+                      <div className="flex items-center gap-3">
+                        <div className={clsx(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-2xs border',
+                          canEditInvoice(inv)
+                            ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                            : 'bg-slate-100 text-slate-400 border-slate-200'
+                        )}>
+                          <Pencil size={15} />
+                        </div>
+                        <div>
+                          <p className={clsx('text-xs font-bold', canEditInvoice(inv) ? 'text-slate-800' : 'text-slate-400')}>
+                            Изменить накладную
+                          </p>
+                          <p className="text-[10px] text-slate-400">Редактировать позиции</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
                     </button>
                   )}
-
 
                   <button
                     type="button"
@@ -787,27 +1042,40 @@ const SalesInvoicesSection = ({
                       const { shareInvoicePdf } = await import('../../utils/print/salesInvoicePdf');
                       await shareInvoicePdf(inv);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 text-left"
+                    className="group flex w-full items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 text-left transition-all active:scale-[0.98] hover:border-slate-300 shadow-2xs"
                   >
-                    <Share2 size={15} className="text-slate-500" />
-                    <span>Поделиться (PDF)</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600 shadow-2xs border border-teal-100">
+                        <Share2 size={15} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Поделиться (PDF)</p>
+                        <p className="text-[10px] text-slate-400">Отправить накладную клиенту</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
                   </button>
 
                   {isAdmin && (
-                    <>
-                      <div className="my-1 border-t border-slate-100" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setExpandedMobileInvoiceId(null);
-                          handleDeleteInvoice(inv);
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 active:bg-rose-100 text-left"
-                      >
-                        <Trash2 size={15} className="text-rose-500" />
-                        <span>Удалить накладную</span>
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedMobileInvoiceId(null);
+                        handleDeleteInvoice(inv);
+                      }}
+                      className="group flex w-full items-center justify-between rounded-xl border border-rose-200/80 bg-rose-50/70 p-2.5 text-left transition-all active:scale-[0.98] hover:bg-rose-100/80 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 shadow-2xs border border-rose-200">
+                          <Trash2 size={15} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-rose-700">Удалить накладную</p>
+                          <p className="text-[10px] text-rose-500/80">Безвозвратное удаление</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-rose-300 group-hover:text-rose-500 transition-colors" />
+                    </button>
                   )}
                 </div>
               )}
@@ -830,14 +1098,14 @@ const SalesInvoicesSection = ({
       <div className="hidden min-h-140 flex-1 overflow-x-auto pt-3 md:block">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-200/80 bg-slate-100/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              <th className="px-4 py-2.5">{renderSortLabel('Дата', 'createdAt')}</th>
-              <th className="px-4 py-2.5">{renderSortLabel('Клиент', 'customer_name')}</th>
-              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Сумма', 'netAmount')}</th>
-              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Оплачено', 'paidAmount')}</th>
-              <th className="px-4 py-2.5 text-right pr-4">{renderSortLabel('Остаток', 'balance')}</th>
-              <th className="px-4 py-2.5 text-center">{renderSortLabel('Статус', 'status')}</th>
-              <th className="px-3 py-2.5 text-center">Действия</th>
+            <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th className="px-4 py-3">{renderSortLabel('Накладная', 'id')}</th>
+              <th className="px-4 py-3">{renderSortLabel('Клиент', 'customer_name')}</th>
+              <th className="px-4 py-3 text-right pr-4">{renderSortLabel('Сумма', 'netAmount')}</th>
+              <th className="px-4 py-3 text-right pr-4">{renderSortLabel('Оплачено', 'paidAmount')}</th>
+              <th className="px-4 py-3 text-right pr-4">{renderSortLabel('Остаток', 'balance')}</th>
+              <th className="px-4 py-3 text-center">{renderSortLabel('Статус', 'status')}</th>
+              <th className="px-3 py-3 text-center">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -851,24 +1119,49 @@ const SalesInvoicesSection = ({
                 <tr
                   key={inv.id}
                   onClick={() => fetchInvoiceDetails(inv.id)}
-                  className="cursor-pointer transition-colors hover:bg-slate-50"
+                  className="group cursor-pointer transition-colors hover:bg-slate-50/90"
                 >
-                  <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">
-                    {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-slate-900">№{inv.id}</span>
+                      <span className="font-mono text-[11px] text-slate-400">
+                        {new Date(inv.createdAt).toLocaleDateString('ru-RU')}
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-slate-900 text-xs">{inv.customer_name}</td>
-                  <td className="px-4 py-2.5 text-right pr-4">
-                    <span className="font-mono text-xs font-semibold tabular-nums text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</span>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-bold text-slate-700 text-[11px]">
+                        {(inv.customer_name || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-xs truncate max-w-[200px]">{inv.customer_name}</p>
+                        {inv.warehouse?.name && (
+                          <p className="text-[10px] text-slate-400 truncate">{inv.warehouse.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right pr-4">
+                    <span className="font-mono text-xs font-bold tabular-nums text-slate-900">{formatMoney(getInvoiceNetAmount(inv))}</span>
                     {hasReturns && (
                       <div className="mt-0.5 font-mono text-[10px] font-medium tabular-nums text-rose-600">
                         возврат: -{formatMoney(returnedAmount)}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-right pr-4 font-mono text-xs font-semibold tabular-nums text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</td>
-                  <td className="px-4 py-2.5 text-right pr-4 font-mono text-xs font-semibold tabular-nums text-rose-600">{formatMoney(getInvoiceBalance(inv))}</td>
-                  <td className="px-4 py-2.5 text-center">{getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}</td>
-                  <td className="px-3 py-3 text-center align-middle">
+                  <td className="px-4 py-3 text-right pr-4 font-mono text-xs font-bold tabular-nums text-emerald-600">
+                    {formatMoney(getInvoiceAppliedPaidAmount(inv))}
+                  </td>
+                  <td className="px-4 py-3 text-right pr-4 font-mono text-xs font-bold tabular-nums">
+                    <span className={getInvoiceBalance(inv) > 0.005 ? 'text-rose-600' : 'text-slate-400'}>
+                      {formatMoney(getInvoiceBalance(inv))}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}
+                  </td>
+                  <td className="px-3 py-3 text-center align-middle whitespace-nowrap">
                     <SalesRowActions
                       inv={inv}
                       isAdmin={isAdmin}

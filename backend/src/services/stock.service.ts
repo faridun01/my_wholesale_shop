@@ -10,10 +10,10 @@ function toNumber(value: any, fallback = 0): number {
 }
 
 /**
- * Rounds a quantity to standard precision (2 decimal places)
+ * Rounds a quantity to integer precision (all quantities are INT)
  */
 function roundQty(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return Math.round(Number(value || 0));
 }
 
 

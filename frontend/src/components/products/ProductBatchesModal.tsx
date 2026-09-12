@@ -44,6 +44,7 @@ const pluralizeRu = (count: number, forms: [string, string, string]) => {
 };
 
 const formatCountWithUnit = (count: number, unit: string) => {
+  const intCount = Math.round(Number(count) || 0);
   const normalized = String(unit || '').trim().toLowerCase();
   const formsMap: Record<string, [string, string, string]> = {
     'шт': ['шт', 'шт', 'шт'],
@@ -59,7 +60,7 @@ const formatCountWithUnit = (count: number, unit: string) => {
   };
 
   const forms = formsMap[normalized] || [unit, unit, unit];
-  return `${count} ${pluralizeRu(count, forms)}`;
+  return `${intCount} ${pluralizeRu(intCount, forms)}`;
 };
 
 const getQuantityBreakdown = (rawQty: number, product: any) => {

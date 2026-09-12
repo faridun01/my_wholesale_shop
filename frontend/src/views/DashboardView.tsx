@@ -131,14 +131,14 @@ const getProductStockParts = (item: any) => {
   if (packageQuantity > 0 && extraUnits > 0) {
     return {
       primary: `${packageQuantity} ${defaultPackaging.packageName} +${extraUnits} ${baseUnitName}`,
-      secondary: `${packageQuantity}*${unitsPerPackage}=${packageQuantity * unitsPerPackage} ${baseUnitName}`,
+      secondary: `${packageQuantity}x${unitsPerPackage}=${packageQuantity * unitsPerPackage} ${baseUnitName}`,
     };
   }
 
   if (packageQuantity > 0) {
     return {
       primary: `${packageQuantity} ${defaultPackaging.packageName}`,
-      secondary: `${packageQuantity}*${unitsPerPackage}=${packageQuantity * unitsPerPackage} ${baseUnitName}`,
+      secondary: `${packageQuantity}x${unitsPerPackage}=${packageQuantity * unitsPerPackage} ${baseUnitName}`,
     };
   }
 

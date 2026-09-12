@@ -125,6 +125,21 @@ router.delete('/:id', authorize(['ADMIN']), async (req: AuthRequest, res, next) 
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    const remainingBatches = await prisma.productBatch.findMany({
+      where: { warehouseId, remainingQuantity: { gt: 0 } },
+      select: { remainingQuantity: true, costPrice: true },
+    });
+    const remainingValue = remainingBatches.reduce(
+      (sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0) * Number(batch.costPrice || 0),
+      0
+    );
+
+    if (remainingValue > 0) {
+      return res.status(400).json({
+        error: `Нельзя скрыть склад: на нём ещё числится товар на сумму ${remainingValue.toFixed(2)}. Сначала перенесите остатки на другой склад или спишите их.`,
+      });
+    }
+
     await prisma.$transaction(async (tx) => {
       const warehouse = await tx.warehouse.findUnique({
         where: { id: warehouseId },

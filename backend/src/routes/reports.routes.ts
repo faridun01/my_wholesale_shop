@@ -82,6 +82,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const [invoices, products, customers, warehouses, batches, writeoffTransactions, expenses] = await Promise.all([
       prisma.invoice.findMany({
         where: whereClause,
+        orderBy: { createdAt: 'asc' },
         select: {
           netAmount: true,
           paidAmount: true,
@@ -209,9 +210,13 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const customerPerformance: Record<string, { id: number; name: string; invoices: number; revenue: number; debt: number }> = {};
 
     for (const inv of invoices) {
-      const month = inv.createdAt.toLocaleString('ru-RU', { month: 'short' });
+      // Keyed by year+month, not just the short month name, so a report spanning more
+      // than one year (or a year boundary) doesn't silently merge e.g. Jan 2025 and
+      // Jan 2026 into a single "янв" bar.
+      const monthLabel = inv.createdAt.toLocaleString('ru-RU', { month: 'short' });
+      const month = `${inv.createdAt.getFullYear()}-${String(inv.createdAt.getMonth() + 1).padStart(2, '0')}`;
       if (!monthlyData[month]) {
-        monthlyData[month] = { name: month, sales: 0, profit: 0 };
+        monthlyData[month] = { name: monthLabel, sales: 0, profit: 0 };
       }
 
       const netAmount = Number(inv.netAmount);

@@ -991,37 +991,6 @@ router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post('/inventory/transaction', async (req: AuthRequest, res, next) => {
-  try {
-    const access = await getAccessContext(req);
-    if (!ensureAdminProductAccess(access, res)) {
-      return;
-    }
-    const userId = req.user!.id;
-    const { product_id, quantity_change, type, reason, cost_at_time } = req.body;
-    const warehouse_id = access.isAdmin ? Number(req.body.warehouse_id) : access.warehouseId;
-
-    if (!warehouse_id || !ensureWarehouseAccess(access, warehouse_id)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    const batch = await StockSvc.addStock(
-      Number(product_id),
-      Number(warehouse_id),
-      Number(quantity_change),
-      Number(cost_at_time),
-      userId,
-      reason
-    );
-    res.json(batch);
-  } catch (error) {
-    if (error instanceof Error) {
-      return res.status(400).json({ error: error.message });
-    }
-    next(error);
-  }
-});
-
 router.get('/:id/price-history', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);

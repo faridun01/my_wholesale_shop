@@ -86,37 +86,37 @@ function ProductRowActions({
       <button
         type="button"
         onClick={() => onRestockProduct(product)}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white shadow-xs"
+        className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200/90 bg-emerald-50/80 text-emerald-700 shadow-2xs transition-all duration-150 active:scale-90 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white hover:shadow-xs"
         title="Пополнить"
       >
-        <PlusCircle size={14} />
+        <PlusCircle size={15} />
       </button>
 
       <button
         type="button"
         onClick={() => onEditProduct(product)}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-900 hover:text-white shadow-xs"
+        className="flex h-8 w-8 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50/70 text-indigo-700 shadow-2xs transition-all duration-150 active:scale-90 hover:border-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-xs"
         title="Редактировать"
       >
-        <Edit size={14} />
+        <Edit size={15} />
       </button>
 
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={clsx(
-          'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors shadow-xs',
+          'flex h-8 w-8 items-center justify-center rounded-xl border transition-all duration-150 active:scale-90 shadow-2xs',
           isOpen
-            ? 'border-slate-900 bg-slate-900 text-white'
-            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+            ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
+            : 'border-slate-200/90 bg-white text-slate-500 hover:border-slate-900 hover:bg-slate-900 hover:text-white'
         )}
         title="Ещё действия"
       >
-        <MoreVertical size={14} />
+        <MoreVertical size={15} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lg text-left">
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-56 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md text-left animate-in fade-in zoom-in-95 duration-150">
           <button
             type="button"
             onClick={() => {
@@ -124,10 +124,15 @@ function ProductRowActions({
               onOpenWriteOffModal(product);
             }}
             disabled={Number(product.stock || 0) <= 0}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Scissors size={14} className="text-slate-400" />
-            <span>Списать</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-100 transition-colors group-hover:bg-amber-500 group-hover:text-white">
+              <Scissors size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">Списать</span>
+              <span className="text-[10px] font-normal text-slate-400">Списание со склада</span>
+            </div>
           </button>
 
           <button
@@ -136,10 +141,15 @@ function ProductRowActions({
               setIsOpen(false);
               onShowBatches(product);
             }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Layers size={14} className="text-slate-400" />
-            <span>Партии (FIFO)</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 border border-violet-100 transition-colors group-hover:bg-violet-500 group-hover:text-white">
+              <Layers size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">Партии (FIFO)</span>
+              <span className="text-[10px] font-normal text-slate-400">Партии и себестоимость</span>
+            </div>
           </button>
 
           <button
@@ -148,10 +158,15 @@ function ProductRowActions({
               setIsOpen(false);
               onShowHistory(product);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <History size={14} className="text-slate-400" />
-            <span>История</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 border border-sky-100 transition-colors group-hover:bg-sky-500 group-hover:text-white">
+              <History size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-slate-800 group-hover:text-slate-900">История</span>
+              <span className="text-[10px] font-normal text-slate-400">Движение товара</span>
+            </div>
           </button>
 
           {canTransferProducts && (
@@ -161,10 +176,15 @@ function ProductRowActions({
                 setIsOpen(false);
                 onTransferProduct(product);
               }}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#f4f5fb] transition-colors"
+              className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <ArrowRightLeft size={14} className="text-slate-400" />
-              <span>Перенос</span>
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 transition-colors group-hover:bg-indigo-500 group-hover:text-white">
+                <ArrowRightLeft size={14} />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="font-semibold text-slate-800 group-hover:text-slate-900">Перенос</span>
+                <span className="text-[10px] font-normal text-slate-400">Между складами</span>
+              </div>
             </button>
           )}
 
@@ -176,10 +196,15 @@ function ProductRowActions({
               setIsOpen(false);
               onDeleteProduct(product);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+            className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
           >
-            <Trash2 size={14} className="text-rose-500" />
-            <span>Удалить</span>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100/70 text-rose-600 border border-rose-200/80 transition-colors group-hover:bg-rose-500 group-hover:text-white">
+              <Trash2 size={14} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="font-semibold text-rose-600">Удалить</span>
+              <span className="text-[10px] font-normal text-rose-400">Удалить позицию</span>
+            </div>
           </button>
         </div>
       )}

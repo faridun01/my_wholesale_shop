@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { clsx } from 'clsx';
-import { History, RotateCcw, Scissors, X } from 'lucide-react';
+import { History, RotateCcw, X } from 'lucide-react';
 import { formatProductName } from '../../utils/productName';
 import { formatTransactionReason } from '../../utils/format';
 
@@ -80,6 +80,7 @@ const pluralizeRu = (count: number, forms: [string, string, string]) => {
 };
 
 const formatCountWithUnit = (count: number, unit: string) => {
+  const intCount = Math.round(Number(count) || 0);
   const normalized = String(unit || '').trim().toLowerCase();
   const formsMap: Record<string, [string, string, string]> = {
     'шт': ['шт', 'шт', 'шт'],
@@ -95,7 +96,7 @@ const formatCountWithUnit = (count: number, unit: string) => {
   };
 
   const forms = formsMap[normalized] || [unit, unit, unit];
-  return `${count} ${pluralizeRu(count, forms)}`;
+  return `${intCount} ${pluralizeRu(intCount, forms)}`;
 };
 
 const getQuantityBreakdown = (rawQty: number, product: any) => {
@@ -215,26 +216,14 @@ export default function ProductHistoryModal({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                {onWriteOff && (
-                  <button
-                    type="button"
-                    onClick={() => void onWriteOff()}
-                    className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-100 active:scale-95"
-                  >
-                    <Scissors size={12} />
-                    <span>Списать</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors active:scale-95"
-                  title="Закрыть"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors active:scale-95"
+                title="Закрыть"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             {/* Modal Body */}

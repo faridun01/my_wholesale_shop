@@ -1,7 +1,7 @@
 import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Banknote, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getProducts } from '../api/products.api';
 import { createInvoice } from '../api/invoices.api';
@@ -73,8 +73,8 @@ const normalizeDisplayBaseUnit = (value: string) => {
 };
 
 const formatStockAmount = (stock: number, packaging: PackagingOption | null, baseUnitName: string) => {
-  const normalizedStock = Math.max(0, Number(stock) || 0);
-  const normalizedBaseUnit = normalizeDisplayBaseUnit(baseUnitName || '\u0448\u0442');
+  const normalizedStock = Math.max(0, Math.floor(Number(stock) || 0));
+  const normalizedBaseUnit = normalizeDisplayBaseUnit(baseUnitName || 'шт');
 
   if (!packaging || Number(packaging.unitsPerPackage || 0) <= 1) {
     return `${normalizedStock} ${normalizedBaseUnit}`;
@@ -82,7 +82,7 @@ const formatStockAmount = (stock: number, packaging: PackagingOption | null, bas
 
   const unitsPerPackage = Number(packaging.unitsPerPackage || 0);
   const packageQuantity = Math.floor(normalizedStock / unitsPerPackage);
-  const extraUnits = normalizedStock % unitsPerPackage;
+  const extraUnits = Math.round(normalizedStock % unitsPerPackage);
 
   if (packageQuantity > 0 && extraUnits > 0) {
     return `${packageQuantity} ${packaging.packageName} + ${extraUnits} ${normalizedBaseUnit}`;
@@ -154,7 +154,7 @@ const getProductStockParts = (product: any, fallbackBaseUnitName?: string) => {
   const baseUnitName = normalizeDisplayBaseUnit(
     String(product?.baseUnitName || product?.unit || fallbackBaseUnitName || defaultPackaging?.baseUnitName || '\u0448\u0442'),
   );
-  const stock = Math.max(0, Number(product?.stock || 0));
+  const stock = Math.max(0, Math.floor(Number(product?.stock || 0)));
 
   if (!defaultPackaging || Number(defaultPackaging.unitsPerPackage || 0) <= 1) {
     return {
@@ -165,7 +165,7 @@ const getProductStockParts = (product: any, fallbackBaseUnitName?: string) => {
 
   const unitsPerPackage = Number(defaultPackaging.unitsPerPackage || 0);
   const packageQuantity = Math.floor(stock / unitsPerPackage);
-  const extraUnits = stock % unitsPerPackage;
+  const extraUnits = Math.round(stock % unitsPerPackage);
 
   if (packageQuantity > 0 && extraUnits > 0) {
     return {
@@ -742,6 +742,13 @@ export default function POSView() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
+  const clearCart = () => {
+    if (cart.length === 0) return;
+    if (!window.confirm('Очистить всю корзину? Все добавленные товары будут удалены.')) return;
+    setCart([]);
+    toast.success('Корзина очищена');
+  };
+
   const updateQuantity = (id: number, quantity: number) => {
     if (productListRef.current) {
       lastProductScrollRef.current = productListRef.current.scrollTop;
@@ -789,13 +796,13 @@ export default function POSView() {
           return { ...item, quantityInput: '' };
         }
 
-        const parsedQuantity = Number(value);
+        const parsedQuantity = Math.floor(Number(value));
         if (Number.isNaN(parsedQuantity)) {
           return item;
         }
 
         const product = products.find((productItem) => productItem.id === id);
-        const maxStock = product?.stock ?? item.stock;
+        const maxStock = Math.floor(Number(product?.stock ?? item.stock ?? 0));
         if (parsedQuantity > maxStock) {
           warnStockOverflow(item, maxStock);
         }
@@ -817,11 +824,11 @@ export default function POSView() {
         }
 
         const product = products.find((productItem) => productItem.id === id);
-        const maxStock = product?.stock ?? item.stock;
+        const maxStock = Math.floor(Number(product?.stock ?? item.stock ?? 0));
         if (item.quantity > maxStock) {
           warnStockOverflow(item, maxStock);
         }
-        const normalizedQuantity = Math.max(1, Math.min(item.quantity, maxStock));
+        const normalizedQuantity = Math.max(1, Math.min(Math.floor(Number(item.quantity || 1)), maxStock));
         return {
           ...item,
           quantity: normalizedQuantity,
@@ -1289,25 +1296,25 @@ export default function POSView() {
             <button
               onClick={() => setActiveTab('products')}
               className={clsx(
-                'min-h-9 rounded-xl py-1.5 text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
-                activeTab === 'products' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                'min-h-9 rounded-xl py-1.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5',
+                activeTab === 'products' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900',
               )}
             >
               <span>Товары</span>
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
                 {filteredProducts.length}
               </span>
             </button>
             <button
               onClick={() => setActiveTab('cart')}
               className={clsx(
-                'min-h-9 rounded-xl py-1.5 text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
-                activeTab === 'cart' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                'min-h-9 rounded-xl py-1.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5',
+                activeTab === 'cart' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900',
               )}
             >
               <span>Корзина</span>
               {cart.length > 0 && (
-                <span className="rounded-full bg-slate-900 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+                <span className="rounded-full bg-emerald-600 px-2 py-0.5 font-mono text-[10px] font-black text-white shadow-2xs">
                   {cart.length}
                 </span>
               )}
@@ -1368,7 +1375,7 @@ export default function POSView() {
             >
               <div
                 className={clsx(
-                  'rounded-[28px] border border-white bg-white shadow-xs',
+                  'rounded-2xl sm:rounded-[28px] border border-slate-200/90 bg-white shadow-xs overflow-hidden',
                   isCartExpanded
                     ? 'flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_minmax(0,1fr)]'
                     : 'flex flex-col',
@@ -1382,6 +1389,7 @@ export default function POSView() {
                   setIsCartExpanded={setIsCartExpanded}
                   cartWidth={cartWidth}
                   setCartWidth={handleCartWidthChange}
+                  onClearCart={clearCart}
                 />
 
                 <POSCartCustomerBlock
@@ -1465,10 +1473,20 @@ export default function POSView() {
               type="button"
               onClick={handleCheckout}
               disabled={isSubmitting || cart.length === 0 || !customerId}
-              className="flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-5 text-xs font-black uppercase tracking-wider text-white shadow-xs transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isSubmitting ? 'Обработка...' : 'Оформить заказ'}
-              {!isSubmitting && <ChevronRight size={16} />}
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Обработка...</span>
+                </>
+              ) : (
+                <>
+                  <Banknote size={15} />
+                  <span>Оформить</span>
+                  <ChevronRight size={15} />
+                </>
+              )}
             </button>
           </div>
         </div>

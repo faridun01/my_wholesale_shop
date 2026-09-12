@@ -1,4 +1,4 @@
-import { Trash2, Plus, Minus } from 'lucide-react';
+import { Trash2, Plus, Minus, Percent } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
 
@@ -93,89 +93,100 @@ export default function POSCartItem({
   };
 
   return (
-    <div className="my-1.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs transition-colors hover:border-slate-300/80">
-      {/* Line 1: ONLY Product Name & Delete button */}
-      <div className="flex items-start justify-between gap-2 min-w-0 border-b border-slate-100 pb-1.5">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs">
+      {/* Line 1: Index, Product Name, Unit Price, Delete */}
+      <div className="flex items-start justify-between gap-2 min-w-0 border-b border-slate-100/90 pb-1.5">
         <div className="flex items-start gap-1.5 min-w-0 flex-1">
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-bold text-slate-600 mt-0.5">
+          <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[10px] font-mono font-black text-slate-500 mt-0.5">
             {index + 1}
           </span>
-          <p
-            className="whitespace-normal wrap-break-word text-[12px] font-semibold text-slate-800 leading-snug line-clamp-2"
-            style={{ overflowWrap: 'anywhere' }}
-          >
-            {formatProductName(item.name)}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p
+              className="whitespace-normal wrap-break-word text-xs sm:text-[13px] font-black text-slate-900 leading-tight line-clamp-2"
+              style={{ overflowWrap: 'anywhere' }}
+            >
+              {formatProductName(item.name)}
+            </p>
+            <p className="mt-0.5 text-[10px] font-mono font-semibold text-slate-400">
+              {formatMoney(item.sellingPrice)} TJS / {item.baseUnitName}
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => removeFromCart(item.id)}
           title="Удалить из корзины"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 active:bg-rose-100"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600 active:scale-90"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
-      {/* Line 2: Packaging Select + Stepper */}
-      <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+      {/* Line 2: Packaging Selector + Quantity Stepper */}
+      <div className="mt-2 flex items-center gap-1.5 text-[11px]">
         <select
           value={item.selectedPackagingId || ''}
           onChange={(e) => updateSelectedPackaging(item.id, e.target.value)}
           title="Выберите упаковку"
-          className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50/50 px-1.5 text-[11px] font-medium text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
+          className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2 text-[11px] font-bold text-slate-800 outline-none transition-colors hover:bg-white focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500/20"
         >
           <option value="">{item.baseUnitName}</option>
           {(Array.isArray(item.packagings) ? item.packagings : []).map((packaging) => {
             const isDisabled = !isPackagingAvailableForCartItem(item, packaging);
             return (
               <option key={packaging.id} value={packaging.id} disabled={isDisabled}>
-                {packaging.packageName} ({packaging.unitsPerPackage}{item.baseUnitName})
+                {packaging.packageName} ({packaging.unitsPerPackage} {item.baseUnitName})
               </option>
             );
           })}
         </select>
 
-        <div className="flex h-8 shrink-0 items-center rounded-lg border border-slate-200 bg-white shadow-xs">
+        {/* Stepper */}
+        <div className="flex h-8 shrink-0 items-center rounded-lg border border-slate-200/90 bg-slate-50/50 shadow-2xs overflow-hidden">
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(-1) : handleStepExtraUnitQuantity(-1))}
-            className="flex h-full w-7 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
+            className="flex h-full w-7.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
           >
             <Minus size={13} />
           </button>
           <input
             type="number"
             min={0}
-            step={isPackageSale ? '1' : '0.01'}
+            step="1"
             value={
               isPackageSale
                 ? (item.packageQuantityInput ?? String(item.packageQuantity))
                 : (item.extraUnitQuantityInput ?? String(item.extraUnitQuantity))
             }
-            onChange={(e) =>
-              isPackageSale
-                ? updatePackageQuantityInput(item.id, e.target.value)
-                : updateExtraUnitQuantityInput(item.id, e.target.value)
-            }
+            onChange={(e) => {
+              const rawVal = e.target.value;
+              const intVal = rawVal === '' ? '' : String(Math.max(0, Math.floor(Number(rawVal) || 0)));
+              if (isPackageSale) {
+                updatePackageQuantityInput(item.id, intVal);
+              } else {
+                updateExtraUnitQuantityInput(item.id, intVal);
+              }
+            }}
             onBlur={() => (isPackageSale ? commitPackageQuantityInput(item.id) : commitExtraUnitQuantityInput(item.id))}
             placeholder="0"
-            className="h-full w-9 text-center font-mono text-[11px] font-bold text-slate-900 outline-none"
+            className="h-full w-10 text-center font-mono text-xs font-black text-slate-950 bg-white border-x border-slate-200/80 outline-none"
           />
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(1) : handleStepExtraUnitQuantity(1))}
-            className="flex h-full w-7 items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-100"
+            className="flex h-full w-7.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
           >
             <Plus size={13} />
           </button>
         </div>
       </div>
 
-      {/* Line 3: Discount % + Total Price */}
-      <div className="mt-1.5 flex items-center justify-between gap-1.5 text-[11px]">
-        <div className="w-16 shrink-0">
+      {/* Line 3: Discount Input + Total Price & Badges */}
+      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+        {/* Discount input */}
+        <div className="relative w-18 shrink-0">
           <input
             type="number"
             min={0}
@@ -189,22 +200,33 @@ export default function POSCartItem({
             }
             onChange={(e) => updateLineDiscountInput(item.id, e.target.value)}
             onBlur={() => commitLineDiscountInput(item.id)}
-            placeholder="%"
-            title="Скидка в %"
-            className="h-7 w-full rounded-md border border-slate-200 bg-white px-1 text-center font-mono text-[11px] font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400"
+            placeholder="0"
+            title="Скидка на позицию в %"
+            className="h-7 w-full rounded-lg border border-slate-200 bg-white pl-1.5 pr-5 text-center font-mono text-[11px] font-black text-slate-900 placeholder:text-slate-300 outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 shadow-2xs"
           />
+          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+            %
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Calculation summary */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {itemLineDiscount > 0 && (
             <span className="font-mono text-[10px] text-slate-400 line-through tabular-nums">
               {formatMoney(itemLineSubtotal)}
             </span>
           )}
-          <span className="font-mono text-xs font-bold text-slate-900 tabular-nums">{formatMoney(itemLineTotal)}</span>
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-slate-600">
-            ={item.quantity}{item.baseUnitName}
+          <span className="font-mono text-xs sm:text-[13px] font-black text-slate-950 tabular-nums">
+            {formatMoney(itemLineTotal)} <span className="text-[10px] font-bold text-slate-400 font-sans">TJS</span>
           </span>
+          <span className="rounded-md border border-emerald-200/70 bg-emerald-50/80 px-1.5 py-0.5 font-mono text-[10px] font-black text-emerald-800 shadow-2xs">
+            ={Math.round(item.quantity)} {item.baseUnitName}
+          </span>
+          {itemWeightKg > 0 && (
+            <span className="hidden sm:inline-block rounded-md border border-slate-200 bg-slate-50 px-1 py-0.5 font-mono text-[9px] font-semibold text-slate-500">
+              {formatWeightKg(itemWeightKg)}
+            </span>
+          )}
         </div>
       </div>
     </div>
