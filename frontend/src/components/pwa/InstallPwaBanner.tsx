@@ -12,6 +12,7 @@ export default function InstallPwaBanner() {
     isDismissed,
     promptInstall,
     dismissBanner,
+    markAsInstalled,
   } = usePWAInstall();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -105,11 +106,12 @@ export default function InstallPwaBanner() {
       </div>
 
       <InstallPwaModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && !isStandalone && !isInstalled}
         onClose={() => setIsModalOpen(false)}
         isIOS={isIOS}
         canPromptNative={canPromptNative}
         onNativeInstall={promptInstall}
+        onMarkAsInstalled={markAsInstalled}
       />
     </>
   );

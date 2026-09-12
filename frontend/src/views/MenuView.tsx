@@ -49,7 +49,7 @@ export default function MenuView() {
   }, [defaultDesktopRoute, navigate]);
 
   const [remindersCount, setRemindersCount] = useState(0);
-  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall } = usePWAInstall();
+  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall, markAsInstalled } = usePWAInstall();
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -383,6 +383,7 @@ export default function MenuView() {
         isIOS={isIOS}
         canPromptNative={canPromptNative}
         onNativeInstall={promptInstall}
+        onMarkAsInstalled={markAsInstalled}
       />
     </div>
   );

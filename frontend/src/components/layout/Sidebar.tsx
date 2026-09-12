@@ -29,7 +29,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
   const [isDesktopViewport, setIsDesktopViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   );
-  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall } = usePWAInstall();
+  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall, markAsInstalled } = usePWAInstall();
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
 
   useEffect(() => {
@@ -338,6 +338,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
         isIOS={isIOS}
         canPromptNative={canPromptNative}
         onNativeInstall={promptInstall}
+        onMarkAsInstalled={markAsInstalled}
       />
     </>
   );

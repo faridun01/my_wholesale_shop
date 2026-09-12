@@ -7,6 +7,7 @@ interface InstallPwaModalProps {
   isIOS: boolean;
   canPromptNative: boolean;
   onNativeInstall: () => void;
+  onMarkAsInstalled?: () => void;
 }
 
 export default function InstallPwaModal({
@@ -15,8 +16,14 @@ export default function InstallPwaModal({
   isIOS,
   canPromptNative,
   onNativeInstall,
+  onMarkAsInstalled,
 }: InstallPwaModalProps) {
   if (!isOpen) return null;
+
+  const handleAlreadyInstalled = () => {
+    onMarkAsInstalled?.();
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 p-0 sm:items-center sm:p-4">
@@ -57,7 +64,7 @@ export default function InstallPwaModal({
                 </p>
               </div>
 
-              <div className="pt-1">
+              <div className="pt-2 flex flex-col gap-2">
                 <button
                   onClick={() => {
                     onNativeInstall();
@@ -67,6 +74,13 @@ export default function InstallPwaModal({
                 >
                   <Download size={18} />
                   <span>Установить приложение</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAlreadyInstalled}
+                  className="btn-ghost w-full text-xs text-slate-500 hover:text-slate-700 font-medium"
+                >
+                  ✓ Уже установлено на этом устройстве
                 </button>
               </div>
             </div>
@@ -114,6 +128,15 @@ export default function InstallPwaModal({
                   </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleAlreadyInstalled}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-600"
+              >
+                <CheckCircle2 size={18} />
+                <span>Я уже добавил(а) на экран «Домой»</span>
+              </button>
             </div>
           ) : (
             /* General / Desktop Instructions */
@@ -142,6 +165,15 @@ export default function InstallPwaModal({
                   </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleAlreadyInstalled}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-600"
+              >
+                <CheckCircle2 size={18} />
+                <span>Приложение уже установлено</span>
+              </button>
             </div>
           )}
 
@@ -170,7 +202,15 @@ export default function InstallPwaModal({
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 justify-end border-t border-line bg-surface-muted px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-t border-line bg-surface-muted px-5 py-4">
+          <button
+            type="button"
+            onClick={handleAlreadyInstalled}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent-700 hover:text-accent-800 hover:underline"
+          >
+            <CheckCircle2 size={16} />
+            <span>Уже установлено</span>
+          </button>
           <button onClick={onClose} className="btn-secondary text-sm">
             Понятно, закрыть
           </button>

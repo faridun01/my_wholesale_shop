@@ -22,5 +22,13 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.json",
+      "id": "/?source=pwa"
+    }
+  ],
+  "prefer_related_applications": false
 }

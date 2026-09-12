@@ -18,7 +18,7 @@ type MobileMoreSheetProps = {
 export default function MobileMoreSheet({ isOpen, onClose, pinnedRoutes }: MobileMoreSheetProps) {
   const navigate = useNavigate();
   const user = React.useMemo(() => getCurrentUser(), []);
-  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall } = usePWAInstall();
+  const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall, markAsInstalled } = usePWAInstall();
   const [isPwaModalOpen, setIsPwaModalOpen] = React.useState(false);
 
   const items = React.useMemo(
@@ -141,6 +141,7 @@ export default function MobileMoreSheet({ isOpen, onClose, pinnedRoutes }: Mobil
         isIOS={isIOS}
         canPromptNative={canPromptNative}
         onNativeInstall={promptInstall}
+        onMarkAsInstalled={markAsInstalled}
       />
     </>
   );
