@@ -30,7 +30,6 @@ const run = async () => {
       twoFactorSecret: null,
       twoFactorBackupCodes: [],
       canCancelInvoices: true,
-      canDeleteData: true,
     },
     create: {
       username,
@@ -38,7 +37,6 @@ const run = async () => {
       role: 'ADMIN',
       active: true,
       canCancelInvoices: true,
-      canDeleteData: true,
     },
   });
 

@@ -28,7 +28,6 @@ type PublicUser = {
   customerId: number | null;
   active: boolean;
   canCancelInvoices: boolean;
-  canDeleteData: boolean;
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -53,7 +52,6 @@ const toPublicUser = (user: any): PublicUser => ({
   customerId: user.customerId ?? null,
   active: user.active,
   canCancelInvoices: Boolean(user.canCancelInvoices),
-  canDeleteData: Boolean(user.canDeleteData),
   twoFactorEnabled: Boolean(user.twoFactorEnabled),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
@@ -111,7 +109,6 @@ const signAccessToken = (user: {
   warehouseId: number | null;
   customerId: number | null;
   canCancelInvoices: boolean;
-  canDeleteData: boolean;
 }) =>
   jwt.sign(
     {
@@ -121,7 +118,6 @@ const signAccessToken = (user: {
       warehouseId: user.warehouseId,
       customerId: user.customerId,
       canCancelInvoices: user.canCancelInvoices,
-      canDeleteData: user.canDeleteData,
     },
     JWT_SECRET,
     {
@@ -227,7 +223,6 @@ export class AuthService {
     warehouseId?: number;
     customerId?: number;
     canCancelInvoices?: boolean;
-    canDeleteData?: boolean;
   }) {
     const username = normalizeUsername(data.username);
     validatePasswordStrength(data.password);
@@ -243,7 +238,6 @@ export class AuthService {
         warehouseId: data.warehouseId,
         customerId: data.customerId,
         canCancelInvoices: data.canCancelInvoices || false,
-        canDeleteData: data.canDeleteData || false,
       },
       include: { warehouse: true, customer: true },
     });

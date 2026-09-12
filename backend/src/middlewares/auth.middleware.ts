@@ -18,7 +18,6 @@ type AuthDbUser = {
   warehouseId: number | null;
   customerId: number | null;
   canCancelInvoices: boolean;
-  canDeleteData: boolean;
 };
 
 const USER_CACHE_TTL_MS = 60_000;
@@ -35,7 +34,6 @@ export interface AuthRequest extends Request {
     warehouseId?: number;
     customerId?: number;
     canCancelInvoices?: boolean;
-    canDeleteData?: boolean;
   };
 }
 
@@ -46,7 +44,6 @@ const buildAuthUser = (user: AuthDbUser) => ({
   warehouseId: user.warehouseId ?? undefined,
   customerId: user.customerId ?? undefined,
   canCancelInvoices: user.canCancelInvoices,
-  canDeleteData: user.canDeleteData,
 });
 
 export const invalidateUserCache = (userId?: number) => {
@@ -131,7 +128,6 @@ const resolveUserFromToken = async (token: string) => {
       customerId: true,
       active: true,
       canCancelInvoices: true,
-      canDeleteData: true,
     },
   });
 

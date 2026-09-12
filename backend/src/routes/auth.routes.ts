@@ -157,7 +157,6 @@ router.put(
       delete updateData.warehouseId;
       delete updateData.customerId;
       delete updateData.canCancelInvoices;
-      delete updateData.canDeleteData;
     }
 
     // A non-admin setting a NEW password for their OWN account through this generic

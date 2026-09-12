@@ -19,7 +19,6 @@ model User {
   customerId       Int?      @map("customer_id")
   active           Boolean   @default(true)
   canCancelInvoices Boolean   @default(false) @map("can_cancel_invoices")
-  canDeleteData    Boolean   @default(false) @map("can_delete_data")
   twoFactorEnabled Boolean   @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?   @map("two_factor_secret")
   twoFactorBackupCodes String[] @default([]) @map("two_factor_backup_codes")

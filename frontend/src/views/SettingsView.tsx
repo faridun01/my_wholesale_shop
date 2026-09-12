@@ -102,7 +102,6 @@ export default function SettingsView() {
     warehouseId: '',
     customerId: '',
     canCancelInvoices: false,
-    canDeleteData: false,
   };
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [customerOptions, setCustomerOptions] = useState<any[]>([]);
@@ -883,12 +882,7 @@ export default function SettingsView() {
                                 Отмена накл.
                               </span>
                             )}
-                            {u.canDeleteData && (
-                              <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 border border-rose-200/60">
-                                Удаление
-                              </span>
-                            )}
-                            {!u.canCancelInvoices && !u.canDeleteData && (
+                            {!u.canCancelInvoices && (
                               <span className="text-slate-400 text-[11px]">—</span>
                             )}
                           </div>
@@ -921,7 +915,6 @@ export default function SettingsView() {
                                     warehouseId: u.warehouseId ? String(u.warehouseId) : '',
                                     customerId: u.customerId ? String(u.customerId) : '',
                                     canCancelInvoices: !!u.canCancelInvoices,
-                                    canDeleteData: !!u.canDeleteData,
                                   });
                                   setShowEditUser(true);
                                 }}
@@ -1007,7 +1000,6 @@ export default function SettingsView() {
                                 warehouseId: u.warehouseId ? String(u.warehouseId) : '',
                                 customerId: u.customerId ? String(u.customerId) : '',
                                 canCancelInvoices: !!u.canCancelInvoices,
-                                canDeleteData: !!u.canDeleteData,
                               });
                               setShowEditUser(true);
                             }}
@@ -1045,11 +1037,6 @@ export default function SettingsView() {
                       {u.canCancelInvoices && (
                         <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                           Отмена
-                        </span>
-                      )}
-                      {u.canDeleteData && (
-                        <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
-                          Удаление
                         </span>
                       )}
                     </div>
@@ -1653,15 +1640,6 @@ export default function SettingsView() {
                             type="checkbox"
                             checked={newUser.canCancelInvoices}
                             onChange={(e) => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                          />
-                        </label>
-                        <label className="flex items-center justify-between text-xs font-medium text-slate-700 cursor-pointer">
-                          <span>Может удалять данные</span>
-                          <input
-                            type="checkbox"
-                            checked={newUser.canDeleteData}
-                            onChange={(e) => setNewUser({ ...newUser, canDeleteData: e.target.checked })}
                             className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                           />
                         </label>
