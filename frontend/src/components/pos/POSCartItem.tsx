@@ -136,7 +136,7 @@ export default function POSCartItem({
             const isDisabled = !isPackagingAvailableForCartItem(item, packaging);
             return (
               <option key={packaging.id} value={packaging.id} disabled={isDisabled}>
-                {packaging.packageName} ({packaging.unitsPerPackage} {item.baseUnitName})
+                {packaging.packageName}
               </option>
             );
           })}
