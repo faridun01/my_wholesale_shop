@@ -10,6 +10,12 @@ import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.
 const router = Router();
 
 const isAdminRequest = (req: AuthRequest) => String(req.user?.role || '').toUpperCase() === 'ADMIN';
+// A user with the canCancelInvoices grant (Settings → Users → "Может отменять
+// накладные") may cancel/delete invoices in their own warehouse without being a
+// full admin — this flag exists on the User model and is set via the admin UI
+// specifically for this, but neither route was actually reading it (both endpoints
+// hard-required ADMIN), so granting it had no effect at all until now.
+const canCancelRequest = (req: AuthRequest) => isAdminRequest(req) || Boolean(req.user?.canCancelInvoices);
 const canAccessInvoice = (
   access: Awaited<ReturnType<typeof getAccessContext>>,
   invoiceMeta: { warehouseId: number | null; userId: number | null },
@@ -166,7 +172,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
   try {
-    if (!isAdminRequest(req)) {
+    if (!canCancelRequest(req)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -184,7 +190,9 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
 
     const userId = req.user!.id;
     const invoiceId = Number(req.params.id);
-    const force = String(req.query.force || '').toLowerCase() === 'true';
+    // Only a full admin may force past the payment/return safety guard — a
+    // canCancelInvoices grant covers ordinary cancellation, not overriding it.
+    const force = access.isAdmin && String(req.query.force || '').toLowerCase() === 'true';
     const result = await InvoiceService.cancelInvoice(invoiceId, userId, { force });
 
     await AuditService.log({
@@ -235,7 +243,7 @@ router.post('/:id/return', async (req: AuthRequest, res, next) => {
 
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    if (!isAdminRequest(req)) {
+    if (!canCancelRequest(req)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -256,7 +264,9 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
     }
 
     if (!invoice.cancelled) {
-      const force = String(req.query.force || '').toLowerCase() === 'true';
+      // Only a full admin may force past the payment/return safety guard — a
+      // canCancelInvoices grant covers ordinary cancellation, not overriding it.
+      const force = access.isAdmin && String(req.query.force || '').toLowerCase() === 'true';
       await InvoiceService.cancelInvoice(invoiceId, req.user!.id, { force });
     }
 
