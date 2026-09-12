@@ -18,6 +18,7 @@ import POSCartCustomerBlock from '../components/pos/POSCartCustomerBlock';
 import POSCartHeader from '../components/pos/POSCartHeader';
 import POSCartItemsList from '../components/pos/POSCartItemsList';
 import POSProductList from '../components/pos/POSProductList';
+import POSClearCartModal from '../components/pos/POSClearCartModal';
 import { Button } from '../components/UI';
 
 type PaymentMethod = 'cash' | 'card' | 'transfer';
@@ -219,6 +220,7 @@ export default function POSView() {
     return saved ? Math.max(280, Math.min(800, Number(saved))) : 440;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [showClearCartModal, setShowClearCartModal] = useState(false);
 
   const handleCartWidthChange = (newWidth: number) => {
     const clamped = Math.max(280, Math.min(800, newWidth));
@@ -744,8 +746,12 @@ export default function POSView() {
 
   const clearCart = () => {
     if (cart.length === 0) return;
-    if (!window.confirm('Очистить всю корзину? Все добавленные товары будут удалены.')) return;
+    setShowClearCartModal(true);
+  };
+
+  const handleConfirmClearCart = () => {
     setCart([]);
+    setShowClearCartModal(false);
     toast.success('Корзина очищена');
   };
 
@@ -1267,6 +1273,15 @@ export default function POSView() {
         confirmText="Сменить склад"
         cancelText="Остаться здесь"
         type="warning"
+      />
+
+      <POSClearCartModal
+        isOpen={showClearCartModal}
+        onClose={() => setShowClearCartModal(false)}
+        onConfirm={handleConfirmClearCart}
+        cartCount={cart.length}
+        totalAmount={total}
+        customerName={customers.find((c) => c.id === customerId)?.name}
       />
 
       <div className="lg:rounded-[28px] lg:bg-[#f4f5fb]">

@@ -15,6 +15,7 @@ import {
   Phone,
   Settings as SettingsIcon,
   Eye,
+  EyeOff,
   Lock,
   CheckCircle2,
   ChevronDown,
@@ -34,6 +35,61 @@ import TwoFactorSettingsCard from '../components/settings/TwoFactorSettingsCard'
 import UserTwoFactorModal from '../components/settings/UserTwoFactorModal';
 import { invalidateSettingsReferenceCache } from '../api/settings-reference.api';
 import PaginationControls from '../components/common/PaginationControls';
+
+function PasswordRequirements({ password, confirmPassword }: { password?: string; confirmPassword?: string }) {
+  if (!password) return null;
+
+  const hasLength = password.length >= 8;
+  const hasUpper = /[A-ZА-ЯЁ]/.test(password) || /\p{Lu}/u.test(password);
+  const hasLower = /[a-zа-яё]/.test(password) || /\p{Ll}/u.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasConfirm = Boolean(confirmPassword);
+  const isMatch = hasConfirm && password === confirmPassword;
+
+  const rules = [
+    { label: 'Минимум 8 символов', ok: hasLength },
+    { label: 'Заглавная буква (A-Z, А-Я)', ok: hasUpper },
+    { label: 'Строчная буква (a-z, а-я)', ok: hasLower },
+    { label: 'Хотя бы одна цифра (0-9)', ok: hasDigit },
+  ];
+
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5 text-[11px] space-y-1.5 sm:col-span-2">
+      <div className="font-semibold text-slate-700">Требования к надежности пароля:</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+        {rules.map((rule, idx) => (
+          <div
+            key={idx}
+            className={`flex items-center gap-1.5 font-medium transition-colors ${
+              rule.ok ? 'text-emerald-600' : 'text-slate-400'
+            }`}
+          >
+            <div
+              className={`h-1.5 w-1.5 rounded-full ${
+                rule.ok ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
+              }`}
+            />
+            <span>{rule.label}</span>
+          </div>
+        ))}
+      </div>
+      {hasConfirm && (
+        <div
+          className={`flex items-center gap-1.5 pt-1 font-medium border-t border-slate-200/70 ${
+            isMatch ? 'text-emerald-600' : 'text-rose-500'
+          }`}
+        >
+          <div
+            className={`h-1.5 w-1.5 rounded-full ${
+              isMatch ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-rose-500'
+            }`}
+          />
+          <span>{isMatch ? 'Пароли совпадают' : 'Пароли не совпадают'}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsView() {
   const warehousesPageSize = 6;
@@ -85,6 +141,11 @@ export default function SettingsView() {
   const [newUser, setNewUser] = useState(emptyUserForm);
   const [warehousePage, setWarehousePage] = useState(1);
 
+  const [showProfilePassword, setShowProfilePassword] = useState(false);
+  const [showProfileConfirmPassword, setShowProfileConfirmPassword] = useState(false);
+  const [showUserPassword, setShowUserPassword] = useState(false);
+  const [showUserConfirmPassword, setShowUserConfirmPassword] = useState(false);
+
   const [profileForm, setProfileForm] = useState({
     username: '',
     password: '',
@@ -94,8 +155,8 @@ export default function SettingsView() {
   const currentUser = getCurrentUser();
   const role = String(currentUser.role || '').toUpperCase();
   const isAdmin = role === 'ADMIN';
-  const canManageSettings = role === 'ADMIN' || role === 'MANAGER';
-  const canViewUsers = role === 'ADMIN' || role === 'MANAGER';
+  const canManageSettings = isAdmin;
+  const canViewUsers = isAdmin;
 
   const enabledTwoFactorCount = users.filter((u) => u.twoFactorEnabled).length;
   const adminCount = users.filter((u) => String(u.role || '').toUpperCase() === 'ADMIN').length;
@@ -119,6 +180,8 @@ export default function SettingsView() {
     setShowEditUser(false);
     setSelectedUser(null);
     setNewUser(emptyUserForm);
+    setShowUserPassword(false);
+    setShowUserConfirmPassword(false);
   };
 
   const closeUserTwoFactor = () => {
@@ -335,6 +398,13 @@ export default function SettingsView() {
       toast.error('Пароли не совпадают');
       return;
     }
+    const hasUpper = /[A-ZА-ЯЁ]/.test(newUser.password) || /\p{Lu}/u.test(newUser.password);
+    const hasLower = /[a-zа-яё]/.test(newUser.password) || /\p{Ll}/u.test(newUser.password);
+    const hasDigit = /\d/.test(newUser.password);
+    if (newUser.password.length < 8 || !hasUpper || !hasLower || !hasDigit) {
+      toast.error('Пароль должен содержать минимум 8 символов, заглавные и строчные буквы и цифру');
+      return;
+    }
     if (isSubmittingForm) return;
     try {
       setIsSubmittingForm(true);
@@ -362,20 +432,33 @@ export default function SettingsView() {
       toast.error('Недостаточно прав');
       return;
     }
-    if (newUser.password && newUser.password !== newUser.confirmPassword) {
-      toast.error('Пароли не совпадают');
-      return;
+    if (newUser.password) {
+      if (newUser.password !== newUser.confirmPassword) {
+        toast.error('Пароли не совпадают');
+        return;
+      }
+      const hasUpper = /[A-ZА-ЯЁ]/.test(newUser.password) || /\p{Lu}/u.test(newUser.password);
+      const hasLower = /[a-zа-яё]/.test(newUser.password) || /\p{Ll}/u.test(newUser.password);
+      const hasDigit = /\d/.test(newUser.password);
+      if (newUser.password.length < 8 || !hasUpper || !hasLower || !hasDigit) {
+        toast.error('Пароль должен содержать минимум 8 символов, заглавные и строчные буквы и цифру');
+        return;
+      }
     }
     if (isSubmittingForm) return;
     try {
       setIsSubmittingForm(true);
       const { confirmPassword, ...payload } = newUser;
       const effectiveWarehouseId = payload.warehouseId || (warehouses.length === 1 ? String(warehouses[0].id) : '');
-      await client.put(`/auth/users/${selectedUser.id}`, {
+      const updateData: any = {
         ...payload,
         warehouseId: effectiveWarehouseId ? Number(effectiveWarehouseId) : null,
         customerId: payload.customerId ? Number(payload.customerId) : null,
-      });
+      };
+      if (!updateData.password) {
+        delete updateData.password;
+      }
+      await client.put(`/auth/users/${selectedUser.id}`, updateData);
       toast.success('Пользователь обновлен');
       closeUserModal();
       fetchData();
@@ -390,9 +473,18 @@ export default function SettingsView() {
     e.preventDefault();
     if (isSubmittingForm) return;
     try {
-      if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-        toast.error('Пароли не совпадают');
-        return;
+      if (profileForm.password) {
+        if (profileForm.password !== profileForm.confirmPassword) {
+          toast.error('Пароли не совпадают');
+          return;
+        }
+        const hasUpper = /[A-ZА-ЯЁ]/.test(profileForm.password) || /\p{Lu}/u.test(profileForm.password);
+        const hasLower = /[a-zа-яё]/.test(profileForm.password) || /\p{Ll}/u.test(profileForm.password);
+        const hasDigit = /\d/.test(profileForm.password);
+        if (profileForm.password.length < 8 || !hasUpper || !hasLower || !hasDigit) {
+          toast.error('Пароль должен содержать минимум 8 символов, заглавные и строчные буквы и цифру');
+          return;
+        }
       }
 
       setIsSubmittingForm(true);
@@ -406,8 +498,10 @@ export default function SettingsView() {
       updateStoredUser(updatedUser);
 
       setProfileForm({ ...profileForm, password: '', confirmPassword: '' });
-    } catch (err) {
-      toast.error('Ошибка при обновлении профиля');
+      setShowProfilePassword(false);
+      setShowProfileConfirmPassword(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message || 'Ошибка при обновлении профиля');
     } finally {
       setIsSubmittingForm(false);
     }
@@ -1188,26 +1282,51 @@ export default function SettingsView() {
                   <label className="mb-1 block text-xs font-semibold text-slate-700">
                     Новый пароль <span className="text-slate-400 font-normal">(если меняете)</span>
                   </label>
-                  <input
-                    type="password"
-                    value={profileForm.password}
-                    onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showProfilePassword ? 'text' : 'password'}
+                      value={profileForm.password}
+                      onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3 pr-10 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProfilePassword(!showProfilePassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                      title={showProfilePassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    >
+                      {showProfilePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-700">Повтор нового пароля</label>
-                  <input
-                    type="password"
-                    required={Boolean(profileForm.password)}
-                    value={profileForm.confirmPassword}
-                    onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showProfileConfirmPassword ? 'text' : 'password'}
+                      required={Boolean(profileForm.password)}
+                      value={profileForm.confirmPassword}
+                      onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3 pr-10 py-2 text-xs sm:text-sm font-medium outline-none focus:border-slate-300 focus:bg-white"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileConfirmPassword(!showProfileConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                      title={showProfileConfirmPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    >
+                      {showProfileConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
+
+                <PasswordRequirements
+                  password={profileForm.password}
+                  confirmPassword={profileForm.confirmPassword}
+                />
 
                 <div className="pt-2">
                   <button
@@ -1405,27 +1524,52 @@ export default function SettingsView() {
                     <label className="mb-1 block text-xs font-semibold text-slate-700">
                       {showEditUser ? 'Новый пароль (необяз.)' : 'Пароль'}
                     </label>
-                    <input
-                      type="password"
-                      required={!showEditUser}
-                      value={newUser.password}
-                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
-                      placeholder="••••••••"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showUserPassword ? 'text' : 'password'}
+                        required={!showEditUser}
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3 pr-10 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowUserPassword(!showUserPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                        title={showUserPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                      >
+                        {showUserPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-700">Повтор пароля</label>
-                    <input
-                      type="password"
-                      required={!showEditUser || Boolean(newUser.password)}
-                      value={newUser.confirmPassword}
-                      onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
-                      placeholder="••••••••"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showUserConfirmPassword ? 'text' : 'password'}
+                        required={!showEditUser || Boolean(newUser.password)}
+                        value={newUser.confirmPassword}
+                        onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3 pr-10 py-2 text-xs sm:text-sm font-medium outline-none focus:border-violet-300 focus:bg-white"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowUserConfirmPassword(!showUserConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-0.5"
+                        title={showUserConfirmPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                      >
+                        {showUserConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
+
+                  <PasswordRequirements
+                    password={newUser.password}
+                    confirmPassword={newUser.confirmPassword}
+                  />
 
                   {warehouses.length > 1 && (
                     <div className="sm:col-span-2">

@@ -107,8 +107,8 @@ export default function POSCartItem({
             >
               {formatProductName(item.name)}
             </p>
-            <p className="mt-0.5 text-[10px] font-mono font-semibold text-slate-400">
-              {formatMoney(item.sellingPrice)} TJS / {item.baseUnitName}
+            <p className="mt-0.5 text-[10px] font-mono font-medium text-slate-400">
+              {formatMoney(item.sellingPrice)} TJS <span className="text-[8.5px] font-normal text-slate-400">/ {item.baseUnitName}</span>
             </p>
           </div>
         </div>
@@ -124,12 +124,12 @@ export default function POSCartItem({
       </div>
 
       {/* Line 2: Packaging Selector + Quantity Stepper */}
-      <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+      <div className="mt-2 flex items-center justify-between gap-1.5">
         <select
           value={item.selectedPackagingId || ''}
           onChange={(e) => updateSelectedPackaging(item.id, e.target.value)}
           title="Выберите упаковку"
-          className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2 text-[11px] font-bold text-slate-800 outline-none transition-colors hover:bg-white focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500/20"
+          className="h-6.5 sm:h-7 w-26 sm:w-32 shrink-0 rounded-lg border border-slate-200 bg-slate-50/60 px-1.5 text-[9.5px] sm:text-[10px] font-semibold text-slate-700 outline-none transition-colors hover:bg-white focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500/20"
         >
           <option value="">{item.baseUnitName}</option>
           {(Array.isArray(item.packagings) ? item.packagings : []).map((packaging) => {
@@ -143,13 +143,13 @@ export default function POSCartItem({
         </select>
 
         {/* Stepper */}
-        <div className="flex h-8 shrink-0 items-center rounded-lg border border-slate-200/90 bg-slate-50/50 shadow-2xs overflow-hidden">
+        <div className="flex h-6.5 sm:h-7 shrink-0 items-center rounded-lg border border-slate-200/90 bg-slate-50/50 shadow-2xs overflow-hidden">
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(-1) : handleStepExtraUnitQuantity(-1))}
-            className="flex h-full w-7.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
+            className="flex h-full w-6.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
           >
-            <Minus size={13} />
+            <Minus size={11} />
           </button>
           <input
             type="number"
@@ -171,14 +171,14 @@ export default function POSCartItem({
             }}
             onBlur={() => (isPackageSale ? commitPackageQuantityInput(item.id) : commitExtraUnitQuantityInput(item.id))}
             placeholder="0"
-            className="h-full w-10 text-center font-mono text-xs font-black text-slate-950 bg-white border-x border-slate-200/80 outline-none"
+            className="h-full w-8.5 text-center font-mono text-xs font-black text-slate-950 bg-white border-x border-slate-200/80 outline-none"
           />
           <button
             type="button"
             onClick={() => (isPackageSale ? handleStepPackageQuantity(1) : handleStepExtraUnitQuantity(1))}
-            className="flex h-full w-7.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
+            className="flex h-full w-6.5 items-center justify-center text-slate-500 hover:bg-white hover:text-slate-900 active:scale-95 transition-all"
           >
-            <Plus size={13} />
+            <Plus size={11} />
           </button>
         </div>
       </div>
@@ -219,8 +219,8 @@ export default function POSCartItem({
           <span className="font-mono text-xs sm:text-[13px] font-black text-slate-950 tabular-nums">
             {formatMoney(itemLineTotal)} <span className="text-[10px] font-bold text-slate-400 font-sans">TJS</span>
           </span>
-          <span className="rounded-md border border-emerald-200/70 bg-emerald-50/80 px-1.5 py-0.5 font-mono text-[10px] font-black text-emerald-800 shadow-2xs">
-            ={Math.round(item.quantity)} {item.baseUnitName}
+          <span className="rounded-md border border-emerald-200/70 bg-emerald-50/80 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-emerald-800 shadow-2xs">
+            ={Math.round(item.quantity)} <span className="text-[8px] font-semibold text-emerald-700/90">{item.baseUnitName}</span>
           </span>
           {itemWeightKg > 0 && (
             <span className="hidden sm:inline-block rounded-md border border-slate-200 bg-slate-50 px-1 py-0.5 font-mono text-[9px] font-semibold text-slate-500">

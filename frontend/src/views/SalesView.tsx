@@ -2281,11 +2281,11 @@ export default function SalesView() {
               </div>
               
               {/* Sticky Footer */}
-              <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-4 sm:flex-row">
+              <div className="flex flex-row items-center justify-end gap-2 sm:gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 sm:px-6 sm:py-3.5">
                 <button 
                   type="button"
                   onClick={handleCloseReturnModal}
-                  className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs"
+                  className="h-9 sm:h-10 px-3.5 sm:px-5 rounded-xl border border-slate-200/90 bg-white text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all shadow-2xs shrink-0"
                 >
                   Отмена
                 </button>
@@ -2293,17 +2293,17 @@ export default function SalesView() {
                   type="button"
                   onClick={handleReturn}
                   disabled={isReturning || returnStats.totalUnits <= 0}
-                  className="flex-[1.4] sm:flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-500 px-4 text-xs sm:text-sm font-semibold text-white shadow-sm shadow-amber-200 hover:bg-amber-600 active:bg-amber-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 sm:px-5 text-xs sm:text-sm font-bold text-white shadow-xs shadow-amber-500/20 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-50 min-w-0"
                 >
                   {isReturning ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Оформление...</span>
+                      <Loader2 size={15} className="animate-spin shrink-0" />
+                      <span className="truncate">Оформление...</span>
                     </>
                   ) : (
                     <>
-                      <RotateCcw size={16} />
-                      <span>
+                      <RotateCcw size={15} className="shrink-0" />
+                      <span className="truncate">
                         {returnStats.totalRefund > 0
                           ? `Оформить возврат (${formatMoney(returnStats.totalRefund)})`
                           : 'Оформить возврат'}
