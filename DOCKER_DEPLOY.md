@@ -57,6 +57,37 @@ crm.itforce.pro {
 
 ## 2) Build and run
 
+For the fastest VPS updates, the `master` GitHub Actions workflow builds and
+publishes the backend and frontend images to GHCR after checks pass. The Compose
+file still includes build contexts for local development, but the VPS should
+pull the ready-made images instead of compiling them.
+
+If the GHCR packages are private, authenticate once on the VPS using a GitHub
+Personal Access Token (classic) with `read:packages`. Keep the token out of
+shell history and never commit it:
+
+```bash
+read -rsp "GitHub token: " GHCR_TOKEN; echo
+echo "$GHCR_TOKEN" | docker login ghcr.io -u GITHUB_USERNAME --password-stdin
+unset GHCR_TOKEN
+```
+
+After the workflow for the new commit has completed successfully, update the
+VPS without running a local build:
+
+```bash
+docker compose pull backend frontend
+docker compose up -d --no-build backend frontend
+docker compose ps
+curl -fsS https://crm.itforce.pro/api/health
+```
+
+If GHCR packages are public, the login step is not needed. To deploy a specific
+published image tag instead of the default `master`, set `IMAGE_TAG` in the
+server's `.env` before pulling.
+
+To build from source locally, use:
+
 ```bash
 docker compose up -d --build
 ```

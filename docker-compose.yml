@@ -16,6 +16,7 @@ services:
       retries: 10
 
   backend:
+    image: ghcr.io/faridun01/my_wholesale_shop/backend:${IMAGE_TAG:-master}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -46,6 +47,7 @@ services:
       - "3001"
 
   frontend:
+    image: ghcr.io/faridun01/my_wholesale_shop/frontend:${IMAGE_TAG:-master}
     build:
       context: ./frontend
       dockerfile: Dockerfile
