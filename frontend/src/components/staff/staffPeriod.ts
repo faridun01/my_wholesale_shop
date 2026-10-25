@@ -9,8 +9,6 @@ export type StaffPeriod = {
 };
 
 export const STAFF_PERIOD_PRESETS: Array<{ id: StaffPeriodPreset; label: string }> = [
-  { id: 'today', label: 'Сегодня' },
-  { id: 'week', label: '7 дней' },
   { id: 'month', label: 'Месяц' },
   { id: 'all', label: 'Всё время' },
   { id: 'custom', label: 'Период' },

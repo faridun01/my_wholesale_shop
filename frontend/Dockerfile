@@ -6,7 +6,7 @@ ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
 COPY package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY tsconfig*.json ./
 COPY vite.config.ts ./

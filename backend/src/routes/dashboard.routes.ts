@@ -15,15 +15,6 @@ import { getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
 
 const router = Router();
 
-const getInvoiceNetAmount = async (where: any) => {
-  const result = await prisma.invoice.aggregate({
-    where,
-    _sum: { netAmount: true },
-  });
-
-  return Number(result._sum.netAmount || 0);
-};
-
 // Profit = SUM(invoice.net_amount) - SUM(actual COGS). Net amount already reflects
 // invoice discount/tax, and COGS prefers real batch-allocation cost (falling back to
 // the item's average cost) — this matches the methodology reports.routes.ts uses
@@ -326,29 +317,27 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
     const ordersChange = safePercentChange(currentMonthInvoiceStats._count, previousMonthInvoiceStats._count);
     const customersChange = safePercentChange(currentMonthCustomers, previousMonthCustomers);
     const productsChange = safePercentChange(currentMonthProducts, previousMonthProducts);
-    const [
-      weekCurrentRevenue,
-      weekPreviousRevenue,
-      monthCurrentRevenue,
-      monthPreviousRevenue,
-      quarterCurrentRevenue,
-      quarterPreviousRevenue,
-      yearCurrentRevenue,
-      yearPreviousRevenue,
-      todayCurrentRevenue,
-      todayPreviousRevenue,
-    ] = await Promise.all([
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.weekStart, lt: windows.tomorrowStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.prevWeekStart, lt: windows.weekStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.monthStart, lt: windows.nextMonthStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.prevMonthStart, lt: windows.monthStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.quarterStart, lt: windows.nextQuarterStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.prevQuarterStart, lt: windows.quarterStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.yearStart, lt: windows.nextYearStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.prevYearStart, lt: windows.yearStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.todayStart, lt: windows.tomorrowStart } }),
-      getInvoiceNetAmount({ ...invoiceWhere, createdAt: { gte: windows.yesterdayStart, lt: windows.todayStart } }),
-    ]);
+    const invoiceWarehouseFilter = typeof invoiceWhere.warehouseId === 'number'
+      ? Prisma.sql`AND warehouse_id = ${invoiceWhere.warehouseId}`
+      : Prisma.empty;
+    const [revenueWindows] = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.weekStart} AND created_at < ${windows.tomorrowStart}), 0) AS "weekCurrentRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.prevWeekStart} AND created_at < ${windows.weekStart}), 0) AS "weekPreviousRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.monthStart} AND created_at < ${windows.nextMonthStart}), 0) AS "monthCurrentRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.prevMonthStart} AND created_at < ${windows.monthStart}), 0) AS "monthPreviousRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.quarterStart} AND created_at < ${windows.nextQuarterStart}), 0) AS "quarterCurrentRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.prevQuarterStart} AND created_at < ${windows.quarterStart}), 0) AS "quarterPreviousRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.yearStart} AND created_at < ${windows.nextYearStart}), 0) AS "yearCurrentRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.prevYearStart} AND created_at < ${windows.yearStart}), 0) AS "yearPreviousRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.todayStart} AND created_at < ${windows.tomorrowStart}), 0) AS "todayCurrentRevenue",
+        COALESCE(SUM(net_amount) FILTER (WHERE created_at >= ${windows.yesterdayStart} AND created_at < ${windows.todayStart}), 0) AS "todayPreviousRevenue"
+      FROM invoices
+      WHERE cancelled = false
+        AND created_at >= ${windows.prevYearStart}
+        AND created_at < ${windows.nextYearStart}
+        ${invoiceWarehouseFilter}
+    `);
 
     res.json({
       todaySales: Number(salesToday._sum.netAmount || 0),
@@ -377,11 +366,11 @@ router.get('/summary', async (req: AuthRequest, res, next) => {
         products: productsChange,
       },
       overviewChanges: {
-        week: safePercentChange(weekCurrentRevenue, weekPreviousRevenue),
-        month: safePercentChange(monthCurrentRevenue, monthPreviousRevenue),
-        quarter: safePercentChange(quarterCurrentRevenue, quarterPreviousRevenue),
-        year: safePercentChange(yearCurrentRevenue, yearPreviousRevenue),
-        today: safePercentChange(todayCurrentRevenue, todayPreviousRevenue),
+        week: safePercentChange(Number(revenueWindows.weekCurrentRevenue || 0), Number(revenueWindows.weekPreviousRevenue || 0)),
+        month: safePercentChange(Number(revenueWindows.monthCurrentRevenue || 0), Number(revenueWindows.monthPreviousRevenue || 0)),
+        quarter: safePercentChange(Number(revenueWindows.quarterCurrentRevenue || 0), Number(revenueWindows.quarterPreviousRevenue || 0)),
+        year: safePercentChange(Number(revenueWindows.yearCurrentRevenue || 0), Number(revenueWindows.yearPreviousRevenue || 0)),
+        today: safePercentChange(Number(revenueWindows.todayCurrentRevenue || 0), Number(revenueWindows.todayPreviousRevenue || 0)),
       },
     });
   } catch (error) {
