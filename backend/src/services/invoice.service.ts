@@ -2,6 +2,7 @@ import prisma from '../db/prisma.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
 import { normalizeMoney, roundMoney, ceilMoney, getInvoiceStatus } from '../utils/money.js';
+import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const PAYMENT_EPSILON = 0.01;
 const TRANSACTION_OPTIONS = {
@@ -394,7 +395,7 @@ export class InvoiceService {
         where: { id: invoiceId },
         include: {
           customer: true,
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
           warehouse: true,
           items: true,
         },
@@ -772,7 +773,7 @@ export class InvoiceService {
       where: { id: invoiceId },
       include: {
         customer: true,
-        user: true,
+        user: { select: PUBLIC_USER_SELECT },
         warehouse: true,
         items: {
           include: { 
@@ -783,10 +784,10 @@ export class InvoiceService {
           }
         },
         payments: {
-          include: { user: true }
+          include: { user: { select: PUBLIC_USER_SELECT } }
         },
         returns: {
-          include: { user: true }
+          include: { user: { select: PUBLIC_USER_SELECT } }
         }
       }
     });

@@ -1,4 +1,4 @@
-import { ChevronRight, ShoppingCart, Loader2, Banknote, Percent } from 'lucide-react';
+import { ChevronRight, ShoppingCart, Loader2, Banknote, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import { formatMoney } from '../../utils/format';
 
@@ -13,6 +13,9 @@ type POSCartSummaryProps = {
   customerId: number | null;
   discount: number;
   paidAmount: string;
+  /** Only admins record payments; for everyone else the sale is created unpaid. */
+  canRecordPayment: boolean;
+  showPaymentHint: boolean;
   subtotal: number;
   total: number;
   lineDiscountAmount: number;
@@ -32,6 +35,8 @@ export default function POSCartSummary({
   customerId,
   discount,
   paidAmount,
+  canRecordPayment,
+  showPaymentHint,
   subtotal,
   total,
   lineDiscountAmount,
@@ -81,26 +86,28 @@ export default function POSCartSummary({
         </div>
       )}
 
-      {/* Quick Payment Presets */}
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setPaidAmount(String(total))}
-          className="flex-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-center text-xs font-black text-emerald-800 shadow-2xs hover:bg-emerald-600 hover:text-white active:scale-95 transition-all truncate"
-        >
-          Вся сумма ({formatMoney(total)})
-        </button>
-        <button
-          type="button"
-          onClick={() => setPaidAmount('0')}
-          className="rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-900 hover:text-white active:scale-95 transition-all"
-        >
-          В долг (0 TJS)
-        </button>
-      </div>
+      {/* Quick Payment Presets (admin only) */}
+      {canRecordPayment && (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPaidAmount(String(total))}
+            className="flex-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-center text-xs font-black text-emerald-800 shadow-2xs hover:bg-emerald-600 hover:text-white active:scale-95 transition-all truncate"
+          >
+            Вся сумма ({formatMoney(total)})
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaidAmount('0')}
+            className="rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-900 hover:text-white active:scale-95 transition-all"
+          >
+            В долг (0 TJS)
+          </button>
+        </div>
+      )}
 
       {/* Inputs for Discount % and Paid Amount */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={clsx('grid gap-2', canRecordPayment ? 'grid-cols-2' : 'grid-cols-1')}>
         <div className="relative">
           <input
             type="number"
@@ -116,24 +123,33 @@ export default function POSCartSummary({
           </span>
         </div>
 
-        <div className="relative">
-          <input
-            type="number"
-            value={paidAmount}
-            min={0}
-            step="0.01"
-            onChange={(e) => {
-              const value = e.target.value;
-              setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
-            }}
-            placeholder="Оплачено"
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-2.5 pr-9 font-mono text-xs font-black text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 shadow-2xs"
-          />
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] font-bold text-slate-400">
-            TJS
-          </span>
-        </div>
+        {canRecordPayment && (
+          <div className="relative">
+            <input
+              type="number"
+              value={paidAmount}
+              min={0}
+              step="0.01"
+              onChange={(e) => {
+                const value = e.target.value;
+                setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
+              }}
+              placeholder="Оплачено"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-2.5 pr-9 font-mono text-xs font-black text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 shadow-2xs"
+            />
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] font-bold text-slate-400">
+              TJS
+            </span>
+          </div>
+        )}
       </div>
+
+      {!canRecordPayment && showPaymentHint && (
+        <div className="flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50/80 px-2.5 py-2 text-[11px] font-semibold text-sky-800">
+          <Info size={14} className="shrink-0 text-sky-500" />
+          <span>Накладная будет создана как «Не оплачено». Оплату отмечает администратор.</span>
+        </div>
+      )}
 
       {/* Financial Breakdown Card */}
       <div className="space-y-2 rounded-2xl border border-slate-200/80 bg-white p-3 text-xs shadow-2xs">
@@ -175,7 +191,7 @@ export default function POSCartSummary({
           </div>
         )}
 
-        {paidAmount !== '' && (
+        {canRecordPayment && paidAmount !== '' && (
           <div className="flex items-center justify-between border-t border-slate-100 pt-1.5 text-slate-500">
             <span className="font-semibold">{balance >= 0 ? 'Сдача клиенту' : 'Остаток в долг'}</span>
             <span

@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings,
   ShoppingBag,
+  UserCheck,
   Users,
   Loader2,
 } from 'lucide-react';
@@ -192,6 +193,19 @@ export default function MenuView() {
                       <LayoutDashboard size={18} />
                     </div>
                     <span className="text-sm font-bold text-slate-900">Дашборд</span>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-300" />
+                </Link>
+
+                <Link
+                  to="/staff"
+                  className="flex items-center justify-between p-3.5 transition-colors hover:bg-slate-50 active:bg-slate-100/70"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                      <UserCheck size={18} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-900">Сотрудники</span>
                   </div>
                   <ChevronRight size={16} className="text-slate-300" />
                 </Link>

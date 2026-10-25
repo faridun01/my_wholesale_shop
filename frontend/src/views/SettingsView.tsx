@@ -24,7 +24,8 @@ import {
   X,
   KeyRound,
   FileText,
-  AlertCircle
+  AlertCircle,
+  BarChart3
 } from 'lucide-react';
 import { m, AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
@@ -35,6 +36,7 @@ import TwoFactorSettingsCard from '../components/settings/TwoFactorSettingsCard'
 import UserTwoFactorModal from '../components/settings/UserTwoFactorModal';
 import { invalidateSettingsReferenceCache } from '../api/settings-reference.api';
 import PaginationControls from '../components/common/PaginationControls';
+import StaffDetailsModal from '../components/staff/StaffDetailsModal';
 
 function PasswordRequirements({ password, confirmPassword }: { password?: string; confirmPassword?: string }) {
   if (!password) return null;
@@ -124,8 +126,10 @@ export default function SettingsView() {
   const [showDeleteWarehouseConfirm, setShowDeleteWarehouseConfirm] = useState(false);
   const [isDeletingWarehouse, setIsDeletingWarehouse] = useState(false);
   const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [statsUser, setStatsUser] = useState<any>(null);
   
   const [warehouseForm, setWarehouseForm] = useState({
     name: '',
@@ -373,20 +377,26 @@ export default function SettingsView() {
     }
   };
 
-  const handleDeleteUser = async () => {
-    if (!selectedUser) return;
+  const handleDeleteUser = async (userToDelete = selectedUser) => {
+    if (!userToDelete || isDeletingUser) return;
     if (!isAdmin) {
       toast.error('Недостаточно прав');
       return;
     }
+
+    setIsDeletingUser(true);
+    toast('Удаление пользователя...', { id: 'user-delete' });
     try {
-      await client.delete(`/auth/users/${selectedUser.id}`);
-      toast.success('Пользователь удален');
-      setShowDeleteUserConfirm(false);
-      setSelectedUser(null);
+      await client.delete(`/auth/users/${userToDelete.id}`);
+      toast.success('Пользователь удален', { id: 'user-delete' });
       fetchData();
-    } catch (err) {
-      toast.error('Ошибка при удалении пользователя');
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.error || err.message || 'Ошибка при удалении пользователя',
+        { id: 'user-delete' }
+      );
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -889,6 +899,17 @@ export default function SettingsView() {
                         </td>
                         <td className="px-3.5 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {isAdmin && uRole !== 'CUSTOMER' && (
+                              <button
+                                type="button"
+                                onClick={() => setStatsUser(u)}
+                                className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                                title="Накладные и оплаты сотрудника"
+                              >
+                                <BarChart3 size={14} />
+                                <span>Статистика</span>
+                              </button>
+                            )}
                             {isAdmin && (
                               <button
                                 type="button"
@@ -927,6 +948,7 @@ export default function SettingsView() {
                             {isAdmin && (
                               <button
                                 type="button"
+                                disabled={isDeletingUser}
                                 onClick={() => {
                                   setSelectedUser(u);
                                   setShowDeleteUserConfirm(true);
@@ -978,6 +1000,16 @@ export default function SettingsView() {
 
                       {isAdmin && (
                         <div className="flex items-center gap-1">
+                          {uRole !== 'CUSTOMER' && (
+                            <button
+                              type="button"
+                              onClick={() => setStatsUser(u)}
+                              aria-label="Статистика сотрудника"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
+                            >
+                              <BarChart3 size={14} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -1009,6 +1041,7 @@ export default function SettingsView() {
                           </button>
                           <button
                             type="button"
+                            disabled={isDeletingUser}
                             onClick={() => {
                               setSelectedUser(u);
                               setShowDeleteUserConfirm(true);
@@ -1691,9 +1724,10 @@ export default function SettingsView() {
             setShowDeleteUserConfirm(false);
             setSelectedUser(null);
           }}
-          onConfirm={handleDeleteUser}
+          onConfirm={() => handleDeleteUser(selectedUser)}
           title="Удалить пользователя?"
           message={`Вы уверены, что хотите удалить пользователя "${selectedUser?.username}"? Это действие нельзя отменить.`}
+          closeOnConfirmStart
         />
       </React.Suspense>
 
@@ -1706,6 +1740,17 @@ export default function SettingsView() {
           fetchData();
         }}
       />
+
+      <AnimatePresence>
+        {statsUser && (
+          <StaffDetailsModal
+            key={statsUser.id}
+            staff={statsUser}
+            canRecordPayment={isAdmin}
+            onClose={() => setStatsUser(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

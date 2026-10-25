@@ -6,6 +6,7 @@ import { getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { maskInvoiceFinancials } from '../utils/customerVisibility.js';
 import { DEFAULT_CUSTOMER_NAME, getCanonicalDefaultCustomer, isDefaultCustomerName, mergeDuplicateCustomers } from '../utils/defaultCustomer.js';
 import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
+import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -419,15 +420,15 @@ router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
         include: {
           items: { include: { product: true } },
           payments: {
-            include: { user: true },
+            include: { user: { select: PUBLIC_USER_SELECT } },
             orderBy: { createdAt: 'desc' },
           },
           returns: {
-            include: { user: true },
+            include: { user: { select: PUBLIC_USER_SELECT } },
             orderBy: { createdAt: 'desc' },
           },
           warehouse: true,
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
         },
         skip,
         take: limit,
@@ -470,7 +471,7 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
       prisma.payment.findMany({
         where,
         include: {
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
           invoice: true,
         },
         skip,
@@ -519,7 +520,7 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
       prisma.return.findMany({
         where,
         include: {
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
           invoice: true,
         },
         skip,
@@ -571,15 +572,15 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
         include: {
           items: { include: { product: true } },
           payments: {
-            include: { user: true },
+            include: { user: { select: PUBLIC_USER_SELECT } },
             orderBy: { createdAt: 'desc' },
           },
           returns: {
-            include: { user: true },
+            include: { user: { select: PUBLIC_USER_SELECT } },
             orderBy: { createdAt: 'desc' },
           },
           warehouse: true,
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
         },
         skip,
         take: limit,

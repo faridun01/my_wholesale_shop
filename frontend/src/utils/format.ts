@@ -12,6 +12,15 @@ export const ceilMoney = (value: unknown, digits = 2) => {
   return Math.ceil((numeric - Number.EPSILON) * factor) / factor;
 };
 
+/** Local calendar day as YYYY-MM-DD (what date inputs and the API's date filters use). */
+export const toLocalDateKey = (value: Date | string | number) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
 export const formatMoney = (value: unknown, currency = '') => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return `0 ${currency}`.trim();

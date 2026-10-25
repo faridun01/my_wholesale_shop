@@ -1081,7 +1081,10 @@ export default function POSView() {
   );
   const totalDiscountAmount = normalizeMoneyValue(roundMoney(lineDiscountAmount + invoiceDiscountAmount));
   const total = normalizeMoneyValue(Math.max(0, roundMoney(subtotalAfterLineDiscount - invoiceDiscountAmount)));
-  const paid = parseFloat(paidAmount) || 0;
+  // Only an admin records payments; everyone else's sale is always created unpaid
+  // (the server enforces the same rule).
+  const canRecordPayment = isAdmin;
+  const paid = canRecordPayment ? parseFloat(paidAmount) || 0 : 0;
   const balance = paid - total;
   const cartWeightSummary = React.useMemo(
     () =>
@@ -1447,6 +1450,8 @@ export default function POSView() {
                   customerId={customerId}
                   discount={discount}
                   paidAmount={paidAmount}
+                  canRecordPayment={canRecordPayment}
+                  showPaymentHint={!isCustomerPortal}
                   subtotal={subtotal}
                   total={total}
                   lineDiscountAmount={lineDiscountAmount}

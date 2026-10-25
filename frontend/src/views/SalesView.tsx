@@ -66,6 +66,10 @@ import {
   isReturnActionDisabled,
   normalizeDisplayBaseUnit,
 } from '../utils/salesViewUtils';
+import StaffPeriodPicker from '../components/staff/StaffPeriodPicker';
+import StaffStatsPanel from '../components/staff/StaffStatsPanel';
+import useStaffSummary from '../components/staff/useStaffSummary';
+import { buildStaffPeriod, type StaffPeriod } from '../components/staff/staffPeriod';
 
 export default function SalesView() {
   const PAYMENT_EPSILON = SALES_PAYMENT_EPSILON;
@@ -89,6 +93,16 @@ export default function SalesView() {
   const [staffFilter, setStaffFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  // Seller's own figures ("Моя статистика"). The period is kept in sync with the
+  // list's date filters so the numbers always describe the invoices shown below.
+  const [myStatsPeriod, setMyStatsPeriod] = useState<StaffPeriod>(() => buildStaffPeriod('all'));
+  const [isMyStatsOpen, setIsMyStatsOpen] = useState(() => {
+    try {
+      return localStorage.getItem('sales:my-stats-collapsed') !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: 'createdAt',
     direction: 'desc',
@@ -120,6 +134,50 @@ export default function SalesView() {
     setSelectedWarehouseId(incomingWarehouseId);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
+
+  const myStats = useStaffSummary(isAdmin ? null : Number(user?.id) || null, myStatsPeriod);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    setMyStatsPeriod((current) =>
+      (current.start || '') === dateFrom && (current.end || '') === dateTo
+        ? current
+        : dateFrom || dateTo
+          ? { preset: 'custom', start: dateFrom || undefined, end: dateTo || undefined }
+          : buildStaffPeriod('all'),
+    );
+  }, [dateFrom, dateTo, isAdmin]);
+
+  // Edits/returns/cancellations reload the invoice list — keep the seller's
+  // figures in step with it (the first load already happens in the hook).
+  const hasLoadedInvoicesOnceRef = React.useRef(false);
+  const reloadMyStatsRef = React.useRef(myStats.reload);
+  reloadMyStatsRef.current = myStats.reload;
+  useEffect(() => {
+    if (isAdmin || isLoading) return;
+    if (!hasLoadedInvoicesOnceRef.current) {
+      hasLoadedInvoicesOnceRef.current = true;
+      return;
+    }
+    void reloadMyStatsRef.current();
+  }, [invoices, isAdmin, isLoading]);
+
+  const handleMyStatsPeriodChange = (period: StaffPeriod) => {
+    setMyStatsPeriod(period);
+    setDateFrom(period.start || '');
+    setDateTo(period.end || '');
+  };
+
+  const toggleMyStats = () => {
+    setIsMyStatsOpen((open) => {
+      try {
+        localStorage.setItem('sales:my-stats-collapsed', open ? '1' : '0');
+      } catch {
+        // storage unavailable — the toggle still works for this visit
+      }
+      return !open;
+    });
+  };
 
   useEffect(() => {
     if (hasLoadedWarehousesRef.current) {
@@ -454,6 +512,18 @@ export default function SalesView() {
     invoices,
   });
 
+  // Opened from a staff card ("Открыть в истории продаж").
+  useEffect(() => {
+    const openInvoiceId =
+      location.state && typeof location.state === 'object'
+        ? Number((location.state as { openInvoiceId?: number }).openInvoiceId || 0)
+        : 0;
+    if (!openInvoiceId) return;
+
+    navigate(location.pathname, { replace: true, state: null });
+    void fetchInvoiceDetails(openInvoiceId);
+  }, [location.pathname, location.state, navigate]);
+
   const handleShareInvoice = async (invoice: any) => {
     if (!invoice) return;
     const effectiveStatus = getEffectiveStatus(invoice);
@@ -576,6 +646,35 @@ export default function SalesView() {
   return (
     <div className="app-page-shell min-h-full font-sans">
       <div className="space-y-3.5 sm:space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
+        {!isAdmin && (
+          <section className="space-y-2.5" aria-label="Моя статистика">
+            <button
+              type="button"
+              onClick={toggleMyStats}
+              className="flex w-full items-center justify-between gap-2 px-1 text-left"
+            >
+              <span className="text-sm font-black text-slate-900">Моя статистика</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                {isMyStatsOpen ? 'Свернуть' : 'Показать'}
+                <ChevronDown size={14} className={clsx('transition-transform', isMyStatsOpen && 'rotate-180')} />
+              </span>
+            </button>
+            {isMyStatsOpen && (
+              <>
+                <StaffPeriodPicker period={myStatsPeriod} onChange={handleMyStatsPeriodChange} />
+                <StaffStatsPanel
+                  metrics={myStats.summary}
+                  loading={myStats.isLoading}
+                  error={myStats.hasError}
+                  onRetry={() => void myStats.reload()}
+                  statusFilter={statusFilter}
+                  onStatusFilterChange={setStatusFilter}
+                />
+              </>
+            )}
+          </section>
+        )}
+
         <SalesInvoicesSection
         isAdmin={isAdmin}
         warehouses={warehouses}
@@ -1190,7 +1289,7 @@ export default function SalesView() {
                     <RotateCcw size={17} />
                   </button>
 
-                  {getInvoiceBalance(selectedInvoice) > PAYMENT_EPSILON && !isPaymentActionDisabled(selectedInvoice) && (
+                  {isAdmin && getInvoiceBalance(selectedInvoice) > PAYMENT_EPSILON && !isPaymentActionDisabled(selectedInvoice) && (
                     <button
                       type="button"
                       onClick={() => {

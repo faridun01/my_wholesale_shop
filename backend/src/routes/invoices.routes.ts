@@ -7,6 +7,8 @@ import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '.
 import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
 import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
 import { getLineCost, getLineNetRevenue } from './reports.helpers.js';
+import { buildInvoiceListWhere, sanitizeInvoiceCreatePayload } from './invoices.helpers.js';
+import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
 
@@ -27,11 +29,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
-    const where = {
-      cancelled: false,
-      warehouseId: warehouseId ?? undefined,
-      userId: access.isAdmin ? undefined : (access.userId ?? -1),
-    };
+    const where = buildInvoiceListWhere(access, warehouseId, req.query as Record<string, unknown>);
 
     // saleAllocations (real per-batch cost) are only pulled for admins, since they're
     // the only ones who see totalProfit below — avoids the extra join for every
@@ -41,7 +39,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         where,
         include: {
           customer: true,
-          user: true,
+          user: { select: PUBLIC_USER_SELECT },
           items: access.isAdmin
             ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
             : true,
@@ -114,7 +112,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         : (await getCanonicalDefaultCustomer(prisma, userId)).id;
 
     const invoice = await InvoiceService.createInvoice({
-      ...req.body,
+      ...sanitizeInvoiceCreatePayload(req.body, access.isAdmin),
       customerId,
       userId,
       warehouseId,

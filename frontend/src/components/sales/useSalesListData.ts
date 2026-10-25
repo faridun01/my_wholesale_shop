@@ -5,6 +5,7 @@ import {
   getInvoiceBalance,
   getInvoiceNetAmount,
 } from '../../utils/salesViewUtils';
+import { toLocalDateKey } from '../../utils/format';
 
 type InvoiceSortConfig = {
   key: string;
@@ -55,7 +56,9 @@ const useSalesListData = ({
         const effectiveStatus = getEffectiveStatus(inv);
         const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
         const matchesStaff = staffFilter === 'all' || String(inv.staff_name || '') === staffFilter;
-        const invoiceDate = String(inv.createdAt || '').slice(0, 10);
+        // Local calendar day — slicing the ISO string would use the UTC day and
+        // put early-morning invoices on the previous date in UTC+ time zones.
+        const invoiceDate = inv.createdAt ? toLocalDateKey(inv.createdAt) : '';
         const matchesDateFrom = !dateFrom || invoiceDate >= dateFrom;
         const matchesDateTo = !dateTo || invoiceDate <= dateTo;
 

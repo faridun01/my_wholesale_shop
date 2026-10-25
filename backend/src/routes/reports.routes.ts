@@ -17,6 +17,7 @@ import {
 } from './reports.helpers.js';
 import { DEFAULT_CUSTOMER_NAME, getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
 import { countUniqueProductsByName } from './dashboard.helpers.js';
+import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
 
@@ -468,7 +469,7 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
       include: {
         product: true,
         warehouse: true,
-        user: true,
+        user: { select: PUBLIC_USER_SELECT },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -515,7 +516,7 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
       include: {
         product: true,
         warehouse: true,
-        user: true,
+        user: { select: PUBLIC_USER_SELECT },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -596,7 +597,7 @@ router.get('/transactions', validateRequest({ query: transactionsQuerySchema }),
       include: {
         product: true,
         warehouse: true,
-        user: true,
+        user: { select: PUBLIC_USER_SELECT },
       },
       orderBy: { createdAt: 'desc' },
       take: Number(limit),

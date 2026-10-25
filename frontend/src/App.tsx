@@ -29,6 +29,7 @@ const HistoryView = React.lazy(() => import('./views/HistoryView'));
 const POSView = React.lazy(() => import('./views/POSView'));
 const CustomerOrdersView = React.lazy(() => import('./views/CustomerOrdersView'));
 const MenuView = React.lazy(() => import('./views/MenuView'));
+const StaffView = React.lazy(() => import('./views/StaffView'));
 
 const RouteLoading = () => (
   <div className="flex min-h-[40vh] items-center justify-center">
@@ -270,6 +271,14 @@ export default function App() {
             element={
               <AdminRoute>
                 <ReportsView />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/staff"
+            element={
+              <AdminRoute>
+                <StaffView />
               </AdminRoute>
             }
           />

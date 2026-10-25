@@ -14,6 +14,7 @@ import {
   parsePackagingFromRawName,
 } from '../utils/product-packaging.js';
 import { roundMoney } from '../utils/money.js';
+import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
 const StockSvc = StockService as any;
@@ -1090,7 +1091,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     const [transactions, priceHistory, totalTransactions, totalPriceEvents] = await Promise.all([
       prisma.inventoryTransaction.findMany({
         where: transactionWhere,
-        include: { user: true, warehouse: true },
+        include: { user: { select: PUBLIC_USER_SELECT }, warehouse: true },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' }

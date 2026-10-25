@@ -9,6 +9,7 @@ import {
   Settings,
   ShoppingBag,
   ShoppingCart,
+  UserCheck,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -33,6 +34,7 @@ export const navItems: NavItem[] = [
   { to: '/products', icon: Package, label: 'Товары', section: 'Управление' },
   { to: '/sales', icon: History, label: 'История продаж', section: 'Управление' },
   { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
+  { to: '/staff', icon: UserCheck, label: 'Сотрудники', section: 'Отношения' },
   { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
   { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
   { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
@@ -58,6 +60,7 @@ export function getFilteredNavItems(user: AppUser): NavItem[] {
           item.to === '/expenses' ||
           item.to === '/analytics' ||
           item.to === '/reports' ||
+          item.to === '/staff' ||
           item.to === '/settings')
       ) {
         return false;
@@ -66,6 +69,7 @@ export function getFilteredNavItems(user: AppUser): NavItem[] {
         item.to === '/expenses' ||
         item.to === '/analytics' ||
         item.to === '/reports' ||
+        item.to === '/staff' ||
         item.to === '/settings'
       ) {
         return isAdmin;
