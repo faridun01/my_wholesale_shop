@@ -10,7 +10,7 @@ import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.
 import { getLineCost, getLineNetRevenue } from './reports.helpers.js';
 import { buildInvoiceListWhere, sanitizeInvoiceCreatePayload } from './invoices.helpers.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
-import { assertNoTaxPayload } from '../utils/financial.js';
+import { addMoney, assertNoTaxPayload, balancePaidAmount, goodsReturnPaymentAdjustments, isGoodsReturnPaymentAdjustment } from '../utils/financial.js';
 
 const router = Router();
 
@@ -48,6 +48,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
           returns: access.isAdmin
             ? { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } }
             : false,
+          payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
         },
         skip,
         take: limit,
@@ -67,9 +68,15 @@ router.get('/', async (req: AuthRequest, res, next) => {
           ? inv.items.reduce((sum: number, item: any) => sum + (getLineNetRevenue(inv, item) - getLineCost(item)), 0)
           : undefined;
         const { returns: _returns, ...invoiceData } = inv;
+        const payments = Array.isArray(inv.payments) ? inv.payments : [];
+        const returnPaymentAdjustments = goodsReturnPaymentAdjustments(payments);
 
         return {
           ...invoiceData,
+          grossPaidAmount: addMoney(...payments.filter((payment: any) => Number(payment.amount) > 0).map((payment: any) => payment.amount)),
+          moneyRefundedAmount: -addMoney(...payments.filter((payment: any) => Number(payment.amount) < 0 && !payment.reversalOfId && !isGoodsReturnPaymentAdjustment(payment)).map((payment: any) => payment.amount)),
+          returnPaymentAdjustments,
+          balancePaidAmount: balancePaidAmount(payments, inv.paidAmount),
           customer_name: inv.customerNameSnapshot || inv.customer?.name || 'Клиент',
           staff_name: inv.user?.username || '—',
           totalProfit,

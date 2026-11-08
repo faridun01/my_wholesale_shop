@@ -95,7 +95,7 @@ export function getEffectiveStatus(invoice: any, epsilon = SALES_PAYMENT_EPSILON
     return 'cancelled';
   }
 
-  const paidAmount = Math.max(0, Number(invoice?.paidAmount || 0));
+  const paidAmount = Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0));
   const netAmount = getInvoiceNetAmount(invoice);
 
   if (paidAmount >= netAmount) {
@@ -110,11 +110,12 @@ export function getEffectiveStatus(invoice: any, epsilon = SALES_PAYMENT_EPSILON
 }
 
 export function getInvoiceBalance(invoice: any) {
-  return roundMoney(getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.paidAmount || 0)));
+  return roundMoney(Math.max(0, getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))));
 }
 
 export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) => {
-  const change = roundMoney(Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceNetAmount(invoice));
+  if (Number(invoice?.returnedAmount || 0) > 0) return 0;
+  const change = roundMoney(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)) - getInvoiceNetAmount(invoice));
   if (change <= epsilon) {
     return 0;
   }
@@ -123,7 +124,45 @@ export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPS
 };
 
 export const getInvoiceAppliedPaidAmount = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) =>
-  Math.max(0, Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceChangeAmount(invoice, epsilon));
+  Math.max(0, Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)) - getInvoiceChangeAmount(invoice, epsilon));
+
+export const getInvoiceGrossPaidAmount = (invoice: any) => {
+  const storedGross = Number(invoice?.grossPaidAmount);
+  if (Number.isFinite(storedGross) && storedGross >= 0) return roundMoney(storedGross);
+  if (Array.isArray(invoice?.payments)) {
+    return roundMoney(invoice.payments.reduce((sum: number, payment: any) => sum + Math.max(0, Number(payment?.amount || 0)), 0));
+  }
+  return getInvoiceAppliedPaidAmount(invoice);
+};
+
+export const getInvoiceMoneyRefundedAmount = (invoice: any) => {
+  const storedRefunded = Number(invoice?.moneyRefundedAmount);
+  if (Number.isFinite(storedRefunded) && storedRefunded >= 0) return roundMoney(storedRefunded);
+  if (Array.isArray(invoice?.payments)) {
+    return roundMoney(invoice.payments.reduce((sum: number, payment: any) => {
+      const amount = Number(payment?.amount || 0);
+      const returnAdjustment = payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund';
+      return sum + (amount < 0 && !payment?.reversalOfId && !returnAdjustment ? Math.abs(amount) : 0);
+    }, 0));
+  }
+  return 0;
+};
+
+export const getInvoiceReturnPaymentAdjustments = (invoice: any) => {
+  const stored = Number(invoice?.returnPaymentAdjustments);
+  if (Number.isFinite(stored) && stored >= 0) return roundMoney(stored);
+  if (!Array.isArray(invoice?.payments)) return 0;
+  return roundMoney(invoice.payments.reduce((sum: number, payment: any) => {
+    const amount = Number(payment?.amount || 0);
+    const isReturnAdjustment = payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund';
+    return sum + (amount < 0 && !payment?.reversalOfId && isReturnAdjustment ? Math.abs(amount) : 0);
+  }, 0));
+};
+
+export const getInvoiceCustomerCredit = (invoice: any) =>
+  Number(invoice?.returnedAmount || 0) > 0
+    ? roundMoney(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0) - getInvoiceNetAmount(invoice)))
+    : 0;
 
 export const normalizeDisplayPackageName = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();

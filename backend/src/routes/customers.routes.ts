@@ -1,4 +1,4 @@
-import { addMoney, discountAmount } from '../utils/financial.js';
+import { addMoney, balancePaidAmount, discountAmount } from '../utils/financial.js';
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../db/prisma.js';
@@ -65,8 +65,8 @@ const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: nu
   );
 };
 
-const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number }) => {
-  return Math.max(0, Number(invoice.netAmount || 0) - Number(invoice.paidAmount || 0));
+const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number; payments?: any[] }) => {
+  return Math.max(0, Number(invoice.netAmount || 0) - balancePaidAmount(invoice.payments || [], invoice.paidAmount));
 };
 
 const getCustomerSegment = (params: {
@@ -130,6 +130,7 @@ const buildCustomerInvoiceStats = async (customerIds: number[], warehouseId?: nu
   }
 
   const warehouseFilter = warehouseId ? Prisma.sql`AND i.warehouse_id = ${warehouseId}` : Prisma.empty;
+  const appliedPaid = Prisma.sql`(i.paid_amount + COALESCE(adj.return_adjustment, 0))`;
 
   const rows = await prisma.$queryRaw<Array<{
     customerId: number;
@@ -151,35 +152,41 @@ const buildCustomerInvoiceStats = async (customerIds: number[], warehouseId?: nu
     SELECT
       i.customer_id AS "customerId",
       COALESCE(SUM(i.net_amount), 0) AS "totalInvoiced",
-      COALESCE(SUM(i.paid_amount), 0) AS "totalPaid",
-      COALESCE(SUM(GREATEST(i.net_amount - i.paid_amount, 0)), 0) AS "balance",
+      COALESCE(SUM(${appliedPaid}), 0) AS "totalPaid",
+      COALESCE(SUM(GREATEST(i.net_amount - ${appliedPaid}, 0)), 0) AS "balance",
       COUNT(*) AS "invoiceCount",
-      COUNT(*) FILTER (WHERE i.net_amount - i.paid_amount <= ${PAYMENT_EPSILON}) AS "paidInvoiceCount",
+      COUNT(*) FILTER (WHERE i.net_amount - ${appliedPaid} <= ${PAYMENT_EPSILON}) AS "paidInvoiceCount",
       COUNT(*) FILTER (
-        WHERE i.paid_amount > ${PAYMENT_EPSILON}
-          AND i.net_amount - i.paid_amount > ${PAYMENT_EPSILON}
+        WHERE ${appliedPaid} > ${PAYMENT_EPSILON}
+          AND i.net_amount - ${appliedPaid} > ${PAYMENT_EPSILON}
       ) AS "partialInvoiceCount",
       COUNT(*) FILTER (
-        WHERE i.paid_amount <= ${PAYMENT_EPSILON}
-          AND i.net_amount - i.paid_amount > ${PAYMENT_EPSILON}
+        WHERE ${appliedPaid} <= ${PAYMENT_EPSILON}
+          AND i.net_amount - ${appliedPaid} > ${PAYMENT_EPSILON}
       ) AS "unpaidInvoiceCount",
-      COALESCE(SUM(i.net_amount) FILTER (WHERE i.net_amount - i.paid_amount <= ${PAYMENT_EPSILON}), 0) AS "paidInvoicedTotal",
-      COALESCE(SUM(i.paid_amount) FILTER (WHERE i.net_amount - i.paid_amount <= ${PAYMENT_EPSILON}), 0) AS "paidCollectedTotal",
+      COALESCE(SUM(i.net_amount) FILTER (WHERE i.net_amount - ${appliedPaid} <= ${PAYMENT_EPSILON}), 0) AS "paidInvoicedTotal",
+      COALESCE(SUM(${appliedPaid}) FILTER (WHERE i.net_amount - ${appliedPaid} <= ${PAYMENT_EPSILON}), 0) AS "paidCollectedTotal",
       COALESCE(SUM(i.net_amount) FILTER (
-        WHERE i.paid_amount > ${PAYMENT_EPSILON}
-          AND i.net_amount - i.paid_amount > ${PAYMENT_EPSILON}
+        WHERE ${appliedPaid} > ${PAYMENT_EPSILON}
+          AND i.net_amount - ${appliedPaid} > ${PAYMENT_EPSILON}
       ), 0) AS "partialInvoicedTotal",
-      COALESCE(SUM(i.paid_amount) FILTER (
-        WHERE i.paid_amount > ${PAYMENT_EPSILON}
-          AND i.net_amount - i.paid_amount > ${PAYMENT_EPSILON}
+      COALESCE(SUM(${appliedPaid}) FILTER (
+        WHERE ${appliedPaid} > ${PAYMENT_EPSILON}
+          AND i.net_amount - ${appliedPaid} > ${PAYMENT_EPSILON}
       ), 0) AS "partialCollectedTotal",
       COALESCE(SUM(i.net_amount) FILTER (
-        WHERE i.paid_amount <= ${PAYMENT_EPSILON}
-          AND i.net_amount - i.paid_amount > ${PAYMENT_EPSILON}
+        WHERE ${appliedPaid} <= ${PAYMENT_EPSILON}
+          AND i.net_amount - ${appliedPaid} > ${PAYMENT_EPSILON}
       ), 0) AS "unpaidInvoicedTotal",
       MAX(i.created_at) AS "lastPurchaseAt",
       ARRAY_REMOVE(ARRAY_AGG(DISTINCT w.name), NULL) AS "warehouseNames"
     FROM invoices i
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(-p.amount), 0) AS return_adjustment
+      FROM payments p
+      WHERE p.invoice_id = i.id AND p.amount < 0 AND p.reversal_of_id IS NULL
+        AND (p.return_id IS NOT NULL OR LOWER(p.method) = 'refund')
+    ) adj ON true
     LEFT JOIN warehouses w ON w.id = i.warehouse_id
     WHERE i.cancelled = false
       AND i.customer_id IN (${Prisma.join(customerIds)})
@@ -425,7 +432,7 @@ router.get('/:id/invoices', async (req: AuthRequest, res, next) => {
             orderBy: { createdAt: 'desc' },
           },
           returns: {
-            include: { user: { select: PUBLIC_USER_SELECT } },
+            include: { user: { select: PUBLIC_USER_SELECT }, items: { include: { invoiceItem: true } } },
             orderBy: { createdAt: 'desc' },
           },
           warehouse: true,
@@ -596,19 +603,34 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
       ...invoice,
       saleBasisAmount: addMoney(invoice.totalAmount, -discountAmount(invoice.totalAmount, invoice.discount), invoice.tax),
       invoiceBalance: getInvoiceBalance(invoice),
+      grossPaidAmount: addMoney(...(invoice.payments || []).filter((payment: any) => Number(payment.amount) > 0).map((payment: any) => payment.amount)),
+      balancePaidAmount: balancePaidAmount(invoice.payments || [], invoice.paidAmount),
       paymentEvents: (invoice.payments || []).map((payment: any) => ({
         id: payment.id,
         amount: payment.amount,
         method: payment.method,
+        returnId: payment.returnId,
+        reversalOfId: payment.reversalOfId,
         createdAt: payment.createdAt,
         staff_name: payment.user?.username || '—',
       })),
       returnEvents: (invoice.returns || []).map((itemReturn: any) => ({
         id: itemReturn.id,
         totalValue: itemReturn.totalValue,
+        refundedAmount: itemReturn.refundedAmount,
+        debtReduction: itemReturn.debtReduction,
+        creditAmount: itemReturn.creditAmount,
         reason: itemReturn.reason,
         createdAt: itemReturn.createdAt,
         staff_name: itemReturn.user?.username || '—',
+        items: (itemReturn.items || []).map((line: any) => ({
+          productName: line.invoiceItem?.productNameSnapshot || `Строка #${line.invoiceItemId}`,
+          quantity: line.quantity,
+          sellingPrice: line.sellingPrice,
+          totalValue: line.totalValue,
+          itemDiscount: line.itemDiscount,
+          allocatedOrderDiscount: line.allocatedOrderDiscount,
+        })),
       })),
     }));
 

@@ -2,7 +2,7 @@ import { financialPost } from '../../api/financialRequest';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
-import { formatMoney, toFixedNumber } from '../../utils/format';
+import { formatMoney, parseMoneyInput, toFixedNumber } from '../../utils/format';
 import { SALES_PAYMENT_EPSILON, getInvoiceBalance } from '../../utils/salesViewUtils';
 
 type UseSalesPaymentActionsOptions = {
@@ -29,8 +29,8 @@ const useSalesPaymentActions = ({
   const handlePayment = async () => {
     if (!selectedInvoice || !paymentAmount) return;
 
-    const normalizedAmount = Number(paymentAmount);
-    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    const normalizedAmount = parseMoneyInput(paymentAmount);
+    if (normalizedAmount === null || normalizedAmount <= 0) {
       toast.error('Сумма оплаты должна быть больше нуля');
       return;
     }

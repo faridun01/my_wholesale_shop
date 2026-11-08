@@ -3,10 +3,10 @@ import toast from 'react-hot-toast';
 import client from '../../api/client';
 import {
   getEffectiveStatus,
-  getInvoiceAppliedPaidAmount,
   getInvoiceBalance,
   getInvoiceChangeAmount,
   getInvoiceDiscountAmount,
+  getInvoiceGrossPaidAmount,
   getInvoiceNetAmount,
   getInvoiceSubtotal,
 } from '../../utils/salesViewUtils';
@@ -127,7 +127,7 @@ const useSalesInvoiceActions = ({
       netAmount: getInvoiceNetAmount(invoice),
       balanceAmount: getInvoiceBalance(invoice),
       changeAmount: getInvoiceChangeAmount(invoice),
-      appliedPaidAmount: getInvoiceAppliedPaidAmount(invoice),
+      appliedPaidAmount: getInvoiceGrossPaidAmount(invoice),
     });
 
     if (!result.ok && result.reason === 'blocked') {

@@ -126,14 +126,10 @@ export default function POSCartSummary({
         {canRecordPayment && (
           <div className="relative">
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={paidAmount}
-              min={0}
-              step="0.01"
-              onChange={(e) => {
-                const value = e.target.value;
-                setPaidAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
-              }}
+              onChange={(e) => setPaidAmount(e.target.value)}
               placeholder="Оплачено"
               className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-2.5 pr-9 font-mono text-xs font-black text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 shadow-2xs"
             />

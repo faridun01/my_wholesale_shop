@@ -1,4 +1,22 @@
 import { fromCents, toCents } from './financial';
+export const parseMoneyInput = (value: unknown): number | null => {
+  let text = String(value ?? '').trim().replace(/[\s\u00a0\u202f]/g, '');
+  if (!text) return null;
+  if (text.includes(',') && text.includes('.')) {
+    const decimalSeparator = text.lastIndexOf(',') > text.lastIndexOf('.') ? ',' : '.';
+    const groupingSeparator = decimalSeparator === ',' ? '.' : ',';
+    text = text.split(groupingSeparator).join('').replace(decimalSeparator, '.');
+  } else {
+    text = text.replace(',', '.');
+  }
+  text = text.replace(/^([+-]?)\./, (_match, sign) => `${sign}0.`);
+  if (!/^[+-]?\d+(?:\.\d*)?(?:e[+-]?\d+)?$/i.test(text)) return null;
+  try {
+    return fromCents(toCents(text));
+  } catch {
+    return null;
+  }
+};
 export const roundMoney = (value: unknown, digits = 2) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
@@ -120,4 +138,3 @@ export const formatTransactionReason = (reason?: unknown): string => {
 
   return s;
 };
-

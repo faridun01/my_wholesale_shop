@@ -5,7 +5,7 @@ import { m } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Banknote, ExternalLink, Loader2, Receipt, X } from 'lucide-react';
 import client from '../../api/client';
-import { formatMoney, toFixedNumber } from '../../utils/format';
+import { formatMoney, parseMoneyInput, toFixedNumber } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
 import {
   SALES_PAYMENT_EPSILON,
@@ -56,8 +56,8 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
   const canPay = canRecordPayment && invoice && !invoice.cancelled && balance > SALES_PAYMENT_EPSILON;
 
   const handlePayment = async () => {
-    const amount = Number(paymentAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = parseMoneyInput(paymentAmount);
+    if (amount === null || amount <= 0) {
       toast.error('Сумма оплаты должна быть больше нуля');
       return;
     }
@@ -165,9 +165,8 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
                 <div className="flex gap-2">
                   <div className="relative min-w-0 flex-1">
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       className="h-10 w-full rounded-xl border border-emerald-200 bg-white pl-3 pr-10 font-mono text-sm font-black text-slate-900 outline-none focus:border-emerald-500"
@@ -184,7 +183,7 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
                     <span>Оплатить</span>
                   </button>
                 </div>
-                {Number(paymentAmount) < balance - SALES_PAYMENT_EPSILON && (
+                {(parseMoneyInput(paymentAmount) ?? 0) < balance - SALES_PAYMENT_EPSILON && (
                   <button
                     type="button"
                     onClick={() => setPaymentAmount(String(toFixedNumber(balance)))}

@@ -38,6 +38,9 @@ type ReportRow = {
   net_sales?: number;
   total_sales?: number;
   total_value?: number;
+  refunded_amount?: number | null;
+  debt_reduction?: number | null;
+  credit_amount?: number | null;
   profit?: number;
   reason?: string;
   returned_qty?: number;
@@ -1892,7 +1895,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                       <th className="py-2 px-3">Прибыль</th>
                     </>
                   )}
-                  {reportType === 'returns' && <th className="py-2 px-3">Причина</th>}
+                  {reportType === 'returns' && (
+                    <>
+                      <th className="py-2 px-3">Накладная</th>
+                      <th className="py-2 px-3">Стоимость возврата</th>
+                      <th className="py-2 px-3">Деньгами возвращено</th>
+                      <th className="py-2 px-3">Долг уменьшен</th>
+                      <th className="py-2 px-3">Кредит</th>
+                      <th className="py-2 px-3">Причина</th>
+                    </>
+                  )}
                   {reportType === 'writeoffs' && (
                     <>
                       <th className="py-2 px-3">Сумма</th>
@@ -1926,7 +1938,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                         <td className="py-1.5 sm:py-2 px-3 font-semibold text-emerald-600 tabular-nums">{formatMoney(row.profit || 0)}</td>
                       </>
                     )}
-                    {reportType === 'returns' && <td className="py-1.5 sm:py-2 px-3 italic text-rose-600">{formatTransactionReason(row.reason)}</td>}
+                    {reportType === 'returns' && (
+                      <>
+                        <td className="py-1.5 sm:py-2 px-3">№{row.invoice_id ?? '—'}</td>
+                        <td className="py-1.5 sm:py-2 px-3 font-semibold text-rose-700 tabular-nums">{formatMoney(row.total_value || 0)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 tabular-nums">{row.refunded_amount == null ? 'Неизвестно' : formatMoney(row.refunded_amount)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 tabular-nums">{row.debt_reduction == null ? 'Неизвестно' : formatMoney(row.debt_reduction)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 tabular-nums">{row.credit_amount == null ? 'Неизвестно' : formatMoney(row.credit_amount)}</td>
+                        <td className="py-1.5 sm:py-2 px-3 italic text-rose-600">{formatTransactionReason(row.reason)}</td>
+                      </>
+                    )}
                     {reportType === 'writeoffs' && (
                       <>
                         <td className="py-1.5 sm:py-2 px-3 font-semibold text-amber-700 tabular-nums">{formatMoney(row.total_value || 0)}</td>
@@ -1973,7 +1994,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                 {!filteredReportData.length && (
                   <tr>
                     <td
-                      colSpan={reportType === 'profit' ? 5 : reportType === 'sales' ? 4 : reportType === 'returns' ? 3 : 9}
+                      colSpan={reportType === 'profit' ? 5 : reportType === 'sales' ? 4 : reportType === 'returns' ? 8 : 9}
                       className="py-12 text-center text-xs font-medium text-slate-400"
                     >
                       Нет данных за выбранный период

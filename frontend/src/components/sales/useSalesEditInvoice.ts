@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { getProducts } from '../../api/products.api';
-import { ceilMoney, roundMoney, toFixedNumber } from '../../utils/format';
+import { ceilMoney, parseMoneyInput, roundMoney, toFixedNumber } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
 import {
   SALES_PAYMENT_EPSILON,
@@ -402,9 +402,9 @@ const useSalesEditInvoice = ({
     () =>
       editInvoiceItems.reduce((sum, item) => {
         const quantity = Number(item.quantity);
-        const sellingPrice = Number(item.sellingPrice);
+        const sellingPrice = parseMoneyInput(item.sellingPrice);
         const itemDiscount = Number(item.discount || 0);
-        if (!Number.isFinite(quantity) || !Number.isFinite(sellingPrice) || quantity <= 0 || sellingPrice < 0) {
+        if (!Number.isFinite(quantity) || sellingPrice === null || quantity <= 0 || sellingPrice < 0) {
           return sum;
         }
         const unitPriceRounded = discountedUnit(sellingPrice, Math.min(100, Math.max(0, Number.isFinite(itemDiscount) ? itemDiscount : 0)));
@@ -471,7 +471,7 @@ const useSalesEditInvoice = ({
       payloadItems = editInvoiceItems.map((item) => {
         const normalizedItem = normalizeEditInvoiceItem(item);
         const quantity = Number(normalizedItem.quantity);
-        const sellingPrice = Number(item.sellingPrice);
+        const sellingPrice = parseMoneyInput(item.sellingPrice);
         const product = getEditProductMeta(normalizedItem.productId);
 
         if (!normalizedItem.productId || !product) {
@@ -482,7 +482,7 @@ const useSalesEditInvoice = ({
           throw new Error(`Укажите корректное количество для "${product.name}"`);
         }
 
-        if (!Number.isFinite(sellingPrice) || sellingPrice < 0) {
+        if (sellingPrice === null || sellingPrice < 0) {
           throw new Error(`Укажите корректную цену продажи для "${product.name}"`);
         }
 

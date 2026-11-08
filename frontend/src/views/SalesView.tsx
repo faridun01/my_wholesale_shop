@@ -33,7 +33,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
-import { formatCount, formatMoney, toFixedNumber, ceilMoney, formatTransactionReason } from '../utils/format';
+import { formatCount, formatMoney, parseMoneyInput, toFixedNumber, ceilMoney, formatTransactionReason } from '../utils/format';
 import { formatProductName } from '../utils/productName';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import { getCustomers } from '../api/customers.api';
@@ -50,9 +50,12 @@ import type { EditProductOption, ReturnInvoiceItem } from '../components/sales/s
 import {
   SALES_PAYMENT_EPSILON,
   getEffectiveStatus,
-  getInvoiceAppliedPaidAmount,
+  getInvoiceGrossPaidAmount,
+  getInvoiceMoneyRefundedAmount,
+  getInvoiceReturnPaymentAdjustments,
   getInvoiceBalance,
   getInvoiceChangeAmount,
+  getInvoiceCustomerCredit,
   getInvoiceDiscountAmount,
   getInvoiceItemQuantityParts,
   getInvoiceItemReturnedQty,
@@ -556,7 +559,7 @@ export default function SalesView() {
       Number(invoice.discount || 0) > 0 ? `Скидка (${invoice.discount}%): -${formatMoney(getInvoiceDiscountAmount(invoice))}` : '',
       Number(invoice.returnedAmount || 0) > 0 ? `Возврат: -${formatMoney(invoice.returnedAmount)}` : '',
       `ИТОГО: ${formatMoney(getInvoiceNetAmount(invoice))}`,
-      `Оплачено: ${formatMoney(getInvoiceAppliedPaidAmount(invoice))}`,
+      `Внесено всего: ${formatMoney(getInvoiceGrossPaidAmount(invoice))}`,
       `Остаток (Долг): ${formatMoney(getInvoiceBalance(invoice))}`,
     ].filter(Boolean).join('\n');
 
@@ -1013,7 +1016,7 @@ export default function SalesView() {
                       </div>
                     )}
 
-                    {getInvoiceChangeAmount(selectedInvoice) > PAYMENT_EPSILON && (
+                    {getInvoiceChangeAmount(selectedInvoice) > PAYMENT_EPSILON && getInvoiceCustomerCredit(selectedInvoice) <= PAYMENT_EPSILON && (
                       <div className="flex items-center justify-between text-slate-600">
                         <span className="font-medium">Сдача клиенту</span>
                         <span className="font-bold font-mono text-amber-600">{formatMoney(getInvoiceChangeAmount(selectedInvoice))}</span>
@@ -1036,10 +1039,28 @@ export default function SalesView() {
                       <div className="flex items-center justify-between text-slate-600">
                         <span className="font-medium flex items-center gap-1">
                           <CheckCircle2 size={13} className="text-emerald-500" />
-                          Оплачено:
+                          Внесено всего:
                         </span>
-                        <span className="font-mono font-bold text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(selectedInvoice))}</span>
+                        <span className="font-mono font-bold text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(selectedInvoice))}</span>
                       </div>
+                      {getInvoiceMoneyRefundedAmount(selectedInvoice) > 0 && (
+                        <div className="flex items-center justify-between text-slate-500">
+                          <span className="font-medium">Деньгами возвращено:</span>
+                          <span className="font-mono">{formatMoney(getInvoiceMoneyRefundedAmount(selectedInvoice))}</span>
+                        </div>
+                      )}
+                      {getInvoiceReturnPaymentAdjustments(selectedInvoice) > 0 && (
+                        <div className="flex items-center justify-between text-amber-700">
+                          <span className="font-medium">Корректировка старого возврата:</span>
+                          <span className="font-mono">{formatMoney(getInvoiceReturnPaymentAdjustments(selectedInvoice))}</span>
+                        </div>
+                      )}
+                      {getInvoiceCustomerCredit(selectedInvoice) > 0 && (
+                        <div className="flex items-center justify-between text-amber-700">
+                          <span className="font-medium">Кредит покупателя:</span>
+                          <span className="font-mono font-bold">{formatMoney(getInvoiceCustomerCredit(selectedInvoice))}</span>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                         <span className="font-bold text-slate-700">Остаток (Долг):</span>
@@ -1403,7 +1424,7 @@ export default function SalesView() {
                       });
 
                     const q = Math.max(0, Number(item.quantity || 0));
-                    const p = Math.max(0, Number(item.sellingPrice || 0));
+                    const p = Math.max(0, parseMoneyInput(item.sellingPrice) ?? 0);
                     const d = Math.max(0, Number(item.discount || 0));
                     const lineTotal = q * ceilMoney(p * (1 - d / 100));
 
@@ -1606,9 +1627,8 @@ export default function SalesView() {
                               Цена (TJS)
                             </label>
                             <input
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               value={item.sellingPrice}
                               onChange={(e) => updateNormalizedEditInvoiceItem(item.key, { sellingPrice: e.target.value })}
                               placeholder="Цена"
@@ -1738,7 +1758,7 @@ export default function SalesView() {
         {showPaymentModal && selectedInvoice && (() => {
           const totalAmount = getInvoiceNetAmount(selectedInvoice);
           const balance = getInvoiceBalance(selectedInvoice);
-          const numericAmount = Number(paymentAmount) || 0;
+          const numericAmount = parseMoneyInput(paymentAmount) ?? 0;
           const alreadyPaid = Math.max(0, totalAmount - balance);
           const remainingAfterPayment = Math.max(0, balance - numericAmount);
           const isFullSettlement = balance > 0 && Math.abs(numericAmount - balance) < 0.01;
@@ -1871,14 +1891,10 @@ export default function SalesView() {
 
                     <div className="relative">
                       <input
-                        type="number"
-                        min={0}
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={paymentAmount}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPaymentAmount(value === '' ? '' : String(Math.max(0, Number(value) || 0)));
-                        }}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !isPaying && numericAmount > 0 && !isOverPayment) {
                             e.preventDefault();

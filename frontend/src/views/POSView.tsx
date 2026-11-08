@@ -11,7 +11,7 @@ import { getWarehouses } from '../api/warehouses.api';
 import { createCustomerOrder } from '../api/customer-orders.api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { filterWarehousesForUser, getCurrentUser, getUserCustomerId, getUserWarehouseId, isAdminUser, isCustomerUser } from '../utils/userAccess';
-import { formatMoney, roundMoney, ceilMoney, toFixedNumber } from '../utils/format';
+import { formatMoney, parseMoneyInput, roundMoney, ceilMoney, toFixedNumber } from '../utils/format';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 import { type CartItem, type PackagingOption } from '../components/pos/POSCartItem';
 import POSCartSummary from '../components/pos/POSCartSummary';
@@ -656,7 +656,7 @@ export default function POSView() {
   };
 
   const hasSaleDraft =
-    cart.length > 0 || customerId !== null || Number(paidAmount || 0) > 0 || discount > 0;
+    cart.length > 0 || customerId !== null || (parseMoneyInput(paidAmount) ?? 0) > 0 || discount > 0;
 
   const handleWarehouseChange = (nextWarehouseId: string) => {
     if (nextWarehouseId === warehouseId) {
@@ -1085,7 +1085,8 @@ export default function POSView() {
   // Only an admin records payments; everyone else's sale is always created unpaid
   // (the server enforces the same rule).
   const canRecordPayment = isAdmin;
-  const paid = canRecordPayment ? parseFloat(paidAmount) || 0 : 0;
+  const parsedPaidAmount = parseMoneyInput(paidAmount);
+  const paid = canRecordPayment ? parsedPaidAmount ?? 0 : 0;
   const balance = paid - total;
   const cartWeightSummary = React.useMemo(
     () =>
@@ -1111,6 +1112,11 @@ export default function POSView() {
   );
 
   const handleCheckout = async () => {
+    if (canRecordPayment && paidAmount.trim() && parsedPaidAmount === null) {
+      toast.error('Введите сумму цифрами, например 1250,50');
+      return;
+    }
+
     if (paid > total + 0.01) {
       toast.error(`Сумма оплаты не может превышать сумму накладной (${toFixedNumber(total)})`);
       return;

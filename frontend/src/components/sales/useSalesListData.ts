@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import {
   getEffectiveStatus,
-  getInvoiceAppliedPaidAmount,
+  getInvoiceGrossPaidAmount,
   getInvoiceBalance,
   getInvoiceNetAmount,
 } from '../../utils/salesViewUtils';
@@ -93,7 +93,7 @@ const useSalesListData = ({
         case 'netAmount':
           return (getInvoiceNetAmount(a) - getInvoiceNetAmount(b)) * direction;
         case 'paidAmount':
-          return (getInvoiceAppliedPaidAmount(a) - getInvoiceAppliedPaidAmount(b)) * direction;
+          return (getInvoiceGrossPaidAmount(a) - getInvoiceGrossPaidAmount(b)) * direction;
         case 'balance':
           return (getInvoiceBalance(a) - getInvoiceBalance(b)) * direction;
         case 'status':

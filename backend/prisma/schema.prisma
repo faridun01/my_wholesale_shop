@@ -534,6 +534,7 @@ model Return {
   totalValue Decimal  @db.Decimal(12, 2) @map("total_value")
   refundedAmount Decimal? @db.Decimal(12, 2) @map("refunded_amount")
   debtReduction Decimal? @db.Decimal(12, 2) @map("debt_reduction")
+  creditAmount Decimal? @db.Decimal(12, 2) @map("credit_amount")
   refundMethod String? @map("refund_method")
   idempotencyKey String? @unique @map("idempotency_key")
   requestHash String? @map("request_hash")

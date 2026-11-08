@@ -1,4 +1,4 @@
-import { assertNoTaxPayload, financialError } from '../utils/financial.js';
+import { assertNoTaxPayload, balancePaidAmount, financialError } from '../utils/financial.js';
 import { addMoney, toCents } from '../utils/financial.js';
 import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
 import { Router } from 'express';
@@ -32,14 +32,16 @@ router.post('/', async (req: AuthRequest, res, next) => {
       let invoice: any = null;
       if (invoiceId) {
         await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`;
-        invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
+        invoice = await tx.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
         if (!invoice || invoice.cancelled) throw financialError('Invoice not found or cancelled');
-        if (toCents(invoice.paidAmount) < 0 || toCents(addMoney(invoice.paidAmount, amount)) > toCents(invoice.netAmount)) throw financialError('Payment exceeds outstanding debt');
+        const appliedPaid = balancePaidAmount(invoice.payments, invoice.paidAmount);
+        if (toCents(appliedPaid) < 0 || toCents(addMoney(appliedPaid, amount)) > toCents(invoice.netAmount)) throw financialError('Payment exceeds outstanding debt');
       }
       const payment = await tx.payment.create({ data: { customerId: invoice?.customerId ?? Number(req.body.customer_id), invoiceId, userId: req.user!.id, amount, method, idempotencyKey: key, requestHash: hash } });
       if (invoice) {
         const paidAmount = addMoney(invoice.paidAmount, amount);
-        await tx.invoice.update({ where: { id: invoiceId }, data: { paidAmount, status: getInvoiceStatus(paidAmount, Number(invoice.netAmount)) } });
+        const appliedPaid = addMoney(balancePaidAmount(invoice.payments, invoice.paidAmount), amount);
+        await tx.invoice.update({ where: { id: invoiceId }, data: { paidAmount, status: getInvoiceStatus(appliedPaid, Number(invoice.netAmount)) } });
       }
       return payment;
     });
@@ -69,7 +71,8 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       }
       const all = await tx.payment.findMany({ where: { invoiceId: meta.invoiceId } });
       const paidAmount = addMoney(...all.map((p: any) => p.amount));
-      const updated = await tx.invoice.update({ where: { id: meta.invoiceId }, data: { paidAmount, status: getInvoiceStatus(paidAmount, Number(invoice.netAmount)) }, include: { customer: true, user: { select: PUBLIC_USER_SELECT }, items: true } });
+      const appliedPaid = balancePaidAmount(all, paidAmount);
+      const updated = await tx.invoice.update({ where: { id: meta.invoiceId }, data: { paidAmount, status: getInvoiceStatus(appliedPaid, Number(invoice.netAmount)) }, include: { customer: true, user: { select: PUBLIC_USER_SELECT }, items: true } });
       return { success: true, invoice: updated };
     });
     res.json(result);

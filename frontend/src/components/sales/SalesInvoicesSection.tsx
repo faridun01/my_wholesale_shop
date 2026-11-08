@@ -22,7 +22,8 @@ import PaginationControls from '../common/PaginationControls';
 import { formatCount, formatMoney, toFixedNumber } from '../../utils/format';
 import {
   getEffectiveStatus,
-  getInvoiceAppliedPaidAmount,
+  getInvoiceGrossPaidAmount,
+  getInvoiceMoneyRefundedAmount,
   getInvoiceBalance,
   getInvoiceNetAmount,
   getInvoiceReturnedAmount,
@@ -883,7 +884,8 @@ const SalesInvoicesSection = ({
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Оплачено</p>
-                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceAppliedPaidAmount(inv))}</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(inv))}</p>
+                  {getInvoiceMoneyRefundedAmount(inv) > 0 && <p className="text-[9px] text-slate-500">Возвращено денег: {formatMoney(getInvoiceMoneyRefundedAmount(inv))}</p>}
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Остаток</p>
@@ -1150,8 +1152,9 @@ const SalesInvoicesSection = ({
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right pr-4 font-mono text-xs font-bold tabular-nums text-emerald-600">
-                    {formatMoney(getInvoiceAppliedPaidAmount(inv))}
+                  <td className="px-4 py-3 text-right pr-4">
+                    <span className="font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(inv))}</span>
+                    {getInvoiceMoneyRefundedAmount(inv) > 0 && <span className="block text-[9px] text-slate-500">Возврат денег: {formatMoney(getInvoiceMoneyRefundedAmount(inv))}</span>}
                   </td>
                   <td className="px-4 py-3 text-right pr-4 font-mono text-xs font-bold tabular-nums">
                     <span className={getInvoiceBalance(inv) > 0.005 ? 'text-rose-600' : 'text-slate-400'}>

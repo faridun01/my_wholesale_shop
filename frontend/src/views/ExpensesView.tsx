@@ -5,7 +5,7 @@ import { addExpensePayment, addExpenseRefund, cancelExpensePayment, createExpens
 import { getWarehouses } from '../api/warehouses.api';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
-import { formatMoney, roundMoney } from '../utils/format';
+import { formatMoney, parseMoneyInput, roundMoney } from '../utils/format';
 import { filterWarehousesForUser, getCurrentUser, getUserWarehouseId, isAdminUser } from '../utils/userAccess';
 import { getDefaultWarehouseId } from '../utils/warehouse';
 
@@ -205,6 +205,8 @@ export default function ExpensesView() {
 
   const handleCreateExpense = async (event: React.FormEvent) => {
     event.preventDefault();
+    const expenseAmount = parseMoneyInput(form.amount);
+    const paidAmount = parseMoneyInput(form.paidAmount);
 
     const warehouseId = isAdmin ? Number(selectedWarehouseId) : userWarehouseId;
     if (!warehouseId) {
@@ -217,17 +219,22 @@ export default function ExpensesView() {
       return;
     }
 
-    if (!(Number(form.amount) > 0)) {
+    if (expenseAmount === null || expenseAmount <= 0) {
       toast.error('Сумма расхода должна быть больше нуля');
       return;
     }
 
-    if (Number(form.paidAmount || 0) < 0) {
+    if (form.paidAmount.trim() && paidAmount === null) {
+      toast.error('Введите корректную сумму оплаты');
+      return;
+    }
+
+    if ((paidAmount ?? 0) < 0) {
       toast.error('Оплата не может быть отрицательной');
       return;
     }
 
-    if (Number(form.paidAmount || 0) > Number(form.amount)) {
+    if ((paidAmount ?? 0) > expenseAmount) {
       toast.error('Оплата не может быть больше суммы расхода');
       return;
     }
@@ -238,8 +245,8 @@ export default function ExpensesView() {
         warehouseId,
         title: form.title.trim(),
         category: form.category,
-        amount: Number(form.amount),
-        paidAmount: Number(form.paidAmount || 0),
+        amount: expenseAmount,
+        paidAmount: paidAmount ?? 0,
         paymentDate: form.paymentDate || todayValue,
         expenseDate: form.expenseDate,
         note: form.note.trim(),
@@ -290,9 +297,9 @@ export default function ExpensesView() {
     }
 
     const remaining = getExpenseRemaining(selectedExpenseForPayment);
-    const amount = Number(String(paymentAmount).replace(',', '.'));
+    const amount = parseMoneyInput(paymentAmount);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (amount === null || amount <= 0) {
       toast.error('Введите корректную сумму оплаты');
       return;
     }
@@ -328,9 +335,9 @@ export default function ExpensesView() {
     }
 
     const refundLimit = getExpenseRefundLimit(selectedExpenseForRefund);
-    const amount = Number(String(refundAmount).replace(',', '.'));
+    const amount = parseMoneyInput(refundAmount);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (amount === null || amount <= 0) {
       toast.error('Введите корректную сумму возврата');
       return;
     }
@@ -404,6 +411,8 @@ export default function ExpensesView() {
 
   const handleUpdateExpense = async (event: React.FormEvent) => {
     event.preventDefault();
+    const expenseAmount = parseMoneyInput(editForm.amount);
+    const paidAmount = parseMoneyInput(editForm.paidAmount);
 
     if (!selectedExpenseForEdit) {
       return;
@@ -420,17 +429,22 @@ export default function ExpensesView() {
       return;
     }
 
-    if (!(Number(editForm.amount) > 0)) {
+    if (expenseAmount === null || expenseAmount <= 0) {
       toast.error('Сумма расхода должна быть больше нуля');
       return;
     }
 
-    if (Number(editForm.paidAmount || 0) < 0) {
+    if (editForm.paidAmount.trim() && paidAmount === null) {
+      toast.error('Введите корректную сумму оплаты');
+      return;
+    }
+
+    if ((paidAmount ?? 0) < 0) {
       toast.error('Оплата не может быть отрицательной');
       return;
     }
 
-    if (Number(editForm.paidAmount || 0) > Number(editForm.amount)) {
+    if ((paidAmount ?? 0) > expenseAmount) {
       toast.error('Оплата не может быть больше суммы расхода');
       return;
     }
@@ -441,8 +455,8 @@ export default function ExpensesView() {
         warehouseId,
         title: editForm.title.trim(),
         category: editForm.category,
-        amount: Number(editForm.amount),
-        paidAmount: Number(editForm.paidAmount || 0),
+        amount: expenseAmount,
+        paidAmount: paidAmount ?? 0,
         expenseDate: editForm.expenseDate,
         note: editForm.note.trim(),
       });
@@ -1025,9 +1039,8 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Сумма расхода</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={form.amount}
                       onChange={(event) => setForm({ ...form, amount: event.target.value })}
                       placeholder="0.00"
@@ -1037,9 +1050,8 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Оплачено сейчас</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={form.paidAmount}
                       onChange={(event) => setForm({ ...form, paidAmount: event.target.value })}
                       placeholder="0.00"
@@ -1048,7 +1060,7 @@ export default function ExpensesView() {
                   </div>
                 </div>
 
-                {Number(form.paidAmount || 0) > 0 && (
+                {(parseMoneyInput(form.paidAmount) ?? 0) > 0 && (
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Дата оплаты</label>
                     <div className="flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-3 py-2">
@@ -1069,7 +1081,7 @@ export default function ExpensesView() {
                 <div className="rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
                   <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
                   <p className="mt-0.5 text-base font-semibold text-slate-900">
-                    {formatMoney(Math.max(0, Number(form.amount || 0) - Number(form.paidAmount || 0)))}
+                    {formatMoney(Math.max(0, (parseMoneyInput(form.amount) ?? 0) - (parseMoneyInput(form.paidAmount) ?? 0)))}
                   </p>
                 </div>
 
@@ -1151,9 +1163,8 @@ export default function ExpensesView() {
                 <div>
                   <label className="text-[11px] font-medium text-slate-700">Сумма оплаты</label>
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={paymentAmount}
                     onChange={(event) => setPaymentAmount(event.target.value)}
                     autoFocus
@@ -1294,9 +1305,8 @@ export default function ExpensesView() {
                 <div>
                   <label className="text-[11px] font-medium text-slate-700">Сумма возврата</label>
                   <input
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={refundAmount}
                     onChange={(event) => setRefundAmount(event.target.value)}
                     autoFocus
@@ -1449,9 +1459,8 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Сумма расхода</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={editForm.amount}
                       onChange={(event) => setEditForm({ ...editForm, amount: event.target.value })}
                       className="w-full rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2 text-xs font-semibold text-slate-900 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -1461,9 +1470,8 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Оплачено</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={editForm.paidAmount}
                       readOnly
                       className="w-full rounded-xl border border-slate-200/70 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 outline-none"
@@ -1474,7 +1482,7 @@ export default function ExpensesView() {
                 <div className="rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
                   <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
                   <p className="mt-0.5 text-base font-semibold text-slate-900">
-                    {formatMoney(Math.max(0, Number(editForm.amount || 0) - Number(editForm.paidAmount || 0)))}
+                    {formatMoney(Math.max(0, (parseMoneyInput(editForm.amount) ?? 0) - (parseMoneyInput(editForm.paidAmount) ?? 0)))}
                   </p>
                 </div>
 

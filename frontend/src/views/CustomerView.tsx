@@ -39,13 +39,13 @@ import { getCurrentUser, isAdminUser } from '../utils/userAccess';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   CUSTOMER_PAYMENT_EPSILON,
-  getInvoiceAppliedPaidAmount,
   getInvoiceChangeAmount,
   getInvoiceDiscountAmount,
   getInvoiceItemQuantityParts,
   getInvoiceNetAmount,
   getInvoiceSubtotal,
 } from '../components/customers/customerInvoiceCalculations';
+import { getInvoiceGrossPaidAmount } from '../utils/salesViewUtils';
 import { segmentTone, useCustomerList } from '../components/customers/useCustomerList';
 import type { Customer, StatementInvoice } from '../types/customer';
 
@@ -327,15 +327,21 @@ export default function CustomerView() {
               id: p.id,
               amount: p.amount,
               method: p.method,
+              returnId: p.returnId,
+              reversalOfId: p.reversalOfId,
               createdAt: p.createdAt,
               staff_name: p.user?.username || '—',
             })),
             returnEvents: (res.data.returns || []).map((r: any) => ({
               id: r.id,
               totalValue: r.totalValue,
+              refundedAmount: r.refundedAmount,
+              debtReduction: r.debtReduction,
+              creditAmount: r.creditAmount,
               reason: r.reason,
               createdAt: r.createdAt,
               staff_name: r.user?.username || '—',
+              items: r.items || [],
             })),
           };
         });
@@ -364,7 +370,7 @@ export default function CustomerView() {
         subtotal: getInvoiceSubtotal(fullInvoice),
         discountAmount: getInvoiceDiscountAmount(fullInvoice),
         netAmount: getInvoiceNetAmount(fullInvoice),
-        appliedPaidAmount: getInvoiceAppliedPaidAmount(fullInvoice),
+        appliedPaidAmount: getInvoiceGrossPaidAmount(fullInvoice),
         changeAmount: getInvoiceChangeAmount(fullInvoice),
         balanceAmount: fullInvoice.invoiceBalance || 0,
       });
@@ -390,7 +396,7 @@ export default function CustomerView() {
       subtotal: getInvoiceSubtotal(invoice),
       discountAmount: getInvoiceDiscountAmount(invoice),
       netAmount: getInvoiceNetAmount(invoice),
-      appliedPaidAmount: getInvoiceAppliedPaidAmount(invoice),
+      appliedPaidAmount: getInvoiceGrossPaidAmount(invoice),
       changeAmount: getInvoiceChangeAmount(invoice),
     });
 
@@ -1515,7 +1521,7 @@ export default function CustomerView() {
                           <span>Оплачено</span>
                         </span>
                         <span className="font-mono font-bold text-emerald-600 text-sm">
-                          {formatMoneyByRole(getInvoiceAppliedPaidAmount(selectedInvoice))}
+                          {formatMoneyByRole(getInvoiceGrossPaidAmount(selectedInvoice))}
                         </span>
                       </div>
 
@@ -1623,8 +1629,12 @@ export default function CustomerView() {
                                 <td className="px-4 py-2.5 text-slate-500 font-mono text-[11px]">
                                   {new Date(itemReturn.createdAt).toLocaleString('ru-RU')}
                                 </td>
-                                <td className="px-4 py-2.5 font-mono font-bold text-rose-600 text-xs">
-                                  -{formatMoneyByRole(itemReturn.totalValue)}
+                                <td className="px-4 py-2.5 font-mono text-xs">
+                                  <div className="font-bold text-rose-600">-{formatMoneyByRole(itemReturn.totalValue)}</div>
+                                  {itemReturn.refundedAmount != null && <div className="mt-1 text-[10px] text-slate-500">Деньгами возвращено: {formatMoneyByRole(itemReturn.refundedAmount)}</div>}
+                                  {itemReturn.debtReduction != null && <div className="text-[10px] text-slate-500">Долг уменьшен: {formatMoneyByRole(itemReturn.debtReduction)}</div>}
+                                  {Number(itemReturn.creditAmount || 0) > 0 && <div className="text-[10px] text-amber-700">Кредит: {formatMoneyByRole(itemReturn.creditAmount)}</div>}
+                                  {itemReturn.items?.length > 0 && <div className="mt-1 max-w-64 whitespace-normal text-[10px] text-slate-600">{itemReturn.items.map((line: any) => `${line.productName || line.invoiceItem?.productNameSnapshot || 'Товар'} × ${line.quantity}`).join(', ')}</div>}
                                 </td>
                                 <td className="px-4 py-2.5 text-slate-700 font-medium">{formatTransactionReason(itemReturn.reason)}</td>
                                 <td className="px-4 py-2.5 text-right text-slate-500">{itemReturn.staff_name}</td>

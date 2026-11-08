@@ -184,14 +184,27 @@ const renderReturnsBlock = (invoice: any) =>
           <tbody>
             ${invoice.returnEvents
               .map(
-                (itemReturn: any) => `
+                (itemReturn: any) => {
+                  const returnedItems = Array.isArray(itemReturn.items)
+                    ? itemReturn.items
+                        .map((line: any) => escapeHtml(`${line.productName || 'Товар'} × ${line.quantity} — ${formatMoney(line.totalValue)}`))
+                        .join('<br>')
+                    : '';
+                  const settlement = [
+                    itemReturn.refundedAmount != null ? `Деньгами возвращено: ${formatMoney(itemReturn.refundedAmount)}` : '',
+                    itemReturn.debtReduction != null ? `Уменьшение долга: ${formatMoney(itemReturn.debtReduction)}` : '',
+                    Number(itemReturn.creditAmount || 0) > 0 ? `Кредит клиента: ${formatMoney(itemReturn.creditAmount)}` : '',
+                  ].filter(Boolean).map(escapeHtml).join('<br>');
+                  return `
                   <tr>
                     <td>${escapeHtml(formatRuDate(itemReturn.createdAt, true))}</td>
-                    <td>-${escapeHtml(formatMoney(itemReturn.totalValue))}</td>
+                    <td>-${escapeHtml(formatMoney(itemReturn.totalValue))}${settlement ? `<br><span style="font-size: 10px;">${settlement}</span>` : ''}</td>
+                    <td>${returnedItems || 'Детали недоступны'}</td>
                     <td>${escapeHtml(formatTransactionReason(itemReturn.reason))}</td>
                     <td>${escapeHtml(itemReturn.staff_name)}</td>
                   </tr>
-                `,
+                `;
+                },
               )
               .join('')}
           </tbody>
@@ -407,6 +420,11 @@ export const getInvoiceStatementEntries = (invoice: any) => {
 
   if (Array.isArray(invoice?.paymentEvents)) {
     invoice.paymentEvents.forEach((payment: any) => {
+      const isReturnAdjustment =
+        Number(payment?.amount || 0) < 0 &&
+        !payment?.reversalOfId &&
+        (payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund');
+      if (isReturnAdjustment) return;
       entries.push({
         date: payment?.createdAt || invoiceDate,
         document: `Оплата по ${invoiceNumber}`,
@@ -495,6 +513,30 @@ const renderReconciliationOverviewSection = (customers: CustomerReconciliationBa
   `;
 };
 
+const getInvoiceGrossPaid = (invoice: any) => {
+  const stored = Number(invoice?.grossPaidAmount);
+  if (Number.isFinite(stored) && stored >= 0) return stored;
+  if (Array.isArray(invoice?.paymentEvents)) {
+    return invoice.paymentEvents.reduce((sum: number, payment: any) => addMoney(sum, Math.max(0, Number(payment?.amount || 0))), 0);
+  }
+  return Math.max(0, Number(invoice?.paidAmount || 0));
+};
+
+const getInvoiceBalancePaid = (invoice: any) => {
+  const stored = Number(invoice?.balancePaidAmount);
+  if (Number.isFinite(stored) && stored >= 0) return stored;
+  if (Array.isArray(invoice?.paymentEvents)) {
+    return invoice.paymentEvents.reduce((sum: number, payment: any) => {
+      const isReturnAdjustment =
+        Number(payment?.amount || 0) < 0 &&
+        !payment?.reversalOfId &&
+        (payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund');
+      return isReturnAdjustment ? sum : addMoney(sum, payment?.amount || 0);
+    }, 0);
+  }
+  return Math.max(0, Number(invoice?.paidAmount || 0));
+};
+
 const renderCustomerReconciliationSection = (
   customer: CustomerReconciliationBatchCustomer,
 ) => {
@@ -502,15 +544,12 @@ const renderCustomerReconciliationSection = (
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
     .map((invoice: any, entryIndex: number) => {
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
-      const paidByEvents = Array.isArray(invoice?.paymentEvents)
-        ? invoice.paymentEvents.reduce((sum: number, payment: any) => addMoney(sum, payment?.amount ?? 0), 0)
-        : 0;
-      const paidAmount = Math.max(0, Number(invoice?.paidAmount ?? paidByEvents));
+      const paidAmount = getInvoiceGrossPaid(invoice);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
         : 0;
       const returnedAmount = Math.max(0, Math.max(Number(invoice?.returnedAmount || 0), returnedByEvents));
-      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - paidAmount));
+      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - getInvoiceBalancePaid(invoice)));
 
       return `
         <tr>
@@ -530,15 +569,12 @@ const renderCustomerReconciliationSection = (
   const invoiceTotals = customer.invoices.reduce(
     (acc, invoice: any) => {
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
-      const paidByEvents = Array.isArray(invoice?.paymentEvents)
-        ? invoice.paymentEvents.reduce((sum: number, payment: any) => addMoney(sum, payment?.amount ?? 0), 0)
-        : 0;
-      const paidAmount = Math.max(0, Number(invoice?.paidAmount ?? paidByEvents));
+      const paidAmount = getInvoiceGrossPaid(invoice);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
         : 0;
       const returnedAmount = Math.max(0, Math.max(Number(invoice?.returnedAmount || 0), returnedByEvents));
-      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - paidAmount));
+      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - getInvoiceBalancePaid(invoice)));
       acc.total += invoiceTotal;
       acc.paid += paidAmount;
       acc.returned += returnedAmount;

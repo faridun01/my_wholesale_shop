@@ -1,5 +1,5 @@
 import prisma from '../db/prisma.js';
-import { addMoney, assertNoTax, cumulativeValue, discountedUnit, discountAmount, fromCents, invoiceLines, lineTotal, percent, quantity as wholeQuantity, refundByMethod, refundSplit, saleTotals, toCents } from '../utils/financial.js';
+import { addMoney, assertNoTax, balancePaidAmount, cumulativeValue, discountedUnit, discountAmount, fromCents, goodsReturnPaymentAdjustments, invoiceLines, isGoodsReturnPaymentAdjustment, lineTotal, percent, quantity as wholeQuantity, refundSplit, saleTotals, toCents } from '../utils/financial.js';
 import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
@@ -857,6 +857,8 @@ export class InvoiceService {
       ...itemReturn,
       staff_name: itemReturn.user?.username || '—'
     }));
+    const grossPaidAmount = addMoney(...normalizedPayments.filter((payment: any) => Number(payment.amount) > 0).map((payment: any) => payment.amount));
+    const moneyRefundedAmount = -addMoney(...normalizedPayments.filter((payment: any) => Number(payment.amount) < 0 && !payment.reversalOfId && !isGoodsReturnPaymentAdjustment(payment)).map((payment: any) => payment.amount));
 
     return {
       ...invoice,
@@ -873,9 +875,13 @@ export class InvoiceService {
       company_phone: companyProfile?.phone || null,
       company_note: companyProfile?.note || null,
       staff_name: invoice.user?.username || '—',
+      grossPaidAmount,
+      moneyRefundedAmount,
+      returnPaymentAdjustments: goodsReturnPaymentAdjustments(normalizedPayments),
       items: normalizedItems,
       originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
-      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, tax: addMoney(...financialLines.map((l: any) => l.remainingTax)), debtAmount: Math.max(0, addMoney(invoice.netAmount, -Number(invoice.paidAmount))) },
+      balancePaidAmount: balancePaidAmount(normalizedPayments, invoice.paidAmount),
+      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, tax: addMoney(...financialLines.map((l: any) => l.remainingTax)), debtAmount: Math.max(0, addMoney(invoice.netAmount, -balancePaidAmount(normalizedPayments, invoice.paidAmount))), customerCredit: addMoney(...normalizedReturns.map((itemReturn: any) => itemReturn.creditAmount || 0)) },
       payments: normalizedPayments,
       returns: normalizedReturns
     };
@@ -897,7 +903,7 @@ export class InvoiceService {
     return prisma.$transaction(async (tx: any) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
       const existing = await tx.return.findUnique({ where: { idempotencyKey: key } });
-      const response = (r: any) => ({ success: true, returnId: r.id, refundAmount: Number(r.totalValue), cashRefundAmount: Number(r.refundedAmount), refundedAmount: Number(r.refundedAmount), debtReduction: Number(r.debtReduction), refundMethod: r.refundMethod });
+      const response = (r: any) => ({ success: true, returnId: r.id, refundAmount: Number(r.totalValue), cashRefundAmount: Number(r.refundedAmount), refundedAmount: Number(r.refundedAmount), debtReduction: Number(r.debtReduction), creditAmount: Number(r.creditAmount || 0), refundMethod: r.refundMethod });
       if (existing) { assertReplay(existing, hash); return response(existing); }
       const locked = await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`;
       if (!locked[0]) throw new Error('Invoice not found');
@@ -929,14 +935,13 @@ export class InvoiceService {
         return { item, quantity: requested.quantity, value, taxValue: 0, allocatedDiscount };
       });
       const totalValue = addMoney(...details.map(d => d.value));
-      const split = refundSplit(invoice.netAmount, invoice.paidAmount, totalValue);
       const paymentHistory = invoice.payments || [];
       if (toCents(addMoney(...paymentHistory.map((p: any) => p.amount))) !== toCents(invoice.paidAmount)) throw new Error('Payment history requires reconciliation');
-      const refundPayments = split.refundedAmount > 0 ? refundByMethod(paymentHistory, split.refundedAmount) : [];
-      const method = refundPayments.length > 1 ? 'mixed' : refundPayments[0]?.method || null;
+      const appliedPaid = balancePaidAmount(paymentHistory, invoice.paidAmount);
+      const split = refundSplit(invoice.netAmount, appliedPaid, totalValue);
       const returned = await tx.return.create({ data: {
         invoiceId, customerId: invoice.customerId, userId: data.userId, reason: data.reason || null,
-        totalValue, refundedAmount: split.refundedAmount, debtReduction: split.debtReduction, refundMethod: method, idempotencyKey: key, requestHash: hash,
+        totalValue, refundedAmount: split.refundedAmount, debtReduction: split.debtReduction, creditAmount: split.creditAmount, refundMethod: null, idempotencyKey: key, requestHash: hash,
         items: { create: details.map(d => ({ invoiceItemId: d.item.id, quantity: d.quantity, sellingPrice: d.item.sellingPrice, itemDiscount: d.item.discount || 0, allocatedOrderDiscount: d.allocatedDiscount, totalValue: d.value, taxAmount: d.taxValue })) },
       } });
       for (const d of details) {
@@ -945,8 +950,7 @@ export class InvoiceService {
         await tx.inventoryTransaction.create({ data: { productId: d.item.productId, warehouseId: invoice.warehouseId, userId: data.userId, qtyChange: d.quantity, type: 'return', referenceId: invoiceId, reason: `Return #${returned.id}: ${data.reason || ''}`, costAtTime: d.item.costPrice || 0, sellingAtTime: d.item.sellingPrice } });
       }
       for (const productId of new Set(details.map(d => Number(d.item.productId)))) await StockService.updateProductStockCache(productId, tx);
-      for (const refund of refundPayments) await tx.payment.create({ data: { invoiceId, customerId: invoice.customerId, userId: data.userId, amount: -refund.amount, method: refund.method, returnId: returned.id, idempotencyKey: `return:${returned.id}:${refund.method}` } });
-      await tx.invoice.update({ where: { id: invoiceId }, data: { returnedAmount: addMoney(invoice.returnedAmount, totalValue), netAmount: split.netAmount, paidAmount: split.paidAmount, status: getInvoiceStatus(split.paidAmount, split.netAmount) } });
+      await tx.invoice.update({ where: { id: invoiceId }, data: { returnedAmount: addMoney(invoice.returnedAmount, totalValue), netAmount: split.netAmount, status: getInvoiceStatus(split.paidAmount, split.netAmount) } });
       return response(returned);
     }, TRANSACTION_OPTIONS);
   }

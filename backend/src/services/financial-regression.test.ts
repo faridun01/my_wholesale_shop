@@ -82,13 +82,44 @@ describe('audit regressions: transactions', () => {
     await ret(1);
     expect(invoice.returnedAmount).toBe(100);
     expect(invoice.netAmount).toBe(10);
-    expect(invoice.paidAmount).toBe(10);
+    expect(invoice.paidAmount).toBe(110);
     expect(returns[0].items[0].totalValue).toBe(100);
     expect(returns[0].items[0].taxAmount).toBe(0);
+    expect(returns[0].creditAmount).toBe(100);
+    expect(payments).toEqual([{ id: 1, amount: 110, method: 'card' }]);
   });
   it('rejects fractional returns', async () => { await expect(ret(.4)).rejects.toThrow(); });
-  it('records even one-cent monetary refunds', async () => {
-    reset(1, .01, 0, .01); await ret(1); expect(payments).toHaveLength(2); expect(Number(payments[1].amount)).toBe(-.01);
+  it('does not record a one-cent goods return as a cash refund', async () => {
+    reset(1, .01, 0, .01);
+    await ret(1);
+    expect(payments).toHaveLength(1);
+    expect(returns[0]).toMatchObject({ totalValue: .01, refundedAmount: 0, debtReduction: 0, creditAmount: .01 });
+  });
+  it('reduces the invoice and debt without reducing the original payment', async () => {
+    reset(5, 20, 0, 70);
+    payments = [{ id: 1, amount: 70, method: 'cash' }];
+
+    const result = await ret(1);
+
+    expect(result).toMatchObject({ refundAmount: 20, cashRefundAmount: 0, debtReduction: 20, creditAmount: 0 });
+    expect(invoice.netAmount).toBe(80);
+    expect(invoice.paidAmount).toBe(70);
+    expect(payments).toHaveLength(1);
+    expect(payments[0]).toMatchObject({ id: 1, amount: 70 });
+    expect(payments.reduce((sum, payment) => sum + payment.amount, 0)).toBe(70);
+  });
+  it('records return value above the remaining debt as customer credit', async () => {
+    reset(2, 50, 0, 90);
+    payments = [{ id: 1, amount: 90, method: 'card' }];
+
+    const result = await ret(1);
+
+    expect(result).toMatchObject({ refundAmount: 50, cashRefundAmount: 0, debtReduction: 10, creditAmount: 40 });
+    expect(invoice.netAmount).toBe(50);
+    expect(invoice.paidAmount).toBe(90);
+    expect(payments).toHaveLength(1);
+    expect(payments[0]).toMatchObject({ id: 1, amount: 90 });
+    expect(payments.reduce((sum, payment) => sum + payment.amount, 0)).toBe(invoice.paidAmount);
   });
   it('retries return operations without applying them twice', async () => {
     reset(3, 100, 0); const first = await ret(1, 'same-key'); const second = await ret(1, 'same-key');
@@ -123,6 +154,14 @@ describe('audit regressions: transactions', () => {
   });
 });
 describe('audit regressions: reports and documents', () => {
+  it('parses localized money input and rejects invalid values', async () => {
+    const { parseMoneyInput } = await import(/* @vite-ignore */ new URL('../../../frontend/src/utils/format.ts', import.meta.url).href);
+    expect(parseMoneyInput('1250,50')).toBe(1250.5);
+    expect(parseMoneyInput('1 250,50')).toBe(1250.5);
+    expect(parseMoneyInput('1.250,50')).toBe(1250.5);
+    expect(parseMoneyInput('')).toBeNull();
+    expect(parseMoneyInput('12,3,4')).toBeNull();
+  });
   it('preserves genuinely zero cost in remaining FIFO allocations', () => {
     expect(getLineCost({ quantity: 2, returnedQty: 1, costPrice: 5, saleAllocations: [{ quantity: 1, batch: { costPrice: 0 } }] })).toBe(0);
   });
@@ -136,7 +175,7 @@ describe('audit regressions: reports and documents', () => {
     (prisma as any).return = { findMany: async () => [{ id: 10, invoiceId: 1, createdAt: new Date(), totalValue: 90, refundedAmount: 50, debtReduction: 40, items: [{ id: 1, quantity: 1, sellingPrice: 100, totalValue: 90, invoiceItem: { productNameSnapshot: 'A' } }], invoice: { warehouse: { name: 'Main' } } }] };
     const route = (reportRouter as any).stack.find((l: any) => l.route?.path === '/returns').route;
     let out: any; await route.stack.at(-1).handle({ query: {}, user: { id: 1, role: 'ADMIN' } }, { json: (value: any) => { out = value; } }, (e: any) => { throw e; });
-    expect(out[0].total_value).toBe(90); expect(out[0].return_id).toBe(10);
+    expect(out[0]).toMatchObject({ total_value: 90, return_id: 10, product_name: 'A', quantity: 1, refunded_amount: 50, debt_reduction: 40 });
   });
   it('reports zero revenue for zero-net invoices', () => { const item = { quantity: 1, sellingPrice: 100, totalPrice: 100 }; expect(getLineNetRevenue({ netAmount: 0, discount: 100, items: [item] }, item)).toBe(0); });
   it('attributes revenue to item-specific discounted values', () => {

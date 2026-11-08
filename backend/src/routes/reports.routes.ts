@@ -1,5 +1,5 @@
 import { reconcileInvoices } from '../services/financial-reconciliation.js';
-import { addMoney, allocateCents, fromCents, toCents } from '../utils/financial.js';
+import { addMoney, allocateCents, balancePaidAmount, fromCents, toCents } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
@@ -51,6 +51,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           discount: true,
           tax: true,
           paidAmount: true,
+          payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
           warehouseId: true,
           createdAt: true,
           customer: {
@@ -192,7 +193,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       }
 
       const netAmount = Number(inv.netAmount);
-      const paidAmount = Number(inv.paidAmount);
+      const paidAmount = balancePaidAmount(inv.payments || [], inv.paidAmount);
 
       totalRevenue = addMoney(totalRevenue, netAmount);
       const invoiceDebt = Math.max(0, netAmount - paidAmount);
@@ -505,9 +506,12 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
     });
     const report = returns.flatMap((r: any) => {
       const base = { return_id: r.id, invoice_id: r.invoiceId, date: r.createdAt.toISOString().split('T')[0], warehouse_name: r.invoice?.warehouse?.name || '', staff_name: r.user?.username || '', reason: r.reason };
-      if (!r.items.length) return [{ ...base, product_name: 'Historical return (item details unavailable)', unit: '', quantity: null, selling_price: null, total_value: Number(r.totalValue), refunded_amount: r.refundedAmount == null ? null : Number(r.refundedAmount), debt_reduction: r.debtReduction == null ? null : Number(r.debtReduction), legacy: true }];
-      const refundParts = allocateCents(toCents(r.refundedAmount || 0), r.items.map((i: any) => toCents(i.totalValue)));
-      return r.items.map((i: any, index: number) => ({ ...base, product_name: i.invoiceItem.productNameSnapshot || `Invoice item #${i.invoiceItemId}`, unit: i.invoiceItem.baseUnitNameSnapshot || '', quantity: i.quantity, selling_price: Number(i.sellingPrice), total_value: Number(i.totalValue), tax_amount: Number(i.taxAmount || 0), refunded_amount: fromCents(refundParts[index]), debt_reduction: addMoney(i.totalValue, -fromCents(refundParts[index])), legacy: false }));
+      if (!r.items.length) return [{ ...base, product_name: 'Historical return (item details unavailable)', unit: '', quantity: null, selling_price: null, total_value: Number(r.totalValue), refunded_amount: r.refundedAmount == null ? null : Number(r.refundedAmount), debt_reduction: r.debtReduction == null ? null : Number(r.debtReduction), credit_amount: r.creditAmount == null ? null : Number(r.creditAmount), legacy: true }];
+      const weights = r.items.map((i: any) => toCents(i.totalValue));
+      const refundParts = r.refundedAmount == null ? null : allocateCents(toCents(r.refundedAmount), weights);
+      const debtParts = r.debtReduction == null ? null : allocateCents(toCents(r.debtReduction), weights);
+      const creditParts = r.creditAmount == null ? null : allocateCents(toCents(r.creditAmount), weights);
+      return r.items.map((i: any, index: number) => ({ ...base, product_name: i.invoiceItem.productNameSnapshot || `Invoice item #${i.invoiceItemId}`, unit: i.invoiceItem.baseUnitNameSnapshot || '', quantity: i.quantity, selling_price: Number(i.sellingPrice), total_value: Number(i.totalValue), tax_amount: Number(i.taxAmount || 0), refunded_amount: refundParts ? fromCents(refundParts[index]) : null, debt_reduction: debtParts ? fromCents(debtParts[index]) : null, credit_amount: creditParts ? fromCents(creditParts[index]) : null, legacy: false }));
     });
 
     res.json(report);

@@ -23,6 +23,34 @@ describe('financial documents and previews', () => {
     expect(prepared.subtotalBeforeDiscount - prepared.totalDiscountAmount + prepared.taxAmount).toBe(90);
     expect(prepared.items[0].price).toBe(100);
   });
+  it('keeps gross customer payments visible while calculating debt from applied payments', async () => {
+    const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');
+    const prepared = prepareSalesInvoiceData({
+      netAmount: 37361.88,
+      paidAmount: 33310.68,
+      grossPaidAmount: 36000,
+      balancePaidAmount: 36000,
+      returnPaymentAdjustments: 2689.32,
+      items: [{ quantity: 1, sellingPrice: 41720, totalPrice: 41720 }],
+    });
+
+    expect(prepared).toMatchObject({ paidAmount: 36000, balanceDue: 1361.88, returnPaymentAdjustments: 2689.32 });
+    expect(buildSalesInvoiceHtml(prepared)).toContain('Внесено всего');
+  });
+  it('shows return settlement separately from cash payments on the return receipt', async () => {
+    const { returnReceiptInvoice } = await frontend('utils/print/returnReceipt.ts');
+    const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');
+    const prepared = prepareSalesInvoiceData(returnReceiptInvoice({ id: 1 }, {
+      id: 10, totalValue: 90, refundedAmount: 0, debtReduction: 60, creditAmount: 30,
+      items: [{ id: 1, quantity: 1, sellingPrice: 90, totalValue: 90, taxAmount: 0 }],
+    }));
+    const html = buildSalesInvoiceHtml(prepared);
+
+    expect(prepared).toMatchObject({ isReturnDocument: true, paidAmount: 0, returnCashRefundAmount: 0, returnDebtReduction: 60, returnCreditAmount: 30 });
+    expect(html).toContain('Уменьшение долга');
+    expect(html).toContain('Кредит клиента');
+    expect(html).not.toContain('Внесено всего');
+  });
   it('generates actual PDFs whose totals tables preserve zero and tax values', async () => {
     const font = readFileSync(new URL('../../../frontend/public/fonts/arial.ttf', import.meta.url));
     vi.stubGlobal('fetch', vi.fn(async () => new Response(font)));

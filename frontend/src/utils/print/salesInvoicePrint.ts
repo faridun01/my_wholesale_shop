@@ -63,6 +63,17 @@ export interface PreparedSalesInvoiceData {
   taxAmountFormatted: string;
   paidAmount: number;
   paidAmountFormatted: string;
+  moneyRefundedAmount: number;
+  moneyRefundedAmountFormatted: string;
+  returnPaymentAdjustments: number;
+  returnPaymentAdjustmentsFormatted: string;
+  isReturnDocument: boolean;
+  returnDebtReduction: number;
+  returnDebtReductionFormatted: string;
+  returnCreditAmount: number;
+  returnCreditAmountFormatted: string;
+  returnCashRefundAmount: number;
+  returnCashRefundAmountFormatted: string;
   balanceDue: number;
   balanceDueFormatted: string;
   finalTotalAmount: number;
@@ -166,8 +177,17 @@ export function prepareSalesInvoiceData(
   const taxAmount = hasStored ? Math.max(0, Number(invoice?.tax ?? 0)) : 0;
   const finalTotalAmount = hasStored ? Math.max(0, Number(stored)) : roundMoneyValue(Math.max(0, itemsNetAmount - roundMoneyValue(itemsNetAmount * Number(invoice?.discount || 0) / 100)));
   const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount + taxAmount - finalTotalAmount));
-  const paidAmount = Math.max(0, Number(invoice?.paidAmount || 0));
-  const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - paidAmount));
+  const isReturnDocument = Boolean(invoice?.isReturnDocument);
+  const paidAmount = isReturnDocument
+    ? 0
+    : Math.max(0, Number(options?.appliedPaidAmount ?? invoice?.grossPaidAmount ?? invoice?.paidAmount ?? 0));
+  const balancePaidAmount = Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0));
+  const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - balancePaidAmount));
+  const moneyRefundedAmount = Math.max(0, Number(invoice?.moneyRefundedAmount || 0));
+  const returnPaymentAdjustments = Math.max(0, Number(invoice?.returnPaymentAdjustments || 0));
+  const returnDebtReduction = Math.max(0, Number(invoice?.returnDebtReduction ?? invoice?.debtReduction ?? 0));
+  const returnCreditAmount = Math.max(0, Number(invoice?.returnCreditAmount ?? invoice?.creditAmount ?? 0));
+  const returnCashRefundAmount = Math.max(0, Number(invoice?.returnCashRefundAmount || 0));
   const totalQuantity = invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item), 0);
 
   const items: PreparedSalesInvoiceItem[] = invoiceItems.map((item: any, index: number) => {
@@ -209,6 +229,17 @@ export function prepareSalesInvoiceData(
     taxAmountFormatted: formatMoneyWithoutCurrency(taxAmount),
     paidAmount,
     paidAmountFormatted: formatMoneyWithoutCurrency(paidAmount),
+    moneyRefundedAmount,
+    moneyRefundedAmountFormatted: formatMoneyWithoutCurrency(moneyRefundedAmount),
+    returnPaymentAdjustments,
+    returnPaymentAdjustmentsFormatted: formatMoneyWithoutCurrency(returnPaymentAdjustments),
+    isReturnDocument,
+    returnDebtReduction,
+    returnDebtReductionFormatted: formatMoneyWithoutCurrency(returnDebtReduction),
+    returnCreditAmount,
+    returnCreditAmountFormatted: formatMoneyWithoutCurrency(returnCreditAmount),
+    returnCashRefundAmount,
+    returnCashRefundAmountFormatted: formatMoneyWithoutCurrency(returnCashRefundAmount),
     balanceDue,
     balanceDueFormatted: formatMoneyWithoutCurrency(balanceDue),
     finalTotalAmount,
@@ -396,13 +427,18 @@ export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
             <tr><td class="label">Скидка</td><td class="right">${escapeHtml(data.totalDiscountAmountFormatted)}</td></tr>
             ${data.taxAmount > 0 ? `<tr><td class="label">Налог</td><td class="right">${escapeHtml(data.taxAmountFormatted)}</td></tr>` : ''}
             ${data.returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(data.returnedAmountFormatted)}</td></tr>` : ''}
-            ${data.paidAmount > 0 ? `<tr><td class="label">Оплачено</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
-            ${data.paidAmount > 0 ? `<tr><td class="label">Остаток</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}
-            <tr class="grand"><td>Итого</td><td class="right">${escapeHtml(data.finalTotalAmountFormatted)}</td></tr>
+            ${!data.isReturnDocument && data.paidAmount > 0 ? `<tr><td class="label">Внесено всего</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
+            ${!data.isReturnDocument && data.balanceDue > 0 ? `<tr><td class="label">Остаток долга</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}
+            ${!data.isReturnDocument && data.moneyRefundedAmount > 0 ? `<tr><td class="label">Денег возвращено</td><td class="right">${escapeHtml(data.moneyRefundedAmountFormatted)}</td></tr>` : ''}
+            ${!data.isReturnDocument && data.returnPaymentAdjustments > 0 ? `<tr><td class="label">Корректировка старых возвратов</td><td class="right">${escapeHtml(data.returnPaymentAdjustmentsFormatted)}</td></tr>` : ''}
+            ${data.isReturnDocument && data.returnCashRefundAmount > 0 ? `<tr><td class="label">Деньгами возвращено</td><td class="right">${escapeHtml(data.returnCashRefundAmountFormatted)}</td></tr>` : ''}
+            ${data.isReturnDocument && data.returnDebtReduction > 0 ? `<tr><td class="label">Уменьшение долга</td><td class="right">${escapeHtml(data.returnDebtReductionFormatted)}</td></tr>` : ''}
+            ${data.isReturnDocument && data.returnCreditAmount > 0 ? `<tr><td class="label">Кредит клиента</td><td class="right">${escapeHtml(data.returnCreditAmountFormatted)}</td></tr>` : ''}
+            <tr class="grand"><td>${data.isReturnDocument ? 'Стоимость возврата' : 'Итого'}</td><td class="right">${escapeHtml(data.finalTotalAmountFormatted)}</td></tr>
           </table>
 
           <div class="summary-text">
-            Всего отпущено ${escapeHtml(data.totalQuantityFormatted)} единиц, на сумму
+            ${data.isReturnDocument ? 'Возвращено' : 'Всего отпущено'} ${escapeHtml(data.totalQuantityFormatted)} единиц, на сумму
             <strong>${escapeHtml(data.finalTotalAmountFormatted)}</strong>.
           </div>
 

@@ -39,7 +39,8 @@ export const isDefaultCustomerName = (value: string | null | undefined) =>
   normalizeCustomerName(value) === normalizeCustomerName(DEFAULT_CUSTOMER_NAME);
 
 /**
- * Total outstanding customer debt (SUM of max(netAmount - paidAmount, 0) per invoice),
+ * Total outstanding customer debt, ignoring legacy payment offsets created by
+ * goods returns; those lower the invoice total, not the money received.
  * excluding cancelled invoices and the technical default customer. This is intentionally
  * NOT date-filtered — outstanding debt doesn't expire when a report's date range does.
  * Shared by Dashboard and Reports so the two pages never show different debt totals.
@@ -48,7 +49,11 @@ export const getTotalOutstandingDebt = async (client: any = prisma, warehouseId?
   const rows: Array<{ totalDebts: unknown }> = await client.$queryRaw(
     typeof warehouseId === 'number'
       ? Prisma.sql`
-          SELECT COALESCE(SUM(GREATEST(i.net_amount - i.paid_amount, 0)), 0) AS "totalDebts"
+          SELECT COALESCE(SUM(GREATEST(i.net_amount - i.paid_amount + COALESCE((
+            SELECT SUM(-p.amount) FROM payments p
+            WHERE p.invoice_id = i.id AND p.amount < 0 AND p.reversal_of_id IS NULL
+              AND (p.return_id IS NOT NULL OR LOWER(p.method) = 'refund')
+          ), 0), 0)), 0) AS "totalDebts"
           FROM invoices i
           INNER JOIN customers c ON c.id = i.customer_id
           WHERE i.cancelled = false
@@ -56,7 +61,11 @@ export const getTotalOutstandingDebt = async (client: any = prisma, warehouseId?
             AND LOWER(c.name) <> LOWER(${DEFAULT_CUSTOMER_NAME})
         `
       : Prisma.sql`
-          SELECT COALESCE(SUM(GREATEST(i.net_amount - i.paid_amount, 0)), 0) AS "totalDebts"
+          SELECT COALESCE(SUM(GREATEST(i.net_amount - i.paid_amount + COALESCE((
+            SELECT SUM(-p.amount) FROM payments p
+            WHERE p.invoice_id = i.id AND p.amount < 0 AND p.reversal_of_id IS NULL
+              AND (p.return_id IS NOT NULL OR LOWER(p.method) = 'refund')
+          ), 0), 0)), 0) AS "totalDebts"
           FROM invoices i
           INNER JOIN customers c ON c.id = i.customer_id
           WHERE i.cancelled = false

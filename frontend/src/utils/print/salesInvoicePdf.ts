@@ -210,20 +210,52 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
     ]);
   }
 
-  if (data.paidAmount > 0) {
+  if (!data.isReturnDocument && data.paidAmount > 0) {
     totalsRows.push([
-      { content: 'Оплачено', styles: { fontStyle: 'bold' } },
+      { content: 'Внесено всего', styles: { fontStyle: 'bold' } },
       { content: data.paidAmountFormatted, styles: { halign: 'right' } },
     ]);
+  }
+  if (!data.isReturnDocument && data.balanceDue > 0) {
     totalsRows.push([
-      { content: 'Остаток', styles: { fontStyle: 'bold' } },
+      { content: 'Остаток долга', styles: { fontStyle: 'bold' } },
       { content: data.balanceDueFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+  if (!data.isReturnDocument && data.moneyRefundedAmount > 0) {
+    totalsRows.push([
+      { content: 'Денег возвращено', styles: { fontStyle: 'bold' } },
+      { content: data.moneyRefundedAmountFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+  if (!data.isReturnDocument && data.returnPaymentAdjustments > 0) {
+    totalsRows.push([
+      { content: 'Корректировка старых возвратов', styles: { fontStyle: 'bold' } },
+      { content: data.returnPaymentAdjustmentsFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+  if (data.isReturnDocument && data.returnCashRefundAmount > 0) {
+    totalsRows.push([
+      { content: 'Деньгами возвращено', styles: { fontStyle: 'bold' } },
+      { content: data.returnCashRefundAmountFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+  if (data.isReturnDocument && data.returnDebtReduction > 0) {
+    totalsRows.push([
+      { content: 'Уменьшение долга', styles: { fontStyle: 'bold' } },
+      { content: data.returnDebtReductionFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+  if (data.isReturnDocument && data.returnCreditAmount > 0) {
+    totalsRows.push([
+      { content: 'Кредит клиента', styles: { fontStyle: 'bold' } },
+      { content: data.returnCreditAmountFormatted, styles: { halign: 'right' } },
     ]);
   }
 
   totalsRows.push([
     {
-      content: 'Итого',
+      content: data.isReturnDocument ? 'Стоимость возврата' : 'Итого',
       styles: {
         fontStyle: 'bold',
         fillColor: [239, 239, 239],
@@ -259,12 +291,12 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
 
   const totalsFinalY = (doc as any).lastAutoTable?.finalY ?? itemsFinalY + 25;
 
-  // 5. Summary Text: "Всего отпущено X единиц, на сумму Y."
+  // 5. Summary text
   const summaryY = totalsFinalY + 4;
   doc.setFont(PDF_FONT_NAME, 'normal');
   doc.setFontSize(8);
   doc.setTextColor(0, 0, 0);
-  const summaryPrefix = `Всего отпущено ${data.totalQuantityFormatted} единиц, на сумму `;
+  const summaryPrefix = `${data.isReturnDocument ? 'Возвращено' : 'Всего отпущено'} ${data.totalQuantityFormatted} единиц, на сумму `;
   doc.text(summaryPrefix, marginLeft, summaryY);
   const prefixWidth = doc.getTextWidth(summaryPrefix);
   doc.setFont(PDF_FONT_NAME, 'bold');

@@ -7,8 +7,7 @@ export const MAX_STORED_CENTS = 999999999999; // PostgreSQL Decimal(12,2)
 export const financialError = (message: string) => Object.assign(new Error(message), { status: 400 });
 export function assertNoTax(value: unknown) {
   if (value === undefined || value === null) return;
-  const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
-  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount !== 0) {
+  if (toCents(value) !== 0) {
     throw financialError('Tax is not supported');
   }
 }
@@ -18,7 +17,15 @@ export function assertNoTaxPayload(payload: unknown) {
   }
 }
 function rational(value: unknown): [bigint, bigint] {
-  const text = String(value ?? 0).trim();
+  let text = String(value ?? 0).trim().replace(/[\s\u00a0\u202f]/g, '');
+  if (text.includes(',') && text.includes('.')) {
+    const decimalSeparator = text.lastIndexOf(',') > text.lastIndexOf('.') ? ',' : '.';
+    const groupingSeparator = decimalSeparator === ',' ? '.' : ',';
+    text = text.split(groupingSeparator).join('').replace(decimalSeparator, '.');
+  } else {
+    text = text.replace(',', '.');
+  }
+  text = text.replace(/^([+-]?)\./, (_match, sign) => `${sign}0.`);
   const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text);
   if (!match) throw financialError('Invalid finite monetary value');
   const exponent = Number(match[4] || 0) - (match[3]?.length || 0);
@@ -123,9 +130,28 @@ export function refundByMethod(payments: any[], refund: unknown) {
   if (cents > buckets.reduce((s, n) => s + n, 0)) throw financialError('Refund exceeds available payments');
   return allocateCents(cents, buckets).map((amount, i) => ({ method: methods[i], amount: fromCents(amount) })).filter(p => p.amount > 0);
 }
+export function isGoodsReturnPaymentAdjustment(payment: any) {
+  return toCents(payment?.amount ?? 0) < 0 && !payment?.reversalOfId &&
+    (payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund');
+}
+export function goodsReturnPaymentAdjustments(payments: any[]) {
+  return fromCents(payments.filter(isGoodsReturnPaymentAdjustment).reduce((sum: number, payment: any) => sum - toCents(payment.amount), 0));
+}
+export function balancePaidAmount(payments: any[], fallback: unknown = 0) {
+  if (!Array.isArray(payments)) return fromCents(toCents(fallback));
+  return addMoney(...payments.filter((payment: any) => !isGoodsReturnPaymentAdjustment(payment)).map((payment: any) => payment.amount));
+}
 export function refundSplit(net: unknown, paid: unknown, eligible: unknown) {
   const n = toCents(net), p = toCents(paid), r = toCents(eligible);
-  if (n < 0 || p < 0 || p > n || r < 0 || r > n) throw financialError('Financial reconciliation required before return');
-  const money = Math.min(p, r);
-  return { refundedAmount: fromCents(money), debtReduction: fromCents(r - money), netAmount: fromCents(n - r), paidAmount: fromCents(p - money), debtAmount: fromCents(n - r - p + money) };
+  if (n < 0 || p < 0 || r < 0 || r > n) throw financialError('Financial reconciliation required before return');
+  const debtReduction = Math.min(Math.max(0, n - p), r);
+  const netAmount = n - r;
+  return {
+    refundedAmount: 0,
+    debtReduction: fromCents(debtReduction),
+    creditAmount: fromCents(r - debtReduction),
+    netAmount: fromCents(netAmount),
+    paidAmount: fromCents(p),
+    debtAmount: fromCents(Math.max(0, netAmount - p)),
+  };
 }
