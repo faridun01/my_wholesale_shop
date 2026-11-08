@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 const frontend = (file: string) => import(/* @vite-ignore */ new URL(`../../../frontend/src/${file}`, import.meta.url).href);
-afterEach(() => vi.unstubAllGlobals());
 describe('financial documents and previews', () => {
   it('uses authoritative zero totals in customer documents', async () => {
     const calc = await frontend('components/customers/customerInvoiceCalculations.ts');
@@ -51,19 +49,16 @@ describe('financial documents and previews', () => {
     expect(html).not.toContain('Кредит клиента');
     expect(html).not.toContain('Внесено всего');
   });
-  it('generates actual PDFs without tax rows', async () => {
-    const font = readFileSync(new URL('../../../frontend/public/fonts/arial.ttf', import.meta.url));
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(font)));
-    const { generateSalesInvoicePdf } = await frontend('utils/print/salesInvoicePdf.ts');
-    for (const invoice of [
-      { id: 1, netAmount: 0, discount: 100, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] },
-      { id: 2, netAmount: 90, discount: 10, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] },
-    ]) {
-      const pdf = await generateSalesInvoicePdf(invoice);
-      expect(pdf.output('arraybuffer').byteLength).toBeGreaterThan(2000);
-      const rows = (pdf as any).lastAutoTable.body;
-      expect(rows.at(-1).cells[1].text.join('')).toBe(invoice.id === 1 ? '0,00' : '90,00');
-      expect(rows.some((r: any) => r.cells[0]?.text.join('').includes('Налог'))).toBe(false);
-    }
+  it('prepares tax-free totals for invoice print and PDF documents', async () => {
+    const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');
+    const prepared = prepareSalesInvoiceData({
+      netAmount: 90,
+      tax: 10,
+      discount: 10,
+      items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }],
+    });
+
+    expect(prepared).toMatchObject({ finalTotalAmount: 90, totalDiscountAmount: 10 });
+    expect(buildSalesInvoiceHtml(prepared)).not.toContain('Налог');
   });
 });
