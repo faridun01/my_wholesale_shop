@@ -29,7 +29,7 @@ const getDashboardProfit = async (warehouseId: number | null) => {
           LEFT JOIN (
             SELECT ii.invoice_id,
               SUM(
-                CASE WHEN COALESCE(alloc.total_alloc_cost, 0) > 0
+                CASE WHEN alloc.total_alloc_cost IS NOT NULL
                   THEN alloc.total_alloc_cost
                   ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
                 END
@@ -51,7 +51,7 @@ const getDashboardProfit = async (warehouseId: number | null) => {
           LEFT JOIN (
             SELECT ii.invoice_id,
               SUM(
-                CASE WHEN COALESCE(alloc.total_alloc_cost, 0) > 0
+                CASE WHEN alloc.total_alloc_cost IS NOT NULL
                   THEN alloc.total_alloc_cost
                   ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
                 END

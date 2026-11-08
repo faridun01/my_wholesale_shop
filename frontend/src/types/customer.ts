@@ -38,6 +38,7 @@ export interface StatementReturn {
 }
 
 export interface StatementItem {
+  allocatedOrderDiscount?: number;
   id: number;
   product?: { name?: string };
   quantity: number;
@@ -56,6 +57,10 @@ export interface StatementItem {
 }
 
 export interface StatementInvoice {
+  originalInvoice?: any;
+  financialSummary?: any;
+  payments?: any[];
+  returns?: any[];
   id: number;
   createdAt: string;
   totalAmount: number;

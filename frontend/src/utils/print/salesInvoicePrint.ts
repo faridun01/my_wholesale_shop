@@ -48,6 +48,7 @@ export interface PreparedSalesInvoiceItem {
 
 export interface PreparedSalesInvoiceData {
   invoiceId: number | string;
+  documentTitle: string;
   invoiceDateLabel: string;
   companyName: string;
   customerName: string;
@@ -58,6 +59,8 @@ export interface PreparedSalesInvoiceData {
   totalDiscountAmountFormatted: string;
   returnedAmount: number;
   returnedAmountFormatted: string;
+  taxAmount: number;
+  taxAmountFormatted: string;
   paidAmount: number;
   paidAmountFormatted: string;
   balanceDue: number;
@@ -156,13 +159,13 @@ export function prepareSalesInvoiceData(
     ? roundMoneyValue(invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalBeforeInvoiceDiscount(item), 0))
     : roundMoneyValue(Math.max(0, Number(options?.subtotal || 0) - Number(options?.discountAmount || 0)));
 
-  const returnedAmount = Math.max(0, Number(invoice?.returnedAmount || 0));
-  const storedInvoiceNetAmount = Math.max(0, Number(options?.netAmount || invoice?.netAmount || 0));
-  const finalTotalAmount = storedInvoiceNetAmount > 0
-    ? storedInvoiceNetAmount
-    : roundMoneyValue(Math.max(0, itemsNetAmount - returnedAmount));
-
-  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - (finalTotalAmount + returnedAmount)));
+  // Current receipts contain remaining lines. Return history is a separate document.
+  const returnedAmount = 0;
+  const stored = options?.netAmount ?? invoice?.netAmount;
+  const hasStored = stored !== null && stored !== undefined && Number.isFinite(Number(stored));
+  const taxAmount = hasStored ? Math.max(0, Number(invoice?.tax ?? 0)) : 0;
+  const finalTotalAmount = hasStored ? Math.max(0, Number(stored)) : roundMoneyValue(Math.max(0, itemsNetAmount - roundMoneyValue(itemsNetAmount * Number(invoice?.discount || 0) / 100)));
+  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount + taxAmount - finalTotalAmount));
   const paidAmount = Math.max(0, Number(invoice?.paidAmount || 0));
   const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - paidAmount));
   const totalQuantity = invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item), 0);
@@ -172,7 +175,7 @@ export function prepareSalesInvoiceData(
     const unitName = String(item?.baseUnitNameSnapshot || item?.baseUnitName || item?.unit || 'шт').trim() || 'шт';
     const quantity = getItemBaseUnits(item);
     const lineTotal = getLineTotalBeforeInvoiceDiscount(item);
-    const price = quantity > 0 ? roundMoneyValue(lineTotal / quantity) : getDiscountedUnitPrice(item);
+    const price = getUnitPrice(item);
     const noteLines = getQuantityText(item);
 
     return {
@@ -195,12 +198,15 @@ export function prepareSalesInvoiceData(
     companyName,
     customerName,
     items,
+    documentTitle: invoice?.documentTitle || 'Накладная',
     subtotalBeforeDiscount,
     subtotalBeforeDiscountFormatted: formatMoneyWithoutCurrency(subtotalBeforeDiscount),
     totalDiscountAmount,
     totalDiscountAmountFormatted: formatMoneyWithoutCurrency(totalDiscountAmount),
     returnedAmount,
     returnedAmountFormatted: formatMoneyWithoutCurrency(returnedAmount),
+    taxAmount,
+    taxAmountFormatted: formatMoneyWithoutCurrency(taxAmount),
     paidAmount,
     paidAmountFormatted: formatMoneyWithoutCurrency(paidAmount),
     balanceDue,
@@ -355,7 +361,7 @@ export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
       </head>
       <body>
         <div class="sheet">
-          <div class="title">Товарная накладная № ${escapeHtml(data.invoiceId)} от ${escapeHtml(data.invoiceDateLabel)}</div>
+          <div class="title">${escapeHtml(data.documentTitle)} № ${escapeHtml(data.invoiceId)} от ${escapeHtml(data.invoiceDateLabel)}</div>
 
           <table class="requisites">
             <tr>
@@ -388,6 +394,7 @@ export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
           <table class="totals">
             <tr><td class="label">Сумма без скидки</td><td class="right">${escapeHtml(data.subtotalBeforeDiscountFormatted)}</td></tr>
             <tr><td class="label">Скидка</td><td class="right">${escapeHtml(data.totalDiscountAmountFormatted)}</td></tr>
+            ${data.taxAmount > 0 ? `<tr><td class="label">Налог</td><td class="right">${escapeHtml(data.taxAmountFormatted)}</td></tr>` : ''}
             ${data.returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(data.returnedAmountFormatted)}</td></tr>` : ''}
             ${data.paidAmount > 0 ? `<tr><td class="label">Оплачено</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
             ${data.paidAmount > 0 ? `<tr><td class="label">Остаток</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}

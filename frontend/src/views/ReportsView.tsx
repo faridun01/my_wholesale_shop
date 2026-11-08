@@ -1,3 +1,4 @@
+import FinancialReconciliationPanel from '../components/sales/FinancialReconciliationPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, BarChart3, Calendar, DollarSign, FileSpreadsheet, FileText, Package, RotateCcw, Search, ShoppingBag, Target, Trash2, TrendingUp, Warehouse, X } from 'lucide-react';
@@ -1341,6 +1342,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
   return (
     <div className="app-page-shell min-h-full font-sans">
+      {(user.role === 'ADMIN' || user.role === 'admin') && <FinancialReconciliationPanel start={dateRange.start} end={dateRange.end} warehouseId={selectedWarehouseId} />}
       <div className="space-y-4 lg:space-y-5 lg:rounded-[28px] lg:bg-[#f4f5fb] lg:p-5 min-h-screen">
         {/* Top Header */}
         <div className="flex items-center justify-between gap-2">

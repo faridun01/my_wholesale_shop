@@ -1,3 +1,4 @@
+import { financialPost } from '../../api/financialRequest';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -35,21 +36,20 @@ const useSalesPaymentActions = ({
     }
 
     const currentBalance = getInvoiceBalance(selectedInvoice);
-    if (normalizedAmount > currentBalance + SALES_PAYMENT_EPSILON) {
+    if (normalizedAmount > currentBalance) {
       toast.error(`Сумма оплаты не может превышать остаток долга (${toFixedNumber(currentBalance)})`);
       return;
     }
 
     setIsPaying(true);
     try {
-      await client.post('/payments', {
+      await financialPost('/payments', {
         customer_id: selectedInvoice.customerId,
         invoice_id: selectedInvoice.id,
         amount: normalizedAmount,
         method: 'cash',
         // Lets the backend dedupe a network retry of this exact submit instead of
         // double-applying the payment.
-        idempotency_key: crypto.randomUUID(),
       });
       toast.success('Оплата принята');
       closePaymentModal();

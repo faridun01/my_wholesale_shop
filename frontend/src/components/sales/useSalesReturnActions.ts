@@ -1,3 +1,4 @@
+import { financialPost } from '../../api/financialRequest';
 import { useState } from 'react';
 import type React from 'react';
 import toast from 'react-hot-toast';
@@ -96,21 +97,21 @@ const useSalesReturnActions = ({
             setIsReturning(false);
             return;
           }
-        } else if (item.quantity > remainingUnits) {
+        } else if (!Number.isInteger(item.quantity) || item.quantity > remainingUnits) {
           toast.error(`Можно вернуть не больше ${remainingUnits} ${packaging?.baseUnitName || 'шт'}`);
           setIsReturning(false);
           return;
         }
       }
 
-      const { data } = await client.post(`/invoices/${selectedInvoice.id}/return`, {
+      const { data } = await financialPost(`/invoices/${selectedInvoice.id}/return`, {
         items: itemsToReturn.map(({ invoiceItemId, quantity }) => ({ invoiceItemId, quantity })),
         reason: returnReason,
       });
-      const cashRefundAmount = Number(data?.cashRefundAmount || 0);
+      const cashRefundAmount = Number(data?.refundedAmount || 0);
       toast.success(
         cashRefundAmount > 0.009
-          ? `Возврат оформлен. Верните клиенту наличными: ${formatMoney(cashRefundAmount)}`
+          ? `Возврат оформлен по исходным способам оплаты: ${formatMoney(cashRefundAmount)}`
           : 'Возврат оформлен',
         { duration: cashRefundAmount > 0.009 ? 6000 : 4000 },
       );

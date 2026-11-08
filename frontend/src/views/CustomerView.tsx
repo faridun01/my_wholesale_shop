@@ -322,15 +322,15 @@ export default function CustomerView() {
           return {
             ...prev,
             ...res.data,
-            invoiceBalance: prev.invoiceBalance ?? (Number(res.data.netAmount || 0) - Number(res.data.paidAmount || 0)),
-            paymentEvents: prev.paymentEvents?.length ? prev.paymentEvents : (res.data.payments || []).map((p: any) => ({
+            invoiceBalance: res.data.financialSummary?.debtAmount ?? (Number(res.data.netAmount || 0) - Number(res.data.paidAmount || 0)),
+            paymentEvents: (res.data.payments || []).map((p: any) => ({
               id: p.id,
               amount: p.amount,
               method: p.method,
               createdAt: p.createdAt,
               staff_name: p.user?.username || '—',
             })),
-            returnEvents: prev.returnEvents?.length ? prev.returnEvents : (res.data.returns || []).map((r: any) => ({
+            returnEvents: (res.data.returns || []).map((r: any) => ({
               id: r.id,
               totalValue: r.totalValue,
               reason: r.reason,
@@ -1480,7 +1480,7 @@ export default function CustomerView() {
                     <div className="w-full max-w-sm space-y-2 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs text-xs">
                       <div className="flex items-center justify-between text-slate-500">
                         <span>Сумма без скидки</span>
-                        <span className="font-mono font-semibold text-slate-800">{formatMoneyByRole(selectedInvoice.totalAmount || selectedInvoice.netAmount)}</span>
+                        <span className="font-mono font-semibold text-slate-800">{formatMoneyByRole(getInvoiceSubtotal(selectedInvoice))}</span>
                       </div>
 
                       {Number(selectedInvoice.discount || 0) > 0 && (
@@ -1495,7 +1495,7 @@ export default function CustomerView() {
                         </div>
                       )}
 
-                      {Number(selectedInvoice.returnedAmount || 0) > 0 && (
+                      {!selectedInvoice.originalInvoice && Number(selectedInvoice.returnedAmount || 0) > 0 && (
                         <div className="flex items-center justify-between text-amber-700">
                           <span>Возврат товаров</span>
                           <span className="font-mono font-bold">-{formatMoneyByRole(selectedInvoice.returnedAmount)}</span>

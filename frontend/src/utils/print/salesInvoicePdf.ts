@@ -86,7 +86,7 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
   doc.text(
-    `Товарная накладная № ${data.invoiceId} от ${data.invoiceDateLabel}`,
+    `${data.documentTitle} № ${data.invoiceId} от ${data.invoiceDateLabel}`,
     pageWidth / 2,
     14,
     { align: 'center' },
@@ -200,6 +200,8 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
       { content: data.totalDiscountAmountFormatted, styles: { halign: 'right' } },
     ],
   ];
+
+  if (data.taxAmount > 0) totalsRows.push([{ content: 'Налог' }, { content: data.taxAmountFormatted, styles: { halign: 'right' } }]);
 
   if (data.returnedAmount > 0) {
     totalsRows.push([

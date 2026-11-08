@@ -1,4 +1,5 @@
 import prisma from '../db/prisma.js';
+import { addMoney, cumulativeValue, lineTotal } from '../utils/financial.js';
 
 function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -13,7 +14,9 @@ function toNumber(value: any, fallback = 0): number {
  * Rounds a quantity to integer precision (all quantities are INT)
  */
 function roundQty(value: number): number {
-  return Math.round(Number(value || 0));
+  const numeric = Number(value || 0);
+  if (!Number.isSafeInteger(numeric)) throw new Error('Quantity must be a whole number');
+  return numeric;
 }
 
 
@@ -79,7 +82,7 @@ export class StockService {
 
       const batchRemaining = roundQty(toNumber(batch.remainingQuantity, 0));
       const takeFromBatch = Math.min(batchRemaining, remainingToAllocate);
-      totalCost += takeFromBatch * Number(batch.costPrice || 0);
+      totalCost = addMoney(totalCost, lineTotal(takeFromBatch, batch.costPrice || 0));
 
       await client.productBatch.update({
         where: { id: batch.id },
@@ -101,7 +104,7 @@ export class StockService {
 
     await this.updateProductStockCache(productId, client);
 
-    return round2(totalCost / requiredQty);
+    return cumulativeValue(totalCost, 1, requiredQty);
   }
 
   /**
@@ -135,6 +138,10 @@ export class StockService {
       quantityToReturn != null
         ? roundQty(toNumber(quantityToReturn, 0))
         : allocations.reduce((sum: number, a: any) => sum + Number(a.quantity || 0), 0);
+
+    if (remainingToReturn > allocations.reduce((sum: number, a: any) => sum + Number(a.quantity || 0), 0)) {
+      throw new Error('Stock allocations require reconciliation before this return');
+    }
 
     for (const allocation of allocations) {
       if (remainingToReturn <= 0) break;

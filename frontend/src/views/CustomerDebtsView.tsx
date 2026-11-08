@@ -387,9 +387,8 @@ export default function CustomerDebtsView() {
 
     const subtotal = getInvoiceSubtotal(invoice);
     const discountAmount = getInvoiceDiscountAmount(invoice);
-    const taxAmount = Math.max(0, Number(invoice?.tax || 0));
     const returnedAmount = Number(invoice?.returnedAmount || 0);
-    const calculatedNet = roundMoney(subtotal - discountAmount + taxAmount - returnedAmount);
+    const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
 
     return roundMoney(Math.max(0, calculatedNet));
   };

@@ -1,3 +1,6 @@
+import { returnPreview } from '../utils/returnPreview';
+import { addMoney } from '../utils/financial';
+import InvoiceFinancialHistory from '../components/sales/InvoiceFinancialHistory';
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 import { 
@@ -225,7 +228,6 @@ export default function SalesView() {
     filteredEditInvoiceItems,
     editInvoiceSubtotal,
     editInvoiceDiscountAmount,
-    editInvoiceTaxAmount,
     editInvoiceNetAmount,
     setEditCustomerId,
     setEditDiscount,
@@ -348,7 +350,6 @@ export default function SalesView() {
               paidAmount: updatedInvoice.paidAmount,
               returnedAmount: updatedInvoice.returnedAmount,
               discount: updatedInvoice.discount,
-              tax: updatedInvoice.tax,
               status: updatedInvoice.status,
               cancelled: Boolean(updatedInvoice.cancelled),
             }
@@ -435,11 +436,7 @@ export default function SalesView() {
           : rawQty;
         totalUnits += units;
 
-        const itemDiscount = Number(item.discount || 0);
-        const globalDiscount = Number(selectedInvoice?.discount || 0);
-        const basePrice = Number(item.sellingPrice ?? item.price ?? 0);
-        const unitPriceAfterDiscount = basePrice * (1 - itemDiscount / 100) * (1 - globalDiscount / 100);
-        totalRefund += unitPriceAfterDiscount * units;
+        totalRefund = addMoney(totalRefund, returnPreview(item, units));
       }
     }
 
@@ -993,6 +990,7 @@ export default function SalesView() {
                   </div>
                 </div>
 
+                <InvoiceFinancialHistory invoice={selectedInvoice} />
                 {/* Summary Requisites Block */}
                 <div className="flex justify-end pt-1">
                   <div className="w-full sm:max-w-96 rounded-2xl border border-slate-200/90 bg-white p-4 text-xs space-y-2.5 shadow-sm">
@@ -1008,7 +1006,7 @@ export default function SalesView() {
                       </div>
                     )}
 
-                    {Number(selectedInvoice.returnedAmount || 0) > 0 && (
+                    {false && (
                       <div className="flex items-center justify-between text-rose-600">
                         <span className="font-medium">Возвращено</span>
                         <span className="font-bold font-mono">-{formatMoney(selectedInvoice.returnedAmount || 0)}</span>
@@ -1198,63 +1196,7 @@ export default function SalesView() {
                 )}
 
                 {/* Returns History Section */}
-                {selectedInvoice.returns && selectedInvoice.returns.length > 0 && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center gap-2 px-0.5">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-amber-700">
-                        <RotateCcw size={12} />
-                      </div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                        История возвратов
-                      </h4>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold font-mono text-slate-600 border border-slate-200/70">
-                        {selectedInvoice.returns.length}
-                      </span>
-                    </div>
 
-                    {/* Mobile Returns Cards */}
-                    <div className="space-y-2 md:hidden">
-                      {selectedInvoice.returns.map((r: any) => (
-                        <div key={r.id} className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3 shadow-2xs space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs font-black text-rose-600">-{formatMoney(r.totalValue)}</span>
-                            <span className="text-[10px] font-mono text-slate-400">{new Date(r.createdAt).toLocaleString('ru-RU')}</span>
-                          </div>
-                          {r.reason && (
-                            <p className="text-[11px] text-slate-700 bg-white/70 p-2 rounded-xl border border-amber-100">
-                              <span className="font-bold text-slate-500">Причина:</span> {formatTransactionReason(r.reason)}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-slate-400">Сотрудник: <span className="font-medium text-slate-600">{r.staff_name}</span></p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop Returns Table */}
-                    <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
-                      <table className="w-full text-left text-[11px]">
-                        <thead>
-                          <tr className="border-b border-slate-200 bg-slate-50/90 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                            <th className="px-3.5 py-2.5">Дата и время</th>
-                            <th className="px-3.5 py-2.5">Сумма возврата</th>
-                            <th className="px-3.5 py-2.5">Причина</th>
-                            <th className="px-3.5 py-2.5">Сотрудник</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {selectedInvoice.returns.map((r: any) => (
-                            <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                              <td className="px-3.5 py-2.5 text-slate-500 font-mono">{new Date(r.createdAt).toLocaleString('ru-RU')}</td>
-                              <td className="px-3.5 py-2.5 font-bold font-mono text-rose-600">-{formatMoney(r.totalValue)}</td>
-                              <td className="max-w-xs wrap-break-word px-3.5 py-2.5 text-slate-600">{formatTransactionReason(r.reason)}</td>
-                              <td className="px-3.5 py-2.5 font-medium text-slate-700">{r.staff_name}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </div>
               
               {/* Sticky Modal Footer */}
@@ -1731,12 +1673,6 @@ export default function SalesView() {
                         <span className="text-[10px] uppercase font-bold text-slate-400 mr-1.5">Сумма:</span>
                         <span className="font-mono font-bold text-slate-900">{formatMoney(editInvoiceSubtotal)}</span>
                       </div>
-                      {Number(selectedInvoice?.tax || 0) > 0 && (
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-1.5">Налог:</span>
-                          <span className="font-mono font-bold text-slate-700">+{formatMoney(editInvoiceTaxAmount)}</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
@@ -2195,7 +2131,7 @@ export default function SalesView() {
                       const itemUnits = item.returnMode === 'package' && packaging
                         ? Number(item.returnQty || 0) * packaging.unitsPerPackage
                         : Number(item.returnQty || 0);
-                      const lineRefund = unitPriceAfterDiscount * itemUnits;
+                      const lineRefund = returnPreview(item, itemUnits);
 
                       return (
                         <div

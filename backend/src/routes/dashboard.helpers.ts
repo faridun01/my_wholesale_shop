@@ -2,7 +2,7 @@ import { DEFAULT_CUSTOMER_NAME } from '../utils/defaultCustomer.js';
 
 const LOW_STOCK_THRESHOLD = 5;
 const LOW_STOCK_PACKAGE_THRESHOLD = 4;
-const PAYMENT_EPSILON = 0.01;
+const PAYMENT_EPSILON = 0;
 
 export const safePercentChange = (current: number, previous: number) => {
   if (previous === 0 && current === 0) return 0;

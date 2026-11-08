@@ -1,18 +1,19 @@
 import { formatCount, roundMoney } from '../../utils/format';
 import type { StatementInvoice, StatementItem } from '../../types/customer';
 
-export const CUSTOMER_PAYMENT_EPSILON = 0.01;
+export const CUSTOMER_PAYMENT_EPSILON = 0;
 
 export const getInvoiceSubtotal = (invoice: StatementInvoice) => {
+  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => sum + Number(item.totalPrice ?? 0), 0));
   const storedTotal = Math.max(0, Number(invoice?.totalAmount || 0));
-  if (storedTotal > CUSTOMER_PAYMENT_EPSILON) {
+  if (invoice?.totalAmount != null && Number.isFinite(Number(invoice.totalAmount))) {
     return storedTotal;
   }
 
   const itemsSubtotal = Array.isArray(invoice?.items)
     ? invoice.items.reduce((sum, item) => {
         const storedLineTotal = Number(item?.totalPrice || 0);
-        if (storedLineTotal > CUSTOMER_PAYMENT_EPSILON) {
+        if (item?.totalPrice != null && Number.isFinite(Number(item.totalPrice))) {
           return roundMoney(sum + storedLineTotal);
         }
 
@@ -24,6 +25,7 @@ export const getInvoiceSubtotal = (invoice: StatementInvoice) => {
 };
 
 export const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
+  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => sum + Number(item.allocatedOrderDiscount ?? 0), 0));
   const subtotal = getInvoiceSubtotal(invoice);
   const discount = Number(invoice?.discount || 0);
   return roundMoney(subtotal * (discount / 100));
@@ -31,15 +33,14 @@ export const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
 
 export const getInvoiceNetAmount = (invoice: StatementInvoice) => {
   const storedNet = Math.max(0, Number(invoice?.netAmount || 0));
-  if (storedNet > CUSTOMER_PAYMENT_EPSILON) {
+  if (invoice?.netAmount != null && Number.isFinite(Number(invoice.netAmount))) {
     return storedNet;
   }
 
   const subtotal = getInvoiceSubtotal(invoice);
   const discountAmount = getInvoiceDiscountAmount(invoice);
-  const taxAmount = Math.max(0, Number(invoice?.tax || 0));
   const returnedAmount = Number(invoice?.returnedAmount || 0);
-  const calculatedNet = roundMoney(subtotal - discountAmount + taxAmount - returnedAmount);
+  const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
 
   return roundMoney(Math.max(0, calculatedNet));
 };

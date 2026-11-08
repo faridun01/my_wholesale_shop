@@ -1,3 +1,4 @@
+import { financialPost } from '../../api/financialRequest';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { m } from 'motion/react';
@@ -60,19 +61,18 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
       toast.error('Сумма оплаты должна быть больше нуля');
       return;
     }
-    if (amount > balance + SALES_PAYMENT_EPSILON) {
+    if (amount > balance) {
       toast.error(`Сумма оплаты не может превышать долг (${formatMoney(balance)})`);
       return;
     }
 
     setIsPaying(true);
     try {
-      await client.post('/payments', {
+      await financialPost('/payments', {
         customer_id: invoice.customerId,
         invoice_id: invoice.id,
         amount,
         method: 'cash',
-        idempotency_key: crypto.randomUUID(),
       });
       toast.success('Оплата принята');
       await loadInvoice();

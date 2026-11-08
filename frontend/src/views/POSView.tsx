@@ -1,3 +1,4 @@
+import { discountedUnit, discountAmount, lineTotal as exactLineTotal, saleTotals } from '../utils/financial';
 import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
@@ -1064,9 +1065,9 @@ export default function POSView() {
     const sellingPrice = Number(item.sellingPrice || 0);
     const itemDiscount = clampDiscountPercent(item.lineDiscountPercent || 0);
     const unitPriceAfterDiscount = sellingPrice * (1 - itemDiscount / 100);
-    return ceilMoney(unitPriceAfterDiscount);
+    return discountedUnit(sellingPrice, itemDiscount);
   };
-  const getLineTotal = (item: CartItem) => roundMoney(Number(item.quantity || 0) * getDiscountedUnitPrice(item));
+  const getLineTotal = (item: CartItem) => exactLineTotal(item.quantity, item.sellingPrice, item.lineDiscountPercent || 0);
   const getLineSubtotal = (item: CartItem) => roundMoney(Number(item.sellingPrice || 0) * Number(item.quantity || 0));
   const getLineDiscountAmount = (item: CartItem) => roundMoney(getLineSubtotal(item) - getLineTotal(item));
 
@@ -1077,7 +1078,7 @@ export default function POSView() {
   const subtotalAfterLineDiscount = normalizeMoneyValue(Math.max(0, roundMoney(subtotal - lineDiscountAmount)));
   const normalizedDiscount = Math.max(0, discount);
   const invoiceDiscountAmount = normalizeMoneyValue(
-    Math.max(0, roundMoney(subtotalAfterLineDiscount * (normalizedDiscount / 100))),
+    Math.max(0, discountAmount(subtotalAfterLineDiscount, normalizedDiscount)),
   );
   const totalDiscountAmount = normalizeMoneyValue(roundMoney(lineDiscountAmount + invoiceDiscountAmount));
   const total = normalizeMoneyValue(Math.max(0, roundMoney(subtotalAfterLineDiscount - invoiceDiscountAmount)));

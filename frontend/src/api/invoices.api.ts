@@ -1,7 +1,8 @@
+import { financialPost } from './financialRequest';
 import client from './client';
 
 export const createInvoice = async (data: any) => {
-  const response = await client.post('/invoices', data);
+  const response = await financialPost('/invoices', data);
   return response.data;
 };
 

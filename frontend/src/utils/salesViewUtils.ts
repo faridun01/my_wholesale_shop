@@ -2,7 +2,7 @@ import { formatCount, roundMoney } from './format';
 import { formatProductName } from './productName';
 import type { EditProductOption, ReturnInvoiceItem } from '../components/sales/salesTypes';
 
-export const SALES_PAYMENT_EPSILON = 0.01;
+export const SALES_PAYMENT_EPSILON = 0;
 
 export const normalizeProductSearchValue = (value: unknown) => formatProductName(value).toLowerCase();
 
@@ -70,6 +70,7 @@ export function getInvoiceSubtotal(invoice: any) {
 }
 
 export function getInvoiceDiscountAmount(invoice: any) {
+  if (invoice?.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum: number, item: any) => sum + Number(item.allocatedOrderDiscount || 0), 0));
   const subtotal = getInvoiceSubtotal(invoice);
   const discount = Number(invoice?.discount || 0);
   return roundMoney(subtotal * (discount / 100));
@@ -83,9 +84,8 @@ export function getInvoiceNetAmount(invoice: any) {
 
   const subtotal = getInvoiceSubtotal(invoice);
   const discountAmount = getInvoiceDiscountAmount(invoice);
-  const taxAmount = Number(invoice?.tax || 0);
   const returnedAmount = Number(invoice?.returnedAmount || 0);
-  const calculatedNet = roundMoney(subtotal - discountAmount + taxAmount - returnedAmount);
+  const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
 
   return roundMoney(Math.max(0, calculatedNet));
 }
@@ -98,7 +98,7 @@ export function getEffectiveStatus(invoice: any, epsilon = SALES_PAYMENT_EPSILON
   const paidAmount = Math.max(0, Number(invoice?.paidAmount || 0));
   const netAmount = getInvoiceNetAmount(invoice);
 
-  if (paidAmount > 0 && paidAmount >= netAmount - epsilon) {
+  if (paidAmount >= netAmount) {
     return 'paid';
   }
 

@@ -1,3 +1,4 @@
+import { financialPost } from './financialRequest';
 import client from './client';
 
 export const getExpenses = async (params?: { warehouseId?: number | string; start?: string; end?: string }) => {
@@ -12,7 +13,7 @@ export const getExpenses = async (params?: { warehouseId?: number | string; star
 };
 
 export const createExpense = async (data: any) => {
-  const response = await client.post('/expenses', data);
+  const response = await financialPost('/expenses', data);
   return response.data;
 };
 
@@ -38,7 +39,7 @@ export const addExpensePayment = async (
   data: number | { amount: number; paymentDate?: string; method?: string; note?: string },
 ) => {
   const payload = typeof data === 'number' ? { amount: data } : data;
-  const response = await client.post(`/expenses/${id}/payments`, payload);
+  const response = await financialPost(`/expenses/${id}/payments`, payload);
   return response.data;
 };
 
@@ -46,7 +47,7 @@ export const addExpenseRefund = async (
   id: number,
   data: { amount: number; refundDate?: string; note?: string },
 ) => {
-  const response = await client.post(`/expenses/${id}/refunds`, data);
+  const response = await financialPost(`/expenses/${id}/refunds`, data);
   return response.data;
 };
 

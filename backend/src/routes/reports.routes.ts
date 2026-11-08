@@ -1,3 +1,5 @@
+import { reconcileInvoices } from '../services/financial-reconciliation.js';
+import { addMoney, allocateCents, fromCents, toCents } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
@@ -23,6 +25,15 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/reconciliation', authorize(['ADMIN']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
+    const invoices = await prisma.invoice.findMany({ where: buildCancelledInvoiceWhere({ warehouseId, start: req.query.start, end: req.query.end }), include: { payments: true, returns: true } });
+    res.json({ ...reconcileInvoices(invoices), periodPolicy: 'invoice-created-date-with-all-subsequent-events' });
+  } catch (error) { next(error); }
+});
+
 router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonReportsQuerySchema }), async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);
@@ -37,6 +48,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         orderBy: { createdAt: 'asc' },
         select: {
           netAmount: true,
+          discount: true,
+          tax: true,
           paidAmount: true,
           warehouseId: true,
           createdAt: true,
@@ -56,6 +69,12 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
             select: {
               quantity: true,
               returnedQty: true,
+            id: true,
+            totalPrice: true,
+            discount: true,
+            allocatedOrderDiscount: true,
+            eligibleNetAmount: true,
+            allocatedTax: true,
               sellingPrice: true,
               costPrice: true,
               product: {
@@ -76,6 +95,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
               },
             },
           },
+          returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
           warehouse: {
             select: {
               name: true,
@@ -152,7 +172,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const totalDebtsPromise = getTotalOutstandingDebt(prisma, warehouseId ?? undefined);
 
     for (const expense of expenses) {
-      totalExpenses += Number(expense.amount || 0);
+      totalExpenses = addMoney(totalExpenses, Number(expense.amount || 0));
     }
 
     const monthlyData: any = {};
@@ -174,14 +194,14 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       const netAmount = Number(inv.netAmount);
       const paidAmount = Number(inv.paidAmount);
 
-      totalRevenue += netAmount;
+      totalRevenue = addMoney(totalRevenue, netAmount);
       const invoiceDebt = Math.max(0, netAmount - paidAmount);
-      monthlyData[month].sales += netAmount;
+      monthlyData[month].sales = addMoney(monthlyData[month].sales, netAmount);
 
       if (!warehousePerformance[inv.warehouseId]) {
         warehousePerformance[inv.warehouseId] = { name: inv.warehouse.name, sales: 0, profit: 0 };
       }
-      warehousePerformance[inv.warehouseId].sales += netAmount;
+      warehousePerformance[inv.warehouseId].sales = addMoney(warehousePerformance[inv.warehouseId].sales, netAmount);
 
       const staffKey = String(inv.user?.id || 0);
       if (!staffPerformance[staffKey]) {
@@ -194,7 +214,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         };
       }
       staffPerformance[staffKey].invoices += 1;
-      staffPerformance[staffKey].revenue += netAmount;
+      staffPerformance[staffKey].revenue = addMoney(staffPerformance[staffKey].revenue, netAmount);
 
       const customerKey = String(inv.customer?.id || 0);
       if (!customerPerformance[customerKey]) {
@@ -207,8 +227,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         };
       }
       customerPerformance[customerKey].invoices += 1;
-      customerPerformance[customerKey].revenue += netAmount;
-      customerPerformance[customerKey].debt += invoiceDebt;
+      customerPerformance[customerKey].revenue = addMoney(customerPerformance[customerKey].revenue, netAmount);
+      customerPerformance[customerKey].debt = addMoney(customerPerformance[customerKey].debt, invoiceDebt);
 
       for (const item of inv.items) {
         const lineRevenue = getLineNetRevenue(inv, item);
@@ -217,12 +237,12 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         const quantity = getRemainingQuantity(item);
         const productKey = String(item.product?.id || 0);
 
-        totalCost += lineCost;
+        totalCost = addMoney(totalCost, lineCost);
         if (isAdmin) {
-          totalProfit += lineProfit;
-          monthlyData[month].profit += lineProfit;
-          warehousePerformance[inv.warehouseId].profit += lineProfit;
-          staffPerformance[staffKey].profit += lineProfit;
+          totalProfit = addMoney(totalProfit, lineProfit);
+          monthlyData[month].profit = addMoney(monthlyData[month].profit, lineProfit);
+          warehousePerformance[inv.warehouseId].profit = addMoney(warehousePerformance[inv.warehouseId].profit, lineProfit);
+          staffPerformance[staffKey].profit = addMoney(staffPerformance[staffKey].profit, lineProfit);
         }
 
         if (!productPerformance[productKey]) {
@@ -236,8 +256,8 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         }
 
         productPerformance[productKey].quantity += quantity;
-        productPerformance[productKey].revenue += lineRevenue;
-        productPerformance[productKey].profit += lineProfit;
+        productPerformance[productKey].revenue = addMoney(productPerformance[productKey].revenue, lineRevenue);
+        productPerformance[productKey].profit = addMoney(productPerformance[productKey].profit, lineProfit);
       }
     }
 
@@ -369,12 +389,19 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
         createdAt: true,
         discount: true,
         netAmount: true,
+        tax: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {
           select: {
             quantity: true,
             returnedQty: true,
+            id: true,
+            totalPrice: true,
+            discount: true,
+            allocatedOrderDiscount: true,
+            eligibleNetAmount: true,
+            allocatedTax: true,
             sellingPrice: true,
             costPrice: true,
             product: { select: { name: true, unit: true } },
@@ -386,6 +413,7 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
             },
           },
         },
+        returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -422,12 +450,19 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
         createdAt: true,
         discount: true,
         netAmount: true,
+        tax: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {
           select: {
             quantity: true,
             returnedQty: true,
+            id: true,
+            totalPrice: true,
+            discount: true,
+            allocatedOrderDiscount: true,
+            eligibleNetAmount: true,
+            allocatedTax: true,
             sellingPrice: true,
             costPrice: true,
             product: { select: { name: true, unit: true } },
@@ -439,6 +474,7 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
             },
           },
         },
+        returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -462,32 +498,17 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
     const access = await getAccessContext(req);
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
-    const where = buildInventoryWhere({ type: 'return', warehouseId, start, end });
-
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where,
-      include: {
-        product: true,
-        warehouse: true,
-        user: { select: PUBLIC_USER_SELECT },
-      },
+    const returns = await prisma.return.findMany({
+      where: { createdAt: buildCreatedAtRange({ start, end }), invoice: warehouseId ? { warehouseId } : undefined },
+      include: { user: { select: PUBLIC_USER_SELECT }, invoice: { include: { warehouse: true } }, items: { include: { invoiceItem: true } } },
       orderBy: { createdAt: 'desc' },
     });
-
-    const report = transactions
-      .map((t: any) => ({
-        return_id: t.referenceId || t.id,
-        date: t.createdAt.toISOString().split('T')[0],
-        warehouse_name: t.warehouse?.name || '',
-        staff_name: t.user?.username || '',
-        product_name: t.product.name,
-        unit: t.product.unit || '',
-        quantity: Math.abs(t.qtyChange),
-        selling_price: Number(t.sellingAtTime || 0),
-        total_value: Math.abs(t.qtyChange) * Number(t.sellingAtTime || 0),
-        reason: t.reason,
-      }))
-      .filter((row) => !/^(Invoice #\d+ Cancelled|Отмена накладной #\d+)$/i.test(String(row.reason || '').trim()));
+    const report = returns.flatMap((r: any) => {
+      const base = { return_id: r.id, invoice_id: r.invoiceId, date: r.createdAt.toISOString().split('T')[0], warehouse_name: r.invoice?.warehouse?.name || '', staff_name: r.user?.username || '', reason: r.reason };
+      if (!r.items.length) return [{ ...base, product_name: 'Historical return (item details unavailable)', unit: '', quantity: null, selling_price: null, total_value: Number(r.totalValue), refunded_amount: r.refundedAmount == null ? null : Number(r.refundedAmount), debt_reduction: r.debtReduction == null ? null : Number(r.debtReduction), legacy: true }];
+      const refundParts = allocateCents(toCents(r.refundedAmount || 0), r.items.map((i: any) => toCents(i.totalValue)));
+      return r.items.map((i: any, index: number) => ({ ...base, product_name: i.invoiceItem.productNameSnapshot || `Invoice item #${i.invoiceItemId}`, unit: i.invoiceItem.baseUnitNameSnapshot || '', quantity: i.quantity, selling_price: Number(i.sellingPrice), total_value: Number(i.totalValue), tax_amount: Number(i.taxAmount || 0), refunded_amount: fromCents(refundParts[index]), debt_reduction: addMoney(i.totalValue, -fromCents(refundParts[index])), legacy: false }));
+    });
 
     res.json(report);
   } catch (error) {

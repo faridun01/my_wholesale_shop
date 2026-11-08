@@ -1,3 +1,6 @@
+import { assertNoTaxPayload, financialError } from '../utils/financial.js';
+import { addMoney, toCents } from '../utils/financial.js';
+import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -14,193 +17,62 @@ const ADMIN_ONLY_PAYMENT_ERROR = 'Оплату может отмечать то�
 // member's "paid / debt" figures reflect money the admin actually confirmed.
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
-    if (!isAdminRole(req.user?.role)) {
-      return res.status(403).json({ error: ADMIN_ONLY_PAYMENT_ERROR });
-    }
-
-    const { customer_id, invoice_id, amount, method, note, idempotency_key } = req.body;
-    const normalizedAmount = normalizeMoney(amount, 'Amount', { allowZero: false });
-    if (!Number.isFinite(normalizedAmount) || normalizedAmount < 0) {
-      return res.status(400).json({ error: 'Amount must be a non-negative number' });
-    }
-
-    const idempotencyKey = typeof idempotency_key === 'string' && idempotency_key.trim() ? idempotency_key.trim() : null;
-    if (idempotencyKey) {
-      // A retried/double-submitted request (double-click, network retry) reusing the
-      // same client-generated key returns the original payment instead of creating a duplicate.
-      const existingPayment = await prisma.payment.findUnique({ where: { idempotencyKey } });
-      if (existingPayment) {
-        return res.status(200).json(existingPayment);
-      }
-    }
-
-    const userId = req.user!.id;
-    const invoiceId = invoice_id ? Number(invoice_id) : null;
-    const invoice = invoiceId
-      ? await prisma.invoice.findUnique({
-          where: { id: invoiceId },
-          select: { id: true, customerId: true, cancelled: true },
-        })
-      : null;
-
-    if (invoiceId && !invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-    if (invoice?.cancelled) {
-      return res.status(400).json({ error: 'Нельзя принять оплату по отменённой накладной' });
-    }
-
-    const payment = await prisma.$transaction(async (tx: any) => {
+    assertNoTaxPayload(req.body);
+    if (!isAdminRole(req.user?.role)) return res.status(403).json({ error: ADMIN_ONLY_PAYMENT_ERROR });
+    const amount = normalizeMoney(req.body.amount, 'Amount', { allowZero: false });
+    const key = operationKey(req.body.idempotency_key);
+    const invoiceId = req.body.invoice_id ? Number(req.body.invoice_id) : null;
+    const method = String(req.body.method || 'cash');
+    if (!['cash', 'card', 'transfer'].includes(method)) throw financialError('Invalid payment method');
+    const hash = requestHash({ invoiceId, customerId: req.body.customer_id, amount, method, userId: req.user!.id });
+    const result = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+      const existing = await tx.payment.findUnique({ where: { idempotencyKey: key } });
+      if (existing) { assertReplay(existing, hash); return existing; }
+      let invoice: any = null;
       if (invoiceId) {
-        // Lock the invoice row first so concurrent payments (double-click, retry,
-        // two staff recording at once) serialize instead of racing on paidAmount.
-        const locked = await tx.$queryRaw<Array<{ netAmount: any; paidAmount: any }>>`
-          SELECT net_amount as "netAmount", paid_amount as "paidAmount" FROM invoices WHERE id = ${invoiceId} FOR UPDATE
-        `;
-        if (!locked[0]) {
-          throw new Error('Invoice not found');
-        }
-
-        const projectedPaidAmount = Number(locked[0].paidAmount) + normalizedAmount;
-        if (projectedPaidAmount > Number(locked[0].netAmount) + PAYMENT_EPSILON) {
-          throw new Error('Сумма оплаты не может превышать сумму накладной');
-        }
+        await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`;
+        invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
+        if (!invoice || invoice.cancelled) throw financialError('Invoice not found or cancelled');
+        if (toCents(invoice.paidAmount) < 0 || toCents(addMoney(invoice.paidAmount, amount)) > toCents(invoice.netAmount)) throw financialError('Payment exceeds outstanding debt');
       }
-
-      const p = await tx.payment.create({
-        data: {
-          customerId: invoice?.customerId ?? Number(customer_id),
-          invoiceId,
-          userId,
-          amount: normalizedAmount,
-          method: method || 'cash',
-          idempotencyKey,
-        },
-      });
-
-      if (invoiceId) {
-        // Atomic increment (not read-modify-write) so a concurrently-committed
-        // payment's amount can never be overwritten/lost.
-        const updated = await tx.invoice.update({
-          where: { id: invoiceId },
-          data: { paidAmount: { increment: normalizedAmount } },
-        });
-
-        const newPaidAmount = roundMoney(Number(updated.paidAmount));
-        const netAmount = Number(updated.netAmount);
-        const status = newPaidAmount > 0 && newPaidAmount >= netAmount - PAYMENT_EPSILON ? 'paid' : 'partial';
-
-        if (status !== updated.status) {
-          await tx.invoice.update({
-            where: { id: invoiceId },
-            data: { status },
-          });
-        }
+      const payment = await tx.payment.create({ data: { customerId: invoice?.customerId ?? Number(req.body.customer_id), invoiceId, userId: req.user!.id, amount, method, idempotencyKey: key, requestHash: hash } });
+      if (invoice) {
+        const paidAmount = addMoney(invoice.paidAmount, amount);
+        await tx.invoice.update({ where: { id: invoiceId }, data: { paidAmount, status: getInvoiceStatus(paidAmount, Number(invoice.netAmount)) } });
       }
-
-      return p;
+      return payment;
     });
-
-    res.status(201).json(payment);
-  } catch (error: any) {
-    // Truly-concurrent duplicate submissions with the same idempotency key: the
-    // pre-check above can both pass before either commits, so the unique constraint
-    // is the final backstop — return the winning payment instead of a 500.
-    const retryKey = typeof req.body?.idempotency_key === 'string' ? req.body.idempotency_key.trim() : '';
-    if (error?.code === 'P2002' && retryKey && !res.headersSent) {
-      const existingPayment = await prisma.payment.findUnique({ where: { idempotencyKey: retryKey } });
-      if (existingPayment) {
-        return res.status(200).json(existingPayment);
-      }
-    }
-    next(error);
-  }
+    res.status(201).json(result);
+  } catch (error) { next(error); }
 });
 
+// Backward-compatible endpoint, now an append-only reversal, never a delete.
 router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    if (!isAdminRole(req.user?.role)) {
-      return res.status(403).json({ error: ADMIN_ONLY_PAYMENT_ERROR });
-    }
-
-    const paymentId = Number(req.params.id);
-    if (!Number.isFinite(paymentId) || paymentId <= 0) {
-      return res.status(400).json({ error: 'Payment ID is required' });
-    }
-
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        invoice: {
-          select: {
-            id: true,
-            warehouseId: true,
-            userId: true,
-            netAmount: true,
-            cancelled: true,
-          },
-        },
-      },
-    });
-
-    if (!payment) {
-      return res.status(404).json({ error: 'Payment not found' });
-    }
-
-    if (!payment.invoice) {
-      return res.status(400).json({ error: 'Only invoice payments can be cancelled' });
-    }
-
-    if (payment.invoice.cancelled) {
-      return res.status(400).json({ error: 'Cannot cancel payment for a cancelled invoice' });
-    }
-
+    if (!isAdminRole(req.user?.role)) return res.status(403).json({ error: ADMIN_ONLY_PAYMENT_ERROR });
+    const id = Number(req.params.id);
+    const meta = await prisma.payment.findUnique({ where: { id } });
+    if (!meta?.invoiceId) throw financialError('Only invoice payments can be reversed');
     const result = await prisma.$transaction(async (tx: any) => {
-      // Lock the invoice row before recomputing paidAmount so a concurrent
-      // payment insert/delete on the same invoice can't interleave with this recompute.
-      await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${payment.invoiceId} FOR UPDATE`;
-
-      await tx.payment.delete({
-        where: { id: paymentId },
-      });
-
-      const remainingPayments = await tx.payment.findMany({
-        where: { invoiceId: payment.invoiceId },
-        select: { amount: true },
-      });
-
-      const paidAmount = roundMoney(
-        remainingPayments.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
-      );
-      const status = getInvoiceStatus(paidAmount, Number(payment.invoice?.netAmount || 0));
-
-      const invoice = await tx.invoice.update({
-        where: { id: payment.invoiceId },
-        data: {
-          paidAmount,
-          status,
-        },
-        include: {
-          customer: true,
-          user: { select: PUBLIC_USER_SELECT },
-          items: true,
-        },
-      });
-
-      return {
-        success: true,
-        invoice: {
-          ...invoice,
-          customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
-          staff_name: invoice.user?.username || '—',
-        },
-      };
+      await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${meta.invoiceId} FOR UPDATE`;
+      const invoice = await tx.invoice.findUnique({ where: { id: meta.invoiceId } });
+      if (!invoice || invoice.cancelled) throw financialError('Invoice not found or cancelled');
+      const payments = await tx.payment.findMany({ where: { invoiceId: meta.invoiceId } });
+      const original = payments.find((p: any) => p.id === id);
+      if (!original || Number(original.amount) <= 0 || original.reversalOfId) throw new Error('Refund and reversal entries cannot be deleted; use an explicit adjustment');
+      if (!payments.some((p: any) => p.reversalOfId === id)) {
+        if (payments.some((p: any) => p.returnId || (Number(p.amount) < 0 && !p.reversalOfId))) throw financialError('Payments with dependent refunds require an explicit reconciliation');
+        const paid = addMoney(...payments.map((p: any) => p.amount));
+        if (toCents(paid) !== toCents(invoice.paidAmount) || toCents(paid) < toCents(original.amount)) throw financialError('Payment reversal would create a negative balance');
+        await tx.payment.create({ data: { customerId: original.customerId, invoiceId: original.invoiceId, userId: req.user!.id, amount: -Number(original.amount), method: original.method, reversalOfId: id, idempotencyKey: `payment-reversal:${id}` } });
+      }
+      const all = await tx.payment.findMany({ where: { invoiceId: meta.invoiceId } });
+      const paidAmount = addMoney(...all.map((p: any) => p.amount));
+      const updated = await tx.invoice.update({ where: { id: meta.invoiceId }, data: { paidAmount, status: getInvoiceStatus(paidAmount, Number(invoice.netAmount)) }, include: { customer: true, user: { select: PUBLIC_USER_SELECT }, items: true } });
+      return { success: true, invoice: updated };
     });
-
     res.json(result);
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 });
-
 export default router;

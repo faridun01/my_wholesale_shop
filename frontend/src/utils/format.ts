@@ -1,6 +1,8 @@
+import { fromCents, toCents } from './financial';
 export const roundMoney = (value: unknown, digits = 2) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
+  if (digits === 2) return fromCents(toCents(value || 0));
   const factor = Math.pow(10, digits);
   return Math.round((numeric + Math.sign(numeric || 1) * Number.EPSILON) * factor) / factor;
 };

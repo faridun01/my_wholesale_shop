@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { operationKey } from '../utils/financial-operation.js';
 import prisma from '../db/prisma.js';
 import { InvoiceService } from '../services/invoice.service.js';
 import { AuditService } from '../services/audit.service.js';
@@ -9,6 +10,7 @@ import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.
 import { getLineCost, getLineNetRevenue } from './reports.helpers.js';
 import { buildInvoiceListWhere, sanitizeInvoiceCreatePayload } from './invoices.helpers.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
+import { assertNoTaxPayload } from '../utils/financial.js';
 
 const router = Router();
 
@@ -43,6 +45,9 @@ router.get('/', async (req: AuthRequest, res, next) => {
           items: access.isAdmin
             ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
             : true,
+          returns: access.isAdmin
+            ? { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } }
+            : false,
         },
         skip,
         take: limit,
@@ -61,9 +66,10 @@ router.get('/', async (req: AuthRequest, res, next) => {
         const totalProfit = access.isAdmin
           ? inv.items.reduce((sum: number, item: any) => sum + (getLineNetRevenue(inv, item) - getLineCost(item)), 0)
           : undefined;
+        const { returns: _returns, ...invoiceData } = inv;
 
         return {
-          ...inv,
+          ...invoiceData,
           customer_name: inv.customerNameSnapshot || inv.customer?.name || 'Клиент',
           staff_name: inv.user?.username || '—',
           totalProfit,
@@ -98,6 +104,7 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     const userId = req.user!.id;
     const warehouseId = access.isAdmin ? Number(req.body.warehouseId) : access.warehouseId;
@@ -113,6 +120,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
     const invoice = await InvoiceService.createInvoice({
       ...sanitizeInvoiceCreatePayload(req.body, access.isAdmin),
+      idempotencyKey: operationKey(req.body.idempotencyKey),
       customerId,
       userId,
       warehouseId,
@@ -128,6 +136,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     const invoiceId = Number(req.params.id);
     const invoiceMeta = await prisma.invoice.findUnique({
@@ -167,7 +176,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           items: req.body.items,
           discount: req.body.discount !== undefined ? Number(req.body.discount) : undefined,
         })
-      : await InvoiceService.reassignCustomer(invoiceId, customerId);
+      : await InvoiceService.reassignCustomer(invoiceId, customerId, req.user!.id);
     res.json(invoice);
   } catch (error) {
     if (error instanceof Error) {
@@ -222,6 +231,7 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/return', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     const invoiceMeta = await prisma.invoice.findUnique({
       where: { id: Number(req.params.id) },
@@ -237,6 +247,7 @@ router.post('/:id/return', async (req: AuthRequest, res, next) => {
     const userId = req.user!.id;
     const result = await InvoiceService.returnItems(Number(req.params.id), {
       ...req.body,
+      idempotencyKey: req.body.idempotencyKey ?? req.body.idempotency_key,
       userId,
     });
     res.json(result);

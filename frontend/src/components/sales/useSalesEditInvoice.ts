@@ -1,3 +1,4 @@
+import { discountedUnit, discountAmount } from '../../utils/financial';
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -58,6 +59,10 @@ const useSalesEditInvoice = ({
       return false;
     }
 
+    if (Number(invoice.tax || 0) !== 0) {
+      return false;
+    }
+
     // Not admin-exempt: the backend wipes Return rows and never reconciles paidAmount
     // when items are edited, so nobody — including admins — can safely edit an
     // invoice that already has a return or a payment recorded against it.
@@ -67,7 +72,7 @@ const useSalesEditInvoice = ({
       return false;
     }
 
-    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.length > 0;
+    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0) !== 0;
     const hasPaidAmount = Number(invoice.paidAmount || 0) > SALES_PAYMENT_EPSILON;
     if (hasPayments || hasPaidAmount) {
       return false;
@@ -93,6 +98,10 @@ const useSalesEditInvoice = ({
       return 'Накладную нельзя изменить';
     }
 
+    if (Number(invoice.tax || 0) !== 0) {
+      return 'Накладную с историческим налогом нельзя изменить без ручной сверки';
+    }
+
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {
       return 'Накладную с возвратом нельзя изменить';
     }
@@ -101,7 +110,7 @@ const useSalesEditInvoice = ({
       return 'Накладную с возвратом нельзя изменить';
     }
 
-    if (Array.isArray(invoice.payments) && invoice.payments.length > 0) {
+    if (Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0) !== 0) {
       return 'Оплаченную накладную нельзя изменить';
     }
 
@@ -398,7 +407,7 @@ const useSalesEditInvoice = ({
         if (!Number.isFinite(quantity) || !Number.isFinite(sellingPrice) || quantity <= 0 || sellingPrice < 0) {
           return sum;
         }
-        const unitPriceRounded = ceilMoney(sellingPrice * (1 - (Number.isFinite(itemDiscount) ? itemDiscount : 0) / 100));
+        const unitPriceRounded = discountedUnit(sellingPrice, Math.min(100, Math.max(0, Number.isFinite(itemDiscount) ? itemDiscount : 0)));
         const itemDiscounted = quantity * unitPriceRounded;
         return sum + itemDiscounted;
       }, 0),
@@ -410,20 +419,12 @@ const useSalesEditInvoice = ({
     if (!Number.isFinite(discountPercent) || discountPercent <= 0) {
       return 0;
     }
-    return roundMoney(editInvoiceSubtotal * (discountPercent / 100));
+    return discountAmount(editInvoiceSubtotal, Math.min(100, discountPercent));
   }, [editInvoiceSubtotal, editDiscount]);
 
-  const editInvoiceTaxAmount = React.useMemo(() => {
-    const taxAmount = Number(selectedInvoice?.tax || 0);
-    if (!Number.isFinite(taxAmount) || taxAmount <= 0) {
-      return 0;
-    }
-    return taxAmount;
-  }, [selectedInvoice?.tax]);
-
   const editInvoiceNetAmount = React.useMemo(
-    () => roundMoney(Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount + editInvoiceTaxAmount)),
-    [editInvoiceDiscountAmount, editInvoiceSubtotal, editInvoiceTaxAmount],
+    () => roundMoney(Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount)),
+    [editInvoiceDiscountAmount, editInvoiceSubtotal],
   );
 
   const openEditInvoiceModal = async (invoice: any) => {
@@ -577,7 +578,6 @@ const useSalesEditInvoice = ({
     filteredEditInvoiceItems,
     editInvoiceSubtotal,
     editInvoiceDiscountAmount,
-    editInvoiceTaxAmount,
     editInvoiceNetAmount,
     setEditCustomerId,
     setEditDiscount,

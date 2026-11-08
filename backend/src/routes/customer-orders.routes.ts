@@ -1,3 +1,6 @@
+import { assertNoTaxPayload, financialError } from '../utils/financial.js';
+import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
+import { saleTotals } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -34,18 +37,7 @@ const mapOrder = (order: any) => ({
   staff_name: order.approvedByUser?.username || null,
 });
 
-const calculateOrderTotal = (items: any[], discount = 0) => {
-  const subtotal = roundMoney(items.reduce((sum, item) => {
-    const quantity = normalizeNonNegative(item.totalBaseUnits ?? item.quantity);
-    const sellingPrice = normalizeNonNegative(item.sellingPrice);
-    const lineDiscount = Math.min(100, normalizeNonNegative(item.discount));
-    const discountedUnitPrice = ceilMoney(sellingPrice * (1 - lineDiscount / 100));
-    return roundMoney(sum + roundMoney(quantity * discountedUnitPrice));
-  }, 0));
-
-  const invoiceDiscountAmount = roundMoney(subtotal * (Math.min(100, normalizeNonNegative(discount)) / 100));
-  return roundMoney(Math.max(0, subtotal - invoiceDiscountAmount));
-};
+const calculateOrderTotal = (items: any[], discount = 0) => saleTotals(items, discount).net;
 
 const ensureCustomerOrderAccess = async (req: AuthRequest, orderId: number) => {
   const order = await (prisma as any).customerOrder.findUnique({
@@ -117,6 +109,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     if (!isCustomerRole(req.user?.role)) {
       return res.status(403).json({ error: 'Только клиент может оформить заявку через этот маршрут' });
     }
@@ -176,10 +169,18 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const discount = normalizeNonNegative(req.body?.discount);
     const totalAmount = calculateOrderTotal(items, discount);
 
-    const order = await (prisma as any).customerOrder.create({
+    const key = operationKey(req.body.idempotency_key);
+    const hash = requestHash({ ...req.body, userId: req.user.id });
+    const order = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+      const existing = await tx.customerOrder.findUnique({ where: { idempotencyKey: key }, include: includeOrderDetails });
+      if (existing) { assertReplay(existing, hash); return existing; }
+      return tx.customerOrder.create({
       data: {
-        customerId: req.user.customerId,
-        userId: req.user.id,
+        idempotencyKey: key,
+        requestHash: hash,
+        customerId: req.user!.customerId,
+        userId: req.user!.id,
         warehouseId,
         discount,
         totalAmount,
@@ -187,6 +188,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         items: { create: items },
       },
       include: includeOrderDetails,
+    });
     });
 
     res.status(201).json(mapOrder(order));
@@ -197,6 +199,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/approve', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     if (!isStaffRole(req.user?.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -209,28 +212,17 @@ router.post('/:id/approve', async (req: AuthRequest, res, next) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    if (order.status !== 'pending') {
-      return res.status(400).json({ error: 'Заказ уже обработан' });
-    }
-
-    // Atomically claim the order before creating the invoice: only one concurrent
-    // approve request can flip status away from 'pending', so a double-click or two
-    // staff approving at once can never both succeed and create two invoices.
-    const claim = await (prisma as any).customerOrder.updateMany({
-      where: { id: orderId, status: 'pending' },
-      data: { status: 'processing' },
-    });
-    if (claim.count === 0) {
-      return res.status(400).json({ error: 'Заказ уже обработан' });
-    }
-
-    let invoice;
-    try {
-      invoice = await InvoiceService.createInvoice({
-        customerId: order.customerId,
+    const result = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT id FROM customer_orders WHERE id = ${orderId} FOR UPDATE`;
+      const current = await tx.customerOrder.findUnique({ where: { id: orderId }, include: includeOrderDetails });
+      if (current.status === 'approved' && current.invoiceId) return { order: current, invoice: await tx.invoice.findUnique({ where: { id: current.invoiceId } }) };
+      if (current.status !== 'pending') throw financialError('Order is not pending');
+      const invoice = await InvoiceService.createInvoice({
+        idempotencyKey: `customer-order:${current.id}`,
+        customerId: current.customerId,
         userId: req.user!.id,
-        warehouseId: order.warehouseId,
-        items: order.items.map((item: any) => ({
+        warehouseId: current.warehouseId,
+        items: current.items.map((item: any) => ({
           productId: item.productId,
           quantity: Number(item.quantity),
           totalBaseUnits: Number(item.totalBaseUnits ?? item.quantity),
@@ -243,31 +235,14 @@ router.post('/:id/approve', async (req: AuthRequest, res, next) => {
           sellingPrice: Number(item.sellingPrice || 0),
           discount: Number(item.discount || 0),
         })),
-        discount: Number(order.discount || 0),
+        discount: Number(current.discount || 0),
         paidAmount: 0,
         paymentMethod: 'cash',
-      });
-    } catch (invoiceError) {
-      // Release the claim so the order can be retried instead of getting stuck in 'processing'.
-      await (prisma as any).customerOrder.updateMany({
-        where: { id: orderId, status: 'processing' },
-        data: { status: 'pending' },
-      });
-      throw invoiceError;
-    }
-
-    const updatedOrder = await (prisma as any).customerOrder.update({
-      where: { id: orderId },
-      data: {
-        status: 'approved',
-        invoiceId: invoice.id,
-        approvedByUserId: req.user!.id,
-        approvedAt: new Date(),
-      },
-      include: includeOrderDetails,
-    });
-
-    res.json({ order: mapOrder(updatedOrder), invoice });
+      }, tx);
+      const updatedOrder = await tx.customerOrder.update({ where: { id: orderId }, data: { status: 'approved', invoiceId: invoice.id, approvedByUserId: req.user!.id, approvedAt: new Date() }, include: includeOrderDetails });
+      return { order: updatedOrder, invoice };
+    }, { maxWait: 10000, timeout: 120000 });
+    res.json({ order: mapOrder(result.order), invoice: result.invoice });
   } catch (error) {
     next(error);
   }

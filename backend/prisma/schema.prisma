@@ -220,6 +220,8 @@ model CustomerOrder {
   warehouseId Int      @map("warehouse_id")
   status      String   @default("pending")
   totalAmount Decimal  @default(0) @db.Decimal(12, 2) @map("total_amount")
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
   discount    Float    @default(0)
   note        String?
   invoiceId   Int?     @map("invoice_id")
@@ -354,10 +356,17 @@ model Invoice {
   warehouseId Int      @map("warehouse_id")
   totalAmount Decimal  @db.Decimal(12, 2) @map("total_amount")
   discount    Float    @default(0)
-  tax         Decimal  @default(0) @db.Decimal(12, 2)
+  tax         Decimal  @default(0) @db.Decimal(12, 2) // Legacy invoice tax; new operations persist zero.
   netAmount   Decimal  @db.Decimal(12, 2) @map("net_amount")
   paidAmount  Decimal  @default(0) @db.Decimal(12, 2) @map("paid_amount")
   returnedAmount Decimal @default(0) @db.Decimal(12, 2) @map("returned_amount")
+  originalNetAmount Decimal? @db.Decimal(12, 2) @map("original_net_amount")
+  originalPaidAmount Decimal? @db.Decimal(12, 2) @map("original_paid_amount")
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
+  calculationVersion Int? @map("calculation_version")
+  originalSnapshot Json? @map("original_snapshot")
+  revisions InvoiceRevision[]
   status      String   @default("unpaid") // 'paid' | 'partial' | 'unpaid'
   cancelled   Boolean  @default(false)
   paymentDueDate DateTime? @map("payment_due_date")
@@ -408,6 +417,10 @@ model InvoiceItem {
   discount     Float    @default(0)
   totalPrice   Decimal  @db.Decimal(12, 2) @map("total_price")
   returnedQty  Float    @default(0) @map("returned_qty")
+  allocatedOrderDiscount Decimal? @db.Decimal(12, 2) @map("allocated_order_discount")
+  eligibleNetAmount Decimal? @db.Decimal(12, 2) @map("eligible_net_amount")
+  allocatedTax Decimal? @db.Decimal(12, 2) @map("allocated_tax") // Retained for legacy invoice history.
+  returnItems ReturnItem[]
 
   invoice         Invoice          @relation(fields: [invoiceId], references: [id])
   product         Product          @relation(fields: [productId], references: [id])
@@ -440,6 +453,12 @@ model Payment {
   amount          Decimal  @db.Decimal(12, 2)
   method          String   @default("cash") // 'cash' | 'card' | 'transfer'
   idempotencyKey  String?  @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
+  returnId Int? @map("return_id")
+  return Return? @relation(fields: [returnId], references: [id])
+  reversalOfId Int? @unique @map("reversal_of_id")
+  reversalOf Payment? @relation("PaymentReversal", fields: [reversalOfId], references: [id])
+  reversal Payment? @relation("PaymentReversal")
   createdAt       DateTime @default(now()) @map("created_at")
 
   customer Customer @relation(fields: [customerId], references: [id])
@@ -461,6 +480,10 @@ model Expense {
   title       String
   amount      Decimal  @db.Decimal(12, 2)
   paidAmount  Decimal  @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  originalAmount Decimal? @db.Decimal(12, 2) @map("original_amount")
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
+  refunds ExpenseRefund[]
   expenseDate DateTime @map("expense_date")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -483,6 +506,11 @@ model ExpensePayment {
   method      String   @default("cash")
   paymentDate DateTime @default(now()) @map("payment_date")
   note        String?
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
+  reversalOfId Int? @unique @map("reversal_of_id")
+  reversalOf ExpensePayment? @relation("ExpensePaymentReversal", fields: [reversalOfId], references: [id])
+  reversal ExpensePayment? @relation("ExpensePaymentReversal")
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Restrict (not Cascade): deleting an Expense must not silently wipe out real
@@ -504,6 +532,13 @@ model Return {
   userId     Int      @map("user_id")
   reason     String?
   totalValue Decimal  @db.Decimal(12, 2) @map("total_value")
+  refundedAmount Decimal? @db.Decimal(12, 2) @map("refunded_amount")
+  debtReduction Decimal? @db.Decimal(12, 2) @map("debt_reduction")
+  refundMethod String? @map("refund_method")
+  idempotencyKey String? @unique @map("idempotency_key")
+  requestHash String? @map("request_hash")
+  items ReturnItem[]
+  payments Payment[]
   createdAt  DateTime @default(now()) @map("created_at")
 
   invoice  Invoice  @relation(fields: [invoiceId], references: [id])
@@ -514,6 +549,51 @@ model Return {
   @@index([customerId, createdAt])
   @@index([userId, createdAt])
   @@map("returns")
+}
+
+model ReturnItem {
+  id Int @id @default(autoincrement())
+  returnId Int @map("return_id")
+  invoiceItemId Int @map("invoice_item_id")
+  quantity Int
+  sellingPrice Decimal @db.Decimal(12, 2) @map("selling_price")
+  itemDiscount Float @map("item_discount")
+  allocatedOrderDiscount Decimal @db.Decimal(12, 2) @map("allocated_order_discount")
+  totalValue Decimal @db.Decimal(12, 2) @map("total_value")
+  taxAmount Decimal @default(0) @db.Decimal(12, 2) @map("tax_amount") // Historical returns only; new returns persist zero.
+  return Return @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  invoiceItem InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Restrict)
+  @@unique([returnId, invoiceItemId])
+  @@index([invoiceItemId])
+  @@map("return_items")
+}
+
+model ExpenseRefund {
+  id Int @id @default(autoincrement())
+  expenseId Int @map("expense_id")
+  userId Int @map("user_id")
+  amount Decimal @db.Decimal(12, 2)
+  refundedAmount Decimal @db.Decimal(12, 2) @map("refunded_amount")
+  debtReduction Decimal @db.Decimal(12, 2) @map("debt_reduction")
+  method String?
+  reason String?
+  idempotencyKey String @unique @map("idempotency_key")
+  requestHash String @map("request_hash")
+  createdAt DateTime @default(now()) @map("created_at")
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  @@index([expenseId, createdAt])
+  @@map("expense_refunds")
+}
+
+model InvoiceRevision {
+  id Int @id @default(autoincrement())
+  invoiceId Int @map("invoice_id")
+  userId Int @map("user_id")
+  snapshot Json
+  createdAt DateTime @default(now()) @map("created_at")
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  @@index([invoiceId, createdAt])
+  @@map("invoice_revisions")
 }
 
 model InventoryTransaction {

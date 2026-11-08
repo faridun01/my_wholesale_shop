@@ -1,3 +1,4 @@
+import { financialPost } from './financialRequest';
 import client from './client';
 
 export const getCustomerOrders = async (status?: string) => {
@@ -13,7 +14,7 @@ export const getPendingCustomerOrdersCount = async () => {
 };
 
 export const createCustomerOrder = async (data: any) => {
-  const response = await client.post('/customer-orders', data);
+  const response = await financialPost('/customer-orders', data);
   return response.data;
 };
 

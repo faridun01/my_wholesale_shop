@@ -1,4 +1,6 @@
 import prisma from '../db/prisma.js';
+import { addMoney, assertNoTax, cumulativeValue, discountedUnit, discountAmount, fromCents, invoiceLines, lineTotal, percent, quantity as wholeQuantity, refundByMethod, refundSplit, saleTotals, toCents } from '../utils/financial.js';
+import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
 import { normalizeMoney, roundMoney, ceilMoney, getInvoiceStatus } from '../utils/money.js';
@@ -25,23 +27,11 @@ function normalizeNonNegativeNumber(value: number, fieldName: string) {
   return normalized;
 }
 
-function calculateDiscountedUnitPrice(sellingPrice: number, discountPercent = 0) {
-  // Clamp defensively: a >100% discount would flip the unit price negative and
-  // silently cancel out other lines' revenue once summed into totalAmount.
-  const clampedDiscount = Math.min(100, Math.max(0, discountPercent));
-  return ceilMoney(sellingPrice * (1 - clampedDiscount / 100));
-}
-
-function calculateLineTotal(quantity: number, sellingPrice: number, discountPercent = 0) {
-  return roundMoney(roundMoney(quantity) * calculateDiscountedUnitPrice(sellingPrice, discountPercent));
-}
-
-function calculateInvoiceDiscountAmount(totalAmount: number, discountPercent = 0) {
-  return roundMoney(totalAmount * (discountPercent / 100));
-}
-
-function calculateInvoiceNetAmount(totalAmount: number, discountPercent = 0, tax = 0, returnedAmount = 0) {
-  return roundMoney(Math.max(0, totalAmount - calculateInvoiceDiscountAmount(totalAmount, discountPercent) + tax - returnedAmount));
+const calculateDiscountedUnitPrice = discountedUnit;
+const calculateLineTotal = lineTotal;
+const calculateInvoiceDiscountAmount = discountAmount;
+function calculateHistoricalInvoiceNetAmount(totalAmount: number, discountPercent = 0, tax = 0, returnedAmount = 0) {
+  return Math.max(0, addMoney(totalAmount, -discountAmount(totalAmount, discountPercent), tax, -returnedAmount));
 }
 
 function buildRequestedQuantityByProduct(
@@ -51,7 +41,7 @@ function buildRequestedQuantityByProduct(
 
   for (const item of items) {
     const productId = Number(item.productId);
-    const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
+    const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
     requested.set(productId, Math.round((requested.get(productId) || 0) + quantity));
   }
 
@@ -105,7 +95,14 @@ function buildCurrentInvoiceItemSnapshot(item: any) {
     packageQuantity,
     extraUnitQuantity,
     returnedQty: 0,
-    totalPrice: calculateLineTotal(remainingBaseUnits, Number(item?.sellingPrice || 0), Number(item?.discount || 0)),
+    originalQuantity: originalTotalBaseUnits,
+    cumulativeReturnedQty: returnedQty,
+    totalPrice: addMoney(item.remainingNetAmount, item.allocatedOrderDiscount ?? 0, -cumulativeValue(item.allocatedOrderDiscount ?? 0, returnedQty, originalTotalBaseUnits)),
+    netLineTotal: item.remainingNetAmount,
+    allocatedTax: item.remainingTax,
+    originalEligibleNetAmount: item.eligibleNetAmount,
+    originalAllocatedTax: item.allocatedTax,
+    allocatedOrderDiscount: addMoney(item.allocatedOrderDiscount ?? 0, -cumulativeValue(item.allocatedOrderDiscount ?? 0, returnedQty, originalTotalBaseUnits)),
   };
 }
 
@@ -134,14 +131,15 @@ export class InvoiceService {
       discount?: number;
     }[];
     discount?: number;
-    tax?: number;
+    tax?: unknown;
     paidAmount?: number;
     paymentMethod?: string;
     paymentDueDate?: string;
-  }) {
-    const { customerId, userId, warehouseId, items, discount = 0, tax = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
-    const normalizedDiscount = normalizeMoney(normalizeNonNegativeNumber(discount, 'Discount'), 'Discount');
-    const normalizedTax = normalizeMoney(normalizeNonNegativeNumber(tax, 'Tax'), 'Tax');
+    idempotencyKey?: string;
+  }, transactionClient?: any) {
+    const { customerId, userId, warehouseId, items, discount = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
+    const normalizedDiscount = percent(discount);
+    assertNoTax(data.tax);
     const normalizedPaidAmount = normalizeMoney(normalizeNonNegativeNumber(paidAmount, 'Paid amount'), 'Paid amount');
 
     if (normalizedDiscount > 100) {
@@ -151,8 +149,17 @@ export class InvoiceService {
       throw new Error('Invoice must contain at least one item');
     }
 
-    // Start Prisma Transaction
-    return await prisma.$transaction(async (tx: any) => {
+    const key = data.idempotencyKey ? operationKey(data.idempotencyKey) : null;
+    const hash = requestHash(data);
+    // An order approval can supply its enclosing transaction so the sale and
+    // order link commit or roll back together.
+    const runTransaction: any = transactionClient ? (callback: any) => callback(transactionClient) : prisma.$transaction.bind(prisma);
+    return await runTransaction(async (tx: any) => {
+      if (key) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+        const existing = await tx.invoice.findUnique({ where: { idempotencyKey: key } });
+        if (existing) { assertReplay(existing, hash); return existing; }
+      }
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
       const companyProfile = await tx.companyProfile.findFirst({ where: { isActive: true }, orderBy: { id: 'asc' } });
       const productIds = [...new Set(items.map((item) => Number(item.productId)))];
@@ -205,7 +212,7 @@ export class InvoiceService {
       // 1. Calculate totals
       let totalAmount = 0;
       for (const item of items) {
-        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
+        const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
         if (quantity <= 0) {
@@ -219,9 +226,10 @@ export class InvoiceService {
       }
 
       totalAmount = roundMoney(totalAmount);
-      const netAmount = calculateInvoiceNetAmount(totalAmount, normalizedDiscount, normalizedTax);
+      const calculation = saleTotals(items, normalizedDiscount);
+      const netAmount = calculation.net;
 
-      if (normalizedPaidAmount > Number(netAmount) + PAYMENT_EPSILON) {
+      if (toCents(normalizedPaidAmount) > toCents(netAmount)) {
         throw new Error('Сумма оплаты не может превышать сумму накладной');
       }
 
@@ -234,12 +242,17 @@ export class InvoiceService {
           userId,
           warehouseId,
           totalAmount,
+          originalNetAmount: netAmount,
+          originalPaidAmount: normalizedPaidAmount,
+          calculationVersion: 1,
           discount: normalizedDiscount,
-          tax: normalizedTax,
+          tax: 0,
           netAmount,
           paidAmount: normalizedPaidAmount,
           status,
           paymentDueDate: paymentDueDate ? new Date(paymentDueDate) : null,
+          idempotencyKey: key,
+          requestHash: hash,
           companyNameSnapshot: companyProfile?.name || null,
           companyCountrySnapshot: companyProfile?.country || null,
           companyRegionSnapshot: companyProfile?.region || null,
@@ -252,8 +265,8 @@ export class InvoiceService {
       });
 
       // 3. Create Items and Allocate Stock
-      for (const item of items) {
-        const quantity = normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity');
+      for (const [itemIndex, item] of items.entries()) {
+        const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const product = productsById.get(item.productId);
 
@@ -271,11 +284,11 @@ export class InvoiceService {
 
         const packageQuantity =
           item.packageQuantity !== undefined && item.packageQuantity !== null
-            ? Math.round(normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity'))
+            ? wholeQuantity(item.packageQuantity, true)
             : null;
         const extraUnitQuantity =
           item.extraUnitQuantity !== undefined && item.extraUnitQuantity !== null
-            ? Math.round(normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity'))
+            ? wholeQuantity(item.extraUnitQuantity, true)
             : 0;
         const baseUnitName = normalizeBaseUnitName(item.baseUnitName || packaging?.baseUnitName || product.baseUnitName || product.unit);
 
@@ -297,7 +310,10 @@ export class InvoiceService {
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
             discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
-            totalPrice: calculateLineTotal(quantity, sellingPrice, normalizeNonNegativeNumber(item.discount || 0, 'Item discount')),
+            totalPrice: calculation.lines[itemIndex].total,
+            allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
+            eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
+            allocatedTax: calculation.lines[itemIndex].allocatedTax,
           },
         });
 
@@ -346,11 +362,12 @@ export class InvoiceService {
     });
   }
 
-  static async reassignCustomer(invoiceId: number, customerId: number) {
+  static async reassignCustomer(invoiceId: number, customerId: number, userId?: number) {
     return await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`;
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
-        select: { id: true, customerId: true },
+        include: { items: true, payments: true, returns: true },
       });
 
       if (!invoice) {
@@ -371,10 +388,13 @@ export class InvoiceService {
         throw new Error('Customer not found');
       }
 
+      const snapshot = JSON.parse(JSON.stringify(invoice));
+      await tx.invoiceRevision.create({ data: { invoiceId, userId: userId ?? invoice.userId, snapshot } });
       await tx.invoice.update({
         where: { id: invoiceId },
         data: {
           customerId,
+          originalSnapshot: invoice.originalSnapshot ?? snapshot,
           customerNameSnapshot: customer.name,
           customerPhoneSnapshot: customer.phone || null,
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
@@ -457,6 +477,10 @@ export class InvoiceService {
         throw new Error('Invoice not found');
       }
 
+      if (toCents(invoice.tax) !== 0) {
+        throw new Error('Накладная с историческим налогом требует ручной сверки перед редактированием');
+      }
+
       if (invoice.cancelled && !isAdmin) {
         throw new Error('Cancelled invoice cannot be edited');
       }
@@ -476,8 +500,8 @@ export class InvoiceService {
       // the invoice here would leave paidAmount > netAmount with no correction —
       // an admin must delete/adjust the existing payment(s) first.
       if (
-        (Array.isArray(invoice.payments) && invoice.payments.length > 0) ||
-        Number(invoice.paidAmount || 0) > PAYMENT_EPSILON
+        Number(invoice.paidAmount || 0) > 0 ||
+        toCents(addMoney(...(invoice.payments || []).map((p: any) => p.amount))) !== toCents(invoice.paidAmount)
       ) {
         throw new Error('Нельзя менять товары в накладной после оплаты. Сначала удалите оплату.');
       }
@@ -551,7 +575,7 @@ export class InvoiceService {
 
       let totalAmount = 0;
       for (const item of items) {
-        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
+        const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
 
@@ -566,9 +590,12 @@ export class InvoiceService {
       }
 
       totalAmount = roundMoney(totalAmount);
-      const normalizedDiscount = normalizeMoney(normalizeNonNegativeNumber(Number(data.discount !== undefined ? data.discount : invoice.discount || 0), 'Discount'), 'Discount');
-      const normalizedTax = normalizeMoney(normalizeNonNegativeNumber(Number(invoice.tax || 0), 'Tax'), 'Tax');
-      const netAmount = calculateInvoiceNetAmount(totalAmount, normalizedDiscount, normalizedTax);
+      const normalizedDiscount = percent(data.discount !== undefined ? data.discount : invoice.discount || 0);
+      const calculation = saleTotals(items, normalizedDiscount);
+      const netAmount = calculation.net;
+      const previousSnapshot = JSON.parse(JSON.stringify(invoice));
+      await tx.invoiceRevision.create({ data: { invoiceId, userId, snapshot: previousSnapshot } });
+      if (!invoice.originalSnapshot) await tx.invoice.update({ where: { id: invoiceId }, data: { originalSnapshot: previousSnapshot } });
       const affectedProductIds = new Set<number>();
 
       for (const existingItem of invoice.items) {
@@ -593,8 +620,8 @@ export class InvoiceService {
         where: { invoiceId },
       });
 
-      for (const item of items) {
-        const quantity = Math.round(normalizeNonNegativeNumber(item.totalBaseUnits ?? item.quantity, 'Item quantity'));
+      for (const [itemIndex, item] of items.entries()) {
+        const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
         const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
         const product = productsById.get(Number(item.productId));
 
@@ -608,11 +635,11 @@ export class InvoiceService {
 
         const packageQuantity =
           item.packageQuantity !== undefined && item.packageQuantity !== null
-            ? Math.round(normalizeNonNegativeNumber(item.packageQuantity, 'Package quantity'))
+            ? wholeQuantity(item.packageQuantity, true)
             : null;
         const extraUnitQuantity =
           item.extraUnitQuantity !== undefined && item.extraUnitQuantity !== null
-            ? Math.round(normalizeNonNegativeNumber(item.extraUnitQuantity, 'Extra unit quantity'))
+            ? wholeQuantity(item.extraUnitQuantity, true)
             : 0;
         const baseUnitName = normalizeBaseUnitName(item.baseUnitName || packaging?.baseUnitName || product.baseUnitName || product.unit);
 
@@ -633,7 +660,10 @@ export class InvoiceService {
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
             discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
-            totalPrice: calculateLineTotal(quantity, sellingPrice, normalizeNonNegativeNumber(item.discount || 0, 'Item discount')),
+            totalPrice: calculation.lines[itemIndex].total,
+            allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
+            eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
+            allocatedTax: calculation.lines[itemIndex].allocatedTax,
           },
         });
 
@@ -673,6 +703,8 @@ export class InvoiceService {
           customerPhoneSnapshot: customer.phone || null,
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
+          originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)),
+          calculationVersion: 1,
           discount: normalizedDiscount,
           netAmount,
           returnedAmount: 0,
@@ -709,7 +741,7 @@ export class InvoiceService {
         include: {
           items: true,
           payments: {
-            select: { id: true },
+            select: { id: true, amount: true },
           },
           returns: {
             select: { id: true },
@@ -721,11 +753,11 @@ export class InvoiceService {
         throw new Error('Invoice not found or already cancelled');
       }
 
-      if (!force && ((invoice.payments?.length || 0) > 0 || Number(invoice.paidAmount || 0) > PAYMENT_EPSILON)) {
+      if (Number(invoice.paidAmount || 0) !== 0 || toCents(addMoney(...(invoice.payments || []).map((p: any) => p.amount))) !== 0) {
         throw new Error('Нельзя удалить накладную, по которой уже есть оплата');
       }
 
-      if (!force && ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON)) {
+      if ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > 0) {
         throw new Error('Нельзя удалить накладную, по которой уже есть возврат');
       }
 
@@ -787,7 +819,7 @@ export class InvoiceService {
           include: { user: { select: PUBLIC_USER_SELECT } }
         },
         returns: {
-          include: { user: { select: PUBLIC_USER_SELECT } }
+          include: { user: { select: PUBLIC_USER_SELECT }, items: { include: { invoiceItem: true } }, payments: true }
         }
       }
     });
@@ -798,7 +830,8 @@ export class InvoiceService {
     const invoicePayments: any[] = Array.isArray(invoice.payments) ? invoice.payments : [];
     const invoiceReturns: any[] = Array.isArray((invoice as any).returns) ? (invoice as any).returns : [];
 
-    const normalizedItems = invoiceItems
+    const financialLines = invoiceLines(invoice);
+    const normalizedItems = financialLines
       .map((item) => buildCurrentInvoiceItemSnapshot(item))
       .filter(Boolean)
       .map((item: any) => ({
@@ -827,6 +860,8 @@ export class InvoiceService {
 
     return {
       ...invoice,
+      tax: addMoney(...financialLines.map((l: any) => l.remainingTax)),
+      saleBasisAmount: calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)),
       customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
       customer_phone: invoice.customerPhoneSnapshot || invoice.customer?.phone || null,
       customer_address: invoice.customerAddressSnapshot || (invoice.customer ? buildCustomerAddressSnapshot(invoice.customer) : null),
@@ -839,6 +874,8 @@ export class InvoiceService {
       company_note: companyProfile?.note || null,
       staff_name: invoice.user?.username || '—',
       items: normalizedItems,
+      originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
+      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, tax: addMoney(...financialLines.map((l: any) => l.remainingTax)), debtAmount: Math.max(0, addMoney(invoice.netAmount, -Number(invoice.paidAmount))) },
       payments: normalizedPayments,
       returns: normalizedReturns
     };
@@ -847,157 +884,70 @@ export class InvoiceService {
   /**
    * Handles partial returns.
    */
-  static async returnItems(invoiceId: number, data: { items: { invoiceItemId: number; quantity: number }[]; reason: string; userId: number }) {
-    const { items, reason, userId } = data;
-
-    return await prisma.$transaction(async (tx: any) => {
-      // Lock the invoice row first so concurrent returns against the same invoice
-      // (double-click, two staff at once) serialize instead of both validating
-      // "available to return" against the same stale returnedQty snapshot.
-      const locked = await tx.$queryRaw<Array<{ id: number }>>`
-        SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE
-      `;
-      if (!locked[0]) {
-        throw new Error('Invoice not found');
-      }
-
+  static async returnItems(invoiceId: number, data: { items: { invoiceItemId: number; quantity: number }[]; reason: string; userId: number; idempotencyKey?: string; refundMethod?: string }) {
+    const key = operationKey(data.idempotencyKey);
+    if (!Array.isArray(data.items) || data.items.length === 0) throw new Error('Return must contain items');
+    const ids = new Set<number>();
+    for (const item of data.items) {
+      wholeQuantity(item.quantity);
+      if (!Number.isSafeInteger(Number(item.invoiceItemId)) || ids.has(Number(item.invoiceItemId))) throw new Error('Duplicate or invalid return item');
+      ids.add(Number(item.invoiceItemId));
+    }
+    const hash = requestHash({ invoiceId, ...data, items: [...data.items].sort((a, b) => a.invoiceItemId - b.invoiceItemId) });
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+      const existing = await tx.return.findUnique({ where: { idempotencyKey: key } });
+      const response = (r: any) => ({ success: true, returnId: r.id, refundAmount: Number(r.totalValue), cashRefundAmount: Number(r.refundedAmount), refundedAmount: Number(r.refundedAmount), debtReduction: Number(r.debtReduction), refundMethod: r.refundMethod });
+      if (existing) { assertReplay(existing, hash); return response(existing); }
+      const locked = await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${invoiceId} FOR UPDATE`;
+      if (!locked[0]) throw new Error('Invoice not found');
       const invoice = await tx.invoice.findUnique({
         where: { id: invoiceId },
-        include: { items: true }
+        include: {
+          items: { orderBy: { id: 'asc' } },
+          payments: true,
+          returns: { include: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
+        },
       });
-
-      if (!invoice) throw new Error('Invoice not found');
-      if (invoice.cancelled) {
-        throw new Error('Нельзя оформить возврат по отмененной накладной');
+      if (!invoice || invoice.cancelled) throw new Error('Invoice not found or cancelled');
+      const lines = invoiceLines(invoice);
+      if (toCents(invoice.tax) !== 0 && (invoice.returns || []).some((r: any) => !Array.isArray(r.items) || r.items.length === 0)) {
+        throw new Error('Исторические возвраты без состава требуют ручной сверки перед новым возвратом');
       }
-
-      let totalRefundValue = 0;
-
-
-      const affectedProductIds = new Set<number>();
-      let processedReturnCount = 0;
-
-      for (const returnItem of items) {
-        const originalItem = invoice.items.find((i: any) => Number(i.id) === Number(returnItem.invoiceItemId));
-        if (!originalItem) {
-          throw new Error(`Строка накладной #${returnItem.invoiceItemId} не найдена`);
-        }
-
-        const normalizedQuantity = Number(returnItem.quantity || 0);
-        if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
-          throw new Error(`Некорректное количество возврата для строки #${originalItem.id}`);
-        }
-
-        const availableToReturn = Math.max(0, Number(originalItem.quantity || 0) - Number(originalItem.returnedQty || 0));
-        if (availableToReturn <= PAYMENT_EPSILON) {
-          throw new Error(`Товар по строке #${originalItem.id} уже полностью возвращён`);
-        }
-
-        if (normalizedQuantity - availableToReturn > PAYMENT_EPSILON) {
-          throw new Error(`Нельзя вернуть больше, чем было продано для строки #${originalItem.id}`);
-        }
-
-        // 1. Return stock to batches (FIFO reverse) - this ensures stock goes back to the same warehouse
-        await StockService.deallocateStock(originalItem.id, normalizedQuantity, undefined, tx, false);
-        affectedProductIds.add(Number(originalItem.productId));
-
-        // 2. Record inventory transaction
-        await tx.inventoryTransaction.create({
-          data: {
-            productId: Number(originalItem.productId),
-            warehouseId: invoice.warehouseId,
-            userId,
-            qtyChange: normalizedQuantity,
-            type: 'return',
-            reason: String(reason || '').trim() ? `${String(reason).trim()} (Накладная #${invoiceId})` : `Возврат по накладной #${invoiceId}`,
-            referenceId: invoiceId,
-            costAtTime: Number(originalItem.costPrice || 0),
-            sellingAtTime: Number(originalItem.sellingPrice || 0),
-          }
-        });
-
-        // 3. Update InvoiceItem returnedQty
-        await tx.invoiceItem.update({
-          where: { id: originalItem.id },
-          data: { returnedQty: { increment: normalizedQuantity } }
-        });
-
-        // 4. Calculate refund value. Mirrors calculateDiscountedUnitPrice's ceilMoney
-        // rounding at each discount step so refunds match what was actually charged.
-        const itemDiscount = Number(originalItem.discount || 0);
-        const globalDiscount = Number(invoice.discount || 0);
-
-        // Value after item discount
-        const discountedUnitPrice = calculateDiscountedUnitPrice(Number(originalItem.sellingPrice), itemDiscount);
-        // Value after global discount
-        const finalUnitPrice = calculateDiscountedUnitPrice(discountedUnitPrice, globalDiscount);
-
-        const lineRefundValue = roundMoney(finalUnitPrice * normalizedQuantity);
-        totalRefundValue += lineRefundValue;
-        processedReturnCount += 1;
-      }
-
-      if (processedReturnCount === 0) {
-        throw new Error('Нет доступных товаров для возврата');
-      }
-
-      for (const productId of affectedProductIds) {
-        await StockService.updateProductStockCache(productId, tx);
-      }
-
-      // 5. Create Return record
-      await tx.return.create({
-        data: {
-          invoiceId,
-          customerId: invoice.customerId,
-          userId,
-          reason,
-          totalValue: roundMoney(totalRefundValue)
-        }
+      // Never repair legacy amounts implicitly. Ambiguous old returns need an
+      // explicit reconciliation, rather than inventing per-item historical data.
+      const accountedReturns = addMoney(...lines.map((l: any) => addMoney(l.returnedNetAmount, l.returnedTax)));
+      if (toCents(accountedReturns) !== toCents(invoice.returnedAmount)) throw new Error('Historical return amounts require reconciliation before another return');
+      const remainingValue = addMoney(...lines.map((l: any) => addMoney(l.remainingNetAmount, l.remainingTax)));
+      if (toCents(remainingValue) !== toCents(invoice.netAmount)) throw new Error('Invoice totals require reconciliation before another return');
+      const details = data.items.map(requested => {
+        const item = lines.find((l: any) => Number(l.id) === Number(requested.invoiceItemId));
+        if (!item || requested.quantity > item.remainingQuantity) throw new Error('Return quantity exceeds available quantity');
+        const nextQty = Number(item.returnedQty || 0) + requested.quantity;
+        const value = addMoney(cumulativeValue(item.eligibleNetAmount, nextQty, item.quantity), -item.returnedNetAmount);
+        const allocatedDiscount = addMoney(cumulativeValue(item.allocatedOrderDiscount, nextQty, item.quantity), -cumulativeValue(item.allocatedOrderDiscount, item.returnedQty || 0, item.quantity));
+        return { item, quantity: requested.quantity, value, taxValue: 0, allocatedDiscount };
       });
-
-      // 6. Update invoice returned amount and net amount
-      totalRefundValue = roundMoney(totalRefundValue);
-      const newReturnedAmount = roundMoney(Number(invoice.returnedAmount) + totalRefundValue);
-      const newNetAmount = Math.max(0, roundMoney(Number(invoice.netAmount) - totalRefundValue));
-
-      // 7. Refund cash back to the customer for whatever portion of the returned
-      // goods they'd already paid for — capped at what was actually paid, so a
-      // return on an unpaid/partially-paid invoice never manufactures a refund
-      // beyond real money received. Recorded as a negative Payment (same convention
-      // ExpensePayment already uses for refunds) so paidAmount and the payment
-      // history both reflect the full 100% cash-back immediately, instead of
-      // leaving it as a standing "change owed" balance the invoice merely displays.
-      const currentPaidAmount = Number(invoice.paidAmount || 0);
-      const cashRefundAmount = roundMoney(Math.min(currentPaidAmount, totalRefundValue));
-      const newPaidAmount = roundMoney(currentPaidAmount - cashRefundAmount);
-
-      if (cashRefundAmount > PAYMENT_EPSILON) {
-        await tx.payment.create({
-          data: {
-            customerId: invoice.customerId,
-            invoiceId,
-            userId,
-            amount: -cashRefundAmount,
-            method: 'refund',
-          },
-        });
+      const totalValue = addMoney(...details.map(d => d.value));
+      const split = refundSplit(invoice.netAmount, invoice.paidAmount, totalValue);
+      const paymentHistory = invoice.payments || [];
+      if (toCents(addMoney(...paymentHistory.map((p: any) => p.amount))) !== toCents(invoice.paidAmount)) throw new Error('Payment history requires reconciliation');
+      const refundPayments = split.refundedAmount > 0 ? refundByMethod(paymentHistory, split.refundedAmount) : [];
+      const method = refundPayments.length > 1 ? 'mixed' : refundPayments[0]?.method || null;
+      const returned = await tx.return.create({ data: {
+        invoiceId, customerId: invoice.customerId, userId: data.userId, reason: data.reason || null,
+        totalValue, refundedAmount: split.refundedAmount, debtReduction: split.debtReduction, refundMethod: method, idempotencyKey: key, requestHash: hash,
+        items: { create: details.map(d => ({ invoiceItemId: d.item.id, quantity: d.quantity, sellingPrice: d.item.sellingPrice, itemDiscount: d.item.discount || 0, allocatedOrderDiscount: d.allocatedDiscount, totalValue: d.value, taxAmount: d.taxValue })) },
+      } });
+      for (const d of details) {
+        await StockService.deallocateStock(d.item.id, d.quantity, undefined, tx, false);
+        await tx.invoiceItem.update({ where: { id: d.item.id }, data: { returnedQty: { increment: d.quantity } } });
+        await tx.inventoryTransaction.create({ data: { productId: d.item.productId, warehouseId: invoice.warehouseId, userId: data.userId, qtyChange: d.quantity, type: 'return', referenceId: invoiceId, reason: `Return #${returned.id}: ${data.reason || ''}`, costAtTime: d.item.costPrice || 0, sellingAtTime: d.item.sellingPrice } });
       }
-
-      // Update status based on the new net amount and post-refund paid amount
-      const status = getInvoiceStatus(newPaidAmount, Number(newNetAmount));
-
-      await tx.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          returnedAmount: newReturnedAmount,
-          netAmount: newNetAmount,
-          paidAmount: newPaidAmount,
-          status
-        }
-      });
-
-      return { success: true, refundAmount: roundMoney(totalRefundValue), cashRefundAmount };
+      for (const productId of new Set(details.map(d => Number(d.item.productId)))) await StockService.updateProductStockCache(productId, tx);
+      for (const refund of refundPayments) await tx.payment.create({ data: { invoiceId, customerId: invoice.customerId, userId: data.userId, amount: -refund.amount, method: refund.method, returnId: returned.id, idempotencyKey: `return:${returned.id}:${refund.method}` } });
+      await tx.invoice.update({ where: { id: invoiceId }, data: { returnedAmount: addMoney(invoice.returnedAmount, totalValue), netAmount: split.netAmount, paidAmount: split.paidAmount, status: getInvoiceStatus(split.paidAmount, split.netAmount) } });
+      return response(returned);
     }, TRANSACTION_OPTIONS);
   }
 }

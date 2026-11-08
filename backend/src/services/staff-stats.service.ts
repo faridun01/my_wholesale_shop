@@ -3,7 +3,7 @@ import { roundMoney } from '../utils/money.js';
 import { buildCreatedAtRange, getLineCost, getLineNetRevenue } from '../routes/reports.helpers.js';
 import { INVOICE_PAYMENT_STATUSES, type InvoicePaymentStatus } from '../routes/invoices.helpers.js';
 
-const PAYMENT_EPSILON = 0.01;
+const PAYMENT_EPSILON = 0;
 
 type DbClient = Pick<typeof prisma, 'invoice' | 'user'>;
 
@@ -81,12 +81,12 @@ export const buildStaffMetrics = (rows: StaffStatsGroupRow[]): StaffMetrics => {
     const rawPaid = Math.max(0, Number(row._sum.paidAmount || 0));
     const status = resolveBucketStatus(row.status, netAmount, rawPaid);
     const bucket = byStatus[status];
-    const appliedPaid = status === 'paid' ? netAmount : Math.min(rawPaid, netAmount);
+    const appliedPaid = Math.min(rawPaid, netAmount);
 
     bucket.count += Number(row._count._all || 0);
     bucket.amount += netAmount;
     bucket.paid += appliedPaid;
-    bucket.debt += status === 'paid' ? 0 : Math.max(0, netAmount - appliedPaid);
+    bucket.debt += Math.max(0, netAmount - appliedPaid);
     returnedAmount += Number(row._sum.returnedAmount || 0);
   }
 
@@ -99,7 +99,7 @@ export const buildStaffMetrics = (rows: StaffStatsGroupRow[]): StaffMetrics => {
   const invoicesCount = byStatus.paid.count + byStatus.partial.count + byStatus.unpaid.count;
   const soldAmount = roundMoney(byStatus.paid.amount + byStatus.partial.amount + byStatus.unpaid.amount);
   const paidAmount = roundMoney(byStatus.paid.paid + byStatus.partial.paid + byStatus.unpaid.paid);
-  const debtAmount = roundMoney(byStatus.partial.debt + byStatus.unpaid.debt);
+  const debtAmount = roundMoney(byStatus.paid.debt + byStatus.partial.debt + byStatus.unpaid.debt);
 
   return {
     invoicesCount,
@@ -199,10 +199,18 @@ export class StaffStatsService {
         where,
         select: {
           netAmount: true,
+          discount: true,
+          tax: true,
           items: {
             select: {
               quantity: true,
               returnedQty: true,
+              id: true,
+              totalPrice: true,
+              discount: true,
+              eligibleNetAmount: true,
+              allocatedOrderDiscount: true,
+              allocatedTax: true,
               sellingPrice: true,
               costPrice: true,
               saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } },

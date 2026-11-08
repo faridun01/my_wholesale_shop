@@ -1,3 +1,6 @@
+import { assertNoTaxPayload, financialError } from '../utils/financial.js';
+import { addMoney, refundByMethod, toCents } from '../utils/financial.js';
+import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -70,6 +73,7 @@ const normalizePaymentDate = (value: unknown) => {
 };
 
 const includeExpenseDetails = {
+  refunds: true,
   warehouse: {
     select: { id: true, name: true },
   },
@@ -90,7 +94,7 @@ const getExpenseRefundedAmount = (expense: any) =>
   Array.isArray(expense?.payments)
     ? roundMoney(
         expense.payments.reduce(
-          (sum: number, payment: any) => sum + (Number(payment.amount || 0) < 0 ? Math.abs(Number(payment.amount || 0)) : 0),
+          (sum: number, payment: any) => sum + (!payment.reversalOfId && Number(payment.amount || 0) < 0 ? Math.abs(Number(payment.amount || 0)) : 0),
           0,
         ),
       )
@@ -99,6 +103,7 @@ const getExpenseRefundedAmount = (expense: any) =>
 const normalizeExpenseResponse = (expense: any) => ({
   ...expense,
   refundedAmount: getExpenseRefundedAmount(expense),
+  returnedValue: addMoney(...(expense.refunds || []).map((r: any) => r.amount)),
   payments: Array.isArray(expense?.payments)
     ? expense.payments.map((payment: any) => ({
         ...payment,
@@ -113,7 +118,7 @@ const recalculateExpensePaidAmount = async (tx: any, expenseId: number) => {
     select: { amount: true },
   });
 
-  const paidAmount = roundMoney(payments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0));
+  const paidAmount = addMoney(...payments.map((payment: any) => payment.amount));
   const expense = await tx.expense.findUnique({
     where: { id: expenseId },
     select: { amount: true },
@@ -136,57 +141,6 @@ const recalculateExpensePaidAmount = async (tx: any, expenseId: number) => {
     data: { paidAmount },
     include: includeExpenseDetails,
   });
-};
-
-const trimExpensePaymentsToAmount = async (tx: any, expenseId: number, targetPaidAmount: number) => {
-  const payments = await tx.expensePayment.findMany({
-    where: { expenseId },
-    orderBy: [{ paymentDate: 'desc' as const }, { id: 'desc' as const }],
-    select: { id: true, amount: true },
-  });
-
-  let currentPaidAmount = roundMoney(payments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0));
-  let amountToTrim = roundMoney(currentPaidAmount - targetPaidAmount);
-
-  if (amountToTrim <= 0) {
-    return;
-  }
-
-  for (const payment of payments) {
-    if (amountToTrim <= 0) {
-      break;
-    }
-
-    const paymentAmount = Number(payment.amount || 0);
-    if (paymentAmount <= 0) {
-      continue;
-    }
-
-    const trimFromPayment = Math.min(paymentAmount, amountToTrim);
-    const nextPaymentAmount = roundMoney(paymentAmount - trimFromPayment);
-
-    if (nextPaymentAmount <= 0) {
-      await tx.expensePayment.delete({ where: { id: payment.id } });
-    } else {
-      await tx.expensePayment.update({
-        where: { id: payment.id },
-        data: { amount: nextPaymentAmount },
-      });
-    }
-
-    amountToTrim = roundMoney(amountToTrim - trimFromPayment);
-  }
-
-  currentPaidAmount = roundMoney(
-    (await tx.expensePayment.findMany({
-      where: { expenseId },
-      select: { amount: true },
-    })).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0),
-  );
-
-  if (currentPaidAmount > targetPaidAmount) {
-    throw Object.assign(new Error('Не удалось скорректировать оплаты расхода'), { status: 400 });
-  }
 };
 
 const ensureAdminOnly = (isAdmin: boolean) => {
@@ -240,6 +194,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     ensureAdminOnly(access.isAdmin);
     const requestedWarehouseId = Number(req.body?.warehouseId);
@@ -260,7 +215,12 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const expenseDate = normalizeExpenseDate(req.body?.expenseDate);
     const paymentDate = normalizePaymentDate(req.body?.paymentDate);
 
+    const key = operationKey(req.body.idempotency_key);
+    const hash = requestHash({ ...req.body, userId: req.user!.id });
     const created = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+      const existing = await tx.expense.findUnique({ where: { idempotencyKey: key }, include: includeExpenseDetails });
+      if (existing) { assertReplay(existing, hash); return existing; }
       const expense = await tx.expense.create({
         data: {
           warehouseId: Number(warehouseId),
@@ -268,6 +228,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
           category,
           title,
           amount,
+          originalAmount: amount,
+          idempotencyKey: key,
+          requestHash: hash,
           paidAmount: 0,
           expenseDate,
           note: normalizeOptionalString(req.body?.note),
@@ -298,6 +261,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
 const updateExpenseHandler = async (req: AuthRequest, res: any, next: any) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     ensureAdminOnly(access.isAdmin);
 
@@ -343,7 +307,7 @@ const updateExpenseHandler = async (req: AuthRequest, res: any, next: any) => {
         where: { expenseId },
         select: { amount: true },
       });
-      const paidAmount = roundMoney(payments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0));
+      const paidAmount = addMoney(...payments.map((payment: any) => payment.amount));
 
       if (paidAmount > amount) {
         throw Object.assign(new Error('Сумма расхода не может быть меньше уже внесенных оплат'), { status: 400 });
@@ -375,6 +339,7 @@ router.patch('/:id', updateExpenseHandler);
 
 router.post('/:id/payments', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     ensureAdminOnly(access.isAdmin);
     const expenseId = Number(req.params.id);
@@ -394,7 +359,10 @@ router.post('/:id/payments', async (req: AuthRequest, res, next) => {
 
     const amount = normalizePositiveAmount(req.body?.amount);
 
+    const key = operationKey(req.body.idempotency_key);
+    const hash = requestHash({ expenseId, ...req.body, userId: req.user!.id });
     const updated = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
       // Lock the expense row first so concurrent payments against the same expense
       // serialize instead of each recomputing paidAmount from a pre-commit snapshot
       // that's missing the other's not-yet-visible insert (last writer silently wins).
@@ -405,9 +373,13 @@ router.post('/:id/payments', async (req: AuthRequest, res, next) => {
         throw Object.assign(new Error('Расход не найден'), { status: 404 });
       }
 
+      const existing = await tx.expensePayment.findUnique({ where: { idempotencyKey: key } });
+      if (existing) { assertReplay(existing, hash); return tx.expense.findUnique({ where: { id: expenseId }, include: includeExpenseDetails }); }
       await tx.expensePayment.create({
         data: {
           expenseId,
+          idempotencyKey: key,
+          requestHash: hash,
           userId: req.user!.id,
           amount,
           method: String(req.body?.method || 'cash').trim() || 'cash',
@@ -427,57 +399,35 @@ router.post('/:id/payments', async (req: AuthRequest, res, next) => {
 
 router.post('/:id/refunds', async (req: AuthRequest, res, next) => {
   try {
-    const access = await getAccessContext(req);
-    ensureAdminOnly(access.isAdmin);
+    assertNoTaxPayload(req.body);
+    ensureAdminOnly((await getAccessContext(req)).isAdmin);
     const expenseId = Number(req.params.id);
-    const expenseExists = await prisma.expense.findUnique({
-      where: { id: expenseId },
-      select: { id: true },
-    });
-
-    if (!expenseExists) {
-      return res.status(404).json({ error: 'Расход не найден' });
-    }
-
-    const amount = normalizeRefundAmount(req.body?.amount);
-
+    const amount = normalizeRefundAmount(req.body.amount);
+    const key = operationKey(req.body.idempotency_key);
+    const hash = requestHash({ expenseId, amount, method: req.body.method, note: req.body.note, userId: req.user!.id });
     const updated = await prisma.$transaction(async (tx: any) => {
-      // Lock (and re-read inside the lock) so a concurrent payment/refund/update
-      // against the same expense can't be silently overwritten by this write, which
-      // otherwise computes nextAmount/nextPaidAmount from a pre-transaction snapshot.
-      const locked: Array<{ amount: unknown; paidAmount: unknown }> = await tx.$queryRaw`
-        SELECT amount, paid_amount as "paidAmount" FROM expenses WHERE id = ${expenseId} FOR UPDATE
-      `;
-      if (!locked[0]) {
-        throw Object.assign(new Error('Расход не найден'), { status: 404 });
-      }
-
-      const currentAmount = Number(locked[0].amount || 0);
-      const currentPaidAmount = Number(locked[0].paidAmount || 0);
-
-      if (amount > currentAmount) {
-        throw Object.assign(new Error('Сумма возврата не может быть больше суммы расхода'), { status: 400 });
-      }
-
-      const nextAmount = roundMoney(currentAmount - amount);
-      const nextPaidAmount = roundMoney(Math.min(currentPaidAmount, nextAmount));
-
-      await trimExpensePaymentsToAmount(tx, expenseId, nextPaidAmount);
-
-      return tx.expense.update({
-        where: { id: expenseId },
-        data: {
-          amount: nextAmount,
-          paidAmount: nextPaidAmount,
-        },
-        include: includeExpenseDetails,
-      });
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+      const locked = await tx.$queryRaw`SELECT * FROM expenses WHERE id = ${expenseId} FOR UPDATE`;
+      if (!locked[0]) throw financialError('Expense not found');
+      const existing = await tx.expenseRefund.findUnique({ where: { idempotencyKey: key } });
+      if (existing) { assertReplay(existing, hash); return tx.expense.findUnique({ where: { id: expenseId }, include: includeExpenseDetails }); }
+      const expense = await tx.expense.findUnique({ where: { id: expenseId } });
+      if (toCents(amount) > toCents(expense.amount)) throw financialError('Refund exceeds expense value');
+      const currentPaid = Number(expense.paidAmount);
+      const nextAmount = addMoney(expense.amount, -amount);
+      // Preserve the existing expense policy: reduce debt before refunding paid money.
+      const nextPaid = Math.min(currentPaid, nextAmount);
+      const refundedAmount = addMoney(currentPaid, -nextPaid);
+      const payments = await tx.expensePayment.findMany({ where: { expenseId } });
+      if (toCents(addMoney(...payments.map((p: any) => p.amount))) !== toCents(currentPaid)) throw financialError('Expense payment history requires reconciliation');
+      const breakdown = refundedAmount > 0 ? refundByMethod(payments, refundedAmount) : [];
+      const method = breakdown.length > 1 ? 'mixed' : breakdown[0]?.method || null;
+      await tx.expenseRefund.create({ data: { expenseId, userId: req.user!.id, amount, refundedAmount, debtReduction: addMoney(amount, -refundedAmount), method, reason: req.body.note || null, idempotencyKey: key, requestHash: hash } });
+      for (const part of breakdown) await tx.expensePayment.create({ data: { expenseId, userId: req.user!.id, amount: -part.amount, method: part.method, note: req.body.note || 'Expense refund', idempotencyKey: `expense-refund:${key}:${part.method}` } });
+      return tx.expense.update({ where: { id: expenseId }, data: { originalAmount: expense.originalAmount ?? expense.amount, amount: nextAmount, paidAmount: nextPaid }, include: includeExpenseDetails });
     });
-
     res.json(normalizeExpenseResponse(updated));
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 });
 
 router.delete('/:id/payments/:paymentId', async (req: AuthRequest, res, next) => {
@@ -504,7 +454,10 @@ router.delete('/:id/payments/:paymentId', async (req: AuthRequest, res, next) =>
         throw Object.assign(new Error('Расход не найден'), { status: 404 });
       }
 
-      await tx.expensePayment.delete({ where: { id: paymentId } });
+      const original = await tx.expensePayment.findUnique({ where: { id: paymentId } });
+      if (Number(original.amount) <= 0 || original.reversalOfId) throw financialError('Refunds and reversal entries cannot be deleted');
+      const previous = await tx.expensePayment.findUnique({ where: { reversalOfId: paymentId } });
+      if (!previous) await tx.expensePayment.create({ data: { expenseId, userId: req.user!.id, amount: -Number(original.amount), method: original.method, reversalOfId: paymentId, idempotencyKey: `expense-payment-reversal:${paymentId}`, note: 'Payment reversal' } });
       return recalculateExpensePaidAmount(tx, expenseId);
     });
 

@@ -29,7 +29,7 @@ export type CustomerDebtSummary = {
   unpaidCount: number;
 };
 
-const PAYMENT_EPSILON = 0.01;
+const PAYMENT_EPSILON = 0;
 
 export const customerPaymentStatusMeta: Record<CustomerPaymentStatus, { label: string; badgeVariant: 'success' | 'warning' | 'danger' }> = {
   paid: {

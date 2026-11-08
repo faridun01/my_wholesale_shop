@@ -1,3 +1,4 @@
+import { addMoney } from '../financial';
 import { formatMoney, formatTransactionReason } from '../format';
 
 import { buildDocumentHtml, createHiddenPrintFrame, escapeHtml } from './customerInvoice/shared';
@@ -299,7 +300,8 @@ const renderCustomerInvoiceSection = (
       <div class="summary">
         <div class="summary-row"><span>Подытог</span><strong>${escapeHtml(formatMoney(subtotal))}</strong></div>
         ${Number(invoice.discount || 0) > 0 ? `<div class="summary-row"><span>Скидка (${escapeHtml(invoice.discount)}%)</span><strong>-${escapeHtml(formatMoney(discountAmount))}</strong></div>` : ''}
-        ${Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount))}</strong></div>` : ''}
+        ${Number(invoice.tax || 0) > 0 ? `<div class="summary-row"><span>Tax</span><strong>${escapeHtml(formatMoney(invoice.tax))}</strong></div>` : ''}
+        ${!invoice.originalInvoice && Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount))}</strong></div>` : ''}
         <div class="summary-row total"><span>ИТОГО</span><strong>${escapeHtml(formatMoney(netAmount))}</strong></div>
         <div class="summary-row"><span>Оплачено</span><strong>${escapeHtml(formatMoney(appliedPaidAmount))}</strong></div>
         <div class="summary-row"><span>Остаток</span><strong>${escapeHtml(formatMoney(invoiceBalance))}</strong></div>
@@ -389,10 +391,10 @@ const renderCustomerGroupHeader = (customer: CustomerInvoicesBatchCustomer) => `
   </section>
 `;
 
-const getInvoiceStatementEntries = (invoice: any) => {
+export const getInvoiceStatementEntries = (invoice: any) => {
   const invoiceDate = invoice?.createdAt || new Date().toISOString();
   const invoiceNumber = invoice?.id ? `Накладная №${invoice.id}` : 'Накладная';
-  const invoiceDebit = Math.max(0, Number(invoice?.netAmount || 0));
+  const invoiceDebit = Math.max(0, Number(invoice?.saleBasisAmount ?? invoice?.originalNetAmount ?? addMoney(invoice?.netAmount ?? 0, invoice?.returnedAmount ?? 0)));
   const entries = [
     {
       date: invoiceDate,
@@ -409,7 +411,7 @@ const getInvoiceStatementEntries = (invoice: any) => {
         date: payment?.createdAt || invoiceDate,
         document: `Оплата по ${invoiceNumber}`,
         description: payment?.method ? `Оплата (${payment.method})` : 'Оплата',
-        debit: 0,
+        debit: Math.max(0, -Number(payment?.amount || 0)),
         credit: Math.max(0, Number(payment?.amount || 0)),
       });
     });
@@ -499,11 +501,11 @@ const renderCustomerReconciliationSection = (
   const invoiceRows = [...customer.invoices]
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
     .map((invoice: any, entryIndex: number) => {
-      const invoiceTotal = Math.max(0, Number(invoice?.netAmount || invoice?.totalAmount || 0));
+      const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
       const paidByEvents = Array.isArray(invoice?.paymentEvents)
-        ? invoice.paymentEvents.reduce((sum: number, payment: any) => sum + Math.max(0, Number(payment?.amount || 0)), 0)
+        ? invoice.paymentEvents.reduce((sum: number, payment: any) => addMoney(sum, payment?.amount ?? 0), 0)
         : 0;
-      const paidAmount = Math.max(0, Math.max(Number(invoice?.paidAmount || 0), paidByEvents));
+      const paidAmount = Math.max(0, Number(invoice?.paidAmount ?? paidByEvents));
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
         : 0;
@@ -527,11 +529,11 @@ const renderCustomerReconciliationSection = (
 
   const invoiceTotals = customer.invoices.reduce(
     (acc, invoice: any) => {
-      const invoiceTotal = Math.max(0, Number(invoice?.netAmount || invoice?.totalAmount || 0));
+      const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
       const paidByEvents = Array.isArray(invoice?.paymentEvents)
-        ? invoice.paymentEvents.reduce((sum: number, payment: any) => sum + Math.max(0, Number(payment?.amount || 0)), 0)
+        ? invoice.paymentEvents.reduce((sum: number, payment: any) => addMoney(sum, payment?.amount ?? 0), 0)
         : 0;
-      const paidAmount = Math.max(0, Math.max(Number(invoice?.paidAmount || 0), paidByEvents));
+      const paidAmount = Math.max(0, Number(invoice?.paidAmount ?? paidByEvents));
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
         : 0;

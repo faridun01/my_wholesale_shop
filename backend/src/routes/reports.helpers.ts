@@ -1,3 +1,4 @@
+import { addMoney, allocateCents, fromCents, invoiceLines, lineTotal, toCents } from '../utils/financial.js';
 export const MONEY_EPSILON = 0.0001;
 
 type DateRangeInput = {
@@ -95,27 +96,16 @@ export function getRemainingQuantity(item: any) {
   return Math.max(0, Number(item?.quantity || 0) - Number(item?.returnedQty || 0));
 }
 
-function getRemainingSubtotal(items: any[]) {
-  return items.reduce((sum, item) => sum + Number(item.sellingPrice || 0) * getRemainingQuantity(item), 0);
-}
-
 export function getLineNetRevenue(invoice: any, item: any) {
-  const remainingQty = getRemainingQuantity(item);
-  if (remainingQty <= 0) return 0;
-
-  const remainingSubtotal = getRemainingSubtotal(invoice.items || []);
-  const lineRemainingSubtotal = Number(item.sellingPrice || 0) * remainingQty;
-  const invoiceNetAmount = Number(invoice.netAmount || 0);
-
-  if (remainingSubtotal <= MONEY_EPSILON) {
-    return lineRemainingSubtotal;
-  }
-
-  if (invoiceNetAmount <= MONEY_EPSILON) {
-    return lineRemainingSubtotal;
-  }
-
-  return (lineRemainingSubtotal / remainingSubtotal) * invoiceNetAmount;
+  const items = invoice.items || [];
+  const index = items.indexOf(item);
+  if (index < 0 || getRemainingQuantity(item) <= 0 || toCents(invoice.netAmount ?? 0) <= 0) return 0;
+  const lines = invoiceLines(invoice);
+  const weights = lines.map(l => toCents(addMoney(l.remainingNetAmount, l.remainingTax)));
+  if (weights.every(w => w === 0)) return 0;
+  // Stored current invoice total is authoritative for legacy records too. Expose
+  // reconciliation anomalies separately; never manufacture undiscounted revenue.
+  return fromCents(allocateCents(toCents(invoice.netAmount), weights)[index]);
 }
 
 export function getLineCost(item: any) {
@@ -128,15 +118,15 @@ export function getLineCost(item: any) {
   // remainingQty/originalQty here would apply the return ratio a second time and
   // understate cost (overstate profit) for any partially-returned line.
   const allocatedCost = Array.isArray(item.saleAllocations)
-    ? item.saleAllocations.reduce((sum: number, alloc: any) => sum + Number(alloc.batch?.costPrice || 0) * Number(alloc.quantity || 0), 0)
+    ? item.saleAllocations.reduce((sum: number, alloc: any) => addMoney(sum, lineTotal(alloc.quantity || 0, alloc.batch?.costPrice || 0)), 0)
     : 0;
 
-  if (allocatedCost > MONEY_EPSILON) {
+  if (Array.isArray(item.saleAllocations) && item.saleAllocations.length > 0) {
     return allocatedCost;
   }
 
   const averageCost = Number(item.costPrice || 0);
-  return averageCost * remainingQty;
+  return lineTotal(remainingQty, averageCost);
 }
 
 export const buildInvoiceLineReportRows = ({

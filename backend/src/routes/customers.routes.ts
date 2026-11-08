@@ -1,3 +1,4 @@
+import { addMoney, discountAmount } from '../utils/financial.js';
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../db/prisma.js';
@@ -9,7 +10,7 @@ import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
-const PAYMENT_EPSILON = 0.01;
+const PAYMENT_EPSILON = 0;
 const normalizeCustomerName = (value: string | null | undefined) => String(value || '').trim().toLowerCase();
 
 const normalizeOptionalString = (value: unknown) => {
@@ -593,6 +594,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
 
     const history = invoices.map((invoice: any) => ({
       ...invoice,
+      saleBasisAmount: addMoney(invoice.totalAmount, -discountAmount(invoice.totalAmount, invoice.discount), invoice.tax),
       invoiceBalance: getInvoiceBalance(invoice),
       paymentEvents: (invoice.payments || []).map((payment: any) => ({
         id: payment.id,

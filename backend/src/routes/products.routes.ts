@@ -14,6 +14,7 @@ import {
   parsePackagingFromRawName,
 } from '../utils/product-packaging.js';
 import { roundMoney } from '../utils/money.js';
+import { assertNoTaxPayload } from '../utils/financial.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
@@ -217,6 +218,7 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     if (!ensureAdminProductAccess(access, res)) {
       return;
@@ -342,6 +344,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
 
 router.put('/:id', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     if (!ensureAdminProductAccess(access, res)) {
       return;
@@ -703,6 +706,7 @@ router.delete('/:id', async (req, res, next) => {
 
 router.post('/:id/restock', async (req: AuthRequest, res, next) => {
   try {
+    assertNoTaxPayload(req.body);
     const access = await getAccessContext(req);
     if (!ensureAdminProductAccess(access, res)) {
       return;
