@@ -1,7 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { addMoney, allocateCents, cumulativeValue, discountedUnit, invoiceLines, refundByMethod, refundSplit, saleTotals, toCents } from './financial.js';
+import { calculateEffectiveCostPrice } from './product-packaging.js';
+import { ceilMoney, roundMoney } from './money.js';
+import { addMoney, allocateCents, assertNoTaxPayload, cumulativeValue, discountedUnit, invoiceLines, refundByMethod, refundSplit, saleTotals, toCents } from './financial.js';
 describe('exact financial arithmetic', () => {
+  it('rounds purchase charges and decimal boundaries explicitly', () => {
+    expect(calculateEffectiveCostPrice(.1, 10)).toBe(.11);
+    expect(calculateEffectiveCostPrice(10, .75)).toBe(10.08);
+    expect(ceilMoney(1.01)).toBe(1.01);
+    expect(ceilMoney(1.001)).toBe(1.01);
+    expect(roundMoney(10.075)).toBe(10.08);
+  });
+  it('preserves three payments and reduces 1000 by a goods return of 150', () => {
+    const paid = addMoney(200, 200, 200);
+    expect(refundSplit(1000, paid, 150)).toEqual({ refundedAmount: 0, debtReduction: 150, creditAmount: 0, netAmount: 850, paidAmount: 600, debtAmount: 250 });
+    expect(refundSplit(850, paid, 350)).toMatchObject({ netAmount: 500, paidAmount: 600, debtAmount: 0, creditAmount: 0 });
+  });
+  it('rejects nonzero tax before rounding, including sub-cent amounts', () => {
+    for (const tax of ['0.004', '-0.001', '1e-20']) expect(() => assertNoTaxPayload({ tax })).toThrow();
+    expect(() => assertNoTaxPayload({ tax: '0.000' })).not.toThrow();
+  });
+  it('sums cents exactly without order-dependent floating point accumulation', () => {
+    expect(addMoney(...Array(10000).fill(.01))).toBe(100);
+    expect(addMoney(9999999999.99, .01, -9999999999.99)).toBe(.01);
+  });
   it('uses identical generated browser arithmetic', () => expect(readFileSync(new URL('./financial.ts', import.meta.url), 'utf8')).toBe(readFileSync(new URL('../../../frontend/src/utils/financial.ts', import.meta.url), 'utf8')));
   it('rounds exact money input and accepts common decimal separators', () => {
     expect(toCents('10.075')).toBe(1008); expect(toCents('-10.075')).toBe(-1008);
@@ -9,17 +31,16 @@ describe('exact financial arithmetic', () => {
     expect(toCents(',5')).toBe(50); expect(() => toCents('NaN')).toThrow();
   });
   it('retains upward discounted unit rounding', () => expect(discountedUnit(.05, 10)).toBe(.05));
-  it('calculates sales and discounts without tax and rejects nonzero tax input', () => {
+  it('calculates sales and discounts without a tax component', () => {
     const sale = saleTotals([{ quantity: 1, sellingPrice: 100 }], 20);
-    expect(sale).toMatchObject({ subtotal: 100, discount: 20, net: 80, lines: [{ allocatedTax: 0, eligibleNet: 80 }] });
-    expect(() => saleTotals([{ quantity: 1, sellingPrice: 100 }], 0, 10)).toThrow(/tax/i);
+    expect(sale).toMatchObject({ subtotal: 100, discount: 20, net: 80, lines: [{ eligibleNet: 80 }] });
+    expect(() => assertNoTaxPayload({ items: [{ taxAmount: 1 }] })).toThrow(/tax/i);
   });
-  it('uses recorded return tax only for historical returns', () => {
+  it('ignores legacy tax fields in return calculations', () => {
     const invoice = { tax: 10, discount: 0, items: [{ id: 1, quantity: 1, returnedQty: 1, totalPrice: 100, eligibleNetAmount: 100, allocatedTax: 10 }],
       returns: [{ items: [{ invoiceItemId: 1, taxAmount: 0 }] }] };
-    expect(invoiceLines(invoice)[0]).toMatchObject({ returnedNetAmount: 100, returnedTax: 0, remainingTax: 10 });
-    invoice.returns[0].items[0].taxAmount = 10;
-    expect(invoiceLines(invoice)[0]).toMatchObject({ returnedTax: 10, remainingTax: 0 });
+    expect(invoiceLines(invoice)[0]).toMatchObject({ returnedNetAmount: 100, remainingNetAmount: 0 });
+    expect(invoiceLines(invoice)[0]).not.toHaveProperty('remainingTax');
   });
   it('conserves discounts and refunds across generated combinations', () => {
     for (let cents = 0; cents < 100; cents++) for (const qty of [1, 2, 3, 7, 10]) for (const discount of [0, 1, 10, 33, 50, 99, 100]) {
@@ -33,8 +54,8 @@ describe('exact financial arithmetic', () => {
   it('reduces the invoice and debt without changing recorded payments', () => {
     expect(refundSplit(200, 50, 100)).toEqual({ refundedAmount: 0, debtReduction: 100, creditAmount: 0, netAmount: 100, paidAmount: 50, debtAmount: 50 });
   });
-  it('records return value above the remaining debt as customer credit', () => {
-    expect(refundSplit(100, 90, 20)).toEqual({ refundedAmount: 0, debtReduction: 10, creditAmount: 10, netAmount: 80, paidAmount: 90, debtAmount: 0 });
+  it('preserves payments without creating credit when returns exceed debt', () => {
+    expect(refundSplit(100, 90, 20)).toEqual({ refundedAmount: 0, debtReduction: 10, creditAmount: 0, netAmount: 80, paidAmount: 90, debtAmount: 0 });
   });
   it('allows report aggregates above a single database amount while rejecting oversized invoices', () => {
     expect(addMoney(9999999999.99, .01)).toBe(10000000000);

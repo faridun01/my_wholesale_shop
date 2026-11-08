@@ -356,7 +356,7 @@ model Invoice {
   warehouseId Int      @map("warehouse_id")
   totalAmount Decimal  @db.Decimal(12, 2) @map("total_amount")
   discount    Float    @default(0)
-  tax         Decimal  @default(0) @db.Decimal(12, 2) // Legacy invoice tax; new operations persist zero.
+  tax         Decimal  @default(0) @db.Decimal(12, 2) @ignore
   netAmount   Decimal  @db.Decimal(12, 2) @map("net_amount")
   paidAmount  Decimal  @default(0) @db.Decimal(12, 2) @map("paid_amount")
   returnedAmount Decimal @default(0) @db.Decimal(12, 2) @map("returned_amount")
@@ -419,7 +419,7 @@ model InvoiceItem {
   returnedQty  Float    @default(0) @map("returned_qty")
   allocatedOrderDiscount Decimal? @db.Decimal(12, 2) @map("allocated_order_discount")
   eligibleNetAmount Decimal? @db.Decimal(12, 2) @map("eligible_net_amount")
-  allocatedTax Decimal? @db.Decimal(12, 2) @map("allocated_tax") // Retained for legacy invoice history.
+  allocatedTax Decimal? @db.Decimal(12, 2) @map("allocated_tax") @ignore
   returnItems ReturnItem[]
 
   invoice         Invoice          @relation(fields: [invoiceId], references: [id])
@@ -561,7 +561,7 @@ model ReturnItem {
   itemDiscount Float @map("item_discount")
   allocatedOrderDiscount Decimal @db.Decimal(12, 2) @map("allocated_order_discount")
   totalValue Decimal @db.Decimal(12, 2) @map("total_value")
-  taxAmount Decimal @default(0) @db.Decimal(12, 2) @map("tax_amount") // Historical returns only; new returns persist zero.
+  taxAmount Decimal @default(0) @db.Decimal(12, 2) @map("tax_amount") @ignore
   return Return @relation(fields: [returnId], references: [id], onDelete: Restrict)
   invoiceItem InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Restrict)
   @@unique([returnId, invoiceItemId])

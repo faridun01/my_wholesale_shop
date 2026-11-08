@@ -50,51 +50,60 @@ suite('PostgreSQL financial transaction integration', () => {
     const rows = await db.returnItem.findMany({ where: { invoiceItemId: item.id } }); expect(rows).toHaveLength(1);
     await expect(db.returnItem.update({ where: { id: rows[0].id }, data: { totalValue: 100 } })).rejects.toThrow();
   });
-  it('keeps historical tax unchanged while new sequential returns exclude it', async () => {
+  it('leaves legacy tax columns untouched while new returns ignore them', async () => {
     const invoice = await sale(); const item = await db.invoiceItem.findFirstOrThrow({ where: { invoiceId: invoice.id } });
-    await db.invoice.update({ where: { id: invoice.id }, data: { tax: .02, netAmount: .15, originalNetAmount: .15 } });
-    await db.invoiceItem.update({ where: { id: item.id }, data: { allocatedTax: .02 } });
+    await db.$executeRaw`UPDATE invoices SET tax = 0.02 WHERE id = ${invoice.id}`;
+    await db.$executeRaw`UPDATE invoice_items SET allocated_tax = 0.02 WHERE id = ${item.id}`;
     for (let i = 0; i < 3; i++) await service.returnItems(invoice.id, { userId, reason: 'sequential', items: [{ invoiceItemId: item.id, quantity: 1 }], idempotencyKey: crypto.randomUUID() });
     const details: any = await service.getInvoiceDetails(invoice.id);
-    expect(details.items).toHaveLength(0); expect(Number(details.tax)).toBe(.02);
-    expect(Number(details.netAmount)).toBe(.02); expect(Number(details.paidAmount)).toBe(0);
+    expect(details.items).toHaveLength(0); expect(details).not.toHaveProperty('tax');
+    expect(Number(details.netAmount)).toBe(0); expect(Number(details.paidAmount)).toBe(.13);
     expect(Number(details.returnedAmount)).toBe(.13);
-    expect(Number(details.netAmount) - Number(details.paidAmount)).toBe(.02);
+    expect(details.financialSummary.debtAmount).toBe(0);
     expect(Number((await db.invoiceItem.findUniqueOrThrow({ where: { id: item.id } })).returnedQty)).toBe(3);
     expect(details.originalInvoice.items[0].quantity).toBe(3);
-    expect(Number(details.originalInvoice.tax)).toBe(.02);
-    expect(Number(details.originalInvoice.netAmount)).toBe(.15);
+    expect(details.originalInvoice).not.toHaveProperty('tax');
+    expect(Number(details.originalInvoice.netAmount)).toBe(.13);
     expect(details.returns).toHaveLength(3);
-    expect(details.returns.every((r: any) => r.items.length === 1 && r.payments.length === 1)).toBe(true);
-    expect(details.returns.every((r: any) => Number(r.items[0].taxAmount) === 0)).toBe(true);
+    expect(details.returns.every((r: any) => r.items.length === 1 && r.payments.length === 0)).toBe(true);
+    expect(details.returns.every((r: any) => !Object.hasOwn(r.items[0], 'taxAmount'))).toBe(true);
+    const [persisted] = await db.$queryRaw<Array<{ tax: number; allocated_tax: number }>>`
+      SELECT i.tax, ii.allocated_tax FROM invoices i JOIN invoice_items ii ON ii.invoice_id = i.id WHERE i.id = ${invoice.id}
+    `;
+    expect(Number(persisted.tax)).toBe(.02);
+    expect(Number(persisted.allocated_tax)).toBe(.02);
     expect(details.payments.filter((p: any) => Number(p.amount) > 0)).toHaveLength(1);
   });
-  it('refunds paid money first for partially paid invoices', async () => {
+  it('reduces debt without subtracting the original payment on a goods return', async () => {
     const invoice = await service.createInvoice({ customerId, userId, warehouseId, items: [{ productId, quantity: 2, sellingPrice: 100 }], paidAmount: 50, paymentMethod: 'transfer' });
     const item = await db.invoiceItem.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     const result = await service.returnItems(invoice.id, { userId, reason: '', items: [{ invoiceItemId: item.id, quantity: 1 }], idempotencyKey: crypto.randomUUID() });
-    expect(result.refundedAmount).toBe(50); expect(result.debtReduction).toBe(50); expect(result.refundMethod).toBe('transfer');
+    expect(result.refundedAmount).toBe(0); expect(result.debtReduction).toBe(100); expect(result.creditAmount).toBe(0);
     const state = await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
-    expect(Number(state.netAmount)).toBe(100); expect(Number(state.paidAmount)).toBe(0);
+    expect(Number(state.netAmount)).toBe(100); expect(Number(state.paidAmount)).toBe(50);
+    expect(await db.payment.count({ where: { invoiceId: invoice.id, amount: { gt: 0 } } })).toBe(1);
+    expect(await db.payment.count({ where: { returnId: result.returnId } })).toBe(0);
   });
   async function invokeRoute(router: any, path: string, method: string, body: any, params: any = {}) {
     let output: any; const res: any = { status: () => res, json: (value: any) => { output = value; } };
     const route = router.stack.find((l: any) => l.route?.path === path && l.route.methods[method]).route;
     await route.stack.at(-1).handle({ body, params, user: { id: userId, role: 'ADMIN' } }, res, (e: any) => { throw e; }); return output;
   }
-  it('refunds mixed methods proportionally and deduplicates payment retries', async () => {
+  it('preserves mixed payment history and deduplicates payment retries after a goods return', async () => {
     const router = (await import('../routes/payments.routes.js')).default;
     const invoice = await service.createInvoice({ customerId, userId, warehouseId, items: [{ productId, quantity: 2, sellingPrice: 100 }], paidAmount: 150, paymentMethod: 'cash' });
     const payload = { invoice_id: invoice.id, customer_id: customerId, amount: 50, method: 'card', idempotency_key: crypto.randomUUID() };
     await Promise.all([invokeRoute(router, '/', 'post', payload), invokeRoute(router, '/', 'post', payload)]);
     const item = await db.invoiceItem.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     const result = await service.returnItems(invoice.id, { userId, reason: '', items: [{ invoiceItemId: item.id, quantity: 1 }], idempotencyKey: crypto.randomUUID() });
-    const refunds = await db.payment.findMany({ where: { returnId: result.returnId }, orderBy: { amount: 'asc' } });
-    expect(refunds.map(p => [p.method, Number(p.amount)])).toEqual([['cash', -75], ['card', -25]]);
+    expect(result).toMatchObject({ cashRefundAmount: 0, debtReduction: 0, creditAmount: 0 });
+    expect(await db.payment.count({ where: { returnId: result.returnId } })).toBe(0);
     expect(await db.payment.count({ where: { invoiceId: invoice.id, amount: { gt: 0 } } })).toBe(2);
     await expect(invokeRoute(router, '/', 'post', { ...payload, amount: 40 })).rejects.toThrow(/different operation/);
     const original = await db.payment.findFirstOrThrow({ where: { invoiceId: invoice.id, amount: 150 } });
-    await expect(invokeRoute(router, '/:id', 'delete', {}, { id: original.id })).rejects.toThrow(/dependent refunds/);
+    const reversed = await invokeRoute(router, '/:id', 'delete', {}, { id: original.id });
+    expect(Number(reversed.invoice.paidAmount)).toBe(50);
+    expect(await db.payment.count({ where: { reversalOfId: original.id } })).toBe(1);
   });
   it('reverses ordinary payments by appending a single immutable ledger entry', async () => {
     const router = (await import('../routes/payments.routes.js')).default;
@@ -129,7 +138,7 @@ suite('PostgreSQL financial transaction integration', () => {
     await expect(service.returnItems(invoice.id, { userId, reason: '', items: [{ invoiceItemId: item.id, quantity: 1 }], idempotencyKey: crypto.randomUUID() })).rejects.toThrow(/allocations require reconciliation/);
     expect(await db.return.count({ where: { invoiceId: invoice.id } })).toBe(0);
     expect((await db.invoiceItem.findUniqueOrThrow({ where: { id: item.id } })).returnedQty).toBe(0);
-    expect(Number((await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).paidAmount)).toBe(.15);
+    expect(Number((await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).paidAmount)).toBe(.13);
   });
   it('does not leave an orphan invoice if customer-order approval cannot be linked', async () => {
     const router = (await import('../routes/customer-orders.routes.js')).default;

@@ -9,7 +9,7 @@ export default function FinancialReconciliationPanel({ start, end, warehouseId }
     client.get('/reports/reconciliation', { params: { start, end, warehouse_id: warehouseId || undefined } }).then(r => { if (active) setData(r.data); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [start, end, warehouseId]);
-  const fields = { salesBeforeReturns: 'Продажи до возвратов', returnedValue: 'Стоимость возвратов товаров', currentNet: 'Текущая выручка после возвратов', grossCollections: 'Всего поступило по оплатам', moneyRefunded: 'Фактически возвращено денег', paymentReversals: 'Сторно платежей', returnPaymentAdjustments: 'Старые корректировки оплат по возвратам', netCollections: 'Чистые поступления без товарных возвратов', debtReduction: 'Долг уменьшен возвратами', customerCredit: 'Кредит покупателям', outstandingDebt: 'Остаток долга' };
+  const fields = { salesBeforeReturns: 'Продажи до возвратов', returnedValue: 'Стоимость возвратов товаров', currentNet: 'Текущая выручка после возвратов', grossCollections: 'Всего поступило по оплатам', moneyRefunded: 'Фактически возвращено денег', paymentReversals: 'Сторно платежей', returnPaymentAdjustments: 'Старые корректировки оплат по возвратам', netCollections: 'Чистые поступления без товарных возвратов', debtReduction: 'Долг уменьшен возвратами', outstandingDebt: 'Остаток долга' };
   return <details className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
     <summary className="cursor-pointer font-bold">Сверка продаж, оплат и возвратов</summary>
     <p className="mt-2 text-xs text-slate-500">Накладные, созданные в выбранном периоде, с учётом всех последующих оплат и возвратов. Дата признания продаж не изменена.</p>

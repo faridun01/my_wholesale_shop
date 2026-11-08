@@ -30,8 +30,8 @@ function normalizeNonNegativeNumber(value: number, fieldName: string) {
 const calculateDiscountedUnitPrice = discountedUnit;
 const calculateLineTotal = lineTotal;
 const calculateInvoiceDiscountAmount = discountAmount;
-function calculateHistoricalInvoiceNetAmount(totalAmount: number, discountPercent = 0, tax = 0, returnedAmount = 0) {
-  return Math.max(0, addMoney(totalAmount, -discountAmount(totalAmount, discountPercent), tax, -returnedAmount));
+function calculateInvoiceNetAmount(totalAmount: number, discountPercent = 0, returnedAmount = 0) {
+  return Math.max(0, addMoney(totalAmount, -discountAmount(totalAmount, discountPercent), -returnedAmount));
 }
 
 function buildRequestedQuantityByProduct(
@@ -99,9 +99,7 @@ function buildCurrentInvoiceItemSnapshot(item: any) {
     cumulativeReturnedQty: returnedQty,
     totalPrice: addMoney(item.remainingNetAmount, item.allocatedOrderDiscount ?? 0, -cumulativeValue(item.allocatedOrderDiscount ?? 0, returnedQty, originalTotalBaseUnits)),
     netLineTotal: item.remainingNetAmount,
-    allocatedTax: item.remainingTax,
     originalEligibleNetAmount: item.eligibleNetAmount,
-    originalAllocatedTax: item.allocatedTax,
     allocatedOrderDiscount: addMoney(item.allocatedOrderDiscount ?? 0, -cumulativeValue(item.allocatedOrderDiscount ?? 0, returnedQty, originalTotalBaseUnits)),
   };
 }
@@ -246,7 +244,6 @@ export class InvoiceService {
           originalPaidAmount: normalizedPaidAmount,
           calculationVersion: 1,
           discount: normalizedDiscount,
-          tax: 0,
           netAmount,
           paidAmount: normalizedPaidAmount,
           status,
@@ -313,7 +310,6 @@ export class InvoiceService {
             totalPrice: calculation.lines[itemIndex].total,
             allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
             eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
-            allocatedTax: calculation.lines[itemIndex].allocatedTax,
           },
         });
 
@@ -475,10 +471,6 @@ export class InvoiceService {
 
       if (!invoice) {
         throw new Error('Invoice not found');
-      }
-
-      if (toCents(invoice.tax) !== 0) {
-        throw new Error('Накладная с историческим налогом требует ручной сверки перед редактированием');
       }
 
       if (invoice.cancelled && !isAdmin) {
@@ -663,7 +655,6 @@ export class InvoiceService {
             totalPrice: calculation.lines[itemIndex].total,
             allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
             eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
-            allocatedTax: calculation.lines[itemIndex].allocatedTax,
           },
         });
 
@@ -703,7 +694,7 @@ export class InvoiceService {
           customerPhoneSnapshot: customer.phone || null,
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
-          originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)),
+          originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)),
           calculationVersion: 1,
           discount: normalizedDiscount,
           netAmount,
@@ -862,8 +853,7 @@ export class InvoiceService {
 
     return {
       ...invoice,
-      tax: addMoney(...financialLines.map((l: any) => l.remainingTax)),
-      saleBasisAmount: calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)),
+      saleBasisAmount: calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)),
       customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
       customer_phone: invoice.customerPhoneSnapshot || invoice.customer?.phone || null,
       customer_address: invoice.customerAddressSnapshot || (invoice.customer ? buildCustomerAddressSnapshot(invoice.customer) : null),
@@ -879,9 +869,9 @@ export class InvoiceService {
       moneyRefundedAmount,
       returnPaymentAdjustments: goodsReturnPaymentAdjustments(normalizedPayments),
       items: normalizedItems,
-      originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
+      originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
       balancePaidAmount: balancePaidAmount(normalizedPayments, invoice.paidAmount),
-      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateHistoricalInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount), Number(invoice.tax)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, tax: addMoney(...financialLines.map((l: any) => l.remainingTax)), debtAmount: Math.max(0, addMoney(invoice.netAmount, -balancePaidAmount(normalizedPayments, invoice.paidAmount))), customerCredit: addMoney(...normalizedReturns.map((itemReturn: any) => itemReturn.creditAmount || 0)) },
+      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, debtAmount: Math.max(0, addMoney(invoice.netAmount, -balancePaidAmount(normalizedPayments, invoice.paidAmount))), customerCredit: 0 },
       payments: normalizedPayments,
       returns: normalizedReturns
     };
@@ -912,19 +902,16 @@ export class InvoiceService {
         include: {
           items: { orderBy: { id: 'asc' } },
           payments: true,
-          returns: { include: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
+          returns: { include: { items: { select: { invoiceItemId: true } } } },
         },
       });
       if (!invoice || invoice.cancelled) throw new Error('Invoice not found or cancelled');
       const lines = invoiceLines(invoice);
-      if (toCents(invoice.tax) !== 0 && (invoice.returns || []).some((r: any) => !Array.isArray(r.items) || r.items.length === 0)) {
-        throw new Error('Исторические возвраты без состава требуют ручной сверки перед новым возвратом');
-      }
       // Never repair legacy amounts implicitly. Ambiguous old returns need an
       // explicit reconciliation, rather than inventing per-item historical data.
-      const accountedReturns = addMoney(...lines.map((l: any) => addMoney(l.returnedNetAmount, l.returnedTax)));
+      const accountedReturns = addMoney(...lines.map((l: any) => l.returnedNetAmount));
       if (toCents(accountedReturns) !== toCents(invoice.returnedAmount)) throw new Error('Historical return amounts require reconciliation before another return');
-      const remainingValue = addMoney(...lines.map((l: any) => addMoney(l.remainingNetAmount, l.remainingTax)));
+      const remainingValue = addMoney(...lines.map((l: any) => l.remainingNetAmount));
       if (toCents(remainingValue) !== toCents(invoice.netAmount)) throw new Error('Invoice totals require reconciliation before another return');
       const details = data.items.map(requested => {
         const item = lines.find((l: any) => Number(l.id) === Number(requested.invoiceItemId));
@@ -932,7 +919,7 @@ export class InvoiceService {
         const nextQty = Number(item.returnedQty || 0) + requested.quantity;
         const value = addMoney(cumulativeValue(item.eligibleNetAmount, nextQty, item.quantity), -item.returnedNetAmount);
         const allocatedDiscount = addMoney(cumulativeValue(item.allocatedOrderDiscount, nextQty, item.quantity), -cumulativeValue(item.allocatedOrderDiscount, item.returnedQty || 0, item.quantity));
-        return { item, quantity: requested.quantity, value, taxValue: 0, allocatedDiscount };
+        return { item, quantity: requested.quantity, value, allocatedDiscount };
       });
       const totalValue = addMoney(...details.map(d => d.value));
       const paymentHistory = invoice.payments || [];
@@ -942,7 +929,7 @@ export class InvoiceService {
       const returned = await tx.return.create({ data: {
         invoiceId, customerId: invoice.customerId, userId: data.userId, reason: data.reason || null,
         totalValue, refundedAmount: split.refundedAmount, debtReduction: split.debtReduction, creditAmount: split.creditAmount, refundMethod: null, idempotencyKey: key, requestHash: hash,
-        items: { create: details.map(d => ({ invoiceItemId: d.item.id, quantity: d.quantity, sellingPrice: d.item.sellingPrice, itemDiscount: d.item.discount || 0, allocatedOrderDiscount: d.allocatedDiscount, totalValue: d.value, taxAmount: d.taxValue })) },
+        items: { create: details.map(d => ({ invoiceItemId: d.item.id, quantity: d.quantity, sellingPrice: d.item.sellingPrice, itemDiscount: d.item.discount || 0, allocatedOrderDiscount: d.allocatedDiscount, totalValue: d.value })) },
       } });
       for (const d of details) {
         await StockService.deallocateStock(d.item.id, d.quantity, undefined, tx, false);

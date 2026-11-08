@@ -106,7 +106,7 @@ async function main() {
     );
 
     const expectedNetAmount = roundMoney(
-      totalAmount - totalAmount * (Number(invoice.discount || 0) / 100) + Number(invoice.tax || 0) - calculatedReturnedAmount,
+      totalAmount - totalAmount * (Number(invoice.discount || 0) / 100) - calculatedReturnedAmount,
     );
     const expectedStatus = getInvoiceStatus(Number(invoice.paidAmount || 0), expectedNetAmount);
 

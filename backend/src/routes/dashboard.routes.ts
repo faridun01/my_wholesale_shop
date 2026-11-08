@@ -16,10 +16,10 @@ import { getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
 const router = Router();
 
 // Profit = SUM(invoice.net_amount) - SUM(actual COGS). Net amount already reflects
-// invoice discount/tax, and COGS prefers real batch-allocation cost (falling back to
+// invoice discount, and COGS prefers real batch-allocation cost (falling back to
 // the item's average cost) — this matches the methodology reports.routes.ts uses
 // (getLineNetRevenue/getLineCost), so Dashboard and Reports no longer diverge on
-// discounted/taxed invoices.
+// discounted invoices.
 const getDashboardProfit = async (warehouseId: number | null) => {
   const rows = await prisma.$queryRaw<Array<{ totalProfit: unknown }>>(
     warehouseId

@@ -5,7 +5,7 @@ ALTER TABLE invoices ADD CONSTRAINT invoices_financial_balances CHECK
 ALTER TABLE invoice_items ADD CONSTRAINT invoice_items_financial_quantities CHECK
   (quantity > 0 AND quantity = trunc(quantity) AND returned_qty >= 0 AND returned_qty = trunc(returned_qty) AND returned_qty <= quantity AND discount BETWEEN 0 AND 100) NOT VALID;
 ALTER TABLE return_items ADD CONSTRAINT return_items_financial_values CHECK
-  (quantity > 0 AND total_value >= 0 AND tax_amount >= 0 AND tax_amount <= total_value AND allocated_order_discount >= 0 AND item_discount BETWEEN 0 AND 100);
+  (quantity > 0 AND total_value >= 0 AND allocated_order_discount >= 0 AND item_discount BETWEEN 0 AND 100);
 ALTER TABLE returns ADD CONSTRAINT returns_financial_values CHECK
   (total_value >= 0 AND (refunded_amount IS NULL OR (refunded_amount >= 0 AND debt_reduction >= 0 AND refunded_amount + debt_reduction = total_value))) NOT VALID;
 ALTER TABLE expense_refunds ADD CONSTRAINT expense_refunds_financial_values CHECK

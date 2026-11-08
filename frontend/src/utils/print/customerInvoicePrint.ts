@@ -193,7 +193,6 @@ const renderReturnsBlock = (invoice: any) =>
                   const settlement = [
                     itemReturn.refundedAmount != null ? `Деньгами возвращено: ${formatMoney(itemReturn.refundedAmount)}` : '',
                     itemReturn.debtReduction != null ? `Уменьшение долга: ${formatMoney(itemReturn.debtReduction)}` : '',
-                    Number(itemReturn.creditAmount || 0) > 0 ? `Кредит клиента: ${formatMoney(itemReturn.creditAmount)}` : '',
                   ].filter(Boolean).map(escapeHtml).join('<br>');
                   return `
                   <tr>
@@ -313,7 +312,6 @@ const renderCustomerInvoiceSection = (
       <div class="summary">
         <div class="summary-row"><span>Подытог</span><strong>${escapeHtml(formatMoney(subtotal))}</strong></div>
         ${Number(invoice.discount || 0) > 0 ? `<div class="summary-row"><span>Скидка (${escapeHtml(invoice.discount)}%)</span><strong>-${escapeHtml(formatMoney(discountAmount))}</strong></div>` : ''}
-        ${Number(invoice.tax || 0) > 0 ? `<div class="summary-row"><span>Tax</span><strong>${escapeHtml(formatMoney(invoice.tax))}</strong></div>` : ''}
         ${!invoice.originalInvoice && Number(invoice.returnedAmount || 0) > 0 ? `<div class="summary-row"><span>Возвращено</span><strong>-${escapeHtml(formatMoney(invoice.returnedAmount))}</strong></div>` : ''}
         <div class="summary-row total"><span>ИТОГО</span><strong>${escapeHtml(formatMoney(netAmount))}</strong></div>
         <div class="summary-row"><span>Оплачено</span><strong>${escapeHtml(formatMoney(appliedPaidAmount))}</strong></div>

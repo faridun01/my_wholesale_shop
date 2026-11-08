@@ -1,3 +1,4 @@
+import { addMoney } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
 import { roundMoney } from '../utils/money.js';
 import { buildCreatedAtRange, getLineCost, getLineNetRevenue } from '../routes/reports.helpers.js';
@@ -84,10 +85,10 @@ export const buildStaffMetrics = (rows: StaffStatsGroupRow[]): StaffMetrics => {
     const appliedPaid = Math.min(rawPaid, netAmount);
 
     bucket.count += Number(row._count._all || 0);
-    bucket.amount += netAmount;
-    bucket.paid += appliedPaid;
-    bucket.debt += Math.max(0, netAmount - appliedPaid);
-    returnedAmount += Number(row._sum.returnedAmount || 0);
+    bucket.amount = addMoney(bucket.amount, netAmount);
+    bucket.paid = addMoney(bucket.paid, appliedPaid);
+    bucket.debt = addMoney(bucket.debt, Math.max(0, addMoney(netAmount, -appliedPaid)));
+    returnedAmount = addMoney(returnedAmount, row._sum.returnedAmount || 0);
   }
 
   for (const bucket of Object.values(byStatus)) {
@@ -200,7 +201,6 @@ export class StaffStatsService {
         select: {
           netAmount: true,
           discount: true,
-          tax: true,
           items: {
             select: {
               quantity: true,
@@ -210,7 +210,6 @@ export class StaffStatsService {
               discount: true,
               eligibleNetAmount: true,
               allocatedOrderDiscount: true,
-              allocatedTax: true,
               sellingPrice: true,
               costPrice: true,
               saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } },
@@ -222,7 +221,7 @@ export class StaffStatsService {
       profit = roundMoney(
         invoices.reduce(
           (sum, invoice) =>
-            sum + invoice.items.reduce((lineSum, item) => lineSum + getLineNetRevenue(invoice, item) - getLineCost(item), 0),
+            addMoney(sum, invoice.items.reduce((lineSum, item) => addMoney(lineSum, getLineNetRevenue(invoice, item), -getLineCost(item)), 0)),
           0,
         ),
       );

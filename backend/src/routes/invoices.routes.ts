@@ -46,7 +46,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
             ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
             : true,
           returns: access.isAdmin
-            ? { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } }
+            ? { select: { items: { select: { invoiceItemId: true } } } }
             : false,
           payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
         },
@@ -65,7 +65,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         // (proportional net revenue per line + real batch-allocation cost), so an
         // invoice's profit never disagrees depending on which screen shows it.
         const totalProfit = access.isAdmin
-          ? inv.items.reduce((sum: number, item: any) => sum + (getLineNetRevenue(inv, item) - getLineCost(item)), 0)
+          ? inv.items.reduce((sum: number, item: any) => addMoney(sum, getLineNetRevenue(inv, item), -getLineCost(item)), 0)
           : undefined;
         const { returns: _returns, ...invoiceData } = inv;
         const payments = Array.isArray(inv.payments) ? inv.payments : [];

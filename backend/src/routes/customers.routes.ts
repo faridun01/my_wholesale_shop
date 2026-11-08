@@ -601,7 +601,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
 
     const history = invoices.map((invoice: any) => ({
       ...invoice,
-      saleBasisAmount: addMoney(invoice.totalAmount, -discountAmount(invoice.totalAmount, invoice.discount), invoice.tax),
+      saleBasisAmount: addMoney(invoice.totalAmount, -discountAmount(invoice.totalAmount, invoice.discount)),
       invoiceBalance: getInvoiceBalance(invoice),
       grossPaidAmount: addMoney(...(invoice.payments || []).filter((payment: any) => Number(payment.amount) > 0).map((payment: any) => payment.amount)),
       balancePaidAmount: balancePaidAmount(invoice.payments || [], invoice.paidAmount),

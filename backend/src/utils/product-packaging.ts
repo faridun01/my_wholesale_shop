@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 const BRAND_PATTERN = /\bskif\b/iu;
 const QUOTED_BRAND_PATTERN = /[«»"“”„‟']\s*([^«»"“”„‟'](?:.*?[^«»"“”„‟'])?)\s*[«»"“”„‟']/u;
 const PACKAGING_PATTERN =
@@ -166,5 +167,5 @@ export function calculateEffectiveCostPrice(purchaseCostPrice: number, expensePe
     return purchase;
   }
 
-  return purchase + (purchase * percent / 100);
+  return new Prisma.Decimal(purchase).mul(new Prisma.Decimal(percent).div(100).plus(1)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toNumber();
 }

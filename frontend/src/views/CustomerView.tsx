@@ -1633,7 +1633,6 @@ export default function CustomerView() {
                                   <div className="font-bold text-rose-600">-{formatMoneyByRole(itemReturn.totalValue)}</div>
                                   {itemReturn.refundedAmount != null && <div className="mt-1 text-[10px] text-slate-500">Деньгами возвращено: {formatMoneyByRole(itemReturn.refundedAmount)}</div>}
                                   {itemReturn.debtReduction != null && <div className="text-[10px] text-slate-500">Долг уменьшен: {formatMoneyByRole(itemReturn.debtReduction)}</div>}
-                                  {Number(itemReturn.creditAmount || 0) > 0 && <div className="text-[10px] text-amber-700">Кредит: {formatMoneyByRole(itemReturn.creditAmount)}</div>}
                                   {itemReturn.items?.length > 0 && <div className="mt-1 max-w-64 whitespace-normal text-[10px] text-slate-600">{itemReturn.items.map((line: any) => `${line.productName || line.invoiceItem?.productNameSnapshot || 'Товар'} × ${line.quantity}`).join(', ')}</div>}
                                 </td>
                                 <td className="px-4 py-2.5 text-slate-700 font-medium">{formatTransactionReason(itemReturn.reason)}</td>

@@ -11,13 +11,13 @@ try {
     await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '10s'");
     return tx.$queryRaw`
       SELECT
-        (SELECT COUNT(*)::int FROM invoices WHERE paid_amount < 0 OR net_amount < 0 OR paid_amount > net_amount) AS invalid_balances,
+        (SELECT COUNT(*)::int FROM invoices WHERE paid_amount < 0 OR net_amount < 0) AS invalid_balances,
         (SELECT COUNT(*)::int FROM invoice_items WHERE quantity <> trunc(quantity) OR returned_qty <> trunc(returned_qty) OR returned_qty > quantity OR returned_qty < 0) AS invalid_quantities,
         (SELECT COUNT(*)::int FROM invoices i WHERE i.paid_amount <> COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)) AS payment_mismatches,
         (SELECT COUNT(*)::int FROM invoices i WHERE i.returned_amount <> COALESCE((SELECT SUM(r.total_value) FROM returns r WHERE r.invoice_id = i.id), 0)) AS return_mismatches,
         (SELECT COUNT(*)::int FROM invoices i WHERE i.total_amount <> COALESCE((SELECT SUM(ii.total_price) FROM invoice_items ii WHERE ii.invoice_id = i.id), 0)) AS subtotal_mismatches,
         (SELECT COUNT(*)::int FROM invoices WHERE discount < 0 OR discount > 100) AS invalid_discounts,
-        (SELECT COUNT(*)::int FROM invoices WHERE returned_amount > total_amount - round(total_amount * discount::numeric / 100, 2) + tax) AS excessive_returns,
+        (SELECT COUNT(*)::int FROM invoices WHERE returned_amount > total_amount - round(total_amount * discount::numeric / 100, 2)) AS excessive_returns,
         (SELECT COUNT(*)::int FROM expenses e WHERE paid_amount <> COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0)) AS expense_payment_mismatches,
         (SELECT COUNT(*)::int FROM returns) AS historical_return_count
     `;

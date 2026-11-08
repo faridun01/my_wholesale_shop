@@ -1,3 +1,4 @@
+import { addMoney, lineTotal } from '../utils/financial.js';
 import { DEFAULT_CUSTOMER_NAME } from '../utils/defaultCustomer.js';
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -11,7 +12,7 @@ export const safePercentChange = (current: number, previous: number) => {
 };
 
 export const getInvoiceDebt = (netAmount: number, paidAmount: number) => {
-  const balance = Number(netAmount || 0) - Number(paidAmount || 0);
+  const balance = addMoney(netAmount || 0, -Number(paidAmount || 0));
   return balance > PAYMENT_EPSILON ? balance : 0;
 };
 
@@ -27,7 +28,7 @@ export const getPeriodRevenue = (
   invoices.reduce((sum, invoice) => {
     const createdAt = new Date(invoice.createdAt);
     if (createdAt >= start && createdAt < end) {
-      return sum + Number(invoice.netAmount || 0);
+      return addMoney(sum, invoice.netAmount || 0);
     }
     return sum;
   }, 0);
@@ -48,7 +49,7 @@ export const computeInventoryValue = (
   }>
 ) =>
   batches.reduce((sum, batch) => {
-    return sum + Number(batch.remainingQuantity || 0) * Number(batch.costPrice || 0);
+    return addMoney(sum, lineTotal(batch.remainingQuantity || 0, batch.costPrice || 0));
   }, 0);
 
 export const filterAndSortLowStock = (lowStockRaw: any[]) =>

@@ -16,7 +16,7 @@ import productRouter from '../routes/products.routes.js';
 let invoice: any, payments: any[], returns: any[], tx: any;
 function reset(quantity = 3, price = .05, discount = 10, paid = 0) {
   const subtotal = Math.round(quantity * price * 100) / 100;
-  invoice = { id: 1, userId: 1, customerId: 1, warehouseId: 1, discount, tax: 0, totalAmount: subtotal,
+  invoice = { id: 1, userId: 1, customerId: 1, warehouseId: 1, discount, totalAmount: subtotal,
     netAmount: subtotal - Math.round(subtotal * discount) / 100, paidAmount: paid, returnedAmount: 0,
     items: [{ id: 1, productId: 1, quantity, totalBaseUnits: quantity, sellingPrice: price, discount: 0,
       totalPrice: subtotal, returnedQty: 0, product: { name: 'A' } }], payments: [], returns: [] };
@@ -41,7 +41,7 @@ beforeEach(() => {
   tx = { $queryRaw: vi.fn(async () => [structuredClone(invoice)]),
     customer: { findUnique: async () => ({ id: 1, name: 'Customer' }) }, companyProfile: { findFirst: async () => null },
     product: { findMany: async () => [{ id: 1, warehouseId: 1, stock: 100, packagings: [], name: 'A' }] },
-    invoice: { findUnique: async () => structuredClone({ ...invoice, payments, returns }), create: async ({ data }: any) => Object.assign(invoice, data), update: async ({ data }: any) => Object.assign(invoice, data) },
+    invoice: { findUnique: async () => structuredClone({ ...invoice, payments, returns }), create: async ({ data }: any) => Object.assign(invoice, data), update: vi.fn(async ({ data }: any) => Object.assign(invoice, data)) },
     invoiceItem: { create: async ({ data }: any) => { const item = { id: 1, ...data, returnedQty: 0 }; invoice.items = [item]; return item; }, update: async ({ data }: any) => { if (data.returnedQty) invoice.items[0].returnedQty += data.returnedQty.increment; }, deleteMany: async () => {} },
     return: { findUnique: async ({ where }: any) => returns.find(r => r.idempotencyKey === where.idempotencyKey), create: async ({ data }: any) => { const r = { id: returns.length + 1, ...data, items: data.items?.create || [] }; returns.push(r); return r; }, deleteMany: async () => {} },
     invoiceRevision: { create: async () => ({}) },
@@ -71,29 +71,29 @@ describe('audit regressions: transactions', () => {
     await expect(invoke(handler(expenseRouter, '/', 'post'), body)).rejects.toThrow(/tax/i);
     expect(await invokeResponse(handler(productRouter, '/:id/restock', 'post'), body, { id: '1' })).toMatchObject({ status: 400, body: { error: 'Tax is not supported' } });
     await expect(InvoiceService.createInvoice({ customerId: 1, userId: 1, warehouseId: 1, items: [{ productId: 1, quantity: 1, sellingPrice: 100 }], tax: 5 })).rejects.toThrow(/tax/i);
+    expect(await invokeResponse(handler(invoiceRouter, '/', 'post'), { items: [{ taxAmount: 5 }] })).toMatchObject({ status: 400, body: { error: 'Tax is not supported' } });
   });
-  it('keeps legacy invoice tax in the balance but excludes it from a new return', async () => {
-    reset(1, 100, 0, 110);
+  it('ignores legacy tax fields when calculating new returns', async () => {
+    reset(1, 100, 0, 100);
     invoice.tax = 10;
-    invoice.netAmount = 110;
     invoice.items[0].allocatedTax = 10;
     invoice.items[0].eligibleNetAmount = 100;
-    payments = [{ id: 1, amount: 110, method: 'card' }];
+    payments = [{ id: 1, amount: 100, method: 'card' }];
     await ret(1);
     expect(invoice.returnedAmount).toBe(100);
-    expect(invoice.netAmount).toBe(10);
-    expect(invoice.paidAmount).toBe(110);
+    expect(invoice.netAmount).toBe(0);
+    expect(invoice.paidAmount).toBe(100);
     expect(returns[0].items[0].totalValue).toBe(100);
-    expect(returns[0].items[0].taxAmount).toBe(0);
-    expect(returns[0].creditAmount).toBe(100);
-    expect(payments).toEqual([{ id: 1, amount: 110, method: 'card' }]);
+    expect(returns[0].items[0]).not.toHaveProperty('taxAmount');
+    expect(returns[0].creditAmount).toBe(0);
+    expect(payments).toEqual([{ id: 1, amount: 100, method: 'card' }]);
   });
   it('rejects fractional returns', async () => { await expect(ret(.4)).rejects.toThrow(); });
   it('does not record a one-cent goods return as a cash refund', async () => {
     reset(1, .01, 0, .01);
     await ret(1);
     expect(payments).toHaveLength(1);
-    expect(returns[0]).toMatchObject({ totalValue: .01, refundedAmount: 0, debtReduction: 0, creditAmount: .01 });
+    expect(returns[0]).toMatchObject({ totalValue: .01, refundedAmount: 0, debtReduction: 0, creditAmount: 0 });
   });
   it('reduces the invoice and debt without reducing the original payment', async () => {
     reset(5, 20, 0, 70);
@@ -108,13 +108,13 @@ describe('audit regressions: transactions', () => {
     expect(payments[0]).toMatchObject({ id: 1, amount: 70 });
     expect(payments.reduce((sum, payment) => sum + payment.amount, 0)).toBe(70);
   });
-  it('records return value above the remaining debt as customer credit', async () => {
+  it('preserves payments without creating credit when returns exceed debt', async () => {
     reset(2, 50, 0, 90);
     payments = [{ id: 1, amount: 90, method: 'card' }];
 
     const result = await ret(1);
 
-    expect(result).toMatchObject({ refundAmount: 50, cashRefundAmount: 0, debtReduction: 10, creditAmount: 40 });
+    expect(result).toMatchObject({ refundAmount: 50, cashRefundAmount: 0, debtReduction: 10, creditAmount: 0 });
     expect(invoice.netAmount).toBe(50);
     expect(invoice.paidAmount).toBe(90);
     expect(payments).toHaveLength(1);
@@ -129,12 +129,17 @@ describe('audit regressions: transactions', () => {
     reset(1, 100, 0); const details = vi.spyOn(InvoiceService, 'getInvoiceDetails').mockResolvedValue(invoice);
     try { await expect(InvoiceService.updateInvoice(1, { customerId: 1, userId: 1, discount: 150, items: [{ productId: 1, quantity: 1, sellingPrice: 100 }] })).rejects.toThrow(/discount/i); } finally { details.mockRestore(); }
   });
-  it('does not rewrite historical tax-bearing invoices during edits', async () => {
+  it('does not write or calculate legacy tax fields when editing', async () => {
     reset(1, 100, 0); invoice.tax = 10;
-    const original = structuredClone(invoice);
-    await expect(InvoiceService.updateInvoice(1, { customerId: 1, userId: 1, items: [{ productId: 1, quantity: 1, sellingPrice: 100 }] })).rejects.toThrow(/историческим налогом/i);
-    expect(invoice).toEqual(original);
-    expect(StockService.deallocateStock).not.toHaveBeenCalled();
+    const details = vi.spyOn(InvoiceService, 'getInvoiceDetails').mockResolvedValue(invoice);
+    try {
+      await InvoiceService.updateInvoice(1, { customerId: 1, userId: 1, items: [{ productId: 1, quantity: 1, sellingPrice: 100 }] });
+    } finally {
+      details.mockRestore();
+    }
+    expect(invoice.netAmount).toBe(100);
+    expect(invoice.tax).toBe(10);
+    expect(tx.invoice.update.mock.calls[0]?.[0]?.data).not.toHaveProperty('tax');
   });
   it('does not delete original payments after a refund', async () => {
     reset(1, 50, 0, 50); payments = [{ id: 1, amount: 100 }, { id: 2, amount: -50 }];
@@ -184,10 +189,10 @@ describe('audit regressions: reports and documents', () => {
   });
   it('keeps new invoice, report, and receipt totals aligned after discounts', async () => {
     const { prepareSalesInvoiceData } = await loadPrint();
-    const item = { id: 1, quantity: 1, sellingPrice: 100, totalPrice: 100, allocatedOrderDiscount: 20, eligibleNetAmount: 80, allocatedTax: 0 };
-    const sale = { totalAmount: 100, discount: 20, tax: 0, netAmount: 80, items: [item], returns: [] };
+    const item = { id: 1, quantity: 1, sellingPrice: 100, totalPrice: 100, allocatedOrderDiscount: 20, eligibleNetAmount: 80 };
+    const sale = { totalAmount: 100, discount: 20, netAmount: 80, items: [item], returns: [] };
     expect(getLineNetRevenue(sale, item)).toBe(80);
-    expect(prepareSalesInvoiceData(sale)).toMatchObject({ finalTotalAmount: 80, totalDiscountAmount: 20, taxAmount: 0 });
+    expect(prepareSalesInvoiceData(sale)).toMatchObject({ finalTotalAmount: 80, totalDiscountAmount: 20 });
   });
   it('staff collections preserve actual paid amounts even for legacy paid status', () => {
     const result = buildStaffMetrics([{ userId: 1, status: 'paid', _count: { _all: 1 }, _sum: { netAmount: 100, paidAmount: 99.99, returnedAmount: 0 } }]);
@@ -200,5 +205,10 @@ describe('audit regressions: reports and documents', () => {
     expect(result.subtotalBeforeDiscount - result.totalDiscountAmount).toBe(result.finalTotalAmount);
     expect(result.returnedAmount).toBe(0);
   });
-  it('does not include tax in displayed discount', async () => { const { prepareSalesInvoiceData } = await loadPrint(); expect(prepareSalesInvoiceData({ netAmount: 90, tax: 10, discount: 20, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] }).totalDiscountAmount).toBe(20); });
+  it('does not include legacy tax fields in printed totals', async () => {
+    const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await loadPrint();
+    const prepared = prepareSalesInvoiceData({ netAmount: 90, tax: 10, discount: 10, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] });
+    expect(prepared.totalDiscountAmount).toBe(10);
+    expect(buildSalesInvoiceHtml(prepared)).not.toContain('Налог');
+  });
 });

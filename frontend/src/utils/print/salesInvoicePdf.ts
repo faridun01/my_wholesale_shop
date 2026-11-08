@@ -201,8 +201,6 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
     ],
   ];
 
-  if (data.taxAmount > 0) totalsRows.push([{ content: 'Налог' }, { content: data.taxAmountFormatted, styles: { halign: 'right' } }]);
-
   if (data.returnedAmount > 0) {
     totalsRows.push([
       { content: 'Возврат', styles: { fontStyle: 'bold' } },

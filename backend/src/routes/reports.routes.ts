@@ -1,5 +1,5 @@
 import { reconcileInvoices } from '../services/financial-reconciliation.js';
-import { addMoney, allocateCents, balancePaidAmount, fromCents, toCents } from '../utils/financial.js';
+import { lineTotal, addMoney, allocateCents, balancePaidAmount, fromCents, toCents } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
@@ -49,7 +49,6 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         select: {
           netAmount: true,
           discount: true,
-          tax: true,
           paidAmount: true,
           payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
           warehouseId: true,
@@ -75,7 +74,6 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
             discount: true,
             allocatedOrderDiscount: true,
             eligibleNetAmount: true,
-            allocatedTax: true,
               sellingPrice: true,
               costPrice: true,
               product: {
@@ -96,7 +94,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
               },
             },
           },
-          returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
+          returns: { select: { items: { select: { invoiceItemId: true } } } },
           warehouse: {
             select: {
               name: true,
@@ -264,7 +262,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
 
     const totalDebts = await totalDebtsPromise;
 
-    const stockValuation = batches.reduce((sum: number, b: any) => sum + (Number(b.costPrice) * b.remainingQuantity), 0);
+    const stockValuation = batches.reduce((sum: number, b: any) => addMoney(sum, lineTotal(b.remainingQuantity, b.costPrice)), 0);
     const writeoffByReason: Record<string, { name: string; quantity: number; value: number; operations: number }> = {};
     const writeoffByStaff: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
     const writeoffByProduct: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
@@ -390,7 +388,6 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
         createdAt: true,
         discount: true,
         netAmount: true,
-        tax: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {
@@ -402,7 +399,6 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
             discount: true,
             allocatedOrderDiscount: true,
             eligibleNetAmount: true,
-            allocatedTax: true,
             sellingPrice: true,
             costPrice: true,
             product: { select: { name: true, unit: true } },
@@ -414,7 +410,7 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
             },
           },
         },
-        returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
+        returns: { select: { items: { select: { invoiceItemId: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -451,7 +447,6 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
         createdAt: true,
         discount: true,
         netAmount: true,
-        tax: true,
         customer: { select: { name: true } },
         warehouse: { select: { name: true } },
         items: {
@@ -463,7 +458,6 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
             discount: true,
             allocatedOrderDiscount: true,
             eligibleNetAmount: true,
-            allocatedTax: true,
             sellingPrice: true,
             costPrice: true,
             product: { select: { name: true, unit: true } },
@@ -475,7 +469,7 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
             },
           },
         },
-        returns: { select: { items: { select: { invoiceItemId: true, taxAmount: true } } } },
+        returns: { select: { items: { select: { invoiceItemId: true } } } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -511,7 +505,7 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
       const refundParts = r.refundedAmount == null ? null : allocateCents(toCents(r.refundedAmount), weights);
       const debtParts = r.debtReduction == null ? null : allocateCents(toCents(r.debtReduction), weights);
       const creditParts = r.creditAmount == null ? null : allocateCents(toCents(r.creditAmount), weights);
-      return r.items.map((i: any, index: number) => ({ ...base, product_name: i.invoiceItem.productNameSnapshot || `Invoice item #${i.invoiceItemId}`, unit: i.invoiceItem.baseUnitNameSnapshot || '', quantity: i.quantity, selling_price: Number(i.sellingPrice), total_value: Number(i.totalValue), tax_amount: Number(i.taxAmount || 0), refunded_amount: refundParts ? fromCents(refundParts[index]) : null, debt_reduction: debtParts ? fromCents(debtParts[index]) : null, credit_amount: creditParts ? fromCents(creditParts[index]) : null, legacy: false }));
+      return r.items.map((i: any, index: number) => ({ ...base, product_name: i.invoiceItem.productNameSnapshot || `Invoice item #${i.invoiceItemId}`, unit: i.invoiceItem.baseUnitNameSnapshot || '', quantity: i.quantity, selling_price: Number(i.sellingPrice), total_value: Number(i.totalValue), refunded_amount: refundParts ? fromCents(refundParts[index]) : null, debt_reduction: debtParts ? fromCents(debtParts[index]) : null, credit_amount: creditParts ? fromCents(creditParts[index]) : null, legacy: false }));
     });
 
     res.json(report);

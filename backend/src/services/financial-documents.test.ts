@@ -9,7 +9,7 @@ describe('financial documents and previews', () => {
   });
   it('previews only discounted merchandise value for a new return', async () => {
     const { returnPreview } = await frontend('utils/returnPreview.ts');
-    const item = { originalQuantity: 3, cumulativeReturnedQty: 1, originalEligibleNetAmount: .13, originalAllocatedTax: .02 };
+    const item = { originalQuantity: 3, cumulativeReturnedQty: 1, originalEligibleNetAmount: .13 };
     expect(returnPreview(item, 1)).toBe(.05);
     expect(returnPreview(item, 2)).toBe(.09);
     expect(returnPreview(item, .4)).toBe(0);
@@ -17,10 +17,10 @@ describe('financial documents and previews', () => {
   it('return receipt totals reconcile with the recorded event, not current invoice totals', async () => {
     const { returnReceiptInvoice } = await frontend('utils/print/returnReceipt.ts');
     const { prepareSalesInvoiceData } = await frontend('utils/print/salesInvoicePrint.ts');
-    const receipt = returnReceiptInvoice({ id: 1, netAmount: 500 }, { id: 10, totalValue: 90, refundedAmount: 50, debtReduction: 40, items: [{ id: 1, quantity: 1, sellingPrice: 100, totalValue: 90, taxAmount: 10 }] });
+    const receipt = returnReceiptInvoice({ id: 1, netAmount: 500 }, { id: 10, totalValue: 90, refundedAmount: 50, debtReduction: 40, items: [{ id: 1, quantity: 1, sellingPrice: 100, totalValue: 90 }] });
     const prepared = prepareSalesInvoiceData(receipt);
-    expect(prepared.finalTotalAmount).toBe(90); expect(prepared.taxAmount).toBe(10);
-    expect(prepared.subtotalBeforeDiscount - prepared.totalDiscountAmount + prepared.taxAmount).toBe(90);
+    expect(prepared.finalTotalAmount).toBe(90);
+    expect(prepared.subtotalBeforeDiscount - prepared.totalDiscountAmount).toBe(90);
     expect(prepared.items[0].price).toBe(100);
   });
   it('keeps gross customer payments visible while calculating debt from applied payments', async () => {
@@ -42,28 +42,28 @@ describe('financial documents and previews', () => {
     const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');
     const prepared = prepareSalesInvoiceData(returnReceiptInvoice({ id: 1 }, {
       id: 10, totalValue: 90, refundedAmount: 0, debtReduction: 60, creditAmount: 30,
-      items: [{ id: 1, quantity: 1, sellingPrice: 90, totalValue: 90, taxAmount: 0 }],
+      items: [{ id: 1, quantity: 1, sellingPrice: 90, totalValue: 90 }],
     }));
     const html = buildSalesInvoiceHtml(prepared);
 
-    expect(prepared).toMatchObject({ isReturnDocument: true, paidAmount: 0, returnCashRefundAmount: 0, returnDebtReduction: 60, returnCreditAmount: 30 });
+    expect(prepared).toMatchObject({ isReturnDocument: true, paidAmount: 0, returnCashRefundAmount: 0, returnDebtReduction: 60, returnCreditAmount: 0 });
     expect(html).toContain('Уменьшение долга');
-    expect(html).toContain('Кредит клиента');
+    expect(html).not.toContain('Кредит клиента');
     expect(html).not.toContain('Внесено всего');
   });
-  it('generates actual PDFs whose totals tables preserve zero and tax values', async () => {
+  it('generates actual PDFs without tax rows', async () => {
     const font = readFileSync(new URL('../../../frontend/public/fonts/arial.ttf', import.meta.url));
     vi.stubGlobal('fetch', vi.fn(async () => new Response(font)));
     const { generateSalesInvoicePdf } = await frontend('utils/print/salesInvoicePdf.ts');
     for (const invoice of [
       { id: 1, netAmount: 0, discount: 100, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] },
-      { id: 2, netAmount: 90, discount: 20, tax: 10, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] },
+      { id: 2, netAmount: 90, discount: 10, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 100 }] },
     ]) {
       const pdf = await generateSalesInvoicePdf(invoice);
       expect(pdf.output('arraybuffer').byteLength).toBeGreaterThan(2000);
       const rows = (pdf as any).lastAutoTable.body;
       expect(rows.at(-1).cells[1].text.join('')).toBe(invoice.id === 1 ? '0,00' : '90,00');
-      if (invoice.id === 2) expect(rows.some((r: any) => r.cells[1]?.text.join('') === '10,00')).toBe(true);
+      expect(rows.some((r: any) => r.cells[0]?.text.join('').includes('Налог'))).toBe(false);
     }
   });
 });

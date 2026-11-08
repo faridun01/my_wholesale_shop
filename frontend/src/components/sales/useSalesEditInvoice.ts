@@ -59,10 +59,6 @@ const useSalesEditInvoice = ({
       return false;
     }
 
-    if (Number(invoice.tax || 0) !== 0) {
-      return false;
-    }
-
     // Not admin-exempt: the backend wipes Return rows and never reconciles paidAmount
     // when items are edited, so nobody — including admins — can safely edit an
     // invoice that already has a return or a payment recorded against it.
@@ -96,10 +92,6 @@ const useSalesEditInvoice = ({
   const getEditBlockedReason = (invoice: any) => {
     if (!invoice) {
       return 'Накладную нельзя изменить';
-    }
-
-    if (Number(invoice.tax || 0) !== 0) {
-      return 'Накладную с историческим налогом нельзя изменить без ручной сверки';
     }
 
     if (Array.isArray(invoice.returns) && invoice.returns.length > 0) {

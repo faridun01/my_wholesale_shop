@@ -1,3 +1,4 @@
+import { addMoney, lineTotal } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { authorize } from '../middlewares/auth.middleware.js';
@@ -130,7 +131,7 @@ router.delete('/:id', authorize(['ADMIN']), async (req: AuthRequest, res, next) 
       select: { remainingQuantity: true, costPrice: true },
     });
     const remainingValue = remainingBatches.reduce(
-      (sum: number, batch: any) => sum + Number(batch.remainingQuantity || 0) * Number(batch.costPrice || 0),
+      (sum: number, batch: any) => addMoney(sum, lineTotal(batch.remainingQuantity || 0, batch.costPrice || 0)),
       0
     );
 

@@ -34,7 +34,6 @@ type StatementInvoice = {
   createdAt: string;
   totalAmount: number;
   discount: number;
-  tax?: number;
   netAmount: number;
   paidAmount: number;
   returnedAmount: number;

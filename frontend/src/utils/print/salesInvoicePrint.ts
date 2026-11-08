@@ -59,8 +59,6 @@ export interface PreparedSalesInvoiceData {
   totalDiscountAmountFormatted: string;
   returnedAmount: number;
   returnedAmountFormatted: string;
-  taxAmount: number;
-  taxAmountFormatted: string;
   paidAmount: number;
   paidAmountFormatted: string;
   moneyRefundedAmount: number;
@@ -174,9 +172,8 @@ export function prepareSalesInvoiceData(
   const returnedAmount = 0;
   const stored = options?.netAmount ?? invoice?.netAmount;
   const hasStored = stored !== null && stored !== undefined && Number.isFinite(Number(stored));
-  const taxAmount = hasStored ? Math.max(0, Number(invoice?.tax ?? 0)) : 0;
   const finalTotalAmount = hasStored ? Math.max(0, Number(stored)) : roundMoneyValue(Math.max(0, itemsNetAmount - roundMoneyValue(itemsNetAmount * Number(invoice?.discount || 0) / 100)));
-  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount + taxAmount - finalTotalAmount));
+  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - finalTotalAmount));
   const isReturnDocument = Boolean(invoice?.isReturnDocument);
   const paidAmount = isReturnDocument
     ? 0
@@ -186,7 +183,7 @@ export function prepareSalesInvoiceData(
   const moneyRefundedAmount = Math.max(0, Number(invoice?.moneyRefundedAmount || 0));
   const returnPaymentAdjustments = Math.max(0, Number(invoice?.returnPaymentAdjustments || 0));
   const returnDebtReduction = Math.max(0, Number(invoice?.returnDebtReduction ?? invoice?.debtReduction ?? 0));
-  const returnCreditAmount = Math.max(0, Number(invoice?.returnCreditAmount ?? invoice?.creditAmount ?? 0));
+  const returnCreditAmount = 0;
   const returnCashRefundAmount = Math.max(0, Number(invoice?.returnCashRefundAmount || 0));
   const totalQuantity = invoiceItems.reduce((sum: number, item: any) => sum + getItemBaseUnits(item), 0);
 
@@ -225,8 +222,6 @@ export function prepareSalesInvoiceData(
     totalDiscountAmountFormatted: formatMoneyWithoutCurrency(totalDiscountAmount),
     returnedAmount,
     returnedAmountFormatted: formatMoneyWithoutCurrency(returnedAmount),
-    taxAmount,
-    taxAmountFormatted: formatMoneyWithoutCurrency(taxAmount),
     paidAmount,
     paidAmountFormatted: formatMoneyWithoutCurrency(paidAmount),
     moneyRefundedAmount,
@@ -425,7 +420,6 @@ export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
           <table class="totals">
             <tr><td class="label">Сумма без скидки</td><td class="right">${escapeHtml(data.subtotalBeforeDiscountFormatted)}</td></tr>
             <tr><td class="label">Скидка</td><td class="right">${escapeHtml(data.totalDiscountAmountFormatted)}</td></tr>
-            ${data.taxAmount > 0 ? `<tr><td class="label">Налог</td><td class="right">${escapeHtml(data.taxAmountFormatted)}</td></tr>` : ''}
             ${data.returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(data.returnedAmountFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.paidAmount > 0 ? `<tr><td class="label">Внесено всего</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.balanceDue > 0 ? `<tr><td class="label">Остаток долга</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}

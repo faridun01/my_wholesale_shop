@@ -101,7 +101,7 @@ export function getLineNetRevenue(invoice: any, item: any) {
   const index = items.indexOf(item);
   if (index < 0 || getRemainingQuantity(item) <= 0 || toCents(invoice.netAmount ?? 0) <= 0) return 0;
   const lines = invoiceLines(invoice);
-  const weights = lines.map(l => toCents(addMoney(l.remainingNetAmount, l.remainingTax)));
+  const weights = lines.map(l => toCents(l.remainingNetAmount));
   if (weights.every(w => w === 0)) return 0;
   // Stored current invoice total is authoritative for legacy records too. Expose
   // reconciliation anomalies separately; never manufacture undiscounted revenue.
@@ -154,11 +154,11 @@ export const buildInvoiceLineReportRows = ({
           unit: item.product.unit || '',
           quantity,
           selling_price: Number(item.sellingPrice),
-          gross_sales: Number(item.sellingPrice) * quantity,
+          gross_sales: lineTotal(quantity, item.sellingPrice),
           discount_percent: Number(inv.discount || 0),
           [netSalesKey]: revenue,
           cost_price: quantity > 0 ? cost / quantity : 0,
-          profit: revenue - cost,
+          profit: addMoney(revenue, -cost),
         };
       })
       .filter(Boolean)
