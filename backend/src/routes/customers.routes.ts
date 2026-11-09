@@ -472,8 +472,10 @@ router.get('/:id/payments', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    // A cancelled invoice is annulled: no money movement of its own is shown.
     const where = {
       customerId,
+      OR: [{ invoiceId: null }, { invoice: { cancelled: false } }],
       invoice: access.isAdmin ? undefined : { warehouseId: access.warehouseId ?? -1, userId: access.userId ?? -1 },
     };
 
@@ -523,7 +525,7 @@ router.get('/:id/returns', async (req: AuthRequest, res, next) => {
 
     const where = {
       customerId,
-      ...(access.isAdmin ? {} : { invoice: { warehouseId: access.warehouseId ?? -1 } }),
+      invoice: { cancelled: false, ...(access.isAdmin ? {} : { warehouseId: access.warehouseId ?? -1 }) },
     };
 
     const [returns, total] = await Promise.all([

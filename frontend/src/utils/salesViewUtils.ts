@@ -124,10 +124,9 @@ export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPS
   return change;
 };
 
-// Goods returned after payment can leave more money received than the invoice is
-// now worth. The excess is what the seller owes the buyer; payments stay as recorded.
+// More money received than the invoice is now worth (a goods return, or a legacy
+// edit): the excess is what the seller owes the buyer; payments stay as recorded.
 export const getInvoiceAmountToReturn = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) => {
-  if (Number(invoice?.returnedAmount || 0) <= 0) return 0;
   const excess = roundMoney(decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
   return excess > epsilon ? excess : 0;
 };

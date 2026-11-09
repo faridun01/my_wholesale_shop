@@ -49,8 +49,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
   } catch (error) { next(error); }
 });
 
-// Records money the seller handed back after a goods return left an invoice paid
-// above its total. An append-only negative entry: the received payments stay as they were.
+// Records money the seller handed back when an invoice ended up paid above its total
+// (a goods return, or a legacy edit). An append-only negative entry: the received
+// payments stay as they were.
 router.post('/give-back', async (req: AuthRequest, res, next) => {
   try {
     if (!isAdminRole(req.user?.role)) return res.status(403).json({ error: ADMIN_ONLY_PAYMENT_ERROR });
@@ -69,8 +70,7 @@ router.post('/give-back', async (req: AuthRequest, res, next) => {
       const invoice = await tx.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
       if (!invoice || invoice.cancelled) throw financialError('Invoice not found or cancelled');
       const received = balancePaidAmount(invoice.payments, invoice.paidAmount);
-      const owedCents = toCents(invoice.returnedAmount) > 0 ? toCents(received) - toCents(invoice.netAmount) : 0;
-      if (toCents(amount) > owedCents) throw financialError('Сумма больше, чем нужно вернуть покупателю');
+      if (toCents(amount) > toCents(received) - toCents(invoice.netAmount)) throw financialError('Сумма больше, чем нужно вернуть покупателю');
       const payment = await tx.payment.create({ data: { customerId: invoice.customerId, invoiceId, userId: req.user!.id, amount: -amount, method, idempotencyKey: key, requestHash: hash } });
       await tx.invoice.update({ where: { id: invoiceId }, data: { paidAmount: addMoney(invoice.paidAmount, -amount), status: getInvoiceStatus(addMoney(received, -amount), Number(invoice.netAmount)) } });
       return payment;

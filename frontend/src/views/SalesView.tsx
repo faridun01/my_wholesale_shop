@@ -56,8 +56,6 @@ import {
   getInvoiceReturnPaymentAdjustments,
   getInvoiceBalance,
   getInvoiceAmountToReturn,
-  getInvoiceChangeAmount,
-  getInvoiceCustomerCredit,
   getInvoiceDiscountAmount,
   getInvoiceItemQuantityParts,
   getInvoiceItemReturnedQty,
@@ -1031,13 +1029,6 @@ export default function SalesView() {
                       <div className="flex items-center justify-between text-amber-700">
                         <span className="font-medium">Скидка ({selectedInvoice.discount}%)</span>
                         <span className="font-bold font-mono">-{formatMoney(getInvoiceDiscountAmount(selectedInvoice))}</span>
-                      </div>
-                    )}
-
-                    {getInvoiceChangeAmount(selectedInvoice) > PAYMENT_EPSILON && getInvoiceCustomerCredit(selectedInvoice) <= PAYMENT_EPSILON && (
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span className="font-medium">Сдача клиенту</span>
-                        <span className="font-bold font-mono text-amber-600">{formatMoney(getInvoiceChangeAmount(selectedInvoice))}</span>
                       </div>
                     )}
 

@@ -1,5 +1,20 @@
 import { decimal } from './financial';
 import { roundMoney, toFixedNumber } from './format';
+
+// The server refuses a cost above the selling price (usually a package price typed
+// as a piece price) unless the person explicitly confirms it.
+export const submitWithCostConfirmation = async <T,>(submit: (confirmCostAboveSelling: boolean) => Promise<T>) => {
+  try {
+    return await submit(false);
+  } catch (err: any) {
+    const message = err?.response?.data?.error;
+    if (typeof message !== 'string' || !message.startsWith('Себестоимость за 1 шт') || !window.confirm(`${message}\n\nСохранить всё равно?`)) {
+      throw err;
+    }
+    return submit(true);
+  }
+};
+
 import {
   calculateEffectiveCost,
   calculateUnitCostFromLineTotal,

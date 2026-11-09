@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 vi.mock('../db/prisma.js', () => ({
   default: {
-    payment: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
+    payment: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), findMany: vi.fn(async () => []) },
     invoice: { findUnique: vi.fn(), groupBy: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),

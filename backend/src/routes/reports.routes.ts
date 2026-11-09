@@ -1,5 +1,6 @@
 import { decimal } from '../utils/financial.js';
 import { reconcileInvoices } from '../services/financial-reconciliation.js';
+import { WRITE_OFF_RESTORATION_REASON } from '../services/stock.service.js';
 import { lineTotal, addMoney, allocateCents, balancePaidAmount, fromCents, toCents } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
@@ -45,7 +46,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const { start, end } = req.query;
     const whereClause = buildCancelledInvoiceWhere({ warehouseId, start, end });
 
-    const [invoices, products, customers, warehouses, batches, writeoffTransactions, expenses] = await Promise.all([
+    const [invoices, products, customers, warehouses, batches, writeoffTransactions] = await Promise.all([
       prisma.invoice.findMany({
         where: whereClause,
         orderBy: { createdAt: 'asc' },
@@ -126,7 +127,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           warehouseId,
           start,
           end,
-          additional: { qtyChange: { lt: 0 } },
+          additional: { qtyChange: { lt: 0 }, sellingAtTime: { not: null } },
         }),
         select: {
           id: true,
@@ -154,34 +155,19 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           },
         },
       }),
-      prisma.expense.findMany({
-        where: {
-          warehouseId: warehouseId ?? undefined,
-          expenseDate: (start || end) ? buildCreatedAtRange({ start, end }) : undefined,
-        },
-        select: {
-          amount: true,
-          category: true,
-        },
-      }),
     ]);
 
     const writeoffRestorations = writeoffTransactions.length ? await prisma.inventoryTransaction.findMany({
-      where: { type: 'adjustment', qtyChange: { gt: 0 }, referenceId: { in: writeoffTransactions.map(transaction => transaction.id) } },
+      where: { type: 'adjustment', qtyChange: { gt: 0 }, reason: { startsWith: WRITE_OFF_RESTORATION_REASON }, referenceId: { in: writeoffTransactions.map(transaction => transaction.id) } },
       select: { referenceId: true, qtyChange: true, totalCost: true, costAtTime: true },
     }) : [];
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalCost = 0;
-    let totalExpenses = 0;
     const totalSalesCount = invoices.length;
     // Outstanding debt is intentionally NOT scoped to the report's date range (debt
     // doesn't expire when the period ends) — shared with Dashboard so both agree.
     const totalDebtsPromise = getTotalOutstandingDebt(prisma, warehouseId ?? undefined);
-
-    for (const expense of expenses) {
-      totalExpenses = addMoney(totalExpenses, Number(expense.amount || 0));
-    }
 
     const monthlyData: any = {};
     const warehousePerformance: any = {};
@@ -346,14 +332,12 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         totalRevenue,
         totalProfit: isAdmin ? totalProfit : null,
         totalCost: isAdmin ? totalCost : null,
-        totalExpenses: isAdmin ? totalExpenses : null,
         totalSalesCount,
         totalCustomers: customers,
         totalProducts: warehouseId ? products.length : countUniqueProductsByName(products),
         totalDebts,
         stockValuation: isAdmin ? stockValuation : null,
-        margin: isAdmin ? (totalRevenue > 0 ? decimal(totalProfit).minus(decimal(totalExpenses)).div(decimal(totalRevenue)).times(decimal(100)).toNumber() : 0) : null,
-        netProfit: isAdmin ? (decimal(totalProfit).minus(decimal(totalExpenses)).toNumber()) : null,
+        margin: isAdmin ? (totalRevenue > 0 ? decimal(totalProfit).div(decimal(totalRevenue)).times(decimal(100)).toNumber() : 0) : null,
       },
       chartData: Object.values(monthlyData),
       warehousePerformance: Object.values(warehousePerformance),
@@ -510,7 +494,7 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
     const warehouseId = getScopedWarehouseId(access, req.query.warehouse_id);
     const { start, end } = req.query;
     const returns = await prisma.return.findMany({
-      where: { createdAt: buildCreatedAtRange({ start, end }), invoice: warehouseId ? { warehouseId } : undefined },
+      where: { createdAt: buildCreatedAtRange({ start, end }), invoice: { cancelled: false, warehouseId: warehouseId ?? undefined } },
       include: { user: { select: PUBLIC_USER_SELECT }, invoice: { include: { warehouse: true } }, items: { include: { invoiceItem: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -562,6 +546,7 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
           where: {
             type: 'adjustment',
             qtyChange: { gt: 0 },
+            reason: { startsWith: WRITE_OFF_RESTORATION_REASON },
             referenceId: { in: transactionIds },
           },
           select: {

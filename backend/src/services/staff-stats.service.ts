@@ -7,7 +7,7 @@ import { INVOICE_PAYMENT_STATUSES, type InvoicePaymentStatus } from '../routes/i
 
 const PAYMENT_EPSILON = 0;
 
-type DbClient = Pick<typeof prisma, 'invoice' | 'user'>;
+type DbClient = Pick<typeof prisma, 'invoice' | 'user' | 'payment'>;
 
 export type StaffStatsPeriod = {
   start?: string;
@@ -131,13 +131,32 @@ const buildStatsWhere = (period: StaffStatsPeriod, userId?: number) => {
   return where;
 };
 
-const groupInvoicesByStatus = (client: DbClient, where: Record<string, unknown>, byUser: boolean) =>
-  (client.invoice.groupBy as any)({
+const groupInvoicesByStatus = async (client: DbClient, where: Record<string, unknown>, byUser: boolean) => {
+  const rows = await ((client.invoice.groupBy as any)({
     by: byUser ? ['userId', 'status'] : ['status'],
     where,
     _count: { _all: true },
     _sum: { netAmount: true, paidAmount: true, returnedAmount: true },
-  }) as Promise<StaffStatsGroupRow[]>;
+  }) as Promise<StaffStatsGroupRow[]>);
+
+  // Old goods returns also lowered paid_amount through an offset entry, although that
+  // money was received. Same rule as getTotalOutstandingDebt and the customer totals.
+  const offsets = await client.payment.findMany({
+    where: {
+      amount: { lt: 0 },
+      reversalOfId: null,
+      OR: [{ returnId: { not: null } }, { method: { equals: 'refund', mode: 'insensitive' } }],
+      invoice: where,
+    },
+    select: { amount: true, invoice: { select: { userId: true, status: true } } },
+  });
+  for (const offset of offsets) {
+    const row = rows.find((candidate) => candidate.status === offset.invoice?.status && (!byUser || candidate.userId === offset.invoice?.userId));
+    if (row) row._sum.paidAmount = addMoney(row._sum.paidAmount, -Number(offset.amount));
+  }
+
+  return rows;
+};
 
 const isCustomerRole = (role: unknown) => String(role || '').toUpperCase() === 'CUSTOMER';
 

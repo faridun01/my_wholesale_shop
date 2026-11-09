@@ -4,6 +4,11 @@ import { decimal } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
 import { quantity as wholeStoredQuantity, toCents, addMoney, cumulativeValue, lineTotal } from '../utils/financial.js';
 
+// reference_id means different things by event: a positive adjustment can also be a
+// cancelled invoice whose id happens to equal a write-off's id. Only this prefix
+// marks a real restoration of a write-off.
+export const WRITE_OFF_RESTORATION_REASON = 'Возврат списания';
+
 function round2(value: number): number {
   return decimal(value).toDecimalPlaces(2).toNumber();
 }
@@ -627,8 +632,7 @@ export class StockService {
         where: {
           referenceId: transaction.id,
           type: 'adjustment',
-          idempotencyKey: operation.key,
-          requestHash: operation.hash,
+          reason: { startsWith: WRITE_OFF_RESTORATION_REASON },
           qtyChange: { gt: 0 },
         },
         select: { qtyChange: true },
@@ -705,7 +709,7 @@ export class StockService {
           type: 'adjustment',
           idempotencyKey: operation.key,
           requestHash: operation.hash,
-          reason: `Возврат списания #${transaction.id}${reasonSuffix ? `: ${reasonSuffix}` : ''}`,
+          reason: `${WRITE_OFF_RESTORATION_REASON} #${transaction.id}${reasonSuffix ? `: ${reasonSuffix}` : ''}`,
           referenceId: transaction.id,
           totalCost: costToRestore,
           ...(saved ? { costAllocations: restoredAllocations } : {}),

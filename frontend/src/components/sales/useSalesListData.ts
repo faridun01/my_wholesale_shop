@@ -49,7 +49,6 @@ const useSalesListData = ({
   const [isLoading, setIsLoading] = useState(true);
   const [allInvoicesCount, setAllInvoicesCount] = useState(0);
   const [staffOptions, setStaffOptions] = useState<SalesStaffOption[]>([]);
-
   const params = {
     warehouseId: warehouseId || undefined,
     search: search || undefined,
@@ -100,8 +99,7 @@ const useSalesListData = ({
         signal: controller.signal,
       });
       setAllInvoicesCount(Number(res.data?.total || 0));
-      setStaffOptions(Array.isArray(res.data?.staff) ? res.data.staff : []);
-    } catch (err) {
+      setStaffOptions(Array.isArray(res.data?.staff) ? res.data.staff : []);    } catch (err) {
       if (!axios.isCancel(err)) {
         console.error(err);
       }

@@ -52,8 +52,8 @@ describe('financial documents and previews', () => {
     expect(sales.getInvoiceAmountToReturn(stillOwing)).toBe(0);
     expect(sales.getInvoiceBalance(stillOwing)).toBe(250);
 
-    const noReturn = { ...invoice, returnedAmount: '0' };
-    expect(sales.getInvoiceAmountToReturn(noReturn)).toBe(0);
+    const editedAfterPayment = { ...invoice, returnedAmount: '0' };
+    expect(sales.getInvoiceAmountToReturn(editedAfterPayment)).toBe(100);
   });
   it('prints the capped payment and the amount to give back', async () => {
     const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');

@@ -6,6 +6,7 @@ import {
   formatPriceInput,
   getDefaultPackaging,
   normalizePackagings,
+  submitWithCostConfirmation,
 } from '../../utils/productsViewUtils';
 
 type RestockData = {
@@ -69,15 +70,18 @@ const useProductRestockActions = ({
     if (!selectedProduct) return;
 
     try {
-      await restockProduct(selectedProduct.id, {
-        warehouseId: Number(restockData.warehouseId),
-        quantity: selectedRestockPackaging ? totalRestockUnits : Number(restockData.quantity),
-        costPrice: roundMoney(restockData.costPrice),
-        purchaseCostPrice: roundMoney(restockData.costPrice),
-        sellingPrice: roundMoney(restockData.sellingPrice || 0),
-        expensePercent: Number(restockData.expensePercent || 0),
-        reason: restockData.reason,
-      });
+      await submitWithCostConfirmation((confirmCostAboveSelling) =>
+        restockProduct(selectedProduct.id, {
+          warehouseId: Number(restockData.warehouseId),
+          quantity: selectedRestockPackaging ? totalRestockUnits : Number(restockData.quantity),
+          costPrice: roundMoney(restockData.costPrice),
+          purchaseCostPrice: roundMoney(restockData.costPrice),
+          sellingPrice: roundMoney(restockData.sellingPrice || 0),
+          expensePercent: Number(restockData.expensePercent || 0),
+          reason: restockData.reason,
+          confirmCostAboveSelling,
+        }),
+      );
       toast.success('Товар успешно пополнен!');
       closeRestockModal();
       void fetchInitialData();

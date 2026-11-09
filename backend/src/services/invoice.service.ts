@@ -19,6 +19,8 @@ const buildCustomerAddressSnapshot = (customer: any) =>
     .filter(Boolean)
     .join(', ') || null;
 
+const MAX_LEGACY_RETURN_GAP_CENTS = 500;
+
 function normalizeNonNegativeNumber(value: number, fieldName: string) {
   const normalized = Number(value);
   if (!Number.isFinite(normalized) || normalized < 0) {
@@ -446,7 +448,7 @@ export class InvoiceService {
     }[];
     discount?: number | string;
   }) {
-    const { customerId, userId, items, isAdmin = false } = data;
+    const { customerId, userId, items } = data;
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('Invoice must contain at least one item');
@@ -475,14 +477,13 @@ export class InvoiceService {
         throw new Error('Invoice not found');
       }
 
-      if (invoice.cancelled && !isAdmin) {
+      if (invoice.cancelled) {
         throw new Error('Cancelled invoice cannot be edited');
       }
 
       // Not admin-exempt: editing items after a return already happened has no safe
-      // reconciliation path here (updateInvoice unconditionally wipes Return rows and
-      // resets returnedAmount below) — even an admin must reverse/delete the returns
-      // through their own flow first, never lose that audit trail as an edit side effect.
+      // reconciliation path here (the lines are rebuilt and returnedAmount is reset
+      // below) — even an admin must not lose that audit trail as an edit side effect.
       if (
         (Array.isArray(invoice.returns) && invoice.returns.length > 0) ||
         Number(invoice.returnedAmount || 0) > PAYMENT_EPSILON
@@ -595,20 +596,21 @@ export class InvoiceService {
       for (const existingItem of invoice.items) {
         affectedProductIds.add(Number(existingItem.productId));
         await StockService.deallocateStock(existingItem.id, undefined, undefined, tx, false);
+        // The stock ledger is append-only: an edit reverses the previous lines.
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: Number(existingItem.productId),
+            warehouseId: Number(invoice.warehouseId),
+            userId,
+            qtyChange: Number(existingItem.quantity),
+            type: 'adjustment',
+            reason: `Invoice #${invoiceId} Edited`,
+            referenceId: invoiceId,
+            costAtTime: existingItem.costPrice,
+            sellingAtTime: existingItem.sellingPrice,
+          },
+        });
       }
-
-      await tx.return.deleteMany({
-        where: { invoiceId },
-      });
-
-      await tx.inventoryTransaction.deleteMany({
-        where: {
-          referenceId: invoiceId,
-          type: { in: ['outgoing', 'return'] }
-        },
-      });
-
-
 
       await tx.invoiceItem.deleteMany({
         where: { invoiceId },
@@ -701,7 +703,6 @@ export class InvoiceService {
           discount: normalizedDiscount,
           netAmount,
           returnedAmount: 0,
-          cancelled: isAdmin ? false : invoice.cancelled,
           status: getInvoiceStatus(Number(invoice.paidAmount || 0), Number(netAmount)),
         },
       });
@@ -912,9 +913,16 @@ export class InvoiceService {
       // Never repair legacy amounts implicitly. Ambiguous old returns need an
       // explicit reconciliation, rather than inventing per-item historical data.
       const accountedReturns = addMoney(...lines.map((l: any) => l.returnedNetAmount));
-      if (toCents(accountedReturns) !== toCents(invoice.returnedAmount)) throw new Error('Historical return amounts require reconciliation before another return');
       const remainingValue = addMoney(...lines.map((l: any) => l.remainingNetAmount));
-      if (toCents(remainingValue) !== toCents(invoice.netAmount)) throw new Error('Invoice totals require reconciliation before another return');
+      const remainingGap = Math.abs(toCents(remainingValue) - toCents(invoice.netAmount));
+      // Returns made before line-level records were valued by older rules. Their lines
+      // may differ from the stored total by a few cents; that total stays authoritative.
+      if (invoice.calculationVersion != null) {
+        if (toCents(accountedReturns) !== toCents(invoice.returnedAmount)) throw new Error('Historical return amounts require reconciliation before another return');
+        if (remainingGap !== 0) throw new Error('Invoice totals require reconciliation before another return');
+      } else if (remainingGap > MAX_LEGACY_RETURN_GAP_CENTS) {
+        throw new Error('Invoice totals require reconciliation before another return');
+      }
       const details = data.items.map(requested => {
         const item = lines.find((l: any) => Number(l.id) === Number(requested.invoiceItemId));
         if (!item || requested.quantity > item.remainingQuantity) throw new Error('Return quantity exceeds available quantity');
@@ -923,6 +931,11 @@ export class InvoiceService {
         const allocatedDiscount = addMoney(cumulativeValue(item.allocatedOrderDiscount, nextQty, item.quantity), -cumulativeValue(item.allocatedOrderDiscount, item.returnedQty || 0, item.quantity));
         return { item, quantity: requested.quantity, value, allocatedDiscount };
       });
+      const overrunCents = toCents(addMoney(...details.map(d => d.value))) - toCents(invoice.netAmount);
+      if (overrunCents > 0) {
+        const largest = details.reduce((best, d) => (toCents(d.value) > toCents(best.value) ? d : best));
+        largest.value = addMoney(largest.value, -fromCents(overrunCents));
+      }
       const totalValue = addMoney(...details.map(d => d.value));
       const paymentHistory = invoice.payments || [];
       if (toCents(addMoney(...paymentHistory.map((p: any) => p.amount))) !== toCents(invoice.paidAmount)) throw new Error('Payment history requires reconciliation');

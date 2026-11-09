@@ -2,7 +2,7 @@ import React from 'react';
 import toast from 'react-hot-toast';
 import { createProduct, deleteProduct, updateProduct } from '../../api/products.api';
 import { createSettingsCategory } from '../../api/settings-reference.api';
-import { buildProductSubmitPayload, type ProductFormData } from '../../utils/productsViewUtils';
+import { buildProductSubmitPayload, submitWithCostConfirmation, type ProductFormData } from '../../utils/productsViewUtils';
 
 type UseProductCrudActionsOptions = {
   formData: ProductFormData;
@@ -65,7 +65,9 @@ const useProductCrudActions = ({
 
     try {
       const categoryId = await resolveCategoryIdForSubmit();
-      await createProduct(buildProductSubmitPayload(formData, categoryId));
+      await submitWithCostConfirmation((confirmCostAboveSelling) =>
+        createProduct({ ...buildProductSubmitPayload(formData, categoryId), confirmCostAboveSelling }),
+      );
       toast.success('Товар успешно добавлен!');
       setShowAddModal(false);
       resetForm();

@@ -183,7 +183,7 @@ export function prepareSalesInvoiceData(
     : Math.min(finalTotalAmount, Math.max(0, Number(options?.appliedPaidAmount ?? invoice?.grossPaidAmount ?? invoice?.paidAmount ?? 0)));
   const balancePaidAmount = Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0));
   const balanceDue = roundMoneyValue(Math.max(0, decimal(finalTotalAmount).minus(decimal(balancePaidAmount)).toNumber()));
-  const amountToReturn = !isReturnDocument && Number(invoice?.returnedAmount || 0) > 0
+  const amountToReturn = !isReturnDocument
     ? roundMoneyValue(Math.max(0, decimal(balancePaidAmount).minus(decimal(finalTotalAmount)).toNumber()))
     : 0;
   const moneyRefundedAmount = Math.max(0, Number(invoice?.moneyRefundedAmount || 0));

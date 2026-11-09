@@ -15,7 +15,7 @@ import {
 } from '../utils/product-packaging.js';
 import { normalizeMoney, roundMoney } from '../utils/money.js';
 import { operationKey } from '../utils/financial-operation.js';
-import { decimal, assertNoTaxPayload, financialError } from '../utils/financial.js';
+import { decimal, assertNoTaxPayload, financialError, toCents } from '../utils/financial.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
@@ -140,6 +140,14 @@ const applyFamilyPhotoFallback = <T extends { id: number; name: string | null; p
   });
 };
 
+// A package price typed into the per-piece cost field inflates stock value and wipes
+// out profit for as long as that batch sells, so it needs an explicit confirmation.
+const assertCostNotAboveSelling = (cost: unknown, selling: unknown, confirmed: unknown) => {
+  if (confirmed !== true && toCents(selling) > 0 && toCents(cost) > toCents(selling)) {
+    throw financialError('Себестоимость за 1 шт выше цены продажи. Проверьте, не указана ли цена коробки вместо цены штуки.');
+  }
+};
+
 router.get('/', async (req, res, next) => {
   try {
     const access = await getAccessContext(req as AuthRequest);
@@ -230,7 +238,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     if (!ensureAdminProductAccess(access, res)) {
       return;
     }
-    const { initialStock, warehouseId, costPrice, purchaseCostPrice, expensePercent, packaging, packagings, ...rest } = req.body;
+    const { initialStock, warehouseId, costPrice, purchaseCostPrice, expensePercent, packaging, packagings, confirmCostAboveSelling, ...rest } = req.body;
     const userId = req.user?.id || 1;
     const requestedWarehouseId = warehouseId ? Number(warehouseId) : null;
     const wId = access.isAdmin ? requestedWarehouseId : access.warehouseId;
@@ -249,6 +257,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const resolvedPurchaseCostPrice = normalizeMoney(purchaseCostPrice ?? costPrice ?? 0, 'Purchase cost');
     const resolvedExpensePercent = decimal(expensePercent ?? 0).toString();
     const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
+    assertCostNotAboveSelling(resolvedEffectiveCostPrice, rest.sellingPrice ?? 0, confirmCostAboveSelling);
 
     // Check for unique constraints
     const existingProducts = await prisma.product.findMany({
@@ -755,6 +764,8 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
       sellingPrice !== undefined && sellingPrice !== null && sellingPrice !== ''
         ? normalizeMoney(sellingPrice, 'Selling price')
         : roundMoney(existingProduct.sellingPrice);
+
+    assertCostNotAboveSelling(resolvedEffectiveCostPrice, resolvedSellingPrice, req.body.confirmCostAboveSelling);
 
     const batch = await StockSvc.addStock(
       productId,

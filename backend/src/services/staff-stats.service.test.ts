@@ -62,6 +62,7 @@ describe('StaffStatsService', () => {
     const groupBy = vi.fn().mockResolvedValue([]);
     const client = {
       invoice: { groupBy },
+      payment: { findMany: vi.fn(async () => []) },
       user: { findMany: vi.fn().mockResolvedValue([]) },
     };
 
@@ -76,6 +77,7 @@ describe('StaffStatsService', () => {
 
   it('lists every staff member (zero sales included), hides customers, sorts by sales', async () => {
     const client = {
+      payment: { findMany: vi.fn(async () => []) },
       invoice: {
         groupBy: vi.fn().mockResolvedValue([
           row(1, 'paid', 1, 100, 100),
@@ -105,6 +107,7 @@ describe('StaffStatsService', () => {
   it('returns null for an unknown staff member', async () => {
     const client = {
       invoice: { groupBy: vi.fn(), findMany: vi.fn() },
+      payment: { findMany: vi.fn(async () => []) },
       user: { findUnique: vi.fn().mockResolvedValue(null) },
     };
 
@@ -124,6 +127,7 @@ describe('StaffStatsService', () => {
     ]);
     const client = {
       invoice: { groupBy, findMany },
+      payment: { findMany: vi.fn(async () => []) },
       user: { findUnique: vi.fn().mockResolvedValue({ id: 5, username: 'Алишер', role: 'SELLER', active: true, warehouse: null }) },
     };
 

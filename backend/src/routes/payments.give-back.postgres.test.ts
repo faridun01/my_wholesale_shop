@@ -91,15 +91,28 @@ suite('recording money given back to the buyer', () => {
 
   it('refuses invoices with nothing to give back and leaves them untouched', async () => {
     const debt = await makeInvoice(405, 324, 135);
-    const noReturn = await makeInvoice(100, 150, 0);
-    const cancelled = await makeInvoice(270, 324, 270, { cancelled: true });
+    const settled = await makeInvoice(100, 100, 0);
 
-    for (const id of [debt, noReturn, cancelled]) {
+    for (const id of [debt, settled]) {
       const before = await paidOf(id);
       expect((await giveBack({ invoice_id: id, amount: 1 })).status).toBe(400);
       expect(await paidOf(id)).toBe(before);
       expect(await ledger(id)).toHaveLength(1);
     }
+  });
+
+  it('also settles an overpayment left by a legacy invoice edit, with no goods return', async () => {
+    const id = await makeInvoice(38361.14, 38533.94, 0);
+    expect((await giveBack({ invoice_id: id, amount: 172.81 })).status).toBe(400);
+    expect((await giveBack({ invoice_id: id, amount: 172.8 })).status).toBe(201);
+    expect(await paidOf(id)).toBe(38361.14);
+  });
+
+  it('records no money operation on a cancelled invoice', async () => {
+    const id = await makeInvoice(1260, 1260, 0, { cancelled: true });
+    expect((await giveBack({ invoice_id: id, amount: 1260 })).status).toBe(400);
+    expect(await paidOf(id)).toBe(1260);
+    expect(await ledger(id)).toHaveLength(1);
   });
 
   it('is admin-only and validates input', async () => {
