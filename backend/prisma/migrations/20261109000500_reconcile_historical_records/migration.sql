@@ -33,6 +33,8 @@ FROM _batch_cost_fix f;
 DROP TABLE _batch_cost_fix;
 
 -- 2. Binary floats billed certain prices one cent too high per unit (9.30 became 9.31).
+-- Invoices already paid in full keep the billed amount: lowering them would only leave
+-- kopecks to hand back to the customer.
 CREATE TEMP TABLE _line_fix AS
 SELECT ii.id AS item_id, ii.invoice_id, ii.total_price AS old_total,
        ceil(ii.selling_price * (100 - ii.discount) / 100 * 100) / 100 * ii.quantity::numeric AS new_total
@@ -40,7 +42,11 @@ FROM invoice_items ii
 JOIN invoices i ON i.id = ii.invoice_id
 WHERE NOT i.cancelled AND ii.eligible_net_amount IS NULL AND i.calculation_version IS NULL
   AND ii.total_price - ceil(ii.selling_price * (100 - ii.discount) / 100 * 100) / 100 * ii.quantity::numeric
-      = 0.01 * ii.quantity::numeric;
+      = 0.01 * ii.quantity::numeric
+  AND i.net_amount > (
+    SELECT COALESCE(SUM(p.amount) FILTER (WHERE NOT (p.amount < 0 AND p.reversal_of_id IS NULL AND (p.return_id IS NOT NULL OR lower(p.method) = 'refund'))), 0)
+    FROM payments p WHERE p.invoice_id = i.id
+  );
 
 CREATE TEMP TABLE _invoice_fix AS
 SELECT i.id AS invoice_id, i.user_id, i.total_amount AS old_total, i.net_amount AS old_net, i.discount,
