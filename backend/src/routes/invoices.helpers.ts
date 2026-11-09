@@ -90,7 +90,7 @@ const INVOICE_LIST_SORT_SQL: Record<InvoiceListSortKey, Prisma.Sql> = {
   createdAt: Prisma.sql`i.created_at`,
   customer_name: Prisma.sql`lower(${CUSTOMER_NAME_SQL})`,
   netAmount: Prisma.sql`i.net_amount`,
-  paidAmount: Prisma.sql`totals.gross_paid`,
+  paidAmount: Prisma.sql`LEAST(totals.gross_paid, i.net_amount)`,
   balance: Prisma.sql`GREATEST(0, i.net_amount - totals.balance_paid)`,
   status: EFFECTIVE_STATUS_SQL,
   staff_name: Prisma.sql`lower(u.username)`,

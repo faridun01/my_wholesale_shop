@@ -53,7 +53,7 @@ export const getInvoiceChangeAmount = (invoice: StatementInvoice) => {
 };
 
 export const getInvoiceAppliedPaidAmount = (invoice: StatementInvoice) =>
-  Math.max(0, decimal(Math.max(0, Number(invoice?.paidAmount || 0))).minus(decimal(getInvoiceChangeAmount(invoice))).toNumber());
+  Math.min(Math.max(0, Number(invoice?.paidAmount || 0)), getInvoiceNetAmount(invoice));
 
 const normalizeDisplayBaseUnit = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();

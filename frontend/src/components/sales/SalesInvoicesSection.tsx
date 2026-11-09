@@ -22,7 +22,8 @@ import PaginationControls from '../common/PaginationControls';
 import { formatCount, formatMoney, toFixedNumber } from '../../utils/format';
 import {
   getEffectiveStatus,
-  getInvoiceGrossPaidAmount,
+  getInvoiceAmountToReturn,
+  getInvoiceShownPaidAmount,
   getInvoiceMoneyRefundedAmount,
   getInvoiceBalance,
   getInvoiceNetAmount,
@@ -77,6 +78,7 @@ type SalesInvoicesSectionProps = {
   fetchInvoiceDetails: (id: number) => Promise<void>;
   handleQuickPrintInvoice: (id: number) => Promise<void>;
   handleDeleteInvoice: (target: any) => void;
+  onGiveBack: (invoice: any) => void;
 };
 
 function SalesRowActions({
@@ -330,6 +332,7 @@ const SalesInvoicesSection = ({
   fetchInvoiceDetails,
   handleQuickPrintInvoice,
   handleDeleteInvoice,
+  onGiveBack,
 }: SalesInvoicesSectionProps) => {
   const [expandedMobileInvoiceId, setExpandedMobileInvoiceId] = useState<number | null>(null);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
@@ -885,7 +888,7 @@ const SalesInvoicesSection = ({
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Оплачено</p>
-                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(inv))}</p>
+                  <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceShownPaidAmount(inv))}</p>
                   {getInvoiceMoneyRefundedAmount(inv) > 0 && <p className="text-[9px] text-slate-500">Возвращено денег: {formatMoney(getInvoiceMoneyRefundedAmount(inv))}</p>}
                 </div>
                 <div>
@@ -893,6 +896,24 @@ const SalesInvoicesSection = ({
                   <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-rose-600">{formatMoney(getInvoiceBalance(inv))}</p>
                 </div>
               </div>
+
+              {getInvoiceAmountToReturn(inv) > 0 && (
+                <div className="mt-2.5 flex items-center justify-between gap-3 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-orange-800">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold">Вернуть покупателю</p>
+                    <p className="font-mono text-xs font-black tabular-nums">{formatMoney(getInvoiceAmountToReturn(inv))}</p>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => onGiveBack(inv)}
+                      className="h-9 shrink-0 rounded-xl bg-orange-600 px-3 text-xs font-bold text-white active:scale-95"
+                    >
+                      Деньги выданы
+                    </button>
+                  )}
+                </div>
+              )}
 
               {hasReturns && (
                 <div className="mt-2.5 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2">
@@ -1154,13 +1175,30 @@ const SalesInvoicesSection = ({
                     )}
                   </td>
                   <td className="px-4 py-3 text-right pr-4">
-                    <span className="font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(inv))}</span>
+                    <span className="font-mono text-xs font-bold tabular-nums text-emerald-600">{formatMoney(getInvoiceShownPaidAmount(inv))}</span>
                     {getInvoiceMoneyRefundedAmount(inv) > 0 && <span className="block text-[9px] text-slate-500">Возврат денег: {formatMoney(getInvoiceMoneyRefundedAmount(inv))}</span>}
                   </td>
                   <td className="px-4 py-3 text-right pr-4 font-mono text-xs font-bold tabular-nums">
                     <span className={getInvoiceBalance(inv) > 0.005 ? 'text-rose-600' : 'text-slate-400'}>
                       {formatMoney(getInvoiceBalance(inv))}
                     </span>
+                    {getInvoiceAmountToReturn(inv) > 0 && (
+                      <span className="mt-0.5 block whitespace-nowrap text-[10px] font-black text-orange-700">
+                        Вернуть: {formatMoney(getInvoiceAmountToReturn(inv))}
+                      </span>
+                    )}
+                    {getInvoiceAmountToReturn(inv) > 0 && isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onGiveBack(inv);
+                        }}
+                        className="mt-1 rounded-lg bg-orange-600 px-2 py-1 font-sans text-[10px] font-bold whitespace-nowrap text-white hover:bg-orange-700 active:scale-95"
+                      >
+                        Деньги выданы
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {getStatusBadge(getEffectiveStatus(inv), inv.cancelled)}

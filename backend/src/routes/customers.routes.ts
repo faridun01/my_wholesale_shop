@@ -131,7 +131,8 @@ const buildCustomerInvoiceStats = async (customerIds: number[], warehouseId?: nu
   }
 
   const warehouseFilter = warehouseId ? Prisma.sql`AND i.warehouse_id = ${warehouseId}` : Prisma.empty;
-  const appliedPaid = Prisma.sql`(i.paid_amount + COALESCE(adj.return_adjustment, 0))`;
+  // Never above the invoice total: money over it after a goods return is owed back.
+  const appliedPaid = Prisma.sql`LEAST(i.paid_amount + COALESCE(adj.return_adjustment, 0), i.net_amount)`;
 
   const rows = await prisma.$queryRaw<Array<{
     customerId: number;

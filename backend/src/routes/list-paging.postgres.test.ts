@@ -92,4 +92,11 @@ suite('complete product and customer lists across pages', () => {
     const seen = new Set((await collect('/customers')).flat().map((row) => row.id));
     expect(customerIds.filter((id) => !seen.has(id))).toEqual([]);
   });
+
+  it('never reports a customer as having paid more than the invoices are worth', async () => {
+    const customerId = customerIds[0];
+    await db.invoice.create({ data: { customerId, userId: adminId, warehouseId, totalAmount: 540, netAmount: 270, paidAmount: 324, returnedAmount: 270, status: 'paid' } });
+    const customer = (await collect('/customers')).flat().find((row) => row.id === customerId);
+    expect(customer).toMatchObject({ total_invoiced: '270', total_paid: '270', balance: '0', paid_invoice_count: 1 });
+  });
 });

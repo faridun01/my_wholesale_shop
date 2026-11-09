@@ -62,6 +62,8 @@ export interface PreparedSalesInvoiceData {
   returnedAmountFormatted: string;
   paidAmount: number;
   paidAmountFormatted: string;
+  amountToReturn: number;
+  amountToReturnFormatted: string;
   moneyRefundedAmount: number;
   moneyRefundedAmountFormatted: string;
   returnPaymentAdjustments: number;
@@ -178,9 +180,12 @@ export function prepareSalesInvoiceData(
   const isReturnDocument = Boolean(invoice?.isReturnDocument);
   const paidAmount = isReturnDocument
     ? 0
-    : Math.max(0, Number(options?.appliedPaidAmount ?? invoice?.grossPaidAmount ?? invoice?.paidAmount ?? 0));
+    : Math.min(finalTotalAmount, Math.max(0, Number(options?.appliedPaidAmount ?? invoice?.grossPaidAmount ?? invoice?.paidAmount ?? 0)));
   const balancePaidAmount = Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0));
   const balanceDue = roundMoneyValue(Math.max(0, decimal(finalTotalAmount).minus(decimal(balancePaidAmount)).toNumber()));
+  const amountToReturn = !isReturnDocument && Number(invoice?.returnedAmount || 0) > 0
+    ? roundMoneyValue(Math.max(0, decimal(balancePaidAmount).minus(decimal(finalTotalAmount)).toNumber()))
+    : 0;
   const moneyRefundedAmount = Math.max(0, Number(invoice?.moneyRefundedAmount || 0));
   const returnPaymentAdjustments = Math.max(0, Number(invoice?.returnPaymentAdjustments || 0));
   const returnDebtReduction = Math.max(0, Number(invoice?.returnDebtReduction ?? invoice?.debtReduction ?? 0));
@@ -225,6 +230,8 @@ export function prepareSalesInvoiceData(
     returnedAmountFormatted: formatMoneyWithoutCurrency(returnedAmount),
     paidAmount,
     paidAmountFormatted: formatMoneyWithoutCurrency(paidAmount),
+    amountToReturn,
+    amountToReturnFormatted: formatMoneyWithoutCurrency(amountToReturn),
     moneyRefundedAmount,
     moneyRefundedAmountFormatted: formatMoneyWithoutCurrency(moneyRefundedAmount),
     returnPaymentAdjustments,
@@ -423,6 +430,7 @@ export function buildSalesInvoiceHtml(data: PreparedSalesInvoiceData): string {
             <tr><td class="label">Скидка</td><td class="right">${escapeHtml(data.totalDiscountAmountFormatted)}</td></tr>
             ${data.returnedAmount > 0 ? `<tr><td class="label">Возврат</td><td class="right">${escapeHtml(data.returnedAmountFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.paidAmount > 0 ? `<tr><td class="label">Внесено всего</td><td class="right">${escapeHtml(data.paidAmountFormatted)}</td></tr>` : ''}
+            ${data.amountToReturn > 0 ? `<tr><td class="label">Вернуть покупателю</td><td class="right">${escapeHtml(data.amountToReturnFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.balanceDue > 0 ? `<tr><td class="label">Остаток долга</td><td class="right">${escapeHtml(data.balanceDueFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.moneyRefundedAmount > 0 ? `<tr><td class="label">Денег возвращено</td><td class="right">${escapeHtml(data.moneyRefundedAmountFormatted)}</td></tr>` : ''}
             ${!data.isReturnDocument && data.returnPaymentAdjustments > 0 ? `<tr><td class="label">Корректировка старых возвратов</td><td class="right">${escapeHtml(data.returnPaymentAdjustmentsFormatted)}</td></tr>` : ''}

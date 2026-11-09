@@ -208,6 +208,13 @@ export async function generateSalesInvoicePdf(rawInvoice: any): Promise<jsPDF> {
     ]);
   }
 
+  if (data.amountToReturn > 0) {
+    totalsRows.push([
+      { content: 'Вернуть покупателю', styles: { fontStyle: 'bold' } },
+      { content: data.amountToReturnFormatted, styles: { halign: 'right' } },
+    ]);
+  }
+
   if (!data.isReturnDocument && data.paidAmount > 0) {
     totalsRows.push([
       { content: 'Внесено всего', styles: { fontStyle: 'bold' } },

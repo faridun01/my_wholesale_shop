@@ -395,14 +395,8 @@ export default function CustomerDebtsView() {
 
   const getInvoicePaidAmount = (invoice: StatementInvoice) => Math.max(0, Number(invoice?.paidAmount || 0));
 
-  const getInvoiceChangeAmount = (invoice: StatementInvoice) => {
-    if (decimal(invoice.returnedAmount || 0).gt(0)) return 0;
-    const change = roundMoney(decimal(getInvoicePaidAmount(invoice)).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
-    return change > PAYMENT_EPSILON ? change : 0;
-  };
-
   const getInvoiceAppliedPaidAmount = (invoice: StatementInvoice) =>
-    Math.max(0, decimal(getInvoicePaidAmount(invoice)).minus(decimal(getInvoiceChangeAmount(invoice))).toNumber());
+    Math.min(getInvoicePaidAmount(invoice), getInvoiceNetAmount(invoice));
 
   const getInvoicesDebtTotal = (invoices: StatementInvoice[]) =>
     invoices.reduce((sum, invoice) => {

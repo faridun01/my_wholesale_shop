@@ -6,6 +6,7 @@ import client from '../../api/client';
 import type { ReturnInvoiceItem } from './salesTypes';
 import {
   createReturnInvoiceItems,
+  getInvoiceAmountToReturn,
   getReturnItemPackaging,
   getReturnItemRemainingUnits,
   isReturnActionDisabled,
@@ -109,14 +110,19 @@ const useSalesReturnActions = ({
         reason: returnReason,
       });
       const cashRefundAmount = Number(data?.refundedAmount || 0);
-      toast.success(
-        cashRefundAmount > 0.009
-          ? `Возврат оформлен по исходным способам оплаты: ${formatMoney(cashRefundAmount)}`
-          : 'Возврат оформлен',
-        { duration: cashRefundAmount > 0.009 ? 6000 : 4000 },
-      );
       closeReturnModal();
-      await refreshSelectedInvoice(selectedInvoice.id);
+      const updatedInvoice = await refreshSelectedInvoice(selectedInvoice.id);
+      const amountToReturn = getInvoiceAmountToReturn(updatedInvoice);
+      if (amountToReturn > 0) {
+        toast.success(`Возврат оформлен. Верните покупателю: ${formatMoney(amountToReturn)}`, { duration: 10000 });
+      } else {
+        toast.success(
+          cashRefundAmount > 0.009
+            ? `Возврат оформлен по исходным способам оплаты: ${formatMoney(cashRefundAmount)}`
+            : 'Возврат оформлен',
+          { duration: cashRefundAmount > 0.009 ? 6000 : 4000 },
+        );
+      }
       await fetchInvoices();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Ошибка при оформлении возврата');

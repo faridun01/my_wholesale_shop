@@ -99,6 +99,7 @@ export interface CustomerInvoicePrintOptions {
   netAmount: number;
   appliedPaidAmount: number;
   changeAmount: number;
+  amountToReturn?: number;
 }
 
 export interface CustomerInvoicesBatchCustomer {
@@ -223,6 +224,7 @@ const renderCustomerInvoiceSection = (
     netAmount,
     appliedPaidAmount,
     changeAmount,
+    amountToReturn = 0,
   }: CustomerInvoicePrintOptions,
   meta?: {
     pageNumber?: number;
@@ -289,9 +291,11 @@ const renderCustomerInvoiceSection = (
           <p class="label">Информация</p>
           <p class="value">Статус: ${escapeHtml(normalizedInvoiceStatusLabel)}</p>
           <p class="subvalue">${
-            changeAmount > PAYMENT_EPSILON
-              ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}`
-              : `Остаток: ${escapeHtml(formatMoney(invoiceBalance))}`
+            amountToReturn > PAYMENT_EPSILON
+              ? `Вернуть покупателю: ${escapeHtml(formatMoney(amountToReturn))}`
+              : changeAmount > PAYMENT_EPSILON
+                ? `Сдача клиенту: ${escapeHtml(formatMoney(changeAmount))}`
+                : `Остаток: ${escapeHtml(formatMoney(invoiceBalance))}`
           }</p>
         </div>
       </div>
@@ -317,6 +321,7 @@ const renderCustomerInvoiceSection = (
         <div class="summary-row total"><span>ИТОГО</span><strong>${escapeHtml(formatMoney(netAmount))}</strong></div>
         <div class="summary-row"><span>Оплачено</span><strong>${escapeHtml(formatMoney(appliedPaidAmount))}</strong></div>
         <div class="summary-row"><span>Остаток</span><strong>${escapeHtml(formatMoney(invoiceBalance))}</strong></div>
+        ${amountToReturn > PAYMENT_EPSILON ? `<div class="summary-row"><span>Вернуть покупателю</span><strong>${escapeHtml(formatMoney(amountToReturn))}</strong></div>` : ''}
       </div>
       ${renderPaymentsBlock(invoice)}
       ${renderReturnsBlock(invoice)}
@@ -543,7 +548,7 @@ const renderCustomerReconciliationSection = (
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
     .map((invoice: any, entryIndex: number) => {
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
-      const paidAmount = getInvoiceGrossPaid(invoice);
+      const paidAmount = Math.min(getInvoiceGrossPaid(invoice), invoiceTotal);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => decimal(sum).plus(Math.max(0, Number(itemReturn?.totalValue || 0))).toNumber(), 0)
         : 0;
@@ -568,7 +573,7 @@ const renderCustomerReconciliationSection = (
   const invoiceTotals = customer.invoices.reduce(
     (acc, invoice: any) => {
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
-      const paidAmount = getInvoiceGrossPaid(invoice);
+      const paidAmount = Math.min(getInvoiceGrossPaid(invoice), invoiceTotal);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
         ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => decimal(sum).plus(Math.max(0, Number(itemReturn?.totalValue || 0))).toNumber(), 0)
         : 0;

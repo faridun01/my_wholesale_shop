@@ -174,4 +174,10 @@ suite('invoice list: server-side paging, search, filters and sorting', () => {
     expect(meta.staff.map((staff: any) => staff.id)).toEqual([adminId, sellerId]);
     expect(Object.keys(meta.staff[0]).sort()).toEqual(['id', 'username']);
   });
+
+  it('sorts by the paid amount as shown, capped at the invoice total', async () => {
+    const overpaid = await makeInvoice('overpaid', { net: 10, paid: 324, status: 'paid', userId: sellerId, createdAt: '2026-10-08T10:00:00Z' });
+    await pay(overpaid.id, 324);
+    expect(await listIds({ userId: sellerId, sort: 'paidAmount', order: 'desc' })).toEqual(named('paid', 'overpaid'));
+  });
 });

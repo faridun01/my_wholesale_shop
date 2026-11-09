@@ -124,10 +124,18 @@ export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPS
   return change;
 };
 
-export const getInvoiceAppliedPaidAmount = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) =>
-  Math.max(0, decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))).minus(decimal(getInvoiceChangeAmount(invoice, epsilon))).toNumber());
+// Goods returned after payment can leave more money received than the invoice is
+// now worth. The excess is what the seller owes the buyer; payments stay as recorded.
+export const getInvoiceAmountToReturn = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) => {
+  if (Number(invoice?.returnedAmount || 0) <= 0) return 0;
+  const excess = roundMoney(decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
+  return excess > epsilon ? excess : 0;
+};
 
-export const getInvoiceGrossPaidAmount = (invoice: any) => {
+export const getInvoiceAppliedPaidAmount = (invoice: any) =>
+  Math.min(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)), getInvoiceNetAmount(invoice));
+
+const getInvoiceGrossPaidAmount = (invoice: any) => {
   const storedGross = Number(invoice?.grossPaidAmount);
   if (Number.isFinite(storedGross) && storedGross >= 0) return roundMoney(storedGross);
   if (Array.isArray(invoice?.payments)) {
@@ -135,6 +143,10 @@ export const getInvoiceGrossPaidAmount = (invoice: any) => {
   }
   return getInvoiceAppliedPaidAmount(invoice);
 };
+
+// "Внесено" as shown to people: never more than the invoice's current total.
+export const getInvoiceShownPaidAmount = (invoice: any) =>
+  Math.min(getInvoiceGrossPaidAmount(invoice), getInvoiceNetAmount(invoice));
 
 export const getInvoiceMoneyRefundedAmount = (invoice: any) => {
   const storedRefunded = Number(invoice?.moneyRefundedAmount);

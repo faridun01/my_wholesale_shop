@@ -6,7 +6,7 @@ import {
   getInvoiceBalance,
   getInvoiceChangeAmount,
   getInvoiceDiscountAmount,
-  getInvoiceGrossPaidAmount,
+  getInvoiceShownPaidAmount,
   getInvoiceNetAmount,
   getInvoiceSubtotal,
 } from '../../utils/salesViewUtils';
@@ -127,7 +127,7 @@ const useSalesInvoiceActions = ({
       netAmount: getInvoiceNetAmount(invoice),
       balanceAmount: getInvoiceBalance(invoice),
       changeAmount: getInvoiceChangeAmount(invoice),
-      appliedPaidAmount: getInvoiceGrossPaidAmount(invoice),
+      appliedPaidAmount: getInvoiceShownPaidAmount(invoice),
     });
 
     if (!result.ok && result.reason === 'blocked') {

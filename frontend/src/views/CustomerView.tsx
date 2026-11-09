@@ -46,7 +46,7 @@ import {
   getInvoiceNetAmount,
   getInvoiceSubtotal,
 } from '../components/customers/customerInvoiceCalculations';
-import { getInvoiceGrossPaidAmount } from '../utils/salesViewUtils';
+import { getInvoiceAmountToReturn, getInvoiceShownPaidAmount } from '../utils/salesViewUtils';
 import { segmentTone, useCustomerList } from '../components/customers/useCustomerList';
 import type { Customer, StatementInvoice } from '../types/customer';
 
@@ -371,7 +371,7 @@ export default function CustomerView() {
         subtotal: getInvoiceSubtotal(fullInvoice),
         discountAmount: getInvoiceDiscountAmount(fullInvoice),
         netAmount: getInvoiceNetAmount(fullInvoice),
-        appliedPaidAmount: getInvoiceGrossPaidAmount(fullInvoice),
+        appliedPaidAmount: getInvoiceShownPaidAmount(fullInvoice),
         changeAmount: getInvoiceChangeAmount(fullInvoice),
         balanceAmount: fullInvoice.invoiceBalance || 0,
       });
@@ -397,8 +397,9 @@ export default function CustomerView() {
       subtotal: getInvoiceSubtotal(invoice),
       discountAmount: getInvoiceDiscountAmount(invoice),
       netAmount: getInvoiceNetAmount(invoice),
-      appliedPaidAmount: getInvoiceGrossPaidAmount(invoice),
+      appliedPaidAmount: getInvoiceShownPaidAmount(invoice),
       changeAmount: getInvoiceChangeAmount(invoice),
+      amountToReturn: getInvoiceAmountToReturn(invoice),
     });
 
     if (!result.ok && result.reason === 'blocked') {
@@ -1522,9 +1523,16 @@ export default function CustomerView() {
                           <span>Оплачено</span>
                         </span>
                         <span className="font-mono font-bold text-emerald-600 text-sm">
-                          {formatMoneyByRole(getInvoiceGrossPaidAmount(selectedInvoice))}
+                          {formatMoneyByRole(getInvoiceShownPaidAmount(selectedInvoice))}
                         </span>
                       </div>
+
+                      {getInvoiceAmountToReturn(selectedInvoice) > 0 && (
+                        <div className="flex items-center justify-between rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-orange-800">
+                          <span className="font-bold text-xs">Вернуть покупателю</span>
+                          <span className="font-mono font-black text-sm">{formatMoneyByRole(getInvoiceAmountToReturn(selectedInvoice))}</span>
+                        </div>
+                      )}
 
                       {/* Balance / Remaining Debt */}
                       <div className="border-t border-slate-100 pt-2">

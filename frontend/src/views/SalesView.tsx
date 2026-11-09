@@ -51,10 +51,11 @@ import type { EditProductOption, ReturnInvoiceItem } from '../components/sales/s
 import {
   SALES_PAYMENT_EPSILON,
   getEffectiveStatus,
-  getInvoiceGrossPaidAmount,
+  getInvoiceShownPaidAmount,
   getInvoiceMoneyRefundedAmount,
   getInvoiceReturnPaymentAdjustments,
   getInvoiceBalance,
+  getInvoiceAmountToReturn,
   getInvoiceChangeAmount,
   getInvoiceCustomerCredit,
   getInvoiceDiscountAmount,
@@ -73,6 +74,7 @@ import {
   isReturnActionDisabled,
   normalizeDisplayBaseUnit,
 } from '../utils/salesViewUtils';
+import GiveBackModal from '../components/sales/GiveBackModal';
 import StaffPeriodPicker from '../components/staff/StaffPeriodPicker';
 import StaffStatsPanel from '../components/staff/StaffStatsPanel';
 import useStaffSummary from '../components/staff/useStaffSummary';
@@ -395,6 +397,15 @@ export default function SalesView() {
     closePaymentModal,
     handlePayment,
     handleCancelPayment,
+    showGiveBackModal,
+    giveBackAmount,
+    setGiveBackAmount,
+    giveBackMethod,
+    setGiveBackMethod,
+    isGivingBack,
+    openGiveBackModal,
+    closeGiveBackModal,
+    handleGiveBack,
   } = useSalesPaymentActions({
     selectedInvoice,
     refreshSelectedInvoice,
@@ -459,6 +470,11 @@ export default function SalesView() {
       activeCount,
       totalUnits,
       totalRefund,
+      amountToReturn: getInvoiceAmountToReturn({
+        ...selectedInvoice,
+        netAmount: addMoney(getInvoiceNetAmount(selectedInvoice), -totalRefund),
+        returnedAmount: addMoney(selectedInvoice?.returnedAmount || 0, totalRefund),
+      }),
     };
   }, [returnItems, selectedInvoice]);
 
@@ -571,8 +587,9 @@ export default function SalesView() {
       Number(invoice.discount || 0) > 0 ? `Скидка (${invoice.discount}%): -${formatMoney(getInvoiceDiscountAmount(invoice))}` : '',
       Number(invoice.returnedAmount || 0) > 0 ? `Возврат: -${formatMoney(invoice.returnedAmount)}` : '',
       `ИТОГО: ${formatMoney(getInvoiceNetAmount(invoice))}`,
-      `Внесено всего: ${formatMoney(getInvoiceGrossPaidAmount(invoice))}`,
+      `Внесено всего: ${formatMoney(getInvoiceShownPaidAmount(invoice))}`,
       `Остаток (Долг): ${formatMoney(getInvoiceBalance(invoice))}`,
+      getInvoiceAmountToReturn(invoice) > 0 ? `Вернуть покупателю: ${formatMoney(getInvoiceAmountToReturn(invoice))}` : '',
     ].filter(Boolean).join('\n');
 
     if (navigator.share) {
@@ -596,7 +613,7 @@ export default function SalesView() {
   };
 
   useEffect(() => {
-    if (!showDetailsModal && !showPaymentModal && !showReturnModal && !showEditModal) {
+    if (!showDetailsModal && !showPaymentModal && !showReturnModal && !showEditModal && !showGiveBackModal) {
       return;
     }
 
@@ -605,6 +622,7 @@ export default function SalesView() {
         return;
       }
 
+      if (showGiveBackModal) return closeGiveBackModal();
       if (showPaymentModal) return closePaymentModal();
       if (showReturnModal) return closeReturnModal();
       if (showEditModal) return closeEditModal();
@@ -613,7 +631,7 @@ export default function SalesView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDetailsModal, showEditModal, showPaymentModal, showReturnModal]);
+  }, [showDetailsModal, showEditModal, showGiveBackModal, showPaymentModal, showReturnModal]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -702,7 +720,25 @@ export default function SalesView() {
         fetchInvoiceDetails={fetchInvoiceDetails}
         handleQuickPrintInvoice={handleQuickPrintInvoice}
         handleDeleteInvoice={handleDeleteInvoice}
+        onGiveBack={(invoice) => {
+          setSelectedInvoice(invoice);
+          openGiveBackModal(getInvoiceAmountToReturn(invoice));
+        }}
       />
+
+      {showGiveBackModal && selectedInvoice && (
+        <GiveBackModal
+          invoice={selectedInvoice}
+          amountToReturn={getInvoiceAmountToReturn(selectedInvoice)}
+          amount={giveBackAmount}
+          method={giveBackMethod}
+          isSaving={isGivingBack}
+          onAmountChange={setGiveBackAmount}
+          onMethodChange={setGiveBackMethod}
+          onClose={closeGiveBackModal}
+          onConfirm={() => void handleGiveBack()}
+        />
+      )}
 
       <AnimatePresence>
         {showDetailsModal && selectedInvoice && (
@@ -1023,8 +1059,25 @@ export default function SalesView() {
                           <CheckCircle2 size={13} className="text-emerald-500" />
                           Внесено всего:
                         </span>
-                        <span className="font-mono font-bold text-emerald-600">{formatMoney(getInvoiceGrossPaidAmount(selectedInvoice))}</span>
+                        <span className="font-mono font-bold text-emerald-600">{formatMoney(getInvoiceShownPaidAmount(selectedInvoice))}</span>
                       </div>
+                      {getInvoiceAmountToReturn(selectedInvoice) > 0 && (
+                        <div className="flex items-center justify-between rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-orange-800">
+                          <div>
+                            <p className="font-bold">Вернуть покупателю:</p>
+                            <p className="font-mono font-black">{formatMoney(getInvoiceAmountToReturn(selectedInvoice))}</p>
+                          </div>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => openGiveBackModal(getInvoiceAmountToReturn(selectedInvoice))}
+                              className="h-9 shrink-0 rounded-xl bg-orange-600 px-3 text-xs font-bold text-white hover:bg-orange-700 active:scale-95"
+                            >
+                              Деньги выданы
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {getInvoiceMoneyRefundedAmount(selectedInvoice) > 0 && (
                         <div className="flex items-center justify-between text-slate-500">
                           <span className="font-medium">Деньгами возвращено:</span>
@@ -1097,7 +1150,7 @@ export default function SalesView() {
                                 {new Date(p.createdAt).toLocaleString('ru-RU')} • <span className="font-medium text-slate-600">{p.staff_name}</span>
                               </p>
                             </div>
-                            {isAdmin && (
+                            {isAdmin && !isRefund && (
                               <button
                                 type="button"
                                 onClick={() => void handleCancelPayment(p)}
@@ -1136,7 +1189,7 @@ export default function SalesView() {
                                 </td>
                                 <td className="px-3.5 py-2.5 font-medium text-slate-700">{p.staff_name}</td>
                                 <td className="px-3.5 py-2.5 text-right">
-                                  {isAdmin && (
+                                  {isAdmin && !isRefund && (
                                     <button
                                       type="button"
                                       onClick={() => void handleCancelPayment(p)}
@@ -2282,6 +2335,12 @@ export default function SalesView() {
                       </p>
                     </div>
                   </div>
+                  {returnStats.amountToReturn > 0 && (
+                    <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2.5 text-orange-800">
+                      <span className="text-xs sm:text-sm font-bold">Вернуть покупателю деньгами</span>
+                      <span className="font-mono text-sm sm:text-base font-black">{formatMoney(returnStats.amountToReturn)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Reason Card */}

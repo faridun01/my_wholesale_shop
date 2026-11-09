@@ -22,3 +22,7 @@ snapshots/
 # Secrets and temporary files
 cookies.txt
 *.env
+
+# Database dumps contain customer data
+*.bak
+*.dump

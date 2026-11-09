@@ -34,14 +34,35 @@ describe('financial documents and previews', () => {
     expect(html).not.toContain('Кредит покупателя');
     expect(html).not.toContain('Налог');
   });
-  it('shows unchanged recorded payments after returns without customer credit or change', async () => {
+  it('caps shown payments at the invoice total and reports the excess as owed to the buyer', async () => {
     const sales = await frontend('utils/salesViewUtils.ts');
     const customer = await frontend('components/customers/customerInvoiceCalculations.ts');
-    const invoice = { netAmount: '500', paidAmount: '600', returnedAmount: '500', totalAmount: '1000', discount: '0', items: [] };
+    const invoice = { netAmount: '500', paidAmount: '600', balancePaidAmount: '600', grossPaidAmount: '600', returnedAmount: '500', totalAmount: '1000', discount: '0', items: [] };
     expect(sales.getInvoiceCustomerCredit(invoice)).toBe(0);
     expect(sales.getInvoiceChangeAmount(invoice)).toBe(0);
+    expect(sales.getInvoiceShownPaidAmount(invoice)).toBe(500);
+    expect(sales.getInvoiceAppliedPaidAmount(invoice)).toBe(500);
+    expect(sales.getInvoiceAmountToReturn(invoice)).toBe(100);
+    expect(sales.getInvoiceBalance(invoice)).toBe(0);
     expect(customer.getInvoiceChangeAmount(invoice)).toBe(0);
-    expect(customer.getInvoiceAppliedPaidAmount(invoice)).toBe(600);
+    expect(customer.getInvoiceAppliedPaidAmount(invoice)).toBe(500);
+
+    const stillOwing = { ...invoice, netAmount: '850', returnedAmount: '150' };
+    expect(sales.getInvoiceShownPaidAmount(stillOwing)).toBe(600);
+    expect(sales.getInvoiceAmountToReturn(stillOwing)).toBe(0);
+    expect(sales.getInvoiceBalance(stillOwing)).toBe(250);
+
+    const noReturn = { ...invoice, returnedAmount: '0' };
+    expect(sales.getInvoiceAmountToReturn(noReturn)).toBe(0);
+  });
+  it('prints the capped payment and the amount to give back', async () => {
+    const { prepareSalesInvoiceData, buildSalesInvoiceHtml } = await frontend('utils/print/salesInvoicePrint.ts');
+    const invoice = { netAmount: 270, paidAmount: 324, grossPaidAmount: 324, balancePaidAmount: 324, returnedAmount: 270, items: [{ quantity: 2, sellingPrice: 150, totalPrice: 300 }] };
+    const prepared = prepareSalesInvoiceData(invoice);
+    expect(prepared).toMatchObject({ paidAmount: 270, amountToReturn: 54, balanceDue: 0, finalTotalAmount: 270 });
+    expect(buildSalesInvoiceHtml(prepared)).toContain('Вернуть покупателю');
+    expect(prepareSalesInvoiceData({ ...invoice, netAmount: 324 }).amountToReturn).toBe(0);
+    expect(buildSalesInvoiceHtml(prepareSalesInvoiceData({ ...invoice, netAmount: 324 }))).not.toContain('Вернуть покупателю');
   });
   it('uses authoritative zero totals in customer documents', async () => {
     const calc = await frontend('components/customers/customerInvoiceCalculations.ts');

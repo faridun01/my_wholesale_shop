@@ -3,7 +3,8 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { formatMoney, parseMoneyInput, toFixedNumber } from '../../utils/format';
-import { SALES_PAYMENT_EPSILON, getInvoiceBalance } from '../../utils/salesViewUtils';
+import { SALES_PAYMENT_EPSILON, getInvoiceAmountToReturn, getInvoiceBalance } from '../../utils/salesViewUtils';
+import type { GiveBackMethod } from './GiveBackModal';
 
 type UseSalesPaymentActionsOptions = {
   selectedInvoice: any;
@@ -20,6 +21,10 @@ const useSalesPaymentActions = ({
   const [paymentAmount, setPaymentAmount] = useState('');
   const [isPaying, setIsPaying] = useState(false);
   const [cancellingPaymentId, setCancellingPaymentId] = useState<number | null>(null);
+  const [showGiveBackModal, setShowGiveBackModal] = useState(false);
+  const [giveBackAmount, setGiveBackAmount] = useState('');
+  const [giveBackMethod, setGiveBackMethod] = useState<GiveBackMethod>('cash');
+  const [isGivingBack, setIsGivingBack] = useState(false);
 
   const closePaymentModal = () => {
     setShowPaymentModal(false);
@@ -62,6 +67,50 @@ const useSalesPaymentActions = ({
     }
   };
 
+  const openGiveBackModal = (amountToReturn: number) => {
+    setGiveBackAmount(String(toFixedNumber(amountToReturn)));
+    setGiveBackMethod('cash');
+    setShowGiveBackModal(true);
+  };
+
+  const closeGiveBackModal = () => {
+    setShowGiveBackModal(false);
+    setGiveBackAmount('');
+  };
+
+  const handleGiveBack = async () => {
+    if (!selectedInvoice) return;
+
+    const normalizedAmount = parseMoneyInput(giveBackAmount);
+    if (normalizedAmount === null || normalizedAmount <= 0) {
+      toast.error('Сумма должна быть больше нуля');
+      return;
+    }
+
+    const amountToReturn = getInvoiceAmountToReturn(selectedInvoice);
+    if (normalizedAmount > amountToReturn) {
+      toast.error(`Нельзя выдать больше ${toFixedNumber(amountToReturn)}`);
+      return;
+    }
+
+    setIsGivingBack(true);
+    try {
+      await financialPost('/payments/give-back', {
+        invoice_id: selectedInvoice.id,
+        amount: normalizedAmount,
+        method: giveBackMethod,
+      });
+      toast.success(`Выдача записана: ${formatMoney(normalizedAmount)}`);
+      closeGiveBackModal();
+      await refreshSelectedInvoice(selectedInvoice.id);
+      await fetchInvoices();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Ошибка при записи выдачи');
+    } finally {
+      setIsGivingBack(false);
+    }
+  };
+
   const handleCancelPayment = async (payment: any) => {
     if (!selectedInvoice || !payment?.id) return;
 
@@ -93,6 +142,15 @@ const useSalesPaymentActions = ({
     closePaymentModal,
     handlePayment,
     handleCancelPayment,
+    showGiveBackModal,
+    giveBackAmount,
+    setGiveBackAmount,
+    giveBackMethod,
+    setGiveBackMethod,
+    isGivingBack,
+    openGiveBackModal,
+    closeGiveBackModal,
+    handleGiveBack,
   };
 };
 

@@ -1,6 +1,7 @@
 import { formatCount, formatMoney } from '../../utils/format';
 import { addMoney } from '../../utils/financial';
 import { returnReceiptInvoice } from '../../utils/print/returnReceipt';
+import { getInvoiceAmountToReturn, getInvoiceShownPaidAmount } from '../../utils/salesViewUtils';
 import toast from 'react-hot-toast';
 
 const methods: Record<string, string> = { cash: 'Наличные', card: 'Карта', transfer: 'Перевод', mixed: 'Несколько способов' };
@@ -13,10 +14,12 @@ async function document(invoice: any, pdf = false) {
 export default function InvoiceFinancialHistory({ invoice }: { invoice: any }) {
   const original = invoice.originalInvoice;
   const debt = invoice.financialSummary?.debtAmount ?? Math.max(0, addMoney(invoice.netAmount, -Number(invoice.paidAmount)));
+  const amountToReturn = getInvoiceAmountToReturn(invoice);
   return <section className="space-y-3" aria-label="Финансовая история накладной">
     <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm">
       <h3 className="font-bold">Текущая накладная — оставшиеся товары</h3>
-      <p className="mt-1">Итого: {formatMoney(invoice.netAmount)} · Внесено всего: {formatMoney(invoice.grossPaidAmount ?? invoice.paidAmount)} · Долг: {formatMoney(debt)}</p>
+      <p className="mt-1">Итого: {formatMoney(invoice.netAmount)} · Внесено всего: {formatMoney(getInvoiceShownPaidAmount(invoice))} · Долг: {formatMoney(debt)}</p>
+      {amountToReturn > 0 && <p className="mt-1 font-bold text-amber-800">Вернуть покупателю: {formatMoney(amountToReturn)}</p>}
       {Number(invoice.moneyRefundedAmount || 0) > 0 && <p className="mt-1 text-xs text-slate-600">Деньгами возвращено: {formatMoney(invoice.moneyRefundedAmount)}. Эта сумма показана отдельно от внесённых оплат.</p>}
       {Number(invoice.returnPaymentAdjustments || 0) > 0 && <p className="mt-1 text-xs text-amber-800">В старой истории есть корректировка оплаты из-за возврата товара: {formatMoney(invoice.returnPaymentAdjustments)}. Она не считается фактически выданными деньгами.</p>}
       <p className="mt-1 text-xs text-slate-600">Возвращено товаров на: {formatMoney(invoice.returnedAmount)}. Возвраты уже учтены в текущем итоге накладной.</p>
