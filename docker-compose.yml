@@ -27,6 +27,8 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      # Report periods and dashboard windows are built from the server's calendar day.
+      TZ: ${TZ:-Asia/Dushanbe}
       HOST: 0.0.0.0
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-my_wholesale_shop}?schema=public

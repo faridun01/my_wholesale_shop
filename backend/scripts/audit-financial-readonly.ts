@@ -67,7 +67,7 @@ try {
     returnDetails = await db.$queryRaw`
       SELECT r.id AS return_id, r.invoice_id, r.total_value,
         COUNT(ri.id)::int AS item_lines,
-        COALESCE(SUM(ri.quantity), 0) AS returned_quantity,
+        COALESCE(SUM(ri.quantity), 0)::int AS returned_quantity,
         COALESCE(SUM(ri.total_value), 0) AS item_value
       FROM returns r
       LEFT JOIN return_items ri ON ri.return_id = r.id

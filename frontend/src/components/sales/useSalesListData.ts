@@ -1,128 +1,142 @@
-import { decimal } from '../../utils/financial';
-import { useMemo } from 'react';
-import {
-  getEffectiveStatus,
-  getInvoiceGrossPaidAmount,
-  getInvoiceBalance,
-  getInvoiceNetAmount,
-} from '../../utils/salesViewUtils';
-import { toLocalDateKey } from '../../utils/format';
+import axios from 'axios';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
+import client from '../../api/client';
 
 type InvoiceSortConfig = {
   key: string;
   direction: 'asc' | 'desc';
 };
 
+export type SalesStaffOption = {
+  id: number;
+  username: string;
+};
+
 type UseSalesListDataOptions = {
-  invoices: any[];
+  warehouseId: string;
   search: string;
   statusFilter: 'all' | 'paid' | 'partial' | 'unpaid';
   staffFilter: string;
   dateFrom: string;
   dateTo: string;
   sortConfig: InvoiceSortConfig;
-  isAdmin: boolean;
-  userWarehouseId: number | null | undefined;
   currentPage: number;
   pageSize: number;
 };
 
+// The picker's dates mean the user's local calendar day; the server may run in
+// another time zone, so it receives the exact moments that day starts and ends.
+const toDayBoundary = (dateKey: string, time: string) => {
+  if (!dateKey) return undefined;
+  const date = new Date(`${dateKey}T${time}`);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 const useSalesListData = ({
-  invoices,
+  warehouseId,
   search,
   statusFilter,
   staffFilter,
   dateFrom,
   dateTo,
   sortConfig,
-  isAdmin,
-  userWarehouseId,
   currentPage,
   pageSize,
 }: UseSalesListDataOptions) => {
-  const normalizedSearch = search.trim().toLowerCase();
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [allInvoicesCount, setAllInvoicesCount] = useState(0);
+  const [staffOptions, setStaffOptions] = useState<SalesStaffOption[]>([]);
 
-  const filteredInvoices = useMemo(
-    () =>
-      invoices.filter((inv) => {
-        if (inv?.cancelled) {
-          return false;
-        }
+  const params = {
+    warehouseId: warehouseId || undefined,
+    search: search || undefined,
+    paymentStatus: statusFilter === 'all' ? undefined : statusFilter,
+    userId: staffFilter === 'all' ? undefined : staffFilter,
+    from: toDayBoundary(dateFrom, '00:00:00.000'),
+    to: toDayBoundary(dateTo, '23:59:59.999'),
+    sort: sortConfig.key,
+    order: sortConfig.direction,
+    page: currentPage,
+    limit: pageSize,
+  };
+  const paramsKey = JSON.stringify(params);
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
 
-        const matchesSearch =
-          !normalizedSearch ||
-          String(inv.id).includes(normalizedSearch) ||
-          String(inv.customer_name || '').toLowerCase().includes(normalizedSearch);
+  const pageRequestRef = useRef<AbortController | null>(null);
+  const metaRequestRef = useRef<AbortController | null>(null);
 
-        const effectiveStatus = getEffectiveStatus(inv);
-        const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
-        const matchesStaff = staffFilter === 'all' || String(inv.staff_name || '') === staffFilter;
-        // Local calendar day — slicing the ISO string would use the UTC day and
-        // put early-morning invoices on the previous date in UTC+ time zones.
-        const invoiceDate = inv.createdAt ? toLocalDateKey(inv.createdAt) : '';
-        const matchesDateFrom = !dateFrom || invoiceDate >= dateFrom;
-        const matchesDateTo = !dateTo || invoiceDate <= dateTo;
-
-        if (isAdmin || !userWarehouseId) {
-          return matchesSearch && matchesStatus && matchesStaff && matchesDateFrom && matchesDateTo;
-        }
-
-        const invoiceWarehouseId = inv.warehouseId || inv.warehouse?.id;
-        return (
-          matchesSearch &&
-          matchesStatus &&
-          matchesStaff &&
-          matchesDateFrom &&
-          matchesDateTo &&
-          Number(invoiceWarehouseId) === userWarehouseId
-        );
-      }),
-    [dateFrom, dateTo, invoices, isAdmin, normalizedSearch, staffFilter, statusFilter, userWarehouseId],
-  );
-
-  const sortedInvoices = useMemo(() => {
-    const direction = sortConfig.direction === 'asc' ? 1 : -1;
-
-    return [...filteredInvoices].sort((a, b) => {
-      switch (sortConfig.key) {
-        case 'id':
-          return (Number(a.id) - Number(b.id)) * direction;
-        case 'createdAt':
-          return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
-        case 'customer_name':
-          return String(a.customer_name || '').localeCompare(String(b.customer_name || '')) * direction;
-        case 'netAmount':
-          return decimal(getInvoiceNetAmount(a)).minus(decimal(getInvoiceNetAmount(b))).times(decimal(direction)).toNumber();
-        case 'paidAmount':
-          return decimal(getInvoiceGrossPaidAmount(a)).minus(decimal(getInvoiceGrossPaidAmount(b))).times(decimal(direction)).toNumber();
-        case 'balance':
-          return decimal(getInvoiceBalance(a)).minus(decimal(getInvoiceBalance(b))).times(decimal(direction)).toNumber();
-        case 'status':
-          return String(getEffectiveStatus(a)).localeCompare(String(getEffectiveStatus(b))) * direction;
-        case 'staff_name':
-          return String(a.staff_name || '').localeCompare(String(b.staff_name || '')) * direction;
-        default:
-          return 0;
+  const fetchPage = useCallback(async () => {
+    pageRequestRef.current?.abort();
+    const controller = new AbortController();
+    pageRequestRef.current = controller;
+    setIsLoading(true);
+    try {
+      const res = await client.get('/invoices', { params: paramsRef.current, signal: controller.signal });
+      const page = Array.isArray(res.data) ? res.data : [];
+      setInvoices(page);
+      setTotalItems(Number(res.headers['x-total-count'] ?? page.length));
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        toast.error('Ошибка при загрузке накладных');
       }
-    });
-  }, [filteredInvoices, sortConfig.direction, sortConfig.key]);
+    } finally {
+      if (pageRequestRef.current === controller) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
-  const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize));
-  const paginatedInvoices = useMemo(
-    () => sortedInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [currentPage, pageSize, sortedInvoices],
+  const fetchMeta = useCallback(async () => {
+    metaRequestRef.current?.abort();
+    const controller = new AbortController();
+    metaRequestRef.current = controller;
+    try {
+      const res = await client.get('/invoices/list-meta', {
+        params: { warehouseId: paramsRef.current.warehouseId },
+        signal: controller.signal,
+      });
+      setAllInvoicesCount(Number(res.data?.total || 0));
+      setStaffOptions(Array.isArray(res.data?.staff) ? res.data.staff : []);
+    } catch (err) {
+      if (!axios.isCancel(err)) {
+        console.error(err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchPage();
+  }, [fetchPage, paramsKey]);
+
+  useEffect(() => {
+    void fetchMeta();
+  }, [fetchMeta, warehouseId]);
+
+  useEffect(
+    () => () => {
+      pageRequestRef.current?.abort();
+      metaRequestRef.current?.abort();
+    },
+    [],
   );
 
-  const staffOptions = useMemo(
-    () => Array.from(new Set(invoices.map((invoice) => String(invoice.staff_name || '').trim()).filter(Boolean))),
-    [invoices],
-  );
+  const fetchInvoices = useCallback(async () => {
+    await Promise.all([fetchPage(), fetchMeta()]);
+  }, [fetchMeta, fetchPage]);
 
   return {
-    sortedInvoices,
-    totalPages,
-    paginatedInvoices,
+    invoices,
+    setInvoices,
+    totalItems,
+    totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+    isLoading,
+    allInvoicesCount,
     staffOptions,
+    fetchInvoices,
   };
 };
 

@@ -240,7 +240,12 @@ suite('PostgreSQL financial transaction integration', () => {
         expect(response.status).toBe(200);
         const row = response.data.find((item: any) => item.id === product.id);
         expect(row.stock).toBe(3);
-        expect(row.batches[0]).not.toHaveProperty('costPrice');
+        expect(row.batches[0]).toHaveProperty('costPrice');
+        expect(row.batches.every((batch: any) => Number(batch.remainingQuantity) !== 0)).toBe(true);
+        const staffResponse = await request(path, undefined, 'MANAGER');
+        expect(staffResponse.status).toBe(200);
+        const staffRow = staffResponse.data.find((item: any) => item.id === product.id);
+        expect(staffRow.batches[0]).not.toHaveProperty('costPrice');
       }
     });
     // Reading must not silently repair historical caches.

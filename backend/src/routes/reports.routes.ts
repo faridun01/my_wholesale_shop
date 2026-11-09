@@ -15,8 +15,10 @@ import {
   buildInvoiceLineReportRows,
   getLineCost,
   getLineNetRevenue,
+  getInvoiceLineRevenues,
   getRemainingQuantity,
   MONEY_EPSILON,
+  toLocalDateKey,
 } from './reports.helpers.js';
 import { DEFAULT_CUSTOMER_NAME, getTotalOutstandingDebt } from '../utils/defaultCustomer.js';
 import { countUniqueProductsByName } from './dashboard.helpers.js';
@@ -236,8 +238,9 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       customerPerformance[customerKey].revenue = addMoney(customerPerformance[customerKey].revenue, netAmount);
       customerPerformance[customerKey].debt = addMoney(customerPerformance[customerKey].debt, invoiceDebt);
 
-      for (const item of inv.items) {
-        const lineRevenue = getLineNetRevenue(inv, item);
+      const lineRevenues = getInvoiceLineRevenues(inv);
+      for (const [itemIndex, item] of inv.items.entries()) {
+        const lineRevenue = lineRevenues[itemIndex];
         const lineCost = getLineCost(item);
         const lineProfit = decimal(lineRevenue).minus(decimal(lineCost)).toNumber();
         const quantity = getRemainingQuantity(item);
@@ -432,6 +435,7 @@ router.get('/sales', authorize(['ADMIN']), validateRequest({ query: commonReport
       getLineNetRevenue,
       getLineCost,
       netSalesKey: 'total_sales',
+      getInvoiceLineRevenues,
     });
 
     res.json(report);
@@ -491,6 +495,7 @@ router.get('/profit', validateRequest({ query: commonReportsQuerySchema }), asyn
       getLineNetRevenue,
       getLineCost,
       netSalesKey: 'net_sales',
+      getInvoiceLineRevenues,
     });
 
     res.json(report);
@@ -510,7 +515,7 @@ router.get('/returns', authorize(['ADMIN']), validateRequest({ query: commonRepo
       orderBy: { createdAt: 'desc' },
     });
     const report = returns.flatMap((r: any) => {
-      const base = { return_id: r.id, invoice_id: r.invoiceId, date: r.createdAt.toISOString().split('T')[0], warehouse_name: r.invoice?.warehouse?.name || '', staff_name: r.user?.username || '', reason: r.reason };
+      const base = { return_id: r.id, invoice_id: r.invoiceId, date: toLocalDateKey(r.createdAt), warehouse_name: r.invoice?.warehouse?.name || '', staff_name: r.user?.username || '', reason: r.reason };
       if (!r.items.length) return [{ ...base, product_name: 'Historical return (item details unavailable)', unit: '', quantity: null, selling_price: null, total_value: Number(r.totalValue), refunded_amount: r.refundedAmount == null ? null : Number(r.refundedAmount), debt_reduction: r.debtReduction == null ? null : Number(r.debtReduction), credit_amount: r.creditAmount == null ? null : Number(r.creditAmount), legacy: true }];
       const weights = r.items.map((i: any) => toCents(i.totalValue));
       const refundParts = r.refundedAmount == null ? null : allocateCents(toCents(r.refundedAmount), weights);
@@ -583,7 +588,7 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
 
       return {
         transaction_id: t.id,
-        date: t.createdAt.toISOString().split('T')[0],
+        date: toLocalDateKey(t.createdAt),
         warehouse_name: t.warehouse?.name || '',
         staff_name: t.user?.username || '',
         product_name: t.product?.name || '',

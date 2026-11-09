@@ -7,8 +7,8 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
 import { getCanonicalDefaultCustomer } from '../utils/defaultCustomer.js';
 import { parsePaginationQuery, setPaginationHeaders } from '../utils/pagination.js';
-import { getLineCost, getLineNetRevenue } from './reports.helpers.js';
-import { buildInvoiceListWhere, sanitizeInvoiceCreatePayload } from './invoices.helpers.js';
+import { getLineCost, getInvoiceLineRevenues } from './reports.helpers.js';
+import { buildInvoiceListSql, buildInvoiceListWhere, sanitizeInvoiceCreatePayload } from './invoices.helpers.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 import { addMoney, assertNoTaxPayload, balancePaidAmount, goodsReturnPaymentAdjustments, isGoodsReturnPaymentAdjustment } from '../utils/financial.js';
 
@@ -32,30 +32,35 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
     const { page, limit, skip } = parsePaginationQuery(req.query, { defaultLimit: 500, maxLimit: 1000 });
     const where = buildInvoiceListWhere(access, warehouseId, req.query as Record<string, unknown>);
+    const listSql = buildInvoiceListSql(where, req.query as Record<string, unknown>);
+    const [pageRows, countRows] = await Promise.all([
+      prisma.$queryRaw<{ id: number }[]>(listSql.pageIds(limit, skip)),
+      prisma.$queryRaw<{ total: number }[]>(listSql.count),
+    ]);
+    const pageIds = pageRows.map((row) => row.id);
+    const total = countRows[0]?.total ?? 0;
 
     // saleAllocations (real per-batch cost) are only pulled for admins, since they're
     // the only ones who see totalProfit below — avoids the extra join for every
     // regular staff request against this hot, paginated list.
-    const [invoices, total] = await Promise.all([
-      prisma.invoice.findMany({
-        where,
-        include: {
-          customer: true,
-          user: { select: PUBLIC_USER_SELECT },
-          items: access.isAdmin
-            ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
-            : true,
-          returns: access.isAdmin
-            ? { select: { items: { select: { invoiceItemId: true } } } }
-            : false,
-          payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.invoice.count({ where }),
-    ]);
+    const invoices = pageIds.length
+      ? await prisma.invoice.findMany({
+          where: { id: { in: pageIds } },
+          include: {
+            customer: true,
+            user: { select: PUBLIC_USER_SELECT },
+            items: access.isAdmin
+              ? { include: { saleAllocations: { select: { quantity: true, batch: { select: { costPrice: true } } } } } }
+              : true,
+            returns: access.isAdmin
+              ? { select: { items: { select: { invoiceItemId: true } } } }
+              : false,
+            payments: { select: { amount: true, method: true, returnId: true, reversalOfId: true } },
+          },
+        })
+      : [];
+    const pagePosition = new Map(pageIds.map((id, index) => [id, index]));
+    invoices.sort((a, b) => pagePosition.get(a.id)! - pagePosition.get(b.id)!);
 
     setPaginationHeaders(res, { page, limit, total });
 
@@ -64,8 +69,9 @@ router.get('/', async (req: AuthRequest, res, next) => {
         // Same revenue/cost methodology as the Reports "Прибыль" endpoint
         // (proportional net revenue per line + real batch-allocation cost), so an
         // invoice's profit never disagrees depending on which screen shows it.
+        const revenues = access.isAdmin ? getInvoiceLineRevenues(inv) : [];
         const totalProfit = access.isAdmin
-          ? inv.items.reduce((sum: number, item: any) => addMoney(sum, getLineNetRevenue(inv, item), -getLineCost(item)), 0)
+          ? inv.items.reduce((sum: number, item: any, index: number) => addMoney(sum, revenues[index], -getLineCost(item)), 0)
           : undefined;
         const { returns: _returns, ...invoiceData } = inv;
         const payments = Array.isArray(inv.payments) ? inv.payments : [];
@@ -83,6 +89,28 @@ router.get('/', async (req: AuthRequest, res, next) => {
         };
       }),
     );
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Totals behind the sales list's header and staff filter: the list itself only
+// carries the page being viewed.
+router.get('/list-meta', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const warehouseId = getScopedWarehouseId(access, req.query.warehouseId);
+    const where = buildInvoiceListWhere(access, warehouseId, {});
+    const groups = await prisma.invoice.groupBy({ by: ['userId'], where: where as any, _count: { _all: true } });
+    const staff = groups.length
+      ? await prisma.user.findMany({
+          where: { id: { in: groups.map((group) => group.userId) } },
+          select: { id: true, username: true },
+          orderBy: { username: 'asc' },
+        })
+      : [];
+
+    res.json({ total: groups.reduce((sum, group) => sum + group._count._all, 0), staff });
   } catch (error) {
     next(error);
   }

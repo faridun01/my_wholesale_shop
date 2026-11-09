@@ -22,6 +22,7 @@ export const corsMiddleware = cors({
   origin: buildCorsOriginCheck(),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type'],
+  exposedHeaders: ['X-Page', 'X-Limit', 'X-Total-Count', 'X-Total-Pages', 'X-Has-More'],
   credentials: true,
   maxAge: 86400,
 });

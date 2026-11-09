@@ -2,7 +2,7 @@ import { decimal } from '../utils/financial.js';
 import { addMoney } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
 import { roundMoney } from '../utils/money.js';
-import { buildCreatedAtRange, getLineCost, getLineNetRevenue } from '../routes/reports.helpers.js';
+import { buildCreatedAtRange, getLineCost, getInvoiceLineRevenues } from '../routes/reports.helpers.js';
 import { INVOICE_PAYMENT_STATUSES, type InvoicePaymentStatus } from '../routes/invoices.helpers.js';
 
 const PAYMENT_EPSILON = 0;
@@ -221,8 +221,10 @@ export class StaffStatsService {
 
       profit = roundMoney(
         invoices.reduce(
-          (sum, invoice) =>
-            addMoney(sum, invoice.items.reduce((lineSum, item) => addMoney(lineSum, getLineNetRevenue(invoice, item), -getLineCost(item)), 0)),
+          (sum, invoice) => {
+            const revenues = getInvoiceLineRevenues(invoice);
+            return addMoney(sum, invoice.items.reduce((lineSum, item, index) => addMoney(lineSum, revenues[index], -getLineCost(item)), 0));
+          },
           0,
         ),
       );

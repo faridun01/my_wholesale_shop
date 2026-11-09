@@ -247,7 +247,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         where: baseWhere,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
       prisma.customer.count({ where: baseWhere }),
     ]);

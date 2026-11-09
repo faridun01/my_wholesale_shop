@@ -81,7 +81,6 @@ import { buildStaffPeriod, type StaffPeriod } from '../components/staff/staffPer
 export default function SalesView() {
   const PAYMENT_EPSILON = SALES_PAYMENT_EPSILON;
   const pageSize = 8;
-  const [invoices, setInvoices] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const hasLoadedCustomersRef = React.useRef(false);
@@ -96,6 +95,7 @@ export default function SalesView() {
     return '';
   });
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
   const [staffFilter, setStaffFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -114,7 +114,6 @@ export default function SalesView() {
     key: 'createdAt',
     direction: 'desc',
   });
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,8 +125,39 @@ export default function SalesView() {
   };
 
   useEffect(() => {
-    fetchInvoices();
-  }, [selectedWarehouseId, isAdmin, userWarehouseId]);
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  // Adjusted during render so a filter change requests page 1 straight away,
+  // instead of first fetching the old page number with the new filters.
+  const listFiltersKey = [debouncedSearch, selectedWarehouseId, sortConfig.key, sortConfig.direction, statusFilter, staffFilter, dateFrom, dateTo].join('\u0000');
+  const [appliedFiltersKey, setAppliedFiltersKey] = useState(listFiltersKey);
+  if (appliedFiltersKey !== listFiltersKey) {
+    setAppliedFiltersKey(listFiltersKey);
+    setCurrentPage(1);
+  }
+
+  const {
+    invoices,
+    setInvoices,
+    totalItems,
+    totalPages,
+    isLoading,
+    allInvoicesCount,
+    staffOptions,
+    fetchInvoices,
+  } = useSalesListData({
+    warehouseId: !isAdmin && userWarehouseId ? String(userWarehouseId) : selectedWarehouseId,
+    search: debouncedSearch,
+    statusFilter,
+    staffFilter,
+    dateFrom,
+    dateTo,
+    sortConfig,
+    currentPage,
+    pageSize,
+  });
 
   useEffect(() => {
     const incomingWarehouseId = location.state && typeof location.state === 'object'
@@ -156,18 +186,13 @@ export default function SalesView() {
   }, [dateFrom, dateTo, isAdmin]);
 
   // Edits/returns/cancellations reload the invoice list — keep the seller's
-  // figures in step with it (the first load already happens in the hook).
-  const hasLoadedInvoicesOnceRef = React.useRef(false);
+  // figures in step with it. Paging and filtering change neither.
   const reloadMyStatsRef = React.useRef(myStats.reload);
   reloadMyStatsRef.current = myStats.reload;
-  useEffect(() => {
-    if (isAdmin || isLoading) return;
-    if (!hasLoadedInvoicesOnceRef.current) {
-      hasLoadedInvoicesOnceRef.current = true;
-      return;
-    }
-    void reloadMyStatsRef.current();
-  }, [invoices, isAdmin, isLoading]);
+  const reloadInvoicesAndStats = React.useCallback(async () => {
+    await fetchInvoices();
+    if (!isAdmin) void reloadMyStatsRef.current();
+  }, [fetchInvoices, isAdmin]);
 
   const handleMyStatsPeriodChange = (period: StaffPeriod) => {
     setMyStatsPeriod(period);
@@ -203,20 +228,6 @@ export default function SalesView() {
     hasLoadedCustomersRef.current = true;
     fetchCustomers();
   }, []);
-
-  const fetchInvoices = async () => {
-    setIsLoading(true);
-    try {
-      const effectiveWarehouseId = !isAdmin && userWarehouseId ? String(userWarehouseId) : selectedWarehouseId;
-      const query = effectiveWarehouseId ? `?warehouseId=${effectiveWarehouseId}` : '';
-      const res = await client.get(`/invoices${query}`);
-      setInvoices(Array.isArray(res.data) ? res.data.filter((invoice) => !invoice?.cancelled) : []);
-    } catch (err) {
-      toast.error('Ошибка при загрузке накладных');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const {
     showEditModal,
@@ -259,7 +270,7 @@ export default function SalesView() {
     setInvoices,
     isAdmin,
     user,
-    fetchInvoices,
+    fetchInvoices: reloadInvoicesAndStats,
   });
 
   const fetchWarehouses = async () => {
@@ -387,7 +398,7 @@ export default function SalesView() {
   } = useSalesPaymentActions({
     selectedInvoice,
     refreshSelectedInvoice,
-    fetchInvoices,
+    fetchInvoices: reloadInvoicesAndStats,
   });
 
   const {
@@ -404,7 +415,7 @@ export default function SalesView() {
     selectedInvoice,
     setSelectedInvoice,
     refreshSelectedInvoice,
-    fetchInvoices,
+    fetchInvoices: reloadInvoicesAndStats,
   });
 
   const [returnSearch, setReturnSearch] = useState('');
@@ -509,7 +520,7 @@ export default function SalesView() {
     closeEditModal,
     closePaymentModal,
     closeReturnModal,
-    fetchInvoices,
+    fetchInvoices: reloadInvoicesAndStats,
     invoices,
   });
 
@@ -604,29 +615,6 @@ export default function SalesView() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showDetailsModal, showEditModal, showPaymentModal, showReturnModal]);
 
-  const {
-    sortedInvoices,
-    totalPages,
-    paginatedInvoices,
-    staffOptions,
-  } = useSalesListData({
-    invoices,
-    search,
-    statusFilter,
-    staffFilter,
-    dateFrom,
-    dateTo,
-    sortConfig,
-    isAdmin,
-    userWarehouseId,
-    currentPage,
-    pageSize,
-  });
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, selectedWarehouseId, sortConfig.key, sortConfig.direction, statusFilter, staffFilter, dateFrom, dateTo]);
-
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -681,7 +669,7 @@ export default function SalesView() {
         warehouses={warehouses}
         selectedWarehouseId={selectedWarehouseId}
         setSelectedWarehouseId={setSelectedWarehouseId}
-        invoicesCount={invoices.length}
+        invoicesCount={allInvoicesCount}
         search={search}
         setSearch={setSearch}
         statusFilter={statusFilter}
@@ -694,8 +682,8 @@ export default function SalesView() {
         setDateTo={setDateTo}
         staffOptions={staffOptions}
         clearInvoiceFilters={clearInvoiceFilters}
-        paginatedInvoices={paginatedInvoices}
-        sortedInvoicesLength={sortedInvoices.length}
+        paginatedInvoices={invoices}
+        sortedInvoicesLength={totalItems}
         isLoading={isLoading}
         currentPage={currentPage}
         totalPages={totalPages}

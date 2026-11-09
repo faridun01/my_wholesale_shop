@@ -1,4 +1,5 @@
 import client from './client';
+import { fetchAllPages } from './fetchAllPages';
 import { getCachedReference, invalidateReferenceCache } from './referenceCache';
 
 const CUSTOMERS_CACHE_KEY = 'customers';
@@ -9,14 +10,7 @@ export const getCustomers = async (options?: { force?: boolean; warehouseId?: nu
 
   return getCachedReference(
     cacheKey,
-    async () => {
-      const response = await client.get('/customers', {
-        params: {
-          warehouseId: warehouseId || undefined,
-        },
-      });
-      return response.data;
-    },
+    () => fetchAllPages('/customers', { warehouseId: warehouseId || undefined }),
     options,
   );
 };

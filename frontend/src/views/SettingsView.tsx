@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
+import { fetchAllPages } from '../api/fetchAllPages';
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, setDefaultWarehouse } from '../api/warehouses.api';
 import {
   Warehouse,
@@ -284,8 +285,7 @@ export default function SettingsView() {
       if (canViewUsers) {
         const uRes = await client.get('/auth/users');
         setUsers(uRes.data || []);
-        const cRes = await client.get('/customers');
-        setCustomerOptions(Array.isArray(cRes.data) ? cRes.data : []);
+        setCustomerOptions(await fetchAllPages('/customers'));
       }
     } catch (err) {
       console.error(err);

@@ -1,0 +1,159 @@
+{
+  "capturedAt": "2026-11-09T06:51:40.700Z",
+  "methodology": "Local warmed CPU median of 7 samples; synthetic invoice, exact result comparison. DB read-only EXPLAIN; not production HTTP latency.",
+  "calculations": [
+    {
+      "lines": 10,
+      "beforeMs": 4.37,
+      "afterMs": 0.481,
+      "speedup": 9.1,
+      "identical": true
+    },
+    {
+      "lines": 50,
+      "beforeMs": 34.445,
+      "afterMs": 0.765,
+      "speedup": 45,
+      "identical": true
+    },
+    {
+      "lines": 100,
+      "beforeMs": 154.62,
+      "afterMs": 1.497,
+      "speedup": 103.3,
+      "identical": true
+    },
+    {
+      "lines": 300,
+      "beforeMs": 1448.938,
+      "afterMs": 4.247,
+      "speedup": 341.2,
+      "identical": true
+    }
+  ],
+  "database": {
+    "counts": [
+      {
+        "invoices": 55,
+        "invoice_items": 241,
+        "products": 36,
+        "batches": 95,
+        "depleted_batches": 52,
+        "largest_invoice": 32
+      }
+    ],
+    "nonzeroBatchPlan": [
+      {
+        "QUERY PLAN": [
+          {
+            "Plan": {
+              "Node Type": "Seq Scan",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Relation Name": "product_batches",
+              "Alias": "product_batches",
+              "Startup Cost": 0,
+              "Total Cost": 4.16,
+              "Plan Rows": 42,
+              "Plan Width": 8,
+              "Actual Startup Time": 0.021,
+              "Actual Total Time": 0.047,
+              "Actual Rows": 43,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Filter": "(remaining_quantity <> '0'::double precision)",
+              "Rows Removed by Filter": 52,
+              "Shared Hit Blocks": 3,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "Planning": {
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            },
+            "Planning Time": 0.202,
+            "Triggers": [],
+            "Execution Time": 0.068
+          }
+        ]
+      }
+    ]
+  },
+  "largestAssets": [
+    {
+      "file": "jspdf.plugin.autotable-DPRAw61G.js",
+      "bytes": 421199,
+      "gzipBytes": 138100
+    },
+    {
+      "file": "PieChart-CPQpUULq.js",
+      "bytes": 396993,
+      "gzipBytes": 105729
+    },
+    {
+      "file": "html2canvas.esm-QH1iLAAe.js",
+      "bytes": 202379,
+      "gzipBytes": 48044
+    },
+    {
+      "file": "vendor-C1MYVfEB.js",
+      "bytes": 181938,
+      "gzipBytes": 59960
+    },
+    {
+      "file": "index-D2KdFYJD.css",
+      "bytes": 171534,
+      "gzipBytes": 22233
+    },
+    {
+      "file": "index.es-D7ZUtfiO.js",
+      "bytes": 159677,
+      "gzipBytes": 53564
+    },
+    {
+      "file": "SalesView-CIRMkd5n.js",
+      "bytes": 140621,
+      "gzipBytes": 30681
+    },
+    {
+      "file": "ProductsView-CsAw1IrK.js",
+      "bytes": 136655,
+      "gzipBytes": 29666
+    },
+    {
+      "file": "index-MzgqvJFQ.js",
+      "bytes": 134416,
+      "gzipBytes": 46156
+    },
+    {
+      "file": "SettingsView-BsiG-bg8.js",
+      "bytes": 92496,
+      "gzipBytes": 23847
+    },
+    {
+      "file": "ReportsView-DdLJExaW.js",
+      "bytes": 81812,
+      "gzipBytes": 18733
+    },
+    {
+      "file": "POSView-B00XTmcF.js",
+      "bytes": 64582,
+      "gzipBytes": 16557
+    }
+  ]
+}

@@ -175,12 +175,16 @@ router.get('/', async (req, res, next) => {
             },
           }),
           batches: {
-            where: { warehouseId: warehouseId ?? undefined },
-            select: { remainingQuantity: true },
+            // Depleted batches add no stock and are only needed in history.
+            where: { warehouseId: warehouseId ?? undefined, remainingQuantity: { not: 0 } },
+            select: { remainingQuantity: true, ...(access.isAdmin ? { costPrice: true, createdAt: true } : {}) },
           }
         },
         skip,
         take: limit,
+        // Without an order, consecutive pages can repeat or lose products. By name so
+        // the family-photo fallback sees a family's products in the same page.
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
       }),
       prisma.product.count({ where }),
     ]);

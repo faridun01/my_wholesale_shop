@@ -32,6 +32,7 @@ import {
   isPaymentActionDisabled,
   isReturnActionDisabled,
 } from '../../utils/salesViewUtils';
+import type { SalesStaffOption } from './useSalesListData';
 
 type SortConfig = {
   key: string;
@@ -54,7 +55,7 @@ type SalesInvoicesSectionProps = {
   setDateFrom: React.Dispatch<React.SetStateAction<string>>;
   dateTo: string;
   setDateTo: React.Dispatch<React.SetStateAction<string>>;
-  staffOptions: string[];
+  staffOptions: SalesStaffOption[];
   clearInvoiceFilters: () => void;
   paginatedInvoices: any[];
   sortedInvoicesLength: number;
@@ -622,9 +623,9 @@ const SalesInvoicesSection = ({
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-slate-300"
               >
                 <option value="all">Все сотрудники</option>
-                {staffOptions.map((staffName) => (
-                  <option key={staffName} value={staffName}>
-                    {staffName}
+                {staffOptions.map((staff) => (
+                  <option key={staff.id} value={String(staff.id)}>
+                    {staff.username}
                   </option>
                 ))}
               </select>
@@ -768,9 +769,9 @@ const SalesInvoicesSection = ({
           className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
         >
           <option value="all">Все сотрудники</option>
-          {staffOptions.map((staffName) => (
-            <option key={staffName} value={staffName}>
-              {staffName}
+          {staffOptions.map((staff) => (
+            <option key={staff.id} value={String(staff.id)}>
+              {staff.username}
             </option>
           ))}
         </select>
