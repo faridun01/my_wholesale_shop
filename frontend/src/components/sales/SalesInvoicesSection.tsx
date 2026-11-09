@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import {
   Banknote,
@@ -18,6 +18,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import FloatingMenu from '../common/FloatingMenu';
 import PaginationControls from '../common/PaginationControls';
 import { formatCount, formatMoney, toFixedNumber } from '../../utils/format';
 import {
@@ -115,16 +116,7 @@ function SalesRowActions({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
 
   const canEdit = canEditInvoice(inv);
 
@@ -210,7 +202,7 @@ function SalesRowActions({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-40 mt-1.5 w-56 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md text-left animate-in fade-in zoom-in-95 duration-150">
+        <FloatingMenu anchorRef={dropdownRef} onClose={closeMenu}>
           <button
             type="button"
             onClick={(e) => {
@@ -288,7 +280,7 @@ function SalesRowActions({
               </button>
             </>
           )}
-        </div>
+        </FloatingMenu>
       )}
     </div>
   );

@@ -777,7 +777,7 @@ export class StockService {
    * has already allocated stock from it (the DB FK would otherwise reject the
    * delete with a raw constraint error).
    */
-  static async deleteBatch(batchId: number) {
+  static async deleteBatch(batchId: number, userId: number) {
     return await prisma.$transaction(async (tx: any) => {
       const batch = await tx.productBatch.findUnique({ where: { id: batchId } });
 
@@ -791,6 +791,23 @@ export class StockService {
       }
 
       await tx.productBatch.delete({ where: { id: batchId } });
+
+      // The stock ledger must keep matching the remaining batches.
+      const remaining = roundQty(toNumber(batch.remainingQuantity, 0));
+      if (remaining > 0) {
+        await tx.inventoryTransaction.create({
+          data: {
+            productId: batch.productId,
+            warehouseId: batch.warehouseId,
+            userId,
+            qtyChange: -remaining,
+            type: 'adjustment',
+            reason: `Удаление партии #${batchId}`,
+            costAtTime: round2(toNumber(batch.costPrice, 0)),
+          },
+        });
+      }
+
       await this.updateProductStockCache(batch.productId, tx);
 
       return { success: true };

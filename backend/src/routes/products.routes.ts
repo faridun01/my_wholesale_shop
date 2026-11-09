@@ -1367,7 +1367,7 @@ router.delete('/batches/:batchId', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockSvc.deleteBatch(batchId);
+    const result = await StockSvc.deleteBatch(batchId, req.user!.id);
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {

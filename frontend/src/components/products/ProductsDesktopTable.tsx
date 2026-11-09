@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ArrowRightLeft,
   ChevronDown,
@@ -21,6 +21,7 @@ import {
   getStockBreakdown,
   normalizeDisplayBaseUnit,
 } from '../../utils/productsViewUtils';
+import FloatingMenu from '../common/FloatingMenu';
 import ProductsEmptyState from './ProductsEmptyState';
 
 interface ProductsDesktopTableProps {
@@ -70,16 +71,7 @@ function ProductRowActions({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
 
   return (
     <div className="relative inline-flex items-center justify-center gap-1.5" ref={dropdownRef}>
@@ -116,7 +108,7 @@ function ProductRowActions({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-40 mt-1.5 w-56 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md text-left animate-in fade-in zoom-in-95 duration-150">
+        <FloatingMenu anchorRef={dropdownRef} onClose={closeMenu}>
           <button
             type="button"
             onClick={() => {
@@ -206,7 +198,7 @@ function ProductRowActions({
               <span className="text-[10px] font-normal text-rose-400">Удалить позицию</span>
             </div>
           </button>
-        </div>
+        </FloatingMenu>
       )}
     </div>
   );

@@ -309,6 +309,23 @@ suite('full financial lifecycle through the real routes', () => {
     await expectStock(p, 10);
   });
 
+  it('allows deleting only an untouched batch and keeps the journal in step', async () => {
+    const p = await newProduct(10);
+    await restock(p, 10, 1);
+    const second = await restock(p, 5, 2);
+    const first = (await db.productBatch.findFirstOrThrow({ where: { productId: p }, orderBy: { id: 'asc' } })).id;
+    await sell([{ productId: p, quantity: 1, sellingPrice: '10' }]);
+
+    const shown = (await call('GET', `/products/${p}/batches`)).data as any[];
+    expect(shown.find((b) => b.id === first).canDelete).toBe(false);
+    expect(shown.find((b) => b.id === second.data.id).canDelete).toBe(true);
+
+    expect((await call('DELETE', `/products/batches/${first}`)).status).toBe(400);
+    await expectStock(p, 14);
+    expect((await call('DELETE', `/products/batches/${second.data.id}`)).status).toBe(200);
+    await expectStock(p, 9);
+  });
+
   it('treats a cancelled invoice as annulled: stock comes back, no money figure includes it', async () => {
     const p = await newProduct(10);
     await restock(p, 10, 1);

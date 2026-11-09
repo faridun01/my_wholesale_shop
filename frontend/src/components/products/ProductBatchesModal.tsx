@@ -14,6 +14,8 @@ interface ProductBatchesModalProps {
   onDeleteBatch?: (batchId: number) => void;
 }
 
+const DELETE_BLOCKED_REASON = 'Нельзя удалить: товар из партии уже продан или списан';
+
 const normalizePackageName = (value: string) => {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return 'упаковка';
@@ -225,12 +227,13 @@ export default function ProductBatchesModal({
                       </div>
 
                       {canManage && (
-                        <div className="flex justify-end pt-1">
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          {!b.canDelete && <p className="text-[10px] text-slate-500">{DELETE_BLOCKED_REASON}</p>}
                           <button
                             type="button"
                             disabled={!b.canDelete}
                             onClick={() => onDeleteBatch?.(b.id)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-rose-100 transition-colors"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-rose-100 transition-colors"
                           >
                             <Trash2 size={11} />
                             <span>Удалить партию</span>
@@ -298,6 +301,7 @@ export default function ProductBatchesModal({
                               <button
                                 type="button"
                                 disabled={!b.canDelete}
+                                title={b.canDelete ? undefined : DELETE_BLOCKED_REASON}
                                 onClick={() => onDeleteBatch?.(b.id)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-rose-100 transition-colors"
                               >
