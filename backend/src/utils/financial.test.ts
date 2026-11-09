@@ -2,14 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { calculateEffectiveCostPrice } from './product-packaging.js';
 import { ceilMoney, roundMoney } from './money.js';
-import { addMoney, allocateCents, assertNoTaxPayload, cumulativeValue, discountedUnit, invoiceLines, refundByMethod, refundSplit, saleTotals, toCents } from './financial.js';
+import { decimal, financialPayload, addMoney, allocateCents, assertNoTaxPayload, cumulativeValue, discountedUnit, invoiceLines, refundByMethod, refundSplit, saleTotals, toCents } from './financial.js';
 describe('exact financial arithmetic', () => {
+  it('preserves decimal text over JSON without changing IDs or quantities', () => {
+    expect(financialPayload({ id: 7, quantity: 3, amount: '10.075000000000000001', items: [{ sellingPrice: .1, discount: '33.333333333333333333' }] })).toEqual({
+      id: 7, quantity: 3, amount: '10.075000000000000001', items: [{ sellingPrice: '0.1', discount: '33.333333333333333333' }],
+    });
+    expect(decimal('0.1').plus('0.2').toString()).toBe('0.3');
+  });
   it('rounds purchase charges and decimal boundaries explicitly', () => {
     expect(calculateEffectiveCostPrice(.1, 10)).toBe(.11);
     expect(calculateEffectiveCostPrice(10, .75)).toBe(10.08);
     expect(ceilMoney(1.01)).toBe(1.01);
     expect(ceilMoney(1.001)).toBe(1.01);
     expect(roundMoney(10.075)).toBe(10.08);
+    expect(() => calculateEffectiveCostPrice(-1, 0)).toThrow();
+    expect(() => calculateEffectiveCostPrice(1, -1)).toThrow();
   });
   it('preserves three payments and reduces 1000 by a goods return of 150', () => {
     const paid = addMoney(200, 200, 200);

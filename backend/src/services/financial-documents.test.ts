@@ -1,6 +1,48 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 const frontend = (file: string) => import(/* @vite-ignore */ new URL(`../../../frontend/src/${file}`, import.meta.url).href);
 describe('financial documents and previews', () => {
+  it('generates real PDF files whose rendered total cells match the invoice', async () => {
+    const font = readFileSync(new URL('../../../frontend/public/fonts/arial.ttf', import.meta.url));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(font)));
+    try {
+      const { generateSalesInvoicePdf } = await frontend('utils/print/salesInvoicePdf.ts');
+      for (const net of [0, 850]) {
+        const doc = await generateSalesInvoicePdf({ id: 1, netAmount: String(net), paidAmount: '600', grossPaidAmount: '600', returnedAmount: String(1000 - net),
+          items: [{ quantity: 1, sellingPrice: String(net), totalPrice: String(net), product_name: 'Reference goods' }] });
+        const rows = doc.lastAutoTable.body;
+        const total = rows.at(-1).cells[1].text.join('').replace(/\s/g, '').replace(',', '.');
+        expect(total).toBe(net.toFixed(2));
+        expect(rows.flatMap((row: any) => row.cells[0].text).join(' ')).not.toContain('Налог');
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(2000);
+      }
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('renders the current invoice, original sale and individual return together', async () => {
+    const React = await import(/* @vite-ignore */ new URL('../../../frontend/node_modules/react/index.js', import.meta.url).href);
+    const { renderToStaticMarkup } = await import(/* @vite-ignore */ new URL('../../../frontend/node_modules/react-dom/server.node.js', import.meta.url).href);
+    const { default: History } = await frontend('components/sales/InvoiceFinancialHistory.tsx');
+    const { formatMoney } = await frontend('utils/format.ts');
+    const original = { netAmount: '1000', totalAmount: '1000', discount: '0', items: [{ id: 1, quantity: 20, sellingPrice: '50', totalPrice: '1000', productNameSnapshot: 'Reference goods' }],
+      payments: [1, 2, 3].map(id => ({ id, amount: '200', method: 'cash', createdAt: '2026-11-09T00:00:00Z' })) };
+    const invoice = { netAmount: '850', paidAmount: '600', grossPaidAmount: '600', returnedAmount: '150', originalInvoice: original,
+      financialSummary: { debtAmount: '250' }, returns: [{ id: 9, totalValue: '150', debtReduction: '150', refundedAmount: '0', createdAt: '2026-11-09T01:00:00Z', reason: 'Customer goods return', items: [{ id: 1, invoiceItemId: 1, quantity: 3, sellingPrice: '50', itemDiscount: '0', allocatedOrderDiscount: '0', totalValue: '150' }] }] };
+    const html = renderToStaticMarkup(React.createElement(History, { invoice }));
+    for (const amount of [1000, 850, 600, 250, 150]) expect(html).toContain(formatMoney(amount));
+    expect(html).toContain('Customer goods return');
+    expect(html).toContain('Reference goods');
+    expect(html).not.toContain('Кредит покупателя');
+    expect(html).not.toContain('Налог');
+  });
+  it('shows unchanged recorded payments after returns without customer credit or change', async () => {
+    const sales = await frontend('utils/salesViewUtils.ts');
+    const customer = await frontend('components/customers/customerInvoiceCalculations.ts');
+    const invoice = { netAmount: '500', paidAmount: '600', returnedAmount: '500', totalAmount: '1000', discount: '0', items: [] };
+    expect(sales.getInvoiceCustomerCredit(invoice)).toBe(0);
+    expect(sales.getInvoiceChangeAmount(invoice)).toBe(0);
+    expect(customer.getInvoiceChangeAmount(invoice)).toBe(0);
+    expect(customer.getInvoiceAppliedPaidAmount(invoice)).toBe(600);
+  });
   it('uses authoritative zero totals in customer documents', async () => {
     const calc = await frontend('components/customers/customerInvoiceCalculations.ts');
     expect(calc.getInvoiceNetAmount({ totalAmount: 0, netAmount: 0, items: [{ quantity: 1, sellingPrice: 100, totalPrice: 0 }] })).toBe(0);

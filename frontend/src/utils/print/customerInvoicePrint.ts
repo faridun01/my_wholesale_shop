@@ -1,3 +1,4 @@
+import { decimal } from '../financial';
 import { addMoney } from '../financial';
 import { formatMoney, formatTransactionReason } from '../format';
 
@@ -245,7 +246,7 @@ const renderCustomerInvoiceSection = (
               <td>${escapeHtml(item.product?.name || '---')}</td>
               <td>${getCustomerInvoiceQuantityLines(item).map((line) => `<div>${escapeHtml(line)}</div>`).join('')}</td>
               <td>${escapeHtml(formatMoney(item.sellingPrice))}</td>
-              <td>${escapeHtml(formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0)))}</td>
+              <td>${escapeHtml(formatMoney(decimal(item.quantity || 0).times(decimal(item.sellingPrice || 0)).toNumber()))}</td>
             </tr>
           `,
         )
@@ -451,9 +452,9 @@ export const getInvoiceStatementEntries = (invoice: any) => {
 const renderReconciliationOverviewSection = (customers: CustomerReconciliationBatchCustomer[]) => {
   const totals = customers.reduce(
     (acc, customer) => {
-      acc.debit += Number(customer.purchasedTotal || 0);
-      acc.credit += Number(customer.paidTotal || 0);
-      acc.balance += Number(customer.debtTotal || 0);
+      acc.debit = decimal(acc.debit).plus(decimal(customer.purchasedTotal || 0)).toNumber();
+      acc.credit = decimal(acc.credit).plus(decimal(customer.paidTotal || 0)).toNumber();
+      acc.balance = decimal(acc.balance).plus(decimal(customer.debtTotal || 0)).toNumber();
       return acc;
     },
     { debit: 0, credit: 0, balance: 0 },
@@ -544,10 +545,10 @@ const renderCustomerReconciliationSection = (
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
       const paidAmount = getInvoiceGrossPaid(invoice);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
-        ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
+        ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => decimal(sum).plus(Math.max(0, Number(itemReturn?.totalValue || 0))).toNumber(), 0)
         : 0;
       const returnedAmount = Math.max(0, Math.max(Number(invoice?.returnedAmount || 0), returnedByEvents));
-      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - getInvoiceBalancePaid(invoice)));
+      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? decimal(invoiceTotal).minus(decimal(getInvoiceBalancePaid(invoice))).toNumber()));
 
       return `
         <tr>
@@ -569,14 +570,14 @@ const renderCustomerReconciliationSection = (
       const invoiceTotal = Math.max(0, Number(invoice?.netAmount ?? invoice?.totalAmount ?? 0));
       const paidAmount = getInvoiceGrossPaid(invoice);
       const returnedByEvents = Array.isArray(invoice?.returnEvents)
-        ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => sum + Math.max(0, Number(itemReturn?.totalValue || 0)), 0)
+        ? invoice.returnEvents.reduce((sum: number, itemReturn: any) => decimal(sum).plus(Math.max(0, Number(itemReturn?.totalValue || 0))).toNumber(), 0)
         : 0;
       const returnedAmount = Math.max(0, Math.max(Number(invoice?.returnedAmount || 0), returnedByEvents));
-      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? invoiceTotal - getInvoiceBalancePaid(invoice)));
-      acc.total += invoiceTotal;
-      acc.paid += paidAmount;
-      acc.returned += returnedAmount;
-      acc.balance += invoiceBalance;
+      const invoiceBalance = Math.max(0, Number(invoice?.invoiceBalance ?? decimal(invoiceTotal).minus(decimal(getInvoiceBalancePaid(invoice))).toNumber()));
+      acc.total = decimal(acc.total).plus(decimal(invoiceTotal)).toNumber();
+      acc.paid = decimal(acc.paid).plus(decimal(paidAmount)).toNumber();
+      acc.returned = decimal(acc.returned).plus(decimal(returnedAmount)).toNumber();
+      acc.balance = decimal(acc.balance).plus(decimal(invoiceBalance)).toNumber();
       return acc;
     },
     { total: 0, paid: 0, returned: 0, balance: 0 },

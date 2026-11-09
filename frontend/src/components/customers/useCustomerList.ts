@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import { useMemo } from 'react';
 import type { Customer } from '../../types/customer';
 
@@ -54,7 +55,7 @@ export const useCustomerList = ({
 
     return [...filteredCustomers].sort((a, b) => {
       if (sortBy === 'amount') {
-        return Number(b.total_invoiced || 0) - Number(a.total_invoiced || 0);
+        return decimal(b.total_invoiced || 0).minus(decimal(a.total_invoiced || 0)).toNumber();
       }
 
       if (sortBy === 'invoices') {
@@ -62,7 +63,7 @@ export const useCustomerList = ({
       }
 
       if (sortBy === 'balance') {
-        return Number(b.balance || 0) - Number(a.balance || 0);
+        return decimal(b.balance || 0).minus(decimal(a.balance || 0)).toNumber();
       }
 
       if (sortBy === 'lastPurchase') {
@@ -74,7 +75,7 @@ export const useCustomerList = ({
         return rankDiff;
       }
 
-      const amountDiff = Number(b.total_invoiced || 0) - Number(a.total_invoiced || 0);
+      const amountDiff = decimal(b.total_invoiced || 0).minus(decimal(a.total_invoiced || 0)).toNumber();
       if (amountDiff !== 0) {
         return amountDiff;
       }

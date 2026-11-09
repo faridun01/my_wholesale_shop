@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import { discountedUnit, discountAmount } from '../../utils/financial';
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -68,7 +69,7 @@ const useSalesEditInvoice = ({
       return false;
     }
 
-    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0) !== 0;
+    const hasPayments = Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => decimal(sum).plus(decimal(p.amount)).toNumber(), 0) !== 0;
     const hasPaidAmount = Number(invoice.paidAmount || 0) > SALES_PAYMENT_EPSILON;
     if (hasPayments || hasPaidAmount) {
       return false;
@@ -102,7 +103,7 @@ const useSalesEditInvoice = ({
       return 'Накладную с возвратом нельзя изменить';
     }
 
-    if (Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0) !== 0) {
+    if (Array.isArray(invoice.payments) && invoice.payments.reduce((sum: number, p: any) => decimal(sum).plus(decimal(p.amount)).toNumber(), 0) !== 0) {
       return 'Оплаченную накладную нельзя изменить';
     }
 
@@ -400,8 +401,8 @@ const useSalesEditInvoice = ({
           return sum;
         }
         const unitPriceRounded = discountedUnit(sellingPrice, Math.min(100, Math.max(0, Number.isFinite(itemDiscount) ? itemDiscount : 0)));
-        const itemDiscounted = quantity * unitPriceRounded;
-        return sum + itemDiscounted;
+        const itemDiscounted = decimal(quantity).times(decimal(unitPriceRounded)).toNumber();
+        return decimal(sum).plus(decimal(itemDiscounted)).toNumber();
       }, 0),
     [editInvoiceItems],
   );
@@ -415,7 +416,7 @@ const useSalesEditInvoice = ({
   }, [editInvoiceSubtotal, editDiscount]);
 
   const editInvoiceNetAmount = React.useMemo(
-    () => roundMoney(Math.max(0, editInvoiceSubtotal - editInvoiceDiscountAmount)),
+    () => roundMoney(Math.max(0, decimal(editInvoiceSubtotal).minus(decimal(editInvoiceDiscountAmount)).toNumber())),
     [editInvoiceDiscountAmount, editInvoiceSubtotal],
   );
 

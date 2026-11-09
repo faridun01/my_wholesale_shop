@@ -1,12 +1,12 @@
 import { assertNoTaxPayload, financialError } from '../utils/financial.js';
 import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
-import { saleTotals } from '../utils/financial.js';
+import { saleTotals, quantity as wholeQuantity, percentText } from '../utils/financial.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
 import { InvoiceService } from '../services/invoice.service.js';
 import { getAccessContext, ensureWarehouseAccess } from '../utils/access.js';
-import { ceilMoney, roundMoney } from '../utils/money.js';
+import { normalizeMoney } from '../utils/money.js';
 
 const router = Router();
 
@@ -37,7 +37,7 @@ const mapOrder = (order: any) => ({
   staff_name: order.approvedByUser?.username || null,
 });
 
-const calculateOrderTotal = (items: any[], discount = 0) => saleTotals(items, discount).net;
+const calculateOrderTotal = (items: any[], discount: unknown = 0) => saleTotals(items, discount).net;
 
 const ensureCustomerOrderAccess = async (req: AuthRequest, orderId: number) => {
   const order = await (prisma as any).customerOrder.findUnique({
@@ -146,7 +146,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const items = rawItems.map((item: any) => {
       const productId = Number(item.productId);
       const product = productsById.get(productId);
-      const quantity = normalizeNonNegative(item.totalBaseUnits ?? item.quantity);
+      const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
       if (!product || quantity <= PAYMENT_EPSILON) {
         throw Object.assign(new Error('Некорректная позиция заказа'), { status: 400 });
       }
@@ -155,18 +155,18 @@ router.post('/', async (req: AuthRequest, res, next) => {
         productId,
         quantity,
         totalBaseUnits: quantity,
-        packageQuantity: normalizeNonNegative(item.packageQuantity),
-        extraUnitQuantity: normalizeNonNegative(item.extraUnitQuantity),
+        packageQuantity: wholeQuantity(item.packageQuantity ?? 0, true),
+        extraUnitQuantity: wholeQuantity(item.extraUnitQuantity ?? 0, true),
         packagingId: item.packagingId ? Number(item.packagingId) : null,
         packageName: item.packageName || null,
         baseUnitName: item.baseUnitName || product.baseUnitName || product.unit || null,
         unitsPerPackage: item.unitsPerPackage ? Number(item.unitsPerPackage) : null,
-        sellingPrice: normalizeNonNegative(item.sellingPrice || product.sellingPrice),
-        discount: normalizeNonNegative(item.discount),
+        sellingPrice: normalizeMoney(item.sellingPrice ?? product.sellingPrice, 'Item price'),
+        discount: percentText(item.discount ?? 0),
       };
     });
 
-    const discount = normalizeNonNegative(req.body?.discount);
+    const discount = percentText(req.body?.discount ?? 0);
     const totalAmount = calculateOrderTotal(items, discount);
 
     const key = operationKey(req.body.idempotency_key);
@@ -232,10 +232,10 @@ router.post('/:id/approve', async (req: AuthRequest, res, next) => {
           packageName: item.packageName || null,
           baseUnitName: item.baseUnitName || null,
           unitsPerPackage: item.unitsPerPackage || null,
-          sellingPrice: Number(item.sellingPrice || 0),
-          discount: Number(item.discount || 0),
+          sellingPrice: String(item.sellingPrice ?? 0),
+          discount: String(item.discount ?? 0),
         })),
-        discount: Number(current.discount || 0),
+        discount: String(current.discount ?? 0),
         paidAmount: 0,
         paymentMethod: 'cash',
       }, tx);
@@ -266,15 +266,16 @@ router.post('/:id/reject', async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'Заказ уже обработан' });
     }
 
-    const updatedOrder = await (prisma as any).customerOrder.update({
-      where: { id: orderId },
+    const result = await (prisma as any).customerOrder.updateMany({
+      where: { id: orderId, status: 'pending' },
       data: {
         status: 'rejected',
         approvedByUserId: req.user!.id,
         approvedAt: new Date(),
       },
-      include: includeOrderDetails,
     });
+    if (result.count !== 1) return res.status(400).json({ error: 'Order has already been processed' });
+    const updatedOrder = await (prisma as any).customerOrder.findUnique({ where: { id: orderId }, include: includeOrderDetails });
 
     res.json(mapOrder(updatedOrder));
   } catch (error) {

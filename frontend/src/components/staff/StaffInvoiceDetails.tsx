@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import { financialPost } from '../../api/financialRequest';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -183,7 +184,7 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
                     <span>Оплатить</span>
                   </button>
                 </div>
-                {(parseMoneyInput(paymentAmount) ?? 0) < balance - SALES_PAYMENT_EPSILON && (
+                {(parseMoneyInput(paymentAmount) ?? 0) < decimal(balance).minus(decimal(SALES_PAYMENT_EPSILON)).toNumber() && (
                   <button
                     type="button"
                     onClick={() => setPaymentAmount(String(toFixedNumber(balance)))}

@@ -1,6 +1,7 @@
+import { decimal } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
-import { addMoney, assertNoTax, balancePaidAmount, cumulativeValue, discountedUnit, discountAmount, fromCents, goodsReturnPaymentAdjustments, invoiceLines, isGoodsReturnPaymentAdjustment, lineTotal, percent, quantity as wholeQuantity, refundSplit, saleTotals, toCents } from '../utils/financial.js';
-import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
+import { addMoney, assertNoTax, balancePaidAmount, cumulativeValue, discountedUnit, discountAmount, fromCents, goodsReturnPaymentAdjustments, invoiceLines, isGoodsReturnPaymentAdjustment, lineTotal, percentText, quantity as wholeQuantity, refundSplit, saleTotals, toCents } from '../utils/financial.js';
+import { operationKey, requestHash, assertReplay, paymentMethod as validatePaymentMethod } from '../utils/financial-operation.js';
 import { StockService } from './stock.service.js';
 import { formatQuantityForInvoice, normalizeBaseUnitName } from '../utils/product-packaging.js';
 import { normalizeMoney, roundMoney, ceilMoney, getInvoiceStatus } from '../utils/money.js';
@@ -30,7 +31,7 @@ function normalizeNonNegativeNumber(value: number, fieldName: string) {
 const calculateDiscountedUnitPrice = discountedUnit;
 const calculateLineTotal = lineTotal;
 const calculateInvoiceDiscountAmount = discountAmount;
-function calculateInvoiceNetAmount(totalAmount: number, discountPercent = 0, returnedAmount = 0) {
+function calculateInvoiceNetAmount(totalAmount: unknown, discountPercent: unknown = 0, returnedAmount = 0) {
   return Math.max(0, addMoney(totalAmount, -discountAmount(totalAmount, discountPercent), -returnedAmount));
 }
 
@@ -115,7 +116,7 @@ export class InvoiceService {
     items: {
       productId: number;
       quantity: number;
-      sellingPrice: number;
+      sellingPrice: number | string;
       totalBaseUnits?: number;
       packageQuantity?: number;
       extraUnitQuantity?: number;
@@ -126,21 +127,22 @@ export class InvoiceService {
       productName?: string | null;
       rawName?: string | null;
       brand?: string | null;
-      discount?: number;
+      discount?: number | string;
     }[];
-    discount?: number;
+    discount?: number | string;
     tax?: unknown;
-    paidAmount?: number;
+    paidAmount?: number | string;
     paymentMethod?: string;
     paymentDueDate?: string;
     idempotencyKey?: string;
   }, transactionClient?: any) {
     const { customerId, userId, warehouseId, items, discount = 0, paidAmount = 0, paymentMethod = 'cash', paymentDueDate } = data;
-    const normalizedDiscount = percent(discount);
+    const normalizedDiscount = percentText(discount);
     assertNoTax(data.tax);
-    const normalizedPaidAmount = normalizeMoney(normalizeNonNegativeNumber(paidAmount, 'Paid amount'), 'Paid amount');
+    const normalizedPaidAmount = normalizeMoney(paidAmount, 'Paid amount');
+    const normalizedPaymentMethod = validatePaymentMethod(paymentMethod);
 
-    if (normalizedDiscount > 100) {
+    if (decimal(normalizedDiscount).gt(100)) {
       throw new Error('Discount cannot exceed 100%');
     }
     if (!Array.isArray(items) || items.length === 0) {
@@ -211,16 +213,16 @@ export class InvoiceService {
       let totalAmount = 0;
       for (const item of items) {
         const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
-        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
-        const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
+        const sellingPrice = normalizeMoney(item.sellingPrice, 'Item price');
+        const itemDiscount = percentText(item.discount ?? 0);
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
-        if (itemDiscount > 100) {
+        if (decimal(itemDiscount).gt(100)) {
           throw new Error('Скидка на товар не может превышать 100%');
         }
 
-        totalAmount = roundMoney(totalAmount + calculateLineTotal(quantity, sellingPrice, itemDiscount));
+        totalAmount = roundMoney(decimal(totalAmount).plus(decimal(calculateLineTotal(quantity, sellingPrice, itemDiscount))).toNumber());
       }
 
       totalAmount = roundMoney(totalAmount);
@@ -264,7 +266,7 @@ export class InvoiceService {
       // 3. Create Items and Allocate Stock
       for (const [itemIndex, item] of items.entries()) {
         const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
-        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
+        const sellingPrice = normalizeMoney(item.sellingPrice, 'Item price');
         const product = productsById.get(item.productId);
 
         if (!product) {
@@ -306,7 +308,7 @@ export class InvoiceService {
             rawNameSnapshot: item.rawName || product.rawName || null,
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
-            discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
+            discount: percentText(item.discount ?? 0),
             totalPrice: calculation.lines[itemIndex].total,
             allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
             eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
@@ -346,7 +348,7 @@ export class InvoiceService {
             invoiceId: invoice.id,
             userId,
             amount: roundMoney(normalizedPaidAmount),
-            method: paymentMethod,
+            method: normalizedPaymentMethod,
           },
         });
       }
@@ -430,7 +432,7 @@ export class InvoiceService {
       productId: number;
       quantity: number;
       totalBaseUnits?: number;
-      sellingPrice: number;
+      sellingPrice: number | string;
       packageQuantity?: number | null;
       extraUnitQuantity?: number | null;
       packagingId?: number | null;
@@ -440,9 +442,9 @@ export class InvoiceService {
       productName?: string | null;
       rawName?: string | null;
       brand?: string | null;
-      discount?: number;
+      discount?: number | string;
     }[];
-    discount?: number;
+    discount?: number | string;
   }) {
     const { customerId, userId, items, isAdmin = false } = data;
 
@@ -568,21 +570,21 @@ export class InvoiceService {
       let totalAmount = 0;
       for (const item of items) {
         const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
-        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
-        const itemDiscount = normalizeNonNegativeNumber(item.discount || 0, 'Item discount');
+        const sellingPrice = normalizeMoney(item.sellingPrice, 'Item price');
+        const itemDiscount = percentText(item.discount ?? 0);
 
         if (quantity <= 0) {
           throw new Error('Item quantity must be greater than zero');
         }
-        if (itemDiscount > 100) {
+        if (decimal(itemDiscount).gt(100)) {
           throw new Error('Скидка на товар не может превышать 100%');
         }
 
-        totalAmount = roundMoney(totalAmount + calculateLineTotal(quantity, sellingPrice, itemDiscount));
+        totalAmount = roundMoney(decimal(totalAmount).plus(decimal(calculateLineTotal(quantity, sellingPrice, itemDiscount))).toNumber());
       }
 
       totalAmount = roundMoney(totalAmount);
-      const normalizedDiscount = percent(data.discount !== undefined ? data.discount : invoice.discount || 0);
+      const normalizedDiscount = percentText(data.discount !== undefined ? data.discount : invoice.discount || 0);
       const calculation = saleTotals(items, normalizedDiscount);
       const netAmount = calculation.net;
       const previousSnapshot = JSON.parse(JSON.stringify(invoice));
@@ -614,7 +616,7 @@ export class InvoiceService {
 
       for (const [itemIndex, item] of items.entries()) {
         const quantity = wholeQuantity(item.totalBaseUnits ?? item.quantity);
-        const sellingPrice = normalizeMoney(normalizeNonNegativeNumber(item.sellingPrice, 'Item price'), 'Item price');
+        const sellingPrice = normalizeMoney(item.sellingPrice, 'Item price');
         const product = productsById.get(Number(item.productId));
 
         if (!product) {
@@ -651,7 +653,7 @@ export class InvoiceService {
             rawNameSnapshot: item.rawName || product.rawName || null,
             brandSnapshot: item.brand || product.brand || null,
             sellingPrice,
-            discount: normalizeNonNegativeNumber(item.discount || 0, 'Item discount'),
+            discount: percentText(item.discount ?? 0),
             totalPrice: calculation.lines[itemIndex].total,
             allocatedOrderDiscount: calculation.lines[itemIndex].orderDiscount,
             eligibleNetAmount: calculation.lines[itemIndex].eligibleNet,
@@ -694,7 +696,7 @@ export class InvoiceService {
           customerPhoneSnapshot: customer.phone || null,
           customerAddressSnapshot: buildCustomerAddressSnapshot(customer),
           totalAmount,
-          originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)),
+          originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(invoice.totalAmount, invoice.discount),
           calculationVersion: 1,
           discount: normalizedDiscount,
           netAmount,
@@ -853,7 +855,7 @@ export class InvoiceService {
 
     return {
       ...invoice,
-      saleBasisAmount: calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)),
+      saleBasisAmount: calculateInvoiceNetAmount(invoice.totalAmount, invoice.discount),
       customer_name: invoice.customerNameSnapshot || invoice.customer?.name || 'Клиент',
       customer_phone: invoice.customerPhoneSnapshot || invoice.customer?.phone || null,
       customer_address: invoice.customerAddressSnapshot || (invoice.customer ? buildCustomerAddressSnapshot(invoice.customer) : null),
@@ -869,9 +871,9 @@ export class InvoiceService {
       moneyRefundedAmount,
       returnPaymentAdjustments: goodsReturnPaymentAdjustments(normalizedPayments),
       items: normalizedItems,
-      originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
+      originalInvoice: invoice.originalSnapshot ? { ...(invoice.originalSnapshot as any), paidAmount: (invoice.originalSnapshot as any).originalPaidAmount ?? null } : { ...invoice, netAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(invoice.totalAmount, invoice.discount), paidAmount: invoice.originalPaidAmount ?? null, items: financialLines, payments: normalizedPayments.filter((p: any) => Number(p.amount) > 0) },
       balancePaidAmount: balancePaidAmount(normalizedPayments, invoice.paidAmount),
-      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(Number(invoice.totalAmount), Number(invoice.discount)), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, debtAmount: Math.max(0, addMoney(invoice.netAmount, -balancePaidAmount(normalizedPayments, invoice.paidAmount))), customerCredit: 0 },
+      financialSummary: { originalNetAmount: invoice.originalNetAmount ?? calculateInvoiceNetAmount(invoice.totalAmount, invoice.discount), currentNetAmount: invoice.netAmount, returnedAmount: invoice.returnedAmount, debtAmount: Math.max(0, addMoney(invoice.netAmount, -balancePaidAmount(normalizedPayments, invoice.paidAmount))), customerCredit: 0 },
       payments: normalizedPayments,
       returns: normalizedReturns
     };

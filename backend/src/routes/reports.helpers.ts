@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial.js';
 import { addMoney, allocateCents, fromCents, invoiceLines, lineTotal, toCents } from '../utils/financial.js';
 export const MONEY_EPSILON = 0.0001;
 
@@ -9,7 +10,7 @@ type DateRangeInput = {
 type InvoiceRow = {
   id: number;
   createdAt: Date;
-  discount?: number | null;
+  discount?: number | string | { toString(): string } | null;
   customer?: { name?: string | null } | null;
   warehouse?: { name?: string | null } | null;
   items: any[];
@@ -157,7 +158,7 @@ export const buildInvoiceLineReportRows = ({
           gross_sales: lineTotal(quantity, item.sellingPrice),
           discount_percent: Number(inv.discount || 0),
           [netSalesKey]: revenue,
-          cost_price: quantity > 0 ? cost / quantity : 0,
+          cost_price: quantity > 0 ? decimal(cost).div(decimal(quantity)).toNumber() : 0,
           profit: addMoney(revenue, -cost),
         };
       })

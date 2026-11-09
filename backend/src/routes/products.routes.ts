@@ -13,8 +13,9 @@ import {
   normalizeProductName,
   parsePackagingFromRawName,
 } from '../utils/product-packaging.js';
-import { roundMoney } from '../utils/money.js';
-import { assertNoTaxPayload } from '../utils/financial.js';
+import { normalizeMoney, roundMoney } from '../utils/money.js';
+import { operationKey } from '../utils/financial-operation.js';
+import { decimal, assertNoTaxPayload, financialError } from '../utils/financial.js';
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 
 const router = Router();
@@ -173,9 +174,10 @@ router.get('/', async (req, res, next) => {
               orderBy: { createdAt: 'desc' as const }
             },
           }),
-          batches: warehouseId ? {
-            where: { warehouseId: Number(warehouseId) }
-          } : false
+          batches: {
+            where: { warehouseId: warehouseId ?? undefined },
+            select: { remainingQuantity: true },
+          }
         },
         skip,
         take: limit,
@@ -208,6 +210,7 @@ router.get('/', async (req, res, next) => {
     res.json(
       productsWithResolvedPhoto.map((product: any) => ({
         ...product,
+        stock: product.batches.reduce((sum: number, batch: any) => sum + Number(batch.remainingQuantity), 0),
         costPrice: access.isAdmin ? product.costPrice : null,
       }))
     );
@@ -239,8 +242,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const finalName = canonicalName || normalizedName.name;
     const parsedPackaging = packaging || parsePackagingFromRawName(rest.rawName || rest.name);
     const resolvedBaseUnitName = normalizeBaseUnitName(String(rest.baseUnitName || parsedPackaging?.baseUnitName || rest.unit || ''));
-    const resolvedPurchaseCostPrice = roundMoney(Number(purchaseCostPrice ?? costPrice ?? 0));
-    const resolvedExpensePercent = Number(expensePercent ?? 0);
+    const resolvedPurchaseCostPrice = normalizeMoney(purchaseCostPrice ?? costPrice ?? 0, 'Purchase cost');
+    const resolvedExpensePercent = decimal(expensePercent ?? 0).toString();
     const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
     // Check for unique constraints
@@ -284,7 +287,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           stock: 0,
           warehouseId: wId,
           costPrice: resolvedEffectiveCostPrice,
-          sellingPrice: roundMoney(rest.sellingPrice || 0),
+          sellingPrice: normalizeMoney(rest.sellingPrice ?? 0, 'Selling price'),
         },
       });
 
@@ -315,17 +318,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
         data: {
           productId: createdProduct.id,
           costPrice: resolvedEffectiveCostPrice,
-          sellingPrice: roundMoney(rest.sellingPrice || 0),
+          sellingPrice: normalizeMoney(rest.sellingPrice ?? 0, 'Selling price'),
         }
       });
 
-      return createdProduct;
-    });
-
-    // Then add initial stock via StockService to create batches and transactions
     if (Number(initialStock) > 0 && wId) {
       await StockSvc.addStock(
-        product.id,
+        createdProduct.id,
         Number(wId),
         Number(initialStock),
         resolvedEffectiveCostPrice,
@@ -333,8 +332,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
         'Initial Stock',
         resolvedPurchaseCostPrice,
         resolvedExpensePercent,
+        { transactionClient: tx },
       );
     }
+
+      return createdProduct;
+    });
+
 
     res.status(201).json(product);
   } catch (error) {
@@ -375,8 +379,8 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       ? roundMoney(productPayload.purchaseCostPrice)
       : (productPayload.costPrice !== undefined ? roundMoney(productPayload.costPrice) : roundMoney(oldProduct.purchaseCostPrice ?? oldProduct.costPrice));
     const nextExpensePercent = productPayload.expensePercent !== undefined
-      ? Number(productPayload.expensePercent)
-      : Number(oldProduct.expensePercent || 0);
+      ? decimal(productPayload.expensePercent).toString()
+      : decimal(oldProduct.expensePercent || 0).toString();
     const nextEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(nextPurchaseCostPrice, nextExpensePercent));
 
     if (newName !== oldProduct.name || newWarehouseId !== oldProduct.warehouseId) {
@@ -417,7 +421,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           purchaseCostPrice: nextPurchaseCostPrice,
           expensePercent: nextExpensePercent,
           costPrice: nextEffectiveCostPrice,
-          sellingPrice: productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : oldProduct.sellingPrice,
+          sellingPrice: productPayload.sellingPrice !== undefined ? normalizeMoney(productPayload.sellingPrice, 'Selling price') : oldProduct.sellingPrice,
           sku: null
         }
       });
@@ -452,7 +456,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
       // If price changed, record history
       if (oldProduct && (productPayload.costPrice !== undefined || productPayload.purchaseCostPrice !== undefined || productPayload.expensePercent !== undefined || productPayload.sellingPrice !== undefined)) {
         const newCost = nextEffectiveCostPrice;
-        const newSelling = productPayload.sellingPrice !== undefined ? roundMoney(productPayload.sellingPrice) : roundMoney(oldProduct.sellingPrice);
+        const newSelling = productPayload.sellingPrice !== undefined ? normalizeMoney(productPayload.sellingPrice, 'Selling price') : roundMoney(oldProduct.sellingPrice);
 
         if (newCost !== Number(oldProduct.costPrice) || newSelling !== Number(oldProduct.sellingPrice)) {
           const historyWarehouseId = oldProduct.warehouseId ?? newWarehouseId ?? null;
@@ -649,6 +653,16 @@ router.delete('/:id', async (req, res, next) => {
       }
 
       await prisma.$transaction(async (tx: any) => {
+        await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+        const [inventoryHistory, purchaseHistory, saleHistory, liveBatches] = await Promise.all([
+          tx.inventoryTransaction.count({ where: { productId } }),
+          tx.purchaseDocumentItem.count({ where: { matchedProductId: productId } }),
+          tx.invoiceItem.count({ where: { productId } }),
+          tx.productBatch.count({ where: { productId, remainingQuantity: { gt: 0 } } }),
+        ]);
+        if (inventoryHistory || purchaseHistory || saleHistory || liveBatches) {
+          throw financialError('Товар с финансовой или складской историей нельзя удалить навсегда. Используйте скрытие товара.');
+        }
         if (purchaseItemCount > 0) {
           await tx.purchaseDocumentItem.updateMany({
             where: { matchedProductId: productId },
@@ -720,8 +734,8 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const resolvedPurchaseCostPrice = roundMoney(purchaseCostPrice ?? costPrice ?? 0);
-    const resolvedExpensePercent = Number(expensePercent ?? 0);
+    const resolvedPurchaseCostPrice = normalizeMoney(purchaseCostPrice ?? costPrice ?? 0, 'Purchase cost');
+    const resolvedExpensePercent = decimal(expensePercent ?? 0).toString();
     const resolvedEffectiveCostPrice = roundMoney(calculateEffectiveCostPrice(resolvedPurchaseCostPrice, resolvedExpensePercent));
 
     const existingProduct = await prisma.product.findUnique({
@@ -735,31 +749,8 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
 
     const resolvedSellingPrice =
       sellingPrice !== undefined && sellingPrice !== null && sellingPrice !== ''
-        ? roundMoney(sellingPrice)
+        ? normalizeMoney(sellingPrice, 'Selling price')
         : roundMoney(existingProduct.sellingPrice);
-
-    await prisma.product.update({
-      where: { id: productId },
-      data: {
-        purchaseCostPrice: resolvedPurchaseCostPrice,
-        expensePercent: resolvedExpensePercent,
-        costPrice: resolvedEffectiveCostPrice,
-        sellingPrice: resolvedSellingPrice,
-      },
-    });
-
-    if (
-      resolvedEffectiveCostPrice !== Number(existingProduct.costPrice) ||
-      resolvedSellingPrice !== Number(existingProduct.sellingPrice)
-    ) {
-      await prisma.priceHistory.create({
-        data: {
-          productId,
-          costPrice: resolvedEffectiveCostPrice,
-          sellingPrice: resolvedSellingPrice,
-        },
-      });
-    }
 
     const batch = await StockSvc.addStock(
       productId,
@@ -770,6 +761,7 @@ router.post('/:id/restock', async (req: AuthRequest, res, next) => {
       reason,
       resolvedPurchaseCostPrice,
       resolvedExpensePercent,
+      { idempotencyKey: operationKey(req.body.idempotency_key ?? req.body.idempotencyKey), sellingPrice: resolvedSellingPrice },
     );
     res.json(batch);
   } catch (error) {
@@ -801,7 +793,8 @@ router.post('/:id/transfer', async (req: AuthRequest, res, next) => {
       fromWarehouseId,
       toWarehouseId,
       quantity,
-      userId
+      userId,
+      operationKey(req.body.idempotency_key ?? req.body.idempotencyKey)
     );
     res.json(result);
   } catch (error) {
@@ -903,7 +896,7 @@ router.post('/history/:transactionId/return-writeoff', authorize(['ADMIN', 'MANA
 
     const quantity = Number(req.body.quantity || 0);
     const reason = String(req.body.reason || '').trim();
-    const result = await StockSvc.returnWriteOffTransaction(transactionId, quantity, req.user!.id, reason);
+    const result = await StockSvc.returnWriteOffTransaction(transactionId, quantity, req.user!.id, reason, operationKey(req.body.idempotency_key ?? req.body.idempotencyKey));
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -935,7 +928,7 @@ router.delete('/history/:transactionId/writeoff', authorize(['ADMIN', 'MANAGER']
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await StockSvc.deleteWriteOffTransactionPermanently(transactionId);
+    const result = await StockSvc.deleteWriteOffTransactionPermanently(transactionId, req.user!.id);
     res.json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -981,10 +974,6 @@ router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: 'Укажите причину списания' });
     }
 
-    if (Number(product.stock || 0) < quantity) {
-      return res.status(400).json({ error: 'Недостаточно остатка для списания' });
-    }
-
     if (!product.warehouseId) {
       return res.status(400).json({ error: 'У товара не найден склад для списания' });
     }
@@ -994,7 +983,8 @@ router.post('/:id/write-off', async (req: AuthRequest, res, next) => {
       product.warehouseId,
       quantity,
       req.user!.id,
-      reason
+      reason,
+      operationKey(req.body.idempotency_key ?? req.body.idempotencyKey)
     );
 
     res.json(result);

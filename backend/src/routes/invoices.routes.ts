@@ -181,7 +181,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
           userId: req.user!.id,
           isAdmin: access.isAdmin,
           items: req.body.items,
-          discount: req.body.discount !== undefined ? Number(req.body.discount) : undefined,
+          discount: req.body.discount,
         })
       : await InvoiceService.reassignCustomer(invoiceId, customerId, req.user!.id);
     res.json(invoice);

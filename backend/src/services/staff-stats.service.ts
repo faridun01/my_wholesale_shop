@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial.js';
 import { addMoney } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
 import { roundMoney } from '../utils/money.js';
@@ -57,7 +58,7 @@ const resolveBucketStatus = (status: string | null, netAmount: number, paidAmoun
   if (INVOICE_PAYMENT_STATUSES.includes(status as InvoicePaymentStatus)) {
     return status as InvoicePaymentStatus;
   }
-  if (paidAmount > 0 && paidAmount >= netAmount - PAYMENT_EPSILON) return 'paid';
+  if (paidAmount > 0 && paidAmount >= decimal(netAmount).minus(decimal(PAYMENT_EPSILON)).toNumber()) return 'paid';
   return paidAmount > 0 ? 'partial' : 'unpaid';
 };
 
@@ -98,9 +99,9 @@ export const buildStaffMetrics = (rows: StaffStatsGroupRow[]): StaffMetrics => {
   }
 
   const invoicesCount = byStatus.paid.count + byStatus.partial.count + byStatus.unpaid.count;
-  const soldAmount = roundMoney(byStatus.paid.amount + byStatus.partial.amount + byStatus.unpaid.amount);
-  const paidAmount = roundMoney(byStatus.paid.paid + byStatus.partial.paid + byStatus.unpaid.paid);
-  const debtAmount = roundMoney(byStatus.paid.debt + byStatus.partial.debt + byStatus.unpaid.debt);
+  const soldAmount = roundMoney(decimal(byStatus.paid.amount).plus(decimal(byStatus.partial.amount)).plus(decimal(byStatus.unpaid.amount)).toNumber());
+  const paidAmount = roundMoney(decimal(byStatus.paid.paid).plus(decimal(byStatus.partial.paid)).plus(decimal(byStatus.unpaid.paid)).toNumber());
+  const debtAmount = roundMoney(decimal(byStatus.paid.debt).plus(decimal(byStatus.partial.debt)).plus(decimal(byStatus.unpaid.debt)).toNumber());
 
   return {
     invoicesCount,
@@ -108,8 +109,8 @@ export const buildStaffMetrics = (rows: StaffStatsGroupRow[]): StaffMetrics => {
     paidAmount,
     debtAmount,
     returnedAmount: roundMoney(returnedAmount),
-    averageCheck: invoicesCount > 0 ? roundMoney(soldAmount / invoicesCount) : 0,
-    collectionRate: soldAmount > PAYMENT_EPSILON ? Math.min(1, paidAmount / soldAmount) : 0,
+    averageCheck: invoicesCount > 0 ? roundMoney(decimal(soldAmount).div(decimal(invoicesCount)).toNumber()) : 0,
+    collectionRate: soldAmount > PAYMENT_EPSILON ? Math.min(1, decimal(paidAmount).div(decimal(soldAmount)).toNumber()) : 0,
     byStatus,
   };
 };
@@ -168,7 +169,7 @@ export class StaffStatsService {
         ...user,
         ...buildStaffMetrics(rowsByUser.get(user.id) || []),
       }))
-      .sort((a, b) => b.soldAmount - a.soldAmount || a.username.localeCompare(b.username, 'ru'));
+      .sort((a, b) => decimal(b.soldAmount).minus(decimal(a.soldAmount)).toNumber() || a.username.localeCompare(b.username, 'ru'));
 
     return {
       totals: buildStaffMetrics(rows),

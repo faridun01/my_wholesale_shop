@@ -288,9 +288,9 @@ export default function ProductsModals(props: ProductsModalsProps) {
           isOpen={showDeleteWriteOffConfirm}
           onClose={closeDeleteWriteOffConfirm}
           onConfirm={handleDeleteWriteOffPermanently}
-          title="Удалить списание навсегда?"
-          message="Операция полностью удалит запись списания из истории. Складской остаток и приход будут восстановлены, но восстановить саму удалённую запись потом уже нельзя."
-          confirmText="Удалить навсегда"
+          title="Отменить списание?"
+          message="Остаток будет восстановлен. Исходное списание и операция отмены сохранятся в истории."
+          confirmText="Отменить списание"
           cancelText="Отмена"
           type="danger"
         />

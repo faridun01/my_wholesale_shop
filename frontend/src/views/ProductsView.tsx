@@ -1,3 +1,5 @@
+import { financialPost } from '../api/financialRequest';
+import { decimal } from '../utils/financial';
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
@@ -354,7 +356,7 @@ export default function ProductsView() {
     if (!selectedProduct) return;
     try {
       const targetWarehouseId = Number(transferData.toWarehouseId);
-      const response = await client.post(`/products/${selectedProduct.id}/transfer`, {
+      const response = await financialPost(`/products/${selectedProduct.id}/transfer`, {
         fromWarehouseId: Number(transferData.fromWarehouseId),
         toWarehouseId: targetWarehouseId,
         quantity: totalTransferUnits
@@ -785,7 +787,7 @@ export default function ProductsView() {
         const sellingPrice = Number(product.sellingPrice || 0);
         const packagePrice = preferredPackaging?.packageSellingPrice
           ? Number(preferredPackaging.packageSellingPrice)
-          : sellingPrice * unitsPerPackage;
+          : decimal(sellingPrice).times(decimal(unitsPerPackage)).toNumber();
 
         return {
           index: index + 1,

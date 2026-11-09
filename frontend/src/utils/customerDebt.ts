@@ -1,3 +1,4 @@
+import { decimal } from './financial';
 export type CustomerPaymentStatus = 'paid' | 'partial' | 'unpaid';
 
 export type DebtCustomer = {
@@ -155,8 +156,8 @@ export function buildCustomerDebtSummary(customers: DebtCustomer[]): CustomerDeb
       const debt = getCustomerDebtTotal(customer);
       const paid = getCustomerPaidTotal(customer);
 
-      summary.totalDebt += debt;
-      summary.totalPaid += paid;
+      summary.totalDebt = decimal(summary.totalDebt).plus(decimal(debt)).toNumber();
+      summary.totalPaid = decimal(summary.totalPaid).plus(decimal(paid)).toNumber();
 
       if (customerMatchesPaymentFilter(customer, 'paid')) {
         summary.fullyPaidCount += 1;

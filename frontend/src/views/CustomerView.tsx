@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React, { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import {
@@ -96,7 +97,7 @@ export default function CustomerView() {
   const getCustomerInvoiceBadge = (inv: StatementInvoice) => {
     const balance = Number(inv.invoiceBalance ?? 0);
     const netAmount = Number(inv.netAmount ?? 0);
-    const paid = Math.max(0, netAmount - balance);
+    const paid = Math.max(0, decimal(netAmount).minus(decimal(balance)).toNumber());
 
     if (inv.cancelled) {
       return (
@@ -322,7 +323,7 @@ export default function CustomerView() {
           return {
             ...prev,
             ...res.data,
-            invoiceBalance: res.data.financialSummary?.debtAmount ?? (Number(res.data.netAmount || 0) - Number(res.data.paidAmount || 0)),
+            invoiceBalance: res.data.financialSummary?.debtAmount ?? (decimal(res.data.netAmount || 0).minus(decimal(res.data.paidAmount || 0)).toNumber()),
             paymentEvents: (res.data.payments || []).map((p: any) => ({
               id: p.id,
               amount: p.amount,
@@ -392,7 +393,7 @@ export default function CustomerView() {
     const result = printCustomerInvoice({
       invoice,
       customer: selectedCustomer,
-      statusLabel: invoice.status === 'paid' ? 'Оплачено' : invoice.invoiceBalance > PAYMENT_EPSILON ? 'Есть долг' : 'Закрыто',
+      statusLabel: invoice.status === 'paid' ? 'Оплачено' : decimal(invoice.invoiceBalance).gt(PAYMENT_EPSILON) ? 'Есть долг' : 'Закрыто',
       subtotal: getInvoiceSubtotal(invoice),
       discountAmount: getInvoiceDiscountAmount(invoice),
       netAmount: getInvoiceNetAmount(invoice),
@@ -731,7 +732,7 @@ export default function CustomerView() {
                     </div>
                     <div>
                       <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400">Долг</p>
-                      <p className={`mt-0.5 text-xs sm:text-sm font-bold truncate ${isAdmin && customer.balance > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
+                      <p className={`mt-0.5 text-xs sm:text-sm font-bold truncate ${isAdmin && decimal(customer.balance).gt(0) ? 'text-rose-600' : 'text-slate-900'}`}>{formatMoneyByRole(customer.balance, true)}</p>
                     </div>
                   </div>
                 </div>
@@ -1137,7 +1138,7 @@ export default function CustomerView() {
                     filteredStatementInvoices.map((invoice) => {
                       const balance = Number(invoice.invoiceBalance ?? 0);
                       const netAmount = Number(invoice.netAmount ?? 0);
-                      const paid = Math.max(0, netAmount - balance);
+                      const paid = Math.max(0, decimal(netAmount).minus(decimal(balance)).toNumber());
                       const paymentsCount = invoice.paymentEvents?.length || 0;
                       const returnsCount = invoice.returnEvents?.length || 0;
 
@@ -1390,7 +1391,7 @@ export default function CustomerView() {
                     <div className="space-y-2.5 md:hidden">
                       {selectedInvoice.items?.map((item: any, idx: number) => {
                         const quantityInfo = getInvoiceItemQuantityParts(item);
-                        const lineTotal = Number(item.totalPrice) || (Number(item.quantity || 0) * Number(item.sellingPrice || 0));
+                        const lineTotal = Number(item.totalPrice) || (decimal(item.quantity || 0).times(decimal(item.sellingPrice || 0)).toNumber());
                         const returnedQty = Number(item.returnedQty || 0);
 
                         return (
@@ -1450,7 +1451,7 @@ export default function CustomerView() {
                         <tbody className="divide-y divide-slate-100">
                           {selectedInvoice.items?.map((item: any, idx: number) => {
                             const quantityInfo = getInvoiceItemQuantityParts(item);
-                            const lineTotal = Number(item.totalPrice) || (Number(item.quantity || 0) * Number(item.sellingPrice || 0));
+                            const lineTotal = Number(item.totalPrice) || (decimal(item.quantity || 0).times(decimal(item.sellingPrice || 0)).toNumber());
                             const returnedQty = Number(item.returnedQty || 0);
 
                             return (

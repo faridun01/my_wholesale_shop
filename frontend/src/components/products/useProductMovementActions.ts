@@ -223,7 +223,7 @@ const useProductMovementActions = ({
       setProductHistory(history);
       await fetchInitialData();
       closeDeleteWriteOffConfirm();
-      toast.success('Списание удалено без возможности восстановления');
+      toast.success('Списание отменено, история сохранена');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Не удалось удалить списание');
     }

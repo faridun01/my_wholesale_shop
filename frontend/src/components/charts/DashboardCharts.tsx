@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import React from 'react';
 import {
   Area,
@@ -49,7 +50,7 @@ function CategoryPieTooltip({
   const item = payload[0]?.payload;
   const label = item?.name || payload[0]?.name || 'Без названия';
   const value = Number(item?.value ?? payload[0]?.value ?? 0);
-  const percent = totalCategoryValue > 0 ? (value / totalCategoryValue) * 100 : 0;
+  const percent = totalCategoryValue > 0 ? decimal(value).div(decimal(totalCategoryValue)).times(decimal(100)).toNumber() : 0;
 
   return (
     <div className="max-w-70 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl text-left">
@@ -72,7 +73,7 @@ export default function DashboardCharts({
   onOpenProfitReport,
   leftBottomContent,
 }: DashboardChartsProps) {
-  const totalCategoryValue = categoryData.reduce((sum, item) => sum + item.value, 0);
+  const totalCategoryValue = categoryData.reduce((sum, item) => decimal(sum).plus(item.value).toNumber(), 0);
   const topCategory = categoryData[0] || null;
 
   return (
@@ -158,7 +159,7 @@ export default function DashboardCharts({
 
         <div className="mt-4 flex-1 space-y-2">
           {categoryData.map((item, index) => {
-            const percent = totalCategoryValue > 0 ? (item.value / totalCategoryValue) * 100 : 0;
+            const percent = totalCategoryValue > 0 ? decimal(item.value).div(decimal(totalCategoryValue)).times(decimal(100)).toNumber() : 0;
             const fullName = formatProductName(item.name);
             return (
               <div
@@ -197,7 +198,7 @@ export default function DashboardCharts({
             </p>
             {topCategory ? (
               <p className="mt-1 text-xs text-slate-500">
-                {totalCategoryValue > 0 ? formatPercent((topCategory.value / totalCategoryValue) * 100) : formatPercent(0)}
+                {totalCategoryValue > 0 ? formatPercent(decimal(topCategory.value).div(decimal(totalCategoryValue)).times(decimal(100)).toNumber()) : formatPercent(0)}
               </p>
             ) : null}
           </div>

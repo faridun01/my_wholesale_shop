@@ -1,3 +1,4 @@
+import { decimal } from './financial';
 import { formatCount, roundMoney } from './format';
 import { formatProductName } from './productName';
 import type { EditProductOption, ReturnInvoiceItem } from '../components/sales/salesTypes';
@@ -64,16 +65,16 @@ export const getProductStockParts = (product: EditProductOption) => {
 export function getInvoiceSubtotal(invoice: any) {
   return roundMoney(
     Array.isArray(invoice?.items)
-      ? invoice.items.reduce((sum: number, item: any) => roundMoney(sum + Number(item.totalPrice || 0)), 0)
+      ? invoice.items.reduce((sum: number, item: any) => roundMoney(decimal(sum).plus(decimal(item.totalPrice || 0)).toNumber()), 0)
       : Number(invoice?.totalAmount || 0),
   );
 }
 
 export function getInvoiceDiscountAmount(invoice: any) {
-  if (invoice?.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum: number, item: any) => sum + Number(item.allocatedOrderDiscount || 0), 0));
+  if (invoice?.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum: number, item: any) => decimal(sum).plus(decimal(item.allocatedOrderDiscount || 0)).toNumber(), 0));
   const subtotal = getInvoiceSubtotal(invoice);
   const discount = Number(invoice?.discount || 0);
-  return roundMoney(subtotal * (discount / 100));
+  return roundMoney(decimal(subtotal).times(decimal(discount).div(decimal(100))).toNumber());
 }
 
 export function getInvoiceNetAmount(invoice: any) {
@@ -85,7 +86,7 @@ export function getInvoiceNetAmount(invoice: any) {
   const subtotal = getInvoiceSubtotal(invoice);
   const discountAmount = getInvoiceDiscountAmount(invoice);
   const returnedAmount = Number(invoice?.returnedAmount || 0);
-  const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
+  const calculatedNet = roundMoney(decimal(subtotal).minus(decimal(discountAmount)).minus(decimal(returnedAmount)).toNumber());
 
   return roundMoney(Math.max(0, calculatedNet));
 }
@@ -110,12 +111,12 @@ export function getEffectiveStatus(invoice: any, epsilon = SALES_PAYMENT_EPSILON
 }
 
 export function getInvoiceBalance(invoice: any) {
-  return roundMoney(Math.max(0, getInvoiceNetAmount(invoice) - Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))));
+  return roundMoney(Math.max(0, decimal(getInvoiceNetAmount(invoice)).minus(decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)))).toNumber()));
 }
 
 export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) => {
   if (Number(invoice?.returnedAmount || 0) > 0) return 0;
-  const change = roundMoney(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)) - getInvoiceNetAmount(invoice));
+  const change = roundMoney(decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
   if (change <= epsilon) {
     return 0;
   }
@@ -124,13 +125,13 @@ export const getInvoiceChangeAmount = (invoice: any, epsilon = SALES_PAYMENT_EPS
 };
 
 export const getInvoiceAppliedPaidAmount = (invoice: any, epsilon = SALES_PAYMENT_EPSILON) =>
-  Math.max(0, Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0)) - getInvoiceChangeAmount(invoice, epsilon));
+  Math.max(0, decimal(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0))).minus(decimal(getInvoiceChangeAmount(invoice, epsilon))).toNumber());
 
 export const getInvoiceGrossPaidAmount = (invoice: any) => {
   const storedGross = Number(invoice?.grossPaidAmount);
   if (Number.isFinite(storedGross) && storedGross >= 0) return roundMoney(storedGross);
   if (Array.isArray(invoice?.payments)) {
-    return roundMoney(invoice.payments.reduce((sum: number, payment: any) => sum + Math.max(0, Number(payment?.amount || 0)), 0));
+    return roundMoney(invoice.payments.reduce((sum: number, payment: any) => decimal(sum).plus(decimal(Math.max(0, Number(payment?.amount || 0)))).toNumber(), 0));
   }
   return getInvoiceAppliedPaidAmount(invoice);
 };
@@ -142,7 +143,7 @@ export const getInvoiceMoneyRefundedAmount = (invoice: any) => {
     return roundMoney(invoice.payments.reduce((sum: number, payment: any) => {
       const amount = Number(payment?.amount || 0);
       const returnAdjustment = payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund';
-      return sum + (amount < 0 && !payment?.reversalOfId && !returnAdjustment ? Math.abs(amount) : 0);
+      return decimal(sum).plus(decimal(amount < 0 && !payment?.reversalOfId && !returnAdjustment ? Math.abs(amount) : 0)).toNumber();
     }, 0));
   }
   return 0;
@@ -155,14 +156,12 @@ export const getInvoiceReturnPaymentAdjustments = (invoice: any) => {
   return roundMoney(invoice.payments.reduce((sum: number, payment: any) => {
     const amount = Number(payment?.amount || 0);
     const isReturnAdjustment = payment?.returnId != null || String(payment?.method || '').toLowerCase() === 'refund';
-    return sum + (amount < 0 && !payment?.reversalOfId && isReturnAdjustment ? Math.abs(amount) : 0);
+    return decimal(sum).plus(decimal(amount < 0 && !payment?.reversalOfId && isReturnAdjustment ? Math.abs(amount) : 0)).toNumber();
   }, 0));
 };
 
-export const getInvoiceCustomerCredit = (invoice: any) =>
-  Number(invoice?.returnedAmount || 0) > 0
-    ? roundMoney(Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0) - getInvoiceNetAmount(invoice)))
-    : 0;
+// Goods returns do not create transferable credit. Kept as a compatibility helper.
+export const getInvoiceCustomerCredit = (_invoice: any) => 0;
 
 export const normalizeDisplayPackageName = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -206,7 +205,7 @@ export const getInvoiceReturnedAmount = (invoice: any, epsilon = SALES_PAYMENT_E
   }
 
   if (Array.isArray(invoice?.returns)) {
-    return invoice.returns.reduce((sum: number, item: any) => sum + Math.max(0, Number(item?.totalValue || 0)), 0);
+    return invoice.returns.reduce((sum: number, item: any) => decimal(sum).plus(Math.max(0, Number(item?.totalValue || 0))).toNumber(), 0);
   }
 
   return 0;

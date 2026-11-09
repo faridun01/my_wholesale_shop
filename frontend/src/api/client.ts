@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { financialPayload } from '../utils/financial';
 import { clearAuthSession, getAuthToken } from '../utils/authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -12,6 +13,9 @@ const client = axios.create({
 // Add auth token automatically
 client.interceptors.request.use(
   (config) => {
+    if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
+      config.data = financialPayload(config.data);
+    }
     const token = getAuthToken();
 
     if (token) {

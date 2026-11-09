@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial.js';
 import { reconcileInvoices } from '../services/financial-reconciliation.js';
 import { lineTotal, addMoney, allocateCents, balancePaidAmount, fromCents, toCents } from '../utils/financial.js';
 import { Router } from 'express';
@@ -126,8 +127,10 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
           additional: { qtyChange: { lt: 0 } },
         }),
         select: {
+          id: true,
           qtyChange: true,
           costAtTime: true,
+          totalCost: true,
           reason: true,
           user: {
             select: {
@@ -161,6 +164,10 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       }),
     ]);
 
+    const writeoffRestorations = writeoffTransactions.length ? await prisma.inventoryTransaction.findMany({
+      where: { type: 'adjustment', qtyChange: { gt: 0 }, referenceId: { in: writeoffTransactions.map(transaction => transaction.id) } },
+      select: { referenceId: true, qtyChange: true, totalCost: true, costAtTime: true },
+    }) : [];
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalCost = 0;
@@ -194,7 +201,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       const paidAmount = balancePaidAmount(inv.payments || [], inv.paidAmount);
 
       totalRevenue = addMoney(totalRevenue, netAmount);
-      const invoiceDebt = Math.max(0, netAmount - paidAmount);
+      const invoiceDebt = Math.max(0, decimal(netAmount).minus(decimal(paidAmount)).toNumber());
       monthlyData[month].sales = addMoney(monthlyData[month].sales, netAmount);
 
       if (!warehousePerformance[inv.warehouseId]) {
@@ -232,7 +239,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
       for (const item of inv.items) {
         const lineRevenue = getLineNetRevenue(inv, item);
         const lineCost = getLineCost(item);
-        const lineProfit = lineRevenue - lineCost;
+        const lineProfit = decimal(lineRevenue).minus(decimal(lineCost)).toNumber();
         const quantity = getRemainingQuantity(item);
         const productKey = String(item.product?.id || 0);
 
@@ -269,8 +276,12 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
     const writeoffByWarehouse: Record<string, { id: number; name: string; quantity: number; value: number; operations: number }> = {};
 
     for (const transaction of writeoffTransactions) {
-      const quantity = Math.abs(Number(transaction.qtyChange || 0));
-      const value = quantity * Number(transaction.costAtTime || 0);
+      const restorations = writeoffRestorations.filter(row => row.referenceId === transaction.id);
+      const restoredQuantity = restorations.reduce((sum, row) => sum + Number(row.qtyChange), 0);
+      const quantity = Math.max(0, Math.abs(Number(transaction.qtyChange || 0)) - restoredQuantity);
+      const value = addMoney(transaction.totalCost ?? lineTotal(Math.abs(Number(transaction.qtyChange)), transaction.costAtTime || 0),
+        -addMoney(...restorations.map(row => row.totalCost ?? lineTotal(row.qtyChange, row.costAtTime || 0))));
+      if (quantity === 0) continue;
       const normalizedReason = String(transaction.reason || '').replace(/^.*?:\s*/i, '').trim() || 'Списание';
       const cleanReason = /^write-?off$/i.test(normalizedReason)
         ? 'Списание'
@@ -283,7 +294,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         writeoffByReason[reasonKey] = { name: cleanReason, quantity: 0, value: 0, operations: 0 };
       }
       writeoffByReason[reasonKey].quantity += quantity;
-      writeoffByReason[reasonKey].value += value;
+      writeoffByReason[reasonKey].value = decimal(writeoffByReason[reasonKey].value).plus(value).toNumber();
       writeoffByReason[reasonKey].operations += 1;
 
       if (!writeoffByStaff[staffKey]) {
@@ -296,7 +307,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         };
       }
       writeoffByStaff[staffKey].quantity += quantity;
-      writeoffByStaff[staffKey].value += value;
+      writeoffByStaff[staffKey].value = decimal(writeoffByStaff[staffKey].value).plus(value).toNumber();
       writeoffByStaff[staffKey].operations += 1;
 
       if (!writeoffByProduct[productKey]) {
@@ -309,7 +320,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         };
       }
       writeoffByProduct[productKey].quantity += quantity;
-      writeoffByProduct[productKey].value += value;
+      writeoffByProduct[productKey].value = decimal(writeoffByProduct[productKey].value).plus(value).toNumber();
       writeoffByProduct[productKey].operations += 1;
 
       const warehouseKey = String(transaction.warehouse?.id || 0);
@@ -323,7 +334,7 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         };
       }
       writeoffByWarehouse[warehouseKey].quantity += quantity;
-      writeoffByWarehouse[warehouseKey].value += value;
+      writeoffByWarehouse[warehouseKey].value = decimal(writeoffByWarehouse[warehouseKey].value).plus(value).toNumber();
       writeoffByWarehouse[warehouseKey].operations += 1;
     }
 
@@ -338,35 +349,35 @@ router.get('/analytics', authorize(['ADMIN']), validateRequest({ query: commonRe
         totalProducts: warehouseId ? products.length : countUniqueProductsByName(products),
         totalDebts,
         stockValuation: isAdmin ? stockValuation : null,
-        margin: isAdmin ? (totalRevenue > 0 ? ((totalProfit - totalExpenses) / totalRevenue) * 100 : 0) : null,
-        netProfit: isAdmin ? (totalProfit - totalExpenses) : null,
+        margin: isAdmin ? (totalRevenue > 0 ? decimal(totalProfit).minus(decimal(totalExpenses)).div(decimal(totalRevenue)).times(decimal(100)).toNumber() : 0) : null,
+        netProfit: isAdmin ? (decimal(totalProfit).minus(decimal(totalExpenses)).toNumber()) : null,
       },
       chartData: Object.values(monthlyData),
       warehousePerformance: Object.values(warehousePerformance),
       productPerformance: Object.values(productPerformance)
-        .sort((a, b) => b.profit - a.profit)
+        .sort((a, b) => decimal(b.profit).minus(decimal(a.profit)).toNumber())
         .slice(0, 20),
       staffPerformance: Object.values(staffPerformance)
-        .sort((a, b) => b.revenue - a.revenue)
+        .sort((a, b) => decimal(b.revenue).minus(decimal(a.revenue)).toNumber())
         .slice(0, 20),
       customerPerformance: Object.values(customerPerformance)
-        .sort((a, b) => b.revenue - a.revenue)
+        .sort((a, b) => decimal(b.revenue).minus(decimal(a.revenue)).toNumber())
         .slice(0, 20),
       customerDebts: Object.values(customerPerformance)
         .filter((item) => item.debt > MONEY_EPSILON)
-        .sort((a, b) => b.debt - a.debt)
+        .sort((a, b) => decimal(b.debt).minus(decimal(a.debt)).toNumber())
         .slice(0, 20),
       writeoffReasons: Object.values(writeoffByReason)
-        .sort((a, b) => b.value - a.value)
+        .sort((a, b) => decimal(b.value).minus(a.value).toNumber())
         .slice(0, 20),
       writeoffByStaff: Object.values(writeoffByStaff)
-        .sort((a, b) => b.value - a.value)
+        .sort((a, b) => decimal(b.value).minus(a.value).toNumber())
         .slice(0, 20),
       writeoffByProduct: Object.values(writeoffByProduct)
-        .sort((a, b) => b.value - a.value)
+        .sort((a, b) => decimal(b.value).minus(a.value).toNumber())
         .slice(0, 20),
       writeoffByWarehouse: Object.values(writeoffByWarehouse)
-        .sort((a, b) => b.value - a.value)
+        .sort((a, b) => decimal(b.value).minus(a.value).toNumber())
         .slice(0, 20),
     });
   } catch (error) {
@@ -551,6 +562,8 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
           select: {
             referenceId: true,
             qtyChange: true,
+            totalCost: true,
+            costAtTime: true,
           },
         })
       : [];
@@ -565,6 +578,8 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
         .reduce((sum: number, candidate: any) => sum + Number(candidate.qtyChange || 0), 0);
 
       const originalQty = Math.abs(Number(t.qtyChange || 0));
+      const originalValue = t.totalCost == null ? lineTotal(originalQty, t.costAtTime || 0) : Number(t.totalCost);
+      const returnedValue = addMoney(...returnTransactions.filter(row => row.referenceId === t.id).map(row => row.totalCost ?? lineTotal(row.qtyChange, row.costAtTime || 0)));
 
       return {
         transaction_id: t.id,
@@ -576,7 +591,11 @@ router.get('/writeoffs', authorize(['ADMIN', 'MANAGER']), validateRequest({ quer
         quantity: originalQty,
         returned_qty: returnedQty,
         cost_price: Number(t.costAtTime || 0),
-        total_value: originalQty * Number(t.costAtTime || 0),
+        original_value: originalValue,
+        returned_value: returnedValue,
+        total_value: addMoney(originalValue, -returnedValue),
+        cost_precision: t.totalCost == null ? 'legacy-average-only' : 'exact-fifo',
+
         reason: (() => {
           const raw = String(t.reason || '').replace(/^.*?:\s*/i, '').trim();
           if (!raw || /^write-?off$/i.test(raw)) return 'Списание';

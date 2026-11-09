@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -365,7 +366,7 @@ export default function DashboardView() {
       salesSource.forEach((sale: any) => {
         const saleDate = new Date(sale.createdAt);
         const bucket = buckets.find((item) => saleDate >= item.start && saleDate < item.end);
-        if (bucket) bucket.total += Number(sale.netAmount || 0);
+        if (bucket) bucket.total = decimal(bucket.total).plus(decimal(sale.netAmount || 0)).toNumber();
       });
 
       return buckets.map(({ label, total }) => ({ label, total }));
@@ -392,7 +393,7 @@ export default function DashboardView() {
       salesSource.forEach((sale: any) => {
         const saleDate = new Date(sale.createdAt);
         const bucket = buckets.find((item) => saleDate >= item.start && saleDate < item.end);
-        if (bucket) bucket.total += Number(sale.netAmount || 0);
+        if (bucket) bucket.total = decimal(bucket.total).plus(decimal(sale.netAmount || 0)).toNumber();
       });
 
       return buckets.map(({ label, total }) => ({ label, total }));
@@ -414,7 +415,7 @@ export default function DashboardView() {
         const saleDate = new Date(sale.createdAt);
         if (saleDate.getFullYear() !== now.getFullYear()) return;
         const bucket = buckets.find((item) => saleDate.getMonth() === item.monthIndex);
-        if (bucket) bucket.total += Number(sale.netAmount || 0);
+        if (bucket) bucket.total = decimal(bucket.total).plus(decimal(sale.netAmount || 0)).toNumber();
       });
 
       return buckets.map(({ label, total }) => ({ label, total }));
@@ -430,7 +431,7 @@ export default function DashboardView() {
       const saleDate = new Date(sale.createdAt);
       if (saleDate.getFullYear() !== now.getFullYear()) return;
       const bucket = buckets.find((item) => saleDate.getMonth() === item.monthIndex);
-      if (bucket) bucket.total += Number(sale.netAmount || 0);
+      if (bucket) bucket.total = decimal(bucket.total).plus(decimal(sale.netAmount || 0)).toNumber();
     });
 
     return buckets.map(({ label, total }) => ({ label, total }));

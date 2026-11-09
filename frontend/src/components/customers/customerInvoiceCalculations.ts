@@ -1,10 +1,11 @@
+import { decimal } from '../../utils/financial';
 import { formatCount, roundMoney } from '../../utils/format';
 import type { StatementInvoice, StatementItem } from '../../types/customer';
 
 export const CUSTOMER_PAYMENT_EPSILON = 0;
 
 export const getInvoiceSubtotal = (invoice: StatementInvoice) => {
-  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => sum + Number(item.totalPrice ?? 0), 0));
+  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => decimal(sum).plus(decimal(item.totalPrice ?? 0)).toNumber(), 0));
   const storedTotal = Math.max(0, Number(invoice?.totalAmount || 0));
   if (invoice?.totalAmount != null && Number.isFinite(Number(invoice.totalAmount))) {
     return storedTotal;
@@ -14,10 +15,10 @@ export const getInvoiceSubtotal = (invoice: StatementInvoice) => {
     ? invoice.items.reduce((sum, item) => {
         const storedLineTotal = Number(item?.totalPrice || 0);
         if (item?.totalPrice != null && Number.isFinite(Number(item.totalPrice))) {
-          return roundMoney(sum + storedLineTotal);
+          return roundMoney(decimal(sum).plus(decimal(storedLineTotal)).toNumber());
         }
 
-        return roundMoney(sum + roundMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0)));
+        return roundMoney(decimal(sum).plus(decimal(roundMoney(decimal(item.quantity || 0).times(decimal(item.sellingPrice || 0)).toNumber()))).toNumber());
       }, 0)
     : 0;
 
@@ -25,10 +26,10 @@ export const getInvoiceSubtotal = (invoice: StatementInvoice) => {
 };
 
 export const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
-  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => sum + Number(item.allocatedOrderDiscount ?? 0), 0));
+  if (invoice.originalInvoice && Array.isArray(invoice.items)) return roundMoney(invoice.items.reduce((sum, item) => decimal(sum).plus(decimal(item.allocatedOrderDiscount ?? 0)).toNumber(), 0));
   const subtotal = getInvoiceSubtotal(invoice);
   const discount = Number(invoice?.discount || 0);
-  return roundMoney(subtotal * (discount / 100));
+  return roundMoney(decimal(subtotal).times(decimal(discount).div(decimal(100))).toNumber());
 };
 
 export const getInvoiceNetAmount = (invoice: StatementInvoice) => {
@@ -40,18 +41,19 @@ export const getInvoiceNetAmount = (invoice: StatementInvoice) => {
   const subtotal = getInvoiceSubtotal(invoice);
   const discountAmount = getInvoiceDiscountAmount(invoice);
   const returnedAmount = Number(invoice?.returnedAmount || 0);
-  const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
+  const calculatedNet = roundMoney(decimal(subtotal).minus(decimal(discountAmount)).minus(decimal(returnedAmount)).toNumber());
 
   return roundMoney(Math.max(0, calculatedNet));
 };
 
 export const getInvoiceChangeAmount = (invoice: StatementInvoice) => {
-  const change = roundMoney(Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceNetAmount(invoice));
+  if (decimal(invoice.returnedAmount || 0).gt(0)) return 0;
+  const change = roundMoney(decimal(Math.max(0, Number(invoice?.paidAmount || 0))).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
   return change > CUSTOMER_PAYMENT_EPSILON ? change : 0;
 };
 
 export const getInvoiceAppliedPaidAmount = (invoice: StatementInvoice) =>
-  Math.max(0, Math.max(0, Number(invoice?.paidAmount || 0)) - getInvoiceChangeAmount(invoice));
+  Math.max(0, decimal(Math.max(0, Number(invoice?.paidAmount || 0))).minus(decimal(getInvoiceChangeAmount(invoice))).toNumber());
 
 const normalizeDisplayBaseUnit = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase();

@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial.js';
 import { addMoney, balancePaidAmount, discountAmount } from '../utils/financial.js';
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
@@ -66,7 +67,7 @@ const findCustomerByNormalizedName = async (name: string, excludeCustomerId?: nu
 };
 
 const getInvoiceBalance = (invoice: { netAmount: number; paidAmount: number; payments?: any[] }) => {
-  return Math.max(0, Number(invoice.netAmount || 0) - balancePaidAmount(invoice.payments || [], invoice.paidAmount));
+  return Math.max(0, decimal(invoice.netAmount || 0).minus(decimal(balancePaidAmount(invoice.payments || [], invoice.paidAmount))).toNumber());
 };
 
 const getCustomerSegment = (params: {

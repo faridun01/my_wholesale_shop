@@ -1,4 +1,4 @@
-import { fromCents, toCents } from './financial';
+import { Decimal, decimal, fromCents, toCents } from './financial';
 export const parseMoneyInput = (value: unknown): number | null => {
   let text = String(value ?? '').trim().replace(/[\s\u00a0\u202f]/g, '');
   if (!text) return null;
@@ -21,15 +21,13 @@ export const roundMoney = (value: unknown, digits = 2) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
   if (digits === 2) return fromCents(toCents(value || 0));
-  const factor = Math.pow(10, digits);
-  return Math.round((numeric + Math.sign(numeric || 1) * Number.EPSILON) * factor) / factor;
+  return decimal(value || 0).toDecimalPlaces(digits, Decimal.ROUND_HALF_UP).toNumber();
 };
 
 export const ceilMoney = (value: unknown, digits = 2) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
-  const factor = Math.pow(10, digits);
-  return Math.ceil((numeric - Number.EPSILON) * factor) / factor;
+  return decimal(value || 0).toDecimalPlaces(digits, Decimal.ROUND_CEIL).toNumber();
 };
 
 /** Local calendar day as YYYY-MM-DD (what date inputs and the API's date filters use). */
@@ -62,8 +60,7 @@ export const formatCount = (value: unknown) => {
 export const toFixedNumber = (value: unknown, digits = 2) => {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
-  const factor = Math.pow(10, digits);
-  return Math.round((numeric + Math.sign(numeric || 1) * Number.EPSILON) * factor) / factor;
+  return decimal(value || 0).toDecimalPlaces(digits, Decimal.ROUND_HALF_UP).toNumber();
 };
 
 export const normalizeDisplayBaseUnit = (value: unknown) => {

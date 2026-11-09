@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Decimal, decimal } from './financial.js';
 import { fromCents, MAX_STORED_CENTS, toCents } from './financial.js';
 export const roundMoney = (value: unknown, digits = 2) => {
   if (digits === 2) return fromCents(toCents(value ?? 0));
@@ -7,7 +7,7 @@ export const roundMoney = (value: unknown, digits = 2) => {
     return 0;
   }
 
-  return new Prisma.Decimal(numeric).toDecimalPlaces(digits, Prisma.Decimal.ROUND_HALF_UP).toNumber();
+  return decimal(value || 0).toDecimalPlaces(digits, Decimal.ROUND_HALF_UP).toNumber();
 };
 
 export const ceilMoney = (value: unknown, digits = 2) => {
@@ -16,7 +16,7 @@ export const ceilMoney = (value: unknown, digits = 2) => {
     return 0;
   }
 
-  return new Prisma.Decimal(numeric).toDecimalPlaces(digits, Prisma.Decimal.ROUND_CEIL).toNumber();
+  return decimal(value || 0).toDecimalPlaces(digits, Decimal.ROUND_CEIL).toNumber();
 };
 
 export const normalizeMoney = (value: unknown, fieldName: string, options?: { allowZero?: boolean }) => {

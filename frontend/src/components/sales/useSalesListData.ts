@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import { useMemo } from 'react';
 import {
   getEffectiveStatus,
@@ -91,11 +92,11 @@ const useSalesListData = ({
         case 'customer_name':
           return String(a.customer_name || '').localeCompare(String(b.customer_name || '')) * direction;
         case 'netAmount':
-          return (getInvoiceNetAmount(a) - getInvoiceNetAmount(b)) * direction;
+          return decimal(getInvoiceNetAmount(a)).minus(decimal(getInvoiceNetAmount(b))).times(decimal(direction)).toNumber();
         case 'paidAmount':
-          return (getInvoiceGrossPaidAmount(a) - getInvoiceGrossPaidAmount(b)) * direction;
+          return decimal(getInvoiceGrossPaidAmount(a)).minus(decimal(getInvoiceGrossPaidAmount(b))).times(decimal(direction)).toNumber();
         case 'balance':
-          return (getInvoiceBalance(a) - getInvoiceBalance(b)) * direction;
+          return decimal(getInvoiceBalance(a)).minus(decimal(getInvoiceBalance(b))).times(decimal(direction)).toNumber();
         case 'status':
           return String(getEffectiveStatus(a)).localeCompare(String(getEffectiveStatus(b))) * direction;
         case 'staff_name':

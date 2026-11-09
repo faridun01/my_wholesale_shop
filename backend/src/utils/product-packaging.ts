@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Decimal, decimal, financialError } from './financial.js';
 const BRAND_PATTERN = /\bskif\b/iu;
 const QUOTED_BRAND_PATTERN = /[«»"“”„‟']\s*([^«»"“”„‟'](?:.*?[^«»"“”„‟'])?)\s*[«»"“”„‟']/u;
 const PACKAGING_PATTERN =
@@ -157,15 +157,9 @@ export function formatQuantityForInvoice(input: {
   return `${extraUnitQuantity} ${baseUnitName}`;
 }
 
-export function calculateEffectiveCostPrice(purchaseCostPrice: number, expensePercent: number) {
-  const purchase = Number(purchaseCostPrice || 0);
-  const percent = Number(expensePercent || 0);
-  if (!Number.isFinite(purchase) || purchase < 0) {
-    return 0;
-  }
-  if (!Number.isFinite(percent) || percent < 0) {
-    return purchase;
-  }
-
-  return new Prisma.Decimal(purchase).mul(new Prisma.Decimal(percent).div(100).plus(1)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toNumber();
+export function calculateEffectiveCostPrice(purchaseCostPrice: unknown, expensePercent: unknown) {
+  const purchase = decimal(purchaseCostPrice ?? 0);
+  const percent = decimal(expensePercent ?? 0);
+  if (purchase.lt(0) || percent.lt(0)) throw financialError('Purchase cost and expense percentage must be non-negative');
+  return purchase.times(percent.div(100).plus(1)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 }

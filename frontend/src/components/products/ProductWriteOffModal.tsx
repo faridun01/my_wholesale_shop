@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import React from 'react';
 import {
   Trash2,
@@ -74,7 +75,7 @@ export default function ProductWriteOffModal({
   const remainingStock = Math.max(0, stock - quantityNum);
   const isOverStock = quantityNum > stock;
   const costPrice = Number(selectedProduct?.costPrice ?? selectedProduct?.cost_price ?? 0);
-  const estimatedLoss = quantityNum * costPrice;
+  const estimatedLoss = decimal(quantityNum).times(decimal(costPrice)).toNumber();
   const unitsPerPackage = Math.floor(
     Number(selectedPackaging?.unitsPerPackage || selectedProduct?.unitsPerPackage || 0)
   );

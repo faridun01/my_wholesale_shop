@@ -1,3 +1,4 @@
+import { financialPost } from './financialRequest';
 import client from './client';
 
 export const getProducts = async (warehouseId?: number) => {
@@ -23,7 +24,7 @@ export const createProduct = async (data: any) => {
 };
 
 export const restockProduct = async (id: number, data: any) => {
-  const response = await client.post(`/products/${id}/restock`, data);
+  const response = await financialPost(`/products/${id}/restock`, data);
   return response.data;
 };
 
@@ -80,7 +81,7 @@ export const reverseCorrectionWriteOffTransaction = async (transactionId: number
 };
 
 export const returnWriteOffTransaction = async (transactionId: number, data: { quantity: number; reason?: string }) => {
-  const response = await client.post(`/products/history/${transactionId}/return-writeoff`, data);
+  const response = await financialPost(`/products/history/${transactionId}/return-writeoff`, data);
   return response.data;
 };
 
@@ -90,6 +91,6 @@ export const deleteWriteOffTransactionPermanently = async (transactionId: number
 };
 
 export const writeOffProduct = async (id: number, data: { quantity: number; reason: string }) => {
-  const response = await client.post(`/products/${id}/write-off`, data);
+  const response = await financialPost(`/products/${id}/write-off`, data);
   return response.data;
 };

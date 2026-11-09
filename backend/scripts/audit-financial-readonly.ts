@@ -25,6 +25,13 @@ try {
         (SELECT COUNT(*)::int FROM returns r LEFT JOIN invoices i ON i.id = r.invoice_id WHERE i.id IS NULL) AS orphan_returns,
         (SELECT COUNT(*)::int FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id WHERE p.invoice_id IS NOT NULL AND i.id IS NULL) AS orphan_invoice_payments,
         (SELECT COUNT(*)::int FROM expenses e WHERE paid_amount <> COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0)) AS expense_payment_mismatches,
+        (SELECT COUNT(*)::int FROM products WHERE cost_price < 0 OR selling_price < 0 OR purchase_cost_price < 0 OR expense_percent < 0) AS invalid_product_money,
+        (SELECT COUNT(*)::int FROM product_batches WHERE cost_price < 0 OR quantity < 0 OR remaining_quantity < 0 OR remaining_quantity > quantity OR quantity <> trunc(quantity) OR remaining_quantity <> trunc(remaining_quantity)) AS invalid_batches,
+        (SELECT COUNT(*)::int FROM products p WHERE p.stock <> COALESCE((SELECT SUM(b.remaining_quantity) FROM product_batches b WHERE b.product_id = p.id), 0)) AS stock_cache_mismatches,
+        (SELECT COUNT(*)::int FROM invoice_items ii JOIN invoices i ON i.id = ii.invoice_id WHERE i.cancelled = false AND ii.quantity - ii.returned_qty <> COALESCE((SELECT SUM(sa.quantity) FROM sale_allocations sa WHERE sa.invoice_item_id = ii.id), 0)) AS allocation_quantity_mismatches,
+        (SELECT COUNT(*)::int FROM payments WHERE amount < 0 AND LOWER(method) = 'refund') AS legacy_refund_payment_count,
+        (SELECT COUNT(*)::int FROM returns WHERE id = 115) AS return_115_count,
+        (SELECT COUNT(*)::int FROM returns WHERE invoice_id = 115) AS invoice_115_return_count,
         (SELECT COUNT(*)::int FROM returns) AS historical_return_count
     `;
   }, { timeout: 15000 });
@@ -77,15 +84,11 @@ try {
           COUNT(DISTINCT t.product_id)::int AS matched_products,
           COALESCE(SUM(t.qty_change), 0) AS matched_quantity,
           COUNT(t.id) FILTER (WHERE t.reason ~ ('Return #' || r.id::text || '([^0-9]|$)'))::int AS exact_return_id_matches,
-          COUNT(t.id) FILTER (WHERE t.reference_id = r.invoice_id
-            AND ABS(EXTRACT(EPOCH FROM (t.created_at - r.created_at))) <= 600)::int AS same_invoice_time_candidates,
           COALESCE(BOOL_AND(t.reference_id = r.invoice_id), true) AS invoice_reference_matches
         FROM returns r
         LEFT JOIN inventory_transactions t
           ON t.type = 'return'
-          AND (t.reason ~ ('Return #' || r.id::text || '([^0-9]|$)')
-            OR (t.reference_id = r.invoice_id
-              AND ABS(EXTRACT(EPOCH FROM (t.created_at - r.created_at))) <= 600))
+          AND t.reason ~ ('Return #' || r.id::text || '([^0-9]|$)')
         GROUP BY r.id, r.invoice_id, r.total_value
         ORDER BY r.id
       `;

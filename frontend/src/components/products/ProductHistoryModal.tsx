@@ -337,7 +337,7 @@ export default function ProductHistoryModal({
                             className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100"
                           >
                             <X size={12} />
-                            <span>Удалить навсегда</span>
+                            <span>Отменить списание</span>
                           </button>
                         )}
                       </div>

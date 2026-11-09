@@ -3,6 +3,8 @@
 import { Decimal as DecimalConstructor } from 'decimal.js-light';
 export const Decimal = DecimalConstructor.clone({ precision: 80, rounding: DecimalConstructor.ROUND_HALF_UP });
 export type DecimalValue = InstanceType<typeof Decimal>;
+// Decimal strings are the wire format; numbers remain accepted for older callers.
+export type MoneyValue = string | number;
 const MAX_CENTS = new Decimal(Number.MAX_SAFE_INTEGER);
 export const MAX_STORED_CENTS = 999999999999; // PostgreSQL Decimal(12,2)
 export const financialError = (message: string) => Object.assign(new Error(message), { status: 400 });
@@ -37,6 +39,34 @@ export function decimal(value: unknown = 0): DecimalValue {
   if (Math.abs(exponent) > 30 || (match[2] + (match[3] || '')).length > 60) throw financialError('Monetary precision out of range');
   return new Decimal(text);
 }
+// Decimal values cross JSON as decimal strings. Counts, quantities, IDs and
+// chart geometry remain numbers; spelling is shared by browser and server.
+const financialKeys = new Set([
+  'amount', 'paid', 'debt', 'balance', 'price', 'cost', 'profit', 'revenue',
+  'sellingprice', 'costprice', 'purchasecostprice', 'packagesellingprice',
+  'costpriceperbaseunit', 'effectivecostpriceperbaseunit', 'costattime', 'sellingattime',
+  'discount', 'itemdiscount', 'expensepercent', 'allocatedorderdiscount', 'eligiblenetamount',
+  'totalamount', 'netamount', 'paidamount', 'returnedamount', 'originalamount',
+  'originalnetamount', 'originalpaidamount', 'totalprice', 'totalvalue', 'totalcost',
+  'refundamount', 'refundedamount', 'cashrefundamount', 'debtreduction', 'creditamount',
+  'totalinvoiced', 'totalpaid', 'totaldebt', 'purchasedtotal', 'paidtotal', 'debttotal',
+  'grosspaidamount', 'moneyrefundedamount', 'balancepaidamount', 'invoicebalance',
+  'salebasisamount', 'currentnetamount', 'debtamount', 'originalvalue', 'returnedvalue',
+  'totalsales', 'netsales', 'grosssales', 'costtotal', 'totalrevenue', 'totalprofit',
+  'totalexpenses', 'totaldebts', 'stockvaluation', 'inventoryvalue', 'salesbeforereturns',
+  'currentnet', 'grosscollections', 'netcollections', 'moneyrefunded', 'paymentreversals',
+  'returnpaymentadjustments', 'outstandingdebt', 'averagecheck', 'averagerevenue',
+]);
+export function financialJsonReplacer(key: string, value: unknown): unknown {
+  const normalized = key.toLowerCase().replace(/_/g, '');
+  if (financialKeys.has(normalized) && value !== null && value !== undefined && value !== '' &&
+      (typeof value === 'number' || typeof value === 'string')) return decimal(value).toString();
+  return value;
+}
+export function financialPayload<T>(value: T): T {
+  // JSON is the explicit transport boundary; Decimal.toJSON is a decimal string.
+  return JSON.parse(JSON.stringify(value, financialJsonReplacer));
+}
 export function toCents(value: unknown): number {
   const cents = decimal(value).times(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
   if (cents.abs().gt(MAX_CENTS)) throw financialError('Monetary amount out of range');
@@ -57,9 +87,12 @@ export function quantity(value: unknown, allowZero = false): number {
   return n;
 }
 export function percent(value: unknown): number {
-  const n = Number(value ?? 0);
-  if (!Number.isFinite(n) || n < 0 || n > 100) throw financialError('Discount must be between 0 and 100%');
-  return n;
+  return decimal(percentText(value)).toNumber();
+}
+export function percentText(value: unknown): string {
+  const n = decimal(value ?? 0);
+  if (n.lt(0) || n.gt(100)) throw financialError('Discount must be between 0 and 100%');
+  return n.toString();
 }
 export function discountedUnit(price: unknown, discount: unknown = 0): number {
   const cents = new Decimal(toCents(price));

@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import type { ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { AlertCircle, CheckCircle2, Clock, Receipt, TrendingUp, Wallet } from 'lucide-react';
@@ -36,7 +37,7 @@ type StaffStatsPanelProps = {
   error?: boolean;
   onRetry?: () => void;
   /** Admin only — omitted for the seller's own view. */
-  profit?: number;
+  profit?: import('../../utils/financial').MoneyValue;
   statusFilter?: StaffStatusFilter;
   onStatusFilterChange?: (status: StaffStatusFilter) => void;
 };
@@ -179,8 +180,8 @@ export default function StaffStatsPanel({
   }
 
   const debtInvoices = metrics.byStatus.partial.count + metrics.byStatus.unpaid.count;
-  const paidShare = metrics.soldAmount > 0 ? metrics.byStatus.paid.amount / metrics.soldAmount : 0;
-  const partialPaidShare = metrics.soldAmount > 0 ? metrics.byStatus.partial.paid / metrics.soldAmount : 0;
+  const paidShare = decimal(metrics.soldAmount).gt(0) ? decimal(metrics.byStatus.paid.amount).div(decimal(metrics.soldAmount)).toNumber() : 0;
+  const partialPaidShare = decimal(metrics.soldAmount).gt(0) ? decimal(metrics.byStatus.partial.paid).div(decimal(metrics.soldAmount)).toNumber() : 0;
 
   return (
     <div className={clsx('space-y-2 transition-opacity', loading && 'opacity-60')}>
@@ -194,7 +195,7 @@ export default function StaffStatsPanel({
         <MetricTile
           label="Продано"
           value={formatMoney(metrics.soldAmount)}
-          hint={metrics.returnedAmount > 0 ? `Возвраты −${formatMoney(metrics.returnedAmount)}` : 'TJS'}
+          hint={decimal(metrics.returnedAmount).gt(0) ? `Возвраты −${formatMoney(metrics.returnedAmount)}` : 'TJS'}
           icon={<TrendingUp size={13} />}
         />
         <MetricTile
@@ -209,7 +210,7 @@ export default function StaffStatsPanel({
           value={formatMoney(metrics.debtAmount)}
           hint={debtInvoices > 0 ? `${formatCount(debtInvoices)} накл. ждут оплаты` : 'Долгов нет'}
           icon={<AlertCircle size={13} />}
-          tone={metrics.debtAmount > 0 ? 'danger' : 'default'}
+          tone={decimal(metrics.debtAmount).gt(0) ? 'danger' : 'default'}
         />
       </div>
 
@@ -221,15 +222,15 @@ export default function StaffStatsPanel({
           {profit !== undefined && (
             <span className="font-semibold text-slate-500">
               Прибыль{' '}
-              <span className={clsx('font-mono font-black', profit >= 0 ? 'text-emerald-700' : 'text-rose-600')}>
+              <span className={clsx('font-mono font-black', decimal(profit).gte(0) ? 'text-emerald-700' : 'text-rose-600')}>
                 {formatMoney(profit)}
               </span>
             </span>
           )}
         </div>
         <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-rose-100" aria-hidden>
-          <div className="h-full bg-emerald-500" style={{ width: `${paidShare * 100}%` }} />
-          <div className="h-full bg-amber-400" style={{ width: `${partialPaidShare * 100}%` }} />
+          <div className="h-full bg-emerald-500" style={{ width: `${decimal(paidShare).times(decimal(100)).toNumber()}%` }} />
+          <div className="h-full bg-amber-400" style={{ width: `${decimal(partialPaidShare).times(decimal(100)).toNumber()}%` }} />
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-400">
           <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Оплачено</span>

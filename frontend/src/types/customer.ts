@@ -1,3 +1,4 @@
+import type { MoneyValue } from '../utils/financial';
 export interface Customer {
   id: number;
   customerType?: 'individual' | 'company';
@@ -11,11 +12,11 @@ export interface Customer {
   city?: string;
   address: string;
   notes: string;
-  total_invoiced: number;
-  total_paid: number;
-  balance: number;
+  total_invoiced: MoneyValue;
+  total_paid: MoneyValue;
+  balance: MoneyValue;
   invoice_count?: number;
-  average_invoice?: number;
+  average_invoice?: MoneyValue;
   customer_segment?: 'VIP' | 'Постоянный' | 'Обычный' | 'Новый' | string;
   last_purchase_at?: string | null;
   payment_efficiency?: number;
@@ -23,7 +24,7 @@ export interface Customer {
 
 export interface StatementPayment {
   id: number;
-  amount: number;
+  amount: MoneyValue;
   method: string;
   createdAt: string;
   staff_name: string;
@@ -31,18 +32,18 @@ export interface StatementPayment {
 
 export interface StatementReturn {
   id: number;
-  totalValue: number;
+  totalValue: MoneyValue;
   reason?: string;
   createdAt: string;
   staff_name: string;
 }
 
 export interface StatementItem {
-  allocatedOrderDiscount?: number;
+  allocatedOrderDiscount?: MoneyValue;
   id: number;
   product?: { name?: string };
   quantity: number;
-  totalPrice?: number;
+  totalPrice?: MoneyValue;
   totalBaseUnits?: number;
   packageQuantity?: number;
   extraUnitQuantity?: number;
@@ -53,7 +54,7 @@ export interface StatementItem {
   packageName?: string;
   baseUnitName?: string;
   returnedQty?: number;
-  sellingPrice: number;
+  sellingPrice: MoneyValue;
 }
 
 export interface StatementInvoice {
@@ -63,11 +64,11 @@ export interface StatementInvoice {
   returns?: any[];
   id: number;
   createdAt: string;
-  totalAmount: number;
-  discount: number;
-  netAmount: number;
-  paidAmount: number;
-  returnedAmount: number;
+  totalAmount: MoneyValue;
+  discount: MoneyValue;
+  netAmount: MoneyValue;
+  paidAmount: MoneyValue;
+  returnedAmount: MoneyValue;
   status: string;
   cancelled?: boolean;
   warehouse?: { name?: string; address?: string };
@@ -77,7 +78,7 @@ export interface StatementInvoice {
   staff_name?: string;
   user?: { id?: number; username?: string; name?: string };
   items?: StatementItem[];
-  invoiceBalance: number;
+  invoiceBalance: MoneyValue;
   paymentEvents: StatementPayment[];
   returnEvents: StatementReturn[];
 }

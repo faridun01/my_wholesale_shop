@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Clock, Phone, Printer, Search, Store, X } from 'lucide-react';
@@ -204,11 +205,11 @@ export default function CustomerDebtsView() {
       }
 
       if (sortBy === 'paid') {
-        return getCustomerPaidTotal(b) - getCustomerPaidTotal(a);
+        return decimal(getCustomerPaidTotal(b)).minus(decimal(getCustomerPaidTotal(a))).toNumber();
       }
 
       if (sortBy === 'purchased') {
-        return getCustomerPurchasedTotal(b) - getCustomerPurchasedTotal(a);
+        return decimal(getCustomerPurchasedTotal(b)).minus(decimal(getCustomerPurchasedTotal(a))).toNumber();
       }
 
       if (sortBy === 'lastPurchase') {
@@ -216,7 +217,7 @@ export default function CustomerDebtsView() {
       }
 
       if (sortBy === 'priority') {
-        const debtDiff = getCustomerDebtTotal(b) - getCustomerDebtTotal(a);
+        const debtDiff = decimal(getCustomerDebtTotal(b)).minus(decimal(getCustomerDebtTotal(a))).toNumber();
         if (debtDiff !== 0) {
           return debtDiff;
         }
@@ -229,12 +230,12 @@ export default function CustomerDebtsView() {
         return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
       }
 
-      const debtDiff = getCustomerDebtTotal(b) - getCustomerDebtTotal(a);
+      const debtDiff = decimal(getCustomerDebtTotal(b)).minus(decimal(getCustomerDebtTotal(a))).toNumber();
       if (debtDiff !== 0) {
         return debtDiff;
       }
 
-      return getCustomerPurchasedTotal(b) - getCustomerPurchasedTotal(a);
+      return decimal(getCustomerPurchasedTotal(b)).minus(decimal(getCustomerPurchasedTotal(a))).toNumber();
     });
   }, [filteredCustomers, sortBy, statusFilter]);
 
@@ -242,8 +243,8 @@ export default function CustomerDebtsView() {
     if (statusFilter === 'all') {
       return filteredCustomers.reduce(
         (acc, customer) => {
-          acc.totalDebt += getCustomerDebtTotal(customer);
-          acc.totalPaid += getCustomerPaidTotal(customer);
+          acc.totalDebt = decimal(acc.totalDebt).plus(decimal(getCustomerDebtTotal(customer))).toNumber();
+          acc.totalPaid = decimal(acc.totalPaid).plus(decimal(getCustomerPaidTotal(customer))).toNumber();
 
           if (customerMatchesPaymentFilter(customer, 'paid')) {
             acc.fullyPaidCount += 1;
@@ -273,10 +274,10 @@ export default function CustomerDebtsView() {
       (acc, customer) => {
         const purchasedTotal = getCustomerPurchasedTotalByFilter(customer, statusFilter);
         const paidTotal = getCustomerPaidTotalByFilter(customer, statusFilter);
-        const debtTotal = Math.max(0, purchasedTotal - paidTotal);
+        const debtTotal = Math.max(0, decimal(purchasedTotal).minus(decimal(paidTotal)).toNumber());
 
-        acc.totalDebt += debtTotal;
-        acc.totalPaid += paidTotal;
+        acc.totalDebt = decimal(acc.totalDebt).plus(decimal(debtTotal)).toNumber();
+        acc.totalPaid = decimal(acc.totalPaid).plus(decimal(paidTotal)).toNumber();
 
         if (statusFilter === 'paid') {
           acc.fullyPaidCount += 1;
@@ -360,12 +361,12 @@ export default function CustomerDebtsView() {
       ? invoice.items.reduce((sum: number, item: any) => {
           const storedLineTotal = Number(item?.totalPrice || 0);
           if (storedLineTotal > PAYMENT_EPSILON) {
-            return roundMoney(sum + storedLineTotal);
+            return roundMoney(decimal(sum).plus(decimal(storedLineTotal)).toNumber());
           }
 
           const quantity = Number(item?.quantity || 0);
           const price = Number(item?.sellingPrice || 0);
-          return roundMoney(sum + roundMoney(quantity * price));
+          return roundMoney(decimal(sum).plus(decimal(roundMoney(decimal(quantity).times(decimal(price)).toNumber()))).toNumber());
         }, 0)
       : 0;
 
@@ -375,7 +376,7 @@ export default function CustomerDebtsView() {
   const getInvoiceDiscountAmount = (invoice: StatementInvoice) => {
     const subtotal = getInvoiceSubtotal(invoice);
     const discount = Number(invoice?.discount || 0);
-    return roundMoney(subtotal * (discount / 100));
+    return roundMoney(decimal(subtotal).times(decimal(discount).div(decimal(100))).toNumber());
   };
 
   const getInvoiceNetAmount = (invoice: StatementInvoice) => {
@@ -387,7 +388,7 @@ export default function CustomerDebtsView() {
     const subtotal = getInvoiceSubtotal(invoice);
     const discountAmount = getInvoiceDiscountAmount(invoice);
     const returnedAmount = Number(invoice?.returnedAmount || 0);
-    const calculatedNet = roundMoney(subtotal - discountAmount - returnedAmount);
+    const calculatedNet = roundMoney(decimal(subtotal).minus(decimal(discountAmount)).minus(decimal(returnedAmount)).toNumber());
 
     return roundMoney(Math.max(0, calculatedNet));
   };
@@ -395,29 +396,30 @@ export default function CustomerDebtsView() {
   const getInvoicePaidAmount = (invoice: StatementInvoice) => Math.max(0, Number(invoice?.paidAmount || 0));
 
   const getInvoiceChangeAmount = (invoice: StatementInvoice) => {
-    const change = roundMoney(getInvoicePaidAmount(invoice) - getInvoiceNetAmount(invoice));
+    if (decimal(invoice.returnedAmount || 0).gt(0)) return 0;
+    const change = roundMoney(decimal(getInvoicePaidAmount(invoice)).minus(decimal(getInvoiceNetAmount(invoice))).toNumber());
     return change > PAYMENT_EPSILON ? change : 0;
   };
 
   const getInvoiceAppliedPaidAmount = (invoice: StatementInvoice) =>
-    Math.max(0, getInvoicePaidAmount(invoice) - getInvoiceChangeAmount(invoice));
+    Math.max(0, decimal(getInvoicePaidAmount(invoice)).minus(decimal(getInvoiceChangeAmount(invoice))).toNumber());
 
   const getInvoicesDebtTotal = (invoices: StatementInvoice[]) =>
     invoices.reduce((sum, invoice) => {
       const storedBalance = Math.max(0, Number(invoice?.invoiceBalance || 0));
       if (storedBalance > PAYMENT_EPSILON) {
-        return sum + storedBalance;
+        return decimal(sum).plus(decimal(storedBalance)).toNumber();
       }
 
-      const computedBalance = getInvoiceNetAmount(invoice) - getInvoiceAppliedPaidAmount(invoice);
-      return sum + (computedBalance > PAYMENT_EPSILON ? computedBalance : 0);
+      const computedBalance = decimal(getInvoiceNetAmount(invoice)).minus(decimal(getInvoiceAppliedPaidAmount(invoice))).toNumber();
+      return decimal(sum).plus(decimal(computedBalance > PAYMENT_EPSILON ? computedBalance : 0)).toNumber();
     }, 0);
 
   const getInvoicesNetTotal = (invoices: StatementInvoice[]) =>
-    invoices.reduce((sum, invoice) => sum + getInvoiceNetAmount(invoice), 0);
+    invoices.reduce((sum, invoice) => decimal(sum).plus(decimal(getInvoiceNetAmount(invoice))).toNumber(), 0);
 
   const getInvoicesPaidTotal = (invoices: StatementInvoice[]) =>
-    invoices.reduce((sum, invoice) => sum + getInvoiceAppliedPaidAmount(invoice), 0);
+    invoices.reduce((sum, invoice) => decimal(sum).plus(decimal(getInvoiceAppliedPaidAmount(invoice))).toNumber(), 0);
 
   const getVisibleInvoicesForCustomer = (customer: DebtCustomer) => {
     const historyInvoices = customerHistories[customer.id];
@@ -502,7 +504,7 @@ export default function CustomerDebtsView() {
               ? getInvoicesDebtTotal(invoices)
               : statusFilter === 'all'
                 ? getCustomerDebtTotal(customer)
-                : Math.max(0, purchasedTotal - paidTotal);
+                : Math.max(0, decimal(purchasedTotal).minus(decimal(paidTotal)).toNumber());
 
           return {
             id: customer.id,

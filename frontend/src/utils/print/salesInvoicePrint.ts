@@ -1,3 +1,4 @@
+import { decimal } from '../financial';
 import { ceilMoney, formatCount, formatMoney, roundMoney } from '../format';
 import { formatProductName } from '../productName';
 
@@ -131,7 +132,7 @@ export function getDiscountedUnitPrice(item: any) {
   const originalPrice = getUnitPrice(item);
   const lineDiscountPercent = Number(item?.lineDiscountPercent ?? item?.discountPercent ?? item?.discount ?? 0);
   if (lineDiscountPercent > 0) {
-    return ceilMoney(originalPrice * (1 - lineDiscountPercent / 100));
+    return ceilMoney(decimal(originalPrice).times(decimal(1).minus(decimal(lineDiscountPercent).div(decimal(100)))).toNumber());
   }
 
   return Number(item?.sellingPrice || 0);
@@ -143,7 +144,7 @@ export function getLineTotalBeforeInvoiceDiscount(item: any) {
     return roundMoneyValue(storedLineTotal);
   }
 
-  return roundMoneyValue(getItemBaseUnits(item) * getDiscountedUnitPrice(item));
+  return roundMoneyValue(decimal(getItemBaseUnits(item)).times(decimal(getDiscountedUnitPrice(item))).toNumber());
 }
 
 export function prepareSalesInvoiceData(
@@ -158,28 +159,28 @@ export function prepareSalesInvoiceData(
   const subtotalBeforeDiscount = invoiceItems.length
     ? roundMoneyValue(
         invoiceItems.reduce(
-          (sum: number, item: any) => roundMoneyValue(sum + roundMoneyValue(getItemBaseUnits(item) * getUnitPrice(item))),
+          (sum: number, item: any) => roundMoneyValue(decimal(sum).plus(decimal(roundMoneyValue(decimal(getItemBaseUnits(item)).times(decimal(getUnitPrice(item))).toNumber()))).toNumber()),
           0,
         ),
       )
     : Math.max(0, Number(options?.subtotal || 0));
 
   const itemsNetAmount = invoiceItems.length
-    ? roundMoneyValue(invoiceItems.reduce((sum: number, item: any) => sum + getLineTotalBeforeInvoiceDiscount(item), 0))
-    : roundMoneyValue(Math.max(0, Number(options?.subtotal || 0) - Number(options?.discountAmount || 0)));
+    ? roundMoneyValue(invoiceItems.reduce((sum: number, item: any) => decimal(sum).plus(decimal(getLineTotalBeforeInvoiceDiscount(item))).toNumber(), 0))
+    : roundMoneyValue(Math.max(0, decimal(options?.subtotal || 0).minus(decimal(options?.discountAmount || 0)).toNumber()));
 
   // Current receipts contain remaining lines. Return history is a separate document.
   const returnedAmount = 0;
   const stored = options?.netAmount ?? invoice?.netAmount;
   const hasStored = stored !== null && stored !== undefined && Number.isFinite(Number(stored));
-  const finalTotalAmount = hasStored ? Math.max(0, Number(stored)) : roundMoneyValue(Math.max(0, itemsNetAmount - roundMoneyValue(itemsNetAmount * Number(invoice?.discount || 0) / 100)));
-  const totalDiscountAmount = roundMoneyValue(Math.max(0, subtotalBeforeDiscount - finalTotalAmount));
+  const finalTotalAmount = hasStored ? Math.max(0, Number(stored)) : roundMoneyValue(Math.max(0, decimal(itemsNetAmount).minus(decimal(roundMoneyValue(decimal(itemsNetAmount).times(decimal(invoice?.discount || 0)).div(decimal(100)).toNumber()))).toNumber()));
+  const totalDiscountAmount = roundMoneyValue(Math.max(0, decimal(subtotalBeforeDiscount).minus(decimal(finalTotalAmount)).toNumber()));
   const isReturnDocument = Boolean(invoice?.isReturnDocument);
   const paidAmount = isReturnDocument
     ? 0
     : Math.max(0, Number(options?.appliedPaidAmount ?? invoice?.grossPaidAmount ?? invoice?.paidAmount ?? 0));
   const balancePaidAmount = Math.max(0, Number(invoice?.balancePaidAmount ?? invoice?.paidAmount ?? 0));
-  const balanceDue = roundMoneyValue(Math.max(0, finalTotalAmount - balancePaidAmount));
+  const balanceDue = roundMoneyValue(Math.max(0, decimal(finalTotalAmount).minus(decimal(balancePaidAmount)).toNumber()));
   const moneyRefundedAmount = Math.max(0, Number(invoice?.moneyRefundedAmount || 0));
   const returnPaymentAdjustments = Math.max(0, Number(invoice?.returnPaymentAdjustments || 0));
   const returnDebtReduction = Math.max(0, Number(invoice?.returnDebtReduction ?? invoice?.debtReduction ?? 0));

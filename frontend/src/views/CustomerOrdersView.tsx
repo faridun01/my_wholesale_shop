@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React from 'react';
 import toast from 'react-hot-toast';
 import { CheckCircle2, Clock3, Package, RefreshCw, Trash2 } from 'lucide-react';
@@ -133,7 +134,7 @@ export default function CustomerOrdersView() {
                       </p>
                     </div>
                     <p className="text-sm text-slate-600">{formatMoney(item.sellingPrice || 0)}</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatMoney(Number(item.quantity || 0) * Number(item.sellingPrice || 0))}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatMoney(decimal(item.quantity || 0).times(decimal(item.sellingPrice || 0)).toNumber())}</p>
                   </div>
                 ))}
               </div>

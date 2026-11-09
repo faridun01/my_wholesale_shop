@@ -31,12 +31,12 @@ const getDashboardProfit = async (warehouseId: number | null) => {
               SUM(
                 CASE WHEN alloc.total_alloc_cost IS NOT NULL
                   THEN alloc.total_alloc_cost
-                  ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
+                  ELSE ii.cost_price * (ii.quantity::numeric - ii.returned_qty::numeric)
                 END
               ) AS total_cost
             FROM invoice_items ii
             LEFT JOIN (
-              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity) AS total_alloc_cost
+              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity::numeric) AS total_alloc_cost
               FROM sale_allocations sa
               INNER JOIN product_batches pb ON pb.id = sa.batch_id
               GROUP BY sa.invoice_item_id
@@ -53,12 +53,12 @@ const getDashboardProfit = async (warehouseId: number | null) => {
               SUM(
                 CASE WHEN alloc.total_alloc_cost IS NOT NULL
                   THEN alloc.total_alloc_cost
-                  ELSE ii.cost_price * (ii.quantity - ii.returned_qty)
+                  ELSE ii.cost_price * (ii.quantity::numeric - ii.returned_qty::numeric)
                 END
               ) AS total_cost
             FROM invoice_items ii
             LEFT JOIN (
-              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity) AS total_alloc_cost
+              SELECT sa.invoice_item_id, SUM(pb.cost_price * sa.quantity::numeric) AS total_alloc_cost
               FROM sale_allocations sa
               INNER JOIN product_batches pb ON pb.id = sa.batch_id
               GROUP BY sa.invoice_item_id

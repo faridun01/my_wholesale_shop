@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import { returnPreview } from '../utils/returnPreview';
 import { addMoney } from '../utils/financial';
 import InvoiceFinancialHistory from '../components/sales/InvoiceFinancialHistory';
@@ -1009,13 +1010,6 @@ export default function SalesView() {
                       </div>
                     )}
 
-                    {false && (
-                      <div className="flex items-center justify-between text-rose-600">
-                        <span className="font-medium">Возвращено</span>
-                        <span className="font-bold font-mono">-{formatMoney(selectedInvoice.returnedAmount || 0)}</span>
-                      </div>
-                    )}
-
                     {getInvoiceChangeAmount(selectedInvoice) > PAYMENT_EPSILON && getInvoiceCustomerCredit(selectedInvoice) <= PAYMENT_EPSILON && (
                       <div className="flex items-center justify-between text-slate-600">
                         <span className="font-medium">Сдача клиенту</span>
@@ -1053,12 +1047,6 @@ export default function SalesView() {
                         <div className="flex items-center justify-between text-amber-700">
                           <span className="font-medium">Корректировка старого возврата:</span>
                           <span className="font-mono">{formatMoney(getInvoiceReturnPaymentAdjustments(selectedInvoice))}</span>
-                        </div>
-                      )}
-                      {getInvoiceCustomerCredit(selectedInvoice) > 0 && (
-                        <div className="flex items-center justify-between text-amber-700">
-                          <span className="font-medium">Кредит покупателя:</span>
-                          <span className="font-mono font-bold">{formatMoney(getInvoiceCustomerCredit(selectedInvoice))}</span>
                         </div>
                       )}
 
@@ -1759,13 +1747,13 @@ export default function SalesView() {
           const totalAmount = getInvoiceNetAmount(selectedInvoice);
           const balance = getInvoiceBalance(selectedInvoice);
           const numericAmount = parseMoneyInput(paymentAmount) ?? 0;
-          const alreadyPaid = Math.max(0, totalAmount - balance);
-          const remainingAfterPayment = Math.max(0, balance - numericAmount);
-          const isFullSettlement = balance > 0 && Math.abs(numericAmount - balance) < 0.01;
-          const isOverPayment = numericAmount > balance + 0.01;
-          const isPartialPayment = numericAmount > 0 && numericAmount < balance - 0.01;
-          const paidPercent = totalAmount > 0 ? Math.min(100, Math.round((alreadyPaid / totalAmount) * 100)) : 0;
-          const projectedPaidPercent = totalAmount > 0 ? Math.min(100, Math.round(((alreadyPaid + numericAmount) / totalAmount) * 100)) : 0;
+          const alreadyPaid = Math.max(0, decimal(totalAmount).minus(decimal(balance)).toNumber());
+          const remainingAfterPayment = Math.max(0, decimal(balance).minus(decimal(numericAmount)).toNumber());
+          const isFullSettlement = balance > 0 && Math.abs(decimal(numericAmount).minus(decimal(balance)).toNumber()) < 0.01;
+          const isOverPayment = numericAmount > decimal(balance).plus(decimal(0.01)).toNumber();
+          const isPartialPayment = numericAmount > 0 && numericAmount < decimal(balance).minus(decimal(0.01)).toNumber();
+          const paidPercent = totalAmount > 0 ? Math.min(100, Math.round(decimal(alreadyPaid).div(decimal(totalAmount)).times(decimal(100)).toNumber())) : 0;
+          const projectedPaidPercent = totalAmount > 0 ? Math.min(100, Math.round(decimal(alreadyPaid).plus(decimal(numericAmount)).div(decimal(totalAmount)).times(decimal(100)).toNumber())) : 0;
 
           return (
             <m.div
@@ -1854,7 +1842,7 @@ export default function SalesView() {
                           )}
                         </span>
                         <span className="font-mono text-slate-400">
-                          {formatMoney(alreadyPaid + numericAmount)} / {formatMoney(totalAmount)}
+                          {formatMoney(decimal(alreadyPaid).plus(decimal(numericAmount)).toNumber())} / {formatMoney(totalAmount)}
                         </span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden flex">
@@ -1865,7 +1853,7 @@ export default function SalesView() {
                         {projectedPaidPercent > paidPercent && (
                           <div
                             className="h-full bg-teal-400 transition-all duration-300 animate-pulse"
-                            style={{ width: `${Math.max(0, projectedPaidPercent - paidPercent)}%` }}
+                            style={{ width: `${Math.max(0, decimal(projectedPaidPercent).minus(decimal(paidPercent)).toNumber())}%` }}
                           />
                         )}
                       </div>
@@ -1924,7 +1912,7 @@ export default function SalesView() {
                       {balance > 10 && (
                         <button
                           type="button"
-                          onClick={() => setPaymentAmount(String(toFixedNumber(ceilMoney(balance / 2, 2))))}
+                          onClick={() => setPaymentAmount(String(toFixedNumber(ceilMoney(decimal(balance).div(decimal(2)).toNumber(), 2))))}
                           className="h-7 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-900 hover:text-white transition-all active:scale-95 text-center"
                           title="50% долга"
                         >
@@ -1963,7 +1951,7 @@ export default function SalesView() {
                     <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs font-semibold text-rose-800 shadow-2xs">
                       <AlertCircle size={15} className="text-rose-600 shrink-0" />
                       <div className="min-w-0">
-                        <p className="leading-tight">Сумма превышает долг на <span className="font-mono font-black">{formatMoney(numericAmount - balance)} TJS</span></p>
+                        <p className="leading-tight">Сумма превышает долг на <span className="font-mono font-black">{formatMoney(decimal(numericAmount).minus(decimal(balance)).toNumber())} TJS</span></p>
                         <p className="text-[10px] text-rose-600/80 font-normal mt-0.5">Максимальная сумма к оплате: {formatMoney(balance)} TJS</p>
                       </div>
                     </div>
@@ -2143,7 +2131,7 @@ export default function SalesView() {
                       const itemDiscount = Number(item.discount || 0);
                       const globalDiscount = Number(selectedInvoice?.discount || 0);
                       const basePrice = Number(item.sellingPrice ?? item.price ?? 0);
-                      const unitPriceAfterDiscount = basePrice * (1 - itemDiscount / 100) * (1 - globalDiscount / 100);
+                      const unitPriceAfterDiscount = decimal(basePrice).times(decimal(1).minus(decimal(itemDiscount).div(decimal(100)))).times(decimal(1).minus(decimal(globalDiscount).div(decimal(100)))).toNumber();
                       const itemUnits = item.returnMode === 'package' && packaging
                         ? Number(item.returnQty || 0) * packaging.unitsPerPackage
                         : Number(item.returnQty || 0);

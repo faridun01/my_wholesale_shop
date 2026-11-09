@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Banknote, CalendarDays, Filter, Pencil, Plus, RotateCcw, Search, Trash2, Wallet, Warehouse, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -87,7 +88,7 @@ export default function ExpensesView() {
   const [editForm, setEditForm] = useState(() => buildExpenseFormState(null, userWarehouseId ? String(userWarehouseId) : ''));
 
   const getExpenseRemaining = (expense: ExpenseRow) =>
-    Math.max(0, Number(expense.amount || 0) - Number(expense.paidAmount || 0));
+    Math.max(0, decimal(expense.amount || 0).minus(decimal(expense.paidAmount || 0)).toNumber());
 
   const getExpenseRefundLimit = (expense: ExpenseRow) =>
     Math.max(0, Number(expense.amount || 0));
@@ -156,9 +157,9 @@ export default function ExpensesView() {
     });
   }, [expenses, historyCategoryFilter, historyDateFrom, historyDateTo, historyStatusFilter, search]);
 
-  const totalAmount = filteredExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-  const totalPaidAmount = filteredExpenses.reduce((sum, expense) => sum + Number(expense.paidAmount || 0), 0);
-  const totalRemainingAmount = Math.max(0, totalAmount - totalPaidAmount);
+  const totalAmount = filteredExpenses.reduce((sum, expense) => decimal(sum).plus(decimal(expense.amount || 0)).toNumber(), 0);
+  const totalPaidAmount = filteredExpenses.reduce((sum, expense) => decimal(sum).plus(decimal(expense.paidAmount || 0)).toNumber(), 0);
+  const totalRemainingAmount = Math.max(0, decimal(totalAmount).minus(decimal(totalPaidAmount)).toNumber());
   const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / pageSize));
   const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -1081,7 +1082,7 @@ export default function ExpensesView() {
                 <div className="rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
                   <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
                   <p className="mt-0.5 text-base font-semibold text-slate-900">
-                    {formatMoney(Math.max(0, (parseMoneyInput(form.amount) ?? 0) - (parseMoneyInput(form.paidAmount) ?? 0)))}
+                    {formatMoney(Math.max(0, decimal(parseMoneyInput(form.amount) ?? 0).minus(decimal(parseMoneyInput(form.paidAmount) ?? 0)).toNumber()))}
                   </p>
                 </div>
 
@@ -1196,7 +1197,7 @@ export default function ExpensesView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentAmount(String(roundMoney(getExpenseRemaining(selectedExpenseForPayment) / 2)))}
+                    onClick={() => setPaymentAmount(String(roundMoney(decimal(getExpenseRemaining(selectedExpenseForPayment)).div(decimal(2)).toNumber())))}
                     className="rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
                   >
                     Половина
@@ -1482,7 +1483,7 @@ export default function ExpensesView() {
                 <div className="rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3.5 py-2.5">
                   <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">Остаток к оплате</p>
                   <p className="mt-0.5 text-base font-semibold text-slate-900">
-                    {formatMoney(Math.max(0, (parseMoneyInput(editForm.amount) ?? 0) - (parseMoneyInput(editForm.paidAmount) ?? 0)))}
+                    {formatMoney(Math.max(0, decimal(parseMoneyInput(editForm.amount) ?? 0).minus(decimal(parseMoneyInput(editForm.paidAmount) ?? 0)).toNumber()))}
                   </p>
                 </div>
 

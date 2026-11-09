@@ -1,4 +1,4 @@
-import { addMoney, lineTotal } from '../utils/financial.js';
+import { decimal, addMoney, lineTotal } from '../utils/financial.js';
 import { DEFAULT_CUSTOMER_NAME } from '../utils/defaultCustomer.js';
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -8,7 +8,7 @@ const PAYMENT_EPSILON = 0;
 export const safePercentChange = (current: number, previous: number) => {
   if (previous === 0 && current === 0) return 0;
   if (previous === 0) return 100;
-  return ((current - previous) / previous) * 100;
+  return decimal(current).minus(previous).div(previous).times(100).toNumber();
 };
 
 export const getInvoiceDebt = (netAmount: number, paidAmount: number) => {

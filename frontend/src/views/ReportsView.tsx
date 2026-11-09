@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import FinancialReconciliationPanel from '../components/sales/FinancialReconciliationPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -372,7 +373,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               : Number(row.total_value || 0);
 
       if (existing) {
-        existing.value += value;
+        existing.value = decimal(existing.value).plus(value).toNumber();
       } else {
         acc.push({ date: row.date, value });
       }
@@ -397,7 +398,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                 : Number(row.total_value || 0);
 
         if (existing) {
-          existing.value += value;
+          existing.value = decimal(existing.value).plus(value).toNumber();
         } else {
           acc.push({ name: formatProductName(row.product_name), value });
         }
@@ -412,15 +413,15 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     const totalQuantity = reportData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
     const totalValue = reportData.reduce((sum, row) => {
       if (reportType === 'sales') {
-        return sum + Number(row.total_sales || 0);
+        return decimal(sum).plus(decimal(row.total_sales || 0)).toNumber();
       }
 
       if (reportType === 'profit') {
-        return sum + Number(row.profit || 0);
+        return decimal(sum).plus(decimal(row.profit || 0)).toNumber();
       }
 
       if (reportType === 'writeoffs') {
-        return sum + Number(row.total_value || 0);
+        return decimal(sum).plus(decimal(row.total_value || 0)).toNumber();
       }
 
       return sum + Number(row.quantity || 0);
@@ -578,7 +579,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       setReportData((prev) => prev.filter((row) => Number(row.transaction_id || 0) !== transactionId));
       await loadReport();
       closeDeleteWriteoffModal();
-      toast.success('Списание удалено навсегда');
+      toast.success('Списание отменено, история сохранена');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Не удалось удалить списание');
     } finally {
@@ -600,8 +601,8 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
         if (existing) {
           existing.quantity += quantity;
-          existing.revenue += revenue;
-          existing.profit += profit;
+          existing.revenue = decimal(existing.revenue).plus(decimal(revenue)).toNumber();
+          existing.profit = decimal(existing.profit).plus(decimal(profit)).toNumber();
         } else {
           acc.push({
             name: formatProductName(row.product_name),
@@ -613,7 +614,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
         return acc;
       }, [])
-      .sort((a, b) => b.profit - a.profit);
+      .sort((a, b) => decimal(b.profit).minus(decimal(a.profit)).toNumber());
   }, [reportData, reportType]);
   const productProfitAnalytics = useMemo(() => {
     if (reportType !== 'profit' || !productProfitData.length) {
@@ -621,32 +622,32 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     }
 
     const totalQuantity = productProfitData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-    const totalRevenue = productProfitData.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
-    const totalProfit = productProfitData.reduce((sum, row) => sum + Number(row.profit || 0), 0);
-    const averageQuantity = totalQuantity / Math.max(productProfitData.length, 1);
-    const averageRevenue = totalRevenue / Math.max(productProfitData.length, 1);
-    const averageProfit = totalProfit / Math.max(productProfitData.length, 1);
+    const totalRevenue = productProfitData.reduce((sum, row) => decimal(sum).plus(decimal(row.revenue || 0)).toNumber(), 0);
+    const totalProfit = productProfitData.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
+    const averageQuantity = decimal(totalQuantity).div(decimal(Math.max(productProfitData.length, 1))).toNumber();
+    const averageRevenue = decimal(totalRevenue).div(decimal(Math.max(productProfitData.length, 1))).toNumber();
+    const averageProfit = decimal(totalProfit).div(decimal(Math.max(productProfitData.length, 1))).toNumber();
 
     const insights = productProfitData.map<ProductProfitInsight>((row) => {
       const quantity = Number(row.quantity || 0);
       const revenue = Number(row.revenue || 0);
       const profit = Number(row.profit || 0);
-      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      const profitPerUnit = quantity > 0 ? profit / quantity : 0;
-      const revenuePerUnit = quantity > 0 ? revenue / quantity : 0;
+      const margin = revenue > 0 ? decimal(profit).div(decimal(revenue)).times(decimal(100)).toNumber() : 0;
+      const profitPerUnit = quantity > 0 ? decimal(profit).div(decimal(quantity)).toNumber() : 0;
+      const revenuePerUnit = quantity > 0 ? decimal(revenue).div(decimal(quantity)).toNumber() : 0;
       const quantityShare = totalQuantity > 0 ? (quantity / totalQuantity) * 100 : 0;
-      const profitShare = totalProfit > 0 ? (profit / totalProfit) * 100 : 0;
+      const profitShare = totalProfit > 0 ? decimal(profit).div(decimal(totalProfit)).times(decimal(100)).toNumber() : 0;
       const normalizedMargin = Math.max(0, Math.min(margin, 100));
-      const efficiencyScore = quantityShare * 0.35 + Math.max(0, profitShare) * 0.45 + normalizedMargin * 0.2;
+      const efficiencyScore = decimal(quantityShare).times(decimal(0.35)).plus(decimal(Math.max(0, profitShare)).times(decimal(0.45))).plus(decimal(normalizedMargin).times(decimal(0.2))).toNumber();
 
       let inefficiencyReason: string | null = null;
       if (profit <= 0) {
         inefficiencyReason = 'Убыточный товар: продажи есть, но прибыль не формируется.';
       } else if (margin < 8 && quantity >= averageQuantity) {
         inefficiencyReason = 'Продаётся часто, но маржа слишком низкая для такого оборота.';
-      } else if (quantityShare > profitShare * 1.8 && quantity >= averageQuantity) {
+      } else if (quantityShare > decimal(profitShare).times(decimal(1.8)).toNumber() && quantity >= averageQuantity) {
         inefficiencyReason = 'Объём продаж высокий, но вклад в прибыль заметно ниже доли продаж.';
-      } else if (revenue >= averageRevenue && profit < averageProfit * 0.5) {
+      } else if (revenue >= averageRevenue && profit < decimal(averageProfit).times(decimal(0.5)).toNumber()) {
         inefficiencyReason = 'Выручка нормальная, но чистый доход остаётся слабым.';
       }
 
@@ -666,14 +667,14 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     });
 
     const topByQuantity = [...insights].sort((a, b) => b.quantity - a.quantity).slice(0, 8);
-    const topByProfit = [...insights].sort((a, b) => b.profit - a.profit).slice(0, 8);
+    const topByProfit = [...insights].sort((a, b) => decimal(b.profit).minus(decimal(a.profit)).toNumber()).slice(0, 8);
     const topByMargin = [...insights]
       .filter((row) => row.revenue > 0 && row.profit > 0)
       .sort((a, b) => {
         if (b.margin === a.margin) {
-          return b.profit - a.profit;
+          return decimal(b.profit).minus(decimal(a.profit)).toNumber();
         }
-        return b.margin - a.margin;
+        return decimal(b.margin).minus(decimal(a.margin)).toNumber();
       })
       .slice(0, 8);
     const topByEfficiency = [...insights].sort((a, b) => b.efficiencyScore - a.efficiencyScore).slice(0, 8);
@@ -682,11 +683,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       .sort((a, b) => {
         if (a.profit <= 0 && b.profit > 0) return -1;
         if (b.profit <= 0 && a.profit > 0) return 1;
-        return a.margin - b.margin;
+        return decimal(a.margin).minus(decimal(b.margin)).toNumber();
       })
       .slice(0, 8);
 
-    const weightedMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    const weightedMargin = totalRevenue > 0 ? decimal(totalProfit).div(decimal(totalRevenue)).times(decimal(100)).toNumber() : 0;
     const demandLeader = topByQuantity[0] || null;
     const profitLeader = topByProfit[0] || null;
     const marginLeader = topByMargin[0] || null;
@@ -715,7 +716,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     }
 
     const totalQuantity = reportData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-    const totalValue = reportData.reduce((sum, row) => sum + Number(row.total_value || 0), 0);
+    const totalValue = reportData.reduce((sum, row) => decimal(sum).plus(decimal(row.total_value || 0)).toNumber(), 0);
 
     const aggregateRows = (getKey: (row: ReportRow) => string, getLabel?: (row: ReportRow) => string) =>
       reportData
@@ -727,7 +728,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
           if (existing) {
             existing.quantity += quantity;
-            existing.value += value;
+            existing.value = decimal(existing.value).plus(value).toNumber();
             existing.count += 1;
           } else {
             acc.push({
@@ -784,7 +785,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       if (reportType === 'sales') {
         const quantity = Number(row.quantity || 0);
         const totalProfit = Number(row.profit || 0);
-        const profitPerUnit = quantity > 0 ? totalProfit / quantity : 0;
+        const profitPerUnit = quantity > 0 ? decimal(totalProfit).div(decimal(quantity)).toNumber() : 0;
 
         return [
           new Date(row.date).toLocaleDateString('ru-RU'),
@@ -805,7 +806,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       if (reportType === 'profit') {
         const quantity = Number(row.quantity || 0);
         const totalProfit = Number(row.profit || 0);
-        const profitPerUnit = quantity > 0 ? totalProfit / quantity : 0;
+        const profitPerUnit = quantity > 0 ? decimal(totalProfit).div(decimal(quantity)).toNumber() : 0;
 
         return [
           new Date(row.date).toLocaleDateString('ru-RU'),
@@ -858,20 +859,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
     const totalValue = rows.reduce((sum, row) => {
       if (reportType === 'sales') {
-        return sum + Number(row.total_sales || 0);
+        return decimal(sum).plus(decimal(row.total_sales || 0)).toNumber();
       }
 
       if (reportType === 'profit') {
-        return sum + Number(row.profit || 0);
+        return decimal(sum).plus(decimal(row.profit || 0)).toNumber();
       }
 
       if (reportType === 'writeoffs') {
-        return sum + Number(row.total_value || 0);
+        return decimal(sum).plus(decimal(row.total_value || 0)).toNumber();
       }
 
       return sum + Number(row.quantity || 0);
     }, 0);
-    const totalProfit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+    const totalProfit = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
 
     const baseRows = [
       ['Отчёт', currentMeta.title],
@@ -893,16 +894,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const buildDetailTotalRow = (rows: ReportRow[]) => {
     const totalRevenue = rows.reduce((sum, row) => {
       if (reportType === 'sales') {
-        return sum + Number(row.total_sales || 0);
+        return decimal(sum).plus(decimal(row.total_sales || 0)).toNumber();
       }
 
       if (reportType === 'profit') {
-        return sum + Number(row.net_sales || 0);
+        return decimal(sum).plus(decimal(row.net_sales || 0)).toNumber();
       }
 
-      return sum + Number(row.total_value || 0);
+      return decimal(sum).plus(decimal(row.total_value || 0)).toNumber();
     }, 0);
-    const totalProfit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+    const totalProfit = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
 
     if (reportType === 'sales' || reportType === 'profit') {
       return [
@@ -955,16 +956,16 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
         const name = formatProductName(row.product_name);
         const existing = acc.find((item) => item.name === name);
         const quantity = Number(row.quantity || 0);
-        const costTotal = Number(row.cost_price || 0) * quantity;
+        const costTotal = decimal(row.cost_price || 0).times(decimal(quantity)).toNumber();
         const revenue = reportType === 'profit' ? Number(row.net_sales || 0) : Number(row.total_sales || row.net_sales || 0);
         const profit = Number(row.profit || 0);
 
         if (existing) {
           existing.quantity += quantity;
           existing.salesCount += 1;
-          existing.costTotal += costTotal;
-          existing.revenue += revenue;
-          existing.profit += profit;
+          existing.costTotal = decimal(existing.costTotal).plus(decimal(costTotal)).toNumber();
+          existing.revenue = decimal(existing.revenue).plus(decimal(revenue)).toNumber();
+          existing.profit = decimal(existing.profit).plus(decimal(profit)).toNumber();
         } else {
           acc.push({
             name,
@@ -978,17 +979,17 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
 
         return acc;
       }, [])
-      .sort((a, b) => b.revenue - a.revenue);
+      .sort((a, b) => decimal(b.revenue).minus(decimal(a.revenue)).toNumber());
 
   const buildProductSalesSummaryRows = (rows: ProductSalesSummaryRow[]): Array<Array<string | number>> => {
     const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
     const totalSalesCount = rows.reduce((sum, row) => sum + Number(row.salesCount || 0), 0);
-    const totalCost = rows.reduce((sum, row) => sum + Number(row.costTotal || 0), 0);
-    const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
-    const totalProfit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
-    const averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
-    const averagePrice = totalQuantity > 0 ? totalRevenue / totalQuantity : 0;
-    const averageProfit = totalQuantity > 0 ? totalProfit / totalQuantity : 0;
+    const totalCost = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.costTotal || 0)).toNumber(), 0);
+    const totalRevenue = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.revenue || 0)).toNumber(), 0);
+    const totalProfit = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
+    const averageCost = totalQuantity > 0 ? decimal(totalCost).div(decimal(totalQuantity)).toNumber() : 0;
+    const averagePrice = totalQuantity > 0 ? decimal(totalRevenue).div(decimal(totalQuantity)).toNumber() : 0;
+    const averageProfit = totalQuantity > 0 ? decimal(totalProfit).div(decimal(totalQuantity)).toNumber() : 0;
 
     return [
       ...rows.map((row) => {
@@ -997,9 +998,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           row.name,
           formatCount(quantity),
           formatCount(row.salesCount),
-          toFixedNumber(quantity > 0 ? row.costTotal / quantity : 0),
-          toFixedNumber(quantity > 0 ? row.revenue / quantity : 0),
-          toFixedNumber(quantity > 0 ? row.profit / quantity : 0),
+          toFixedNumber(quantity > 0 ? decimal(row.costTotal).div(decimal(quantity)).toNumber() : 0),
+          toFixedNumber(quantity > 0 ? decimal(row.revenue).div(decimal(quantity)).toNumber() : 0),
+          toFixedNumber(quantity > 0 ? decimal(row.profit).div(decimal(quantity)).toNumber() : 0),
           toFixedNumber(row.revenue),
           toFixedNumber(row.profit),
         ];
@@ -1078,18 +1079,18 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
   const buildProductSummaryExcelRows = (rows: ProductSalesSummaryRow[]) => {
     const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
     const totalSalesCount = rows.reduce((sum, row) => sum + Number(row.salesCount || 0), 0);
-    const totalCost = rows.reduce((sum, row) => sum + Number(row.costTotal || 0), 0);
-    const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
-    const totalProfit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+    const totalCost = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.costTotal || 0)).toNumber(), 0);
+    const totalRevenue = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.revenue || 0)).toNumber(), 0);
+    const totalProfit = rows.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
 
     return [
       buildExcelRow(['№', 'Товар', 'Кол-во продано', 'Кол-во продаж', 'Себестоимость за 1 шт', 'Цена продажи за 1 шт', 'Прибыль за 1 шт', 'Сумма себестоимости', 'Сумма продаж', 'Общая прибыль', 'Рентабельность %'], { style: 'Header' }),
       ...rows.map((row, index) => {
         const quantity = Number(row.quantity || 0);
-        const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
-        const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
-        const profitPerUnit = quantity > 0 ? row.profit / quantity : 0;
-        const margin = row.revenue > 0 ? (row.profit / row.revenue) * 100 : 0;
+        const costPerUnit = quantity > 0 ? decimal(row.costTotal).div(decimal(quantity)).toNumber() : 0;
+        const salePerUnit = quantity > 0 ? decimal(row.revenue).div(decimal(quantity)).toNumber() : 0;
+        const profitPerUnit = quantity > 0 ? decimal(row.profit).div(decimal(quantity)).toNumber() : 0;
+        const margin = row.revenue > 0 ? decimal(row.profit).div(decimal(row.revenue)).times(decimal(100)).toNumber() : 0;
 
         return `<Row>
           ${buildExcelCell(index + 1, { type: 'Number', style: 'Center' })}
@@ -1102,20 +1103,20 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
           ${buildExcelCell(row.costTotal, { type: 'Number', style: 'Money' })}
           ${buildExcelCell(row.revenue, { type: 'Number', style: 'Money' })}
           ${buildExcelCell(row.profit, { type: 'Number', style: getExcelMoneyFormatStyle(row.profit) })}
-          ${buildExcelCell(margin / 100, { type: 'Number', style: 'Percent' })}
+          ${buildExcelCell(decimal(margin).div(decimal(100)).toNumber(), { type: 'Number', style: 'Percent' })}
         </Row>`;
       }),
       `<Row>
         ${buildExcelCell('ИТОГО', { style: 'Total', mergeAcross: 1 })}
         ${buildExcelCell(totalQuantity, { type: 'Number', style: 'TotalQty' })}
         ${buildExcelCell(totalSalesCount, { type: 'Number', style: 'TotalQty' })}
-        ${buildExcelCell(totalQuantity > 0 ? totalCost / totalQuantity : 0, { type: 'Number', style: 'TotalMoney' })}
-        ${buildExcelCell(totalQuantity > 0 ? totalRevenue / totalQuantity : 0, { type: 'Number', style: 'TotalMoney' })}
-        ${buildExcelCell(totalQuantity > 0 ? totalProfit / totalQuantity : 0, { type: 'Number', style: 'TotalMoney' })}
+        ${buildExcelCell(totalQuantity > 0 ? decimal(totalCost).div(decimal(totalQuantity)).toNumber() : 0, { type: 'Number', style: 'TotalMoney' })}
+        ${buildExcelCell(totalQuantity > 0 ? decimal(totalRevenue).div(decimal(totalQuantity)).toNumber() : 0, { type: 'Number', style: 'TotalMoney' })}
+        ${buildExcelCell(totalQuantity > 0 ? decimal(totalProfit).div(decimal(totalQuantity)).toNumber() : 0, { type: 'Number', style: 'TotalMoney' })}
         ${buildExcelCell(totalCost, { type: 'Number', style: 'TotalMoney' })}
         ${buildExcelCell(totalRevenue, { type: 'Number', style: 'TotalMoney' })}
         ${buildExcelCell(totalProfit, { type: 'Number', style: 'TotalMoney' })}
-        ${buildExcelCell(totalRevenue > 0 ? totalProfit / totalRevenue : 0, { type: 'Number', style: 'TotalPercent' })}
+        ${buildExcelCell(totalRevenue > 0 ? decimal(totalProfit).div(decimal(totalRevenue)).toNumber() : 0, { type: 'Number', style: 'TotalPercent' })}
       </Row>`,
     ];
   };
@@ -1129,11 +1130,11 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     const { detailHeaders, detailRows } = buildReportRows(reportData);
     const totalQuantity = reportData.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
     const totalRevenue = reportData.reduce((sum, row) => {
-      if (reportType === 'profit') return sum + Number(row.net_sales || 0);
-      if (reportType === 'sales') return sum + Number(row.total_sales || 0);
-      return sum + Number(row.total_value || 0);
+      if (reportType === 'profit') return decimal(sum).plus(decimal(row.net_sales || 0)).toNumber();
+      if (reportType === 'sales') return decimal(sum).plus(decimal(row.total_sales || 0)).toNumber();
+      return decimal(sum).plus(decimal(row.total_value || 0)).toNumber();
     }, 0);
-    const totalProfit = reportData.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+    const totalProfit = reportData.reduce((sum, row) => decimal(sum).plus(decimal(row.profit || 0)).toNumber(), 0);
 
     const summaryRows = [
       buildExcelRow([`Отчет: ${currentMeta.title}`, '', '', '', '', '', '', '', '', '', ''], { style: 'Title' }),
@@ -1170,7 +1171,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       buildExcelRow(['Общее количество', totalQuantity], { numericColumns: [1] }),
       buildExcelRow(['Сумма продаж / сумма периода', totalRevenue], { numericColumns: [1] }),
       buildExcelRow(['Общая прибыль', totalProfit], { numericColumns: [1] }),
-      buildExcelRow(['Рентабельность', totalRevenue > 0 ? totalProfit / totalRevenue : 0], { numericColumns: [1] }),
+      buildExcelRow(['Рентабельность', totalRevenue > 0 ? decimal(totalProfit).div(decimal(totalRevenue)).toNumber() : 0], { numericColumns: [1] }),
     ];
 
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -1310,12 +1311,12 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
     }
     return [...list].sort((a, b) => {
       if (summarySortBy === 'profit') {
-        return b.profit - a.profit;
+        return decimal(b.profit).minus(decimal(a.profit)).toNumber();
       }
       if (summarySortBy === 'quantity') {
         return b.quantity - a.quantity;
       }
-      return b.revenue - a.revenue;
+      return decimal(b.revenue).minus(decimal(a.revenue)).toNumber();
     });
   }, [reportData, reportType, summarySearchTerm, summarySortBy]);
 
@@ -1324,9 +1325,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
       (totals, row) => ({
         quantity: totals.quantity + Number(row.quantity || 0),
         salesCount: totals.salesCount + Number(row.salesCount || 0),
-        costTotal: totals.costTotal + Number(row.costTotal || 0),
-        revenue: totals.revenue + Number(row.revenue || 0),
-        profit: totals.profit + Number(row.profit || 0),
+        costTotal: decimal(totals.costTotal).plus(decimal(row.costTotal || 0)).toNumber(),
+        revenue: decimal(totals.revenue).plus(decimal(row.revenue || 0)).toNumber(),
+        profit: decimal(totals.profit).plus(decimal(row.profit || 0)).toNumber(),
       }),
       { quantity: 0, salesCount: 0, costTotal: 0, revenue: 0, profit: 0 },
     );
@@ -1657,10 +1658,10 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               {paginatedSummaryRows.map((row, index) => {
                 const globalIndex = (summaryPage - 1) * summaryPageSize + index + 1;
                 const quantity = Number(row.quantity || 0);
-                const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
-                const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
-                const profitPerUnit = quantity > 0 ? row.profit / quantity : 0;
-                const marginPercent = row.revenue > 0 ? (row.profit / row.revenue) * 100 : 0;
+                const costPerUnit = quantity > 0 ? decimal(row.costTotal).div(decimal(quantity)).toNumber() : 0;
+                const salePerUnit = quantity > 0 ? decimal(row.revenue).div(decimal(quantity)).toNumber() : 0;
+                const profitPerUnit = quantity > 0 ? decimal(row.profit).div(decimal(quantity)).toNumber() : 0;
+                const marginPercent = row.revenue > 0 ? decimal(row.profit).div(decimal(row.revenue)).times(decimal(100)).toNumber() : 0;
 
                 return (
                   <article
@@ -1773,9 +1774,9 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   {paginatedSummaryRows.map((row, index) => {
                     const globalIndex = (summaryPage - 1) * summaryPageSize + index + 1;
                     const quantity = Number(row.quantity || 0);
-                    const costPerUnit = quantity > 0 ? row.costTotal / quantity : 0;
-                    const salePerUnit = quantity > 0 ? row.revenue / quantity : 0;
-                    const profitPerUnit = quantity > 0 ? row.profit / quantity : 0;
+                    const costPerUnit = quantity > 0 ? decimal(row.costTotal).div(decimal(quantity)).toNumber() : 0;
+                    const salePerUnit = quantity > 0 ? decimal(row.revenue).div(decimal(quantity)).toNumber() : 0;
+                    const profitPerUnit = quantity > 0 ? decimal(row.profit).div(decimal(quantity)).toNumber() : 0;
 
                     return (
                       <tr key={`${row.name}-${index}`} className="transition-colors hover:bg-slate-50/80">
@@ -1810,13 +1811,13 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatCount(productSalesSummaryTotals.quantity)}</td>
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatCount(productSalesSummaryTotals.salesCount)}</td>
                       <td className="py-2 px-2.5 text-right tabular-nums">
-                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.costTotal / productSalesSummaryTotals.quantity : 0)}
+                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? decimal(productSalesSummaryTotals.costTotal).div(decimal(productSalesSummaryTotals.quantity)).toNumber() : 0)}
                       </td>
                       <td className="py-2 px-2.5 text-right tabular-nums">
-                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.revenue / productSalesSummaryTotals.quantity : 0)}
+                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? decimal(productSalesSummaryTotals.revenue).div(decimal(productSalesSummaryTotals.quantity)).toNumber() : 0)}
                       </td>
                       <td className="py-2 px-2.5 text-right tabular-nums">
-                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? productSalesSummaryTotals.profit / productSalesSummaryTotals.quantity : 0)}
+                        {formatMoney(productSalesSummaryTotals.quantity > 0 ? decimal(productSalesSummaryTotals.profit).div(decimal(productSalesSummaryTotals.quantity)).toNumber() : 0)}
                       </td>
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.costTotal)}</td>
                       <td className="py-2 px-2.5 text-right tabular-nums">{formatMoney(productSalesSummaryTotals.revenue)}</td>
@@ -2095,7 +2096,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-[#f4f5fb] px-6 py-4">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">Удалить списание</h3>
+                  <h3 className="text-base font-semibold text-slate-900">Отменить списание</h3>
                   <p className="text-xs text-slate-500">{formatProductName(deleteWriteoffRow.product_name)}</p>
                 </div>
                 <button
@@ -2108,7 +2109,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
               </div>
               <div className="space-y-3 p-6">
                 <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-3.5 text-xs font-medium text-rose-800">
-                  Удаление необратимо. Остаток и приход будут восстановлены, но запись списания вернуть потом нельзя.
+                  Остаток будет восстановлен. Исходное списание и операция отмены сохранятся в истории.
                 </div>
                 <div className="rounded-2xl border border-slate-200/70 bg-[#f4f5fb] p-3.5 text-xs text-slate-600">
                   Количество: {Number(deleteWriteoffRow.quantity || 0)} • Склад: {deleteWriteoffRow.warehouse_name || '-'}
@@ -2128,7 +2129,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   disabled={isSubmittingWriteoffAction}
                   className="rounded-full bg-rose-600 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 disabled:opacity-50"
                 >
-                  {isSubmittingWriteoffAction ? 'Удаление...' : 'Удалить навсегда'}
+                  {isSubmittingWriteoffAction ? 'Отмена...' : 'Отменить списание'}
                 </button>
               </div>
             </div>

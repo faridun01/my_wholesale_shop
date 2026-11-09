@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
+import express from 'express';
+import { once } from 'node:events';
+import { ReferenceInvoice } from '../testing/financial-reference.js';
+import jwt from 'jsonwebtoken';
+import { financialJsonReplacer } from '../utils/financial.js';
 // This suite NEVER uses DATABASE_URL. Provision/migrate an isolated database whose
 // name ends in _financial_test, then explicitly supply FINANCIAL_TEST_DATABASE_URL.
 const testUrl = process.env.FINANCIAL_TEST_DATABASE_URL;
@@ -25,6 +30,251 @@ suite('PostgreSQL financial transaction integration', () => {
   });
   afterAll(async () => { await db?.$disconnect(); delete (globalThis as any).prisma; });
   const sale = () => service.createInvoice({ customerId, userId, warehouseId, items: [{ productId, quantity: 3, sellingPrice: .05 }], discount: 10, paidAmount: .13, paymentMethod: 'card', idempotencyKey: crypto.randomUUID() });
+  async function withApi(run: (request: (path: string, body?: any, role?: string, method?: string) => Promise<{ status: number; data: any }>) => Promise<void>) {
+    // Real loopback HTTP, production routers and PostgreSQL. Authentication is
+    // replaced by the isolated test actor; authentication itself is outside this suite.
+    const app = express(); app.set('json replacer', financialJsonReplacer); app.use(express.json());
+    app.use((req, _res, next) => { (req as any).user = { id: userId, role: req.headers['x-test-role'] || 'ADMIN', warehouseId, customerId }; next(); });
+    app.use('/invoices', (await import('../routes/invoices.routes.js')).default);
+    app.use('/payments', (await import('../routes/payments.routes.js')).default);
+    app.use('/orders', (await import('../routes/customer-orders.routes.js')).default);
+    app.use('/products', (await import('../routes/products.routes.js')).default);
+    app.use('/reports', (await import('../routes/reports.routes.js')).default);
+    app.use((error: any, _req: any, res: any, _next: any) => res.status(error.status || 400).json({ error: error.message }));
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const address = server.address() as { port: number };
+    try {
+      await run(async (path, body, role = 'ADMIN', method = body === undefined ? 'GET' : 'POST') => {
+        const token = jwt.sign({ id: userId }, process.env.JWT_SECRET!, { issuer: process.env.JWT_ISSUER || 'my-wholesale-shop', audience: process.env.JWT_AUDIENCE || 'my-wholesale-shop-users' });
+        const response = await fetch(`http://127.0.0.1:${address.port}${path}`, { method, headers: { 'Content-Type': 'application/json', 'x-test-role': role, Authorization: `Bearer ${token}` }, body: body === undefined ? undefined : JSON.stringify(body) });
+        return { status: response.status, data: await response.json() };
+      });
+    } finally { await new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections(); }); }
+  }
+  it('HTTP sale, three payments and goods returns reconcile with the independent model and reports', async () => {
+    await withApi(async request => {
+      const stockBefore = Number((await db.product.findUniqueOrThrow({ where: { id: productId } })).stock);
+      const model = new ReferenceInvoice([{ quantity: 20, sellingPrice: '50' }], '0');
+      const created = await request('/invoices', { customerId, warehouseId, items: [{ productId, quantity: 20, sellingPrice: '50.00' }], idempotencyKey: crypto.randomUUID() });
+      expect(created.status).toBe(201); const id = created.data.id;
+      for (let n = 0; n < 3; n++) {
+        model.pay('200');
+        expect((await request('/payments', { customer_id: customerId, invoice_id: id, amount: '200.00', method: ['cash', 'card', 'transfer'][n], idempotency_key: crypto.randomUUID() })).status).toBe(201);
+      }
+      const original = await db.invoiceItem.findFirstOrThrow({ where: { invoiceId: id } });
+      for (const qty of [3, 8]) {
+        model.returnGoods(0, qty);
+        const body = { items: [{ invoiceItemId: original.id, quantity: qty }], reason: 'HTTP reference lifecycle', idempotencyKey: crypto.randomUUID() };
+        const first = await request(`/invoices/${id}/return`, body);
+        expect(first.status).toBe(200);
+        expect((await request(`/invoices/${id}/return`, body)).data).toEqual(first.data);
+        const detail = (await request(`/invoices/${id}`)).data;
+        expect(Number(detail.netAmount)).toBe(model.net.div(100).toNumber());
+        expect(Number(detail.paidAmount)).toBe(600);
+        expect(Number(detail.financialSummary.debtAmount)).toBe(model.debt.div(100).toNumber());
+        expect(Number(detail.financialSummary.customerCredit || 0)).toBe(0);
+        expect(Number(detail.originalInvoice.netAmount)).toBe(1000);
+        expect(detail.payments).toHaveLength(3);
+        const state = await db.invoice.findUniqueOrThrow({ where: { id } });
+        expect(Number(state.netAmount)).toBe(Number(detail.netAmount));
+        expect(Number((await db.payment.aggregate({ where: { invoiceId: id }, _sum: { amount: true } }))._sum.amount)).toBe(600);
+        const rows = await request(`/reports/sales?warehouse_id=${warehouseId}`);
+        expect(rows.status).toBe(200);
+        const ownRows = rows.data.filter((row: any) => row.invoice_id === id);
+        expect(ownRows.reduce((sum: number, row: any) => sum + Math.round(Number(row.total_sales) * 100), 0)).toBe(model.net.toNumber());
+      }
+      expect(await db.return.count({ where: { invoiceId: id } })).toBe(2);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: productId } })).stock)).toBe(stockBefore - 9);
+    });
+  });
+  it('HTTP rejects nonzero sub-cent tax and preserves an explicitly free customer order', async () => {
+    await withApi(async request => {
+      const base = { customerId, warehouseId, items: [{ productId, quantity: 1, sellingPrice: '0.00' }], idempotencyKey: crypto.randomUUID() };
+      expect((await request('/invoices', { ...base, tax: '0.004' })).status).toBe(400);
+      const order = await request('/orders', { ...base, items: [{ productId, quantity: 1, sellingPrice: 0 }], idempotency_key: crypto.randomUUID() }, 'CUSTOMER');
+      expect(order.status).toBe(201);
+      expect(Number(order.data.totalAmount)).toBe(0);
+      expect(Number(order.data.items[0].sellingPrice)).toBe(0);
+    });
+  });
+  it('HTTP rejects invalid negative customer-order discounts instead of silently making them zero', async () => {
+    await withApi(async request => {
+      const response = await request('/orders', { warehouseId, items: [{ productId, quantity: 1, sellingPrice: 10, discount: -1 }], idempotency_key: crypto.randomUUID() }, 'CUSTOMER');
+      expect(response.status).toBe(400);
+    });
+  });
+  it('HTTP serializes different concurrent payments so their sum cannot exceed debt', async () => {
+    await withApi(async request => {
+      const created = await request('/invoices', { customerId, warehouseId, items: [{ productId, quantity: 2, sellingPrice: 100 }], idempotencyKey: crypto.randomUUID() });
+      const invoiceId = created.data.id;
+      const results = await Promise.all([1, 2].map(() => request('/payments', { customer_id: customerId, invoice_id: invoiceId, amount: '150.00', method: 'cash', idempotency_key: crypto.randomUUID() })));
+      expect(results.map(r => r.status).sort()).toEqual([201, 400]);
+      const state = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+      expect(Number(state.paidAmount)).toBe(150);
+      expect(await db.payment.count({ where: { invoiceId } })).toBe(1);
+    });
+  });
+  it('SQL dashboard debt agrees with preserved historical payment adjustments', async () => {
+    const isolatedWarehouse = await db.warehouse.create({ data: { name: crypto.randomUUID() } });
+    const invoice = await db.invoice.create({ data: { warehouseId: isolatedWarehouse.id, customerId, userId, totalAmount: 100, netAmount: 80, paidAmount: 80, returnedAmount: 20, discount: 0 } });
+    await db.payment.createMany({ data: [
+      { customerId, invoiceId: invoice.id, userId, amount: 100, method: 'cash' },
+      { customerId, invoiceId: invoice.id, userId, amount: -20, method: 'refund' },
+    ] });
+    const { getTotalOutstandingDebt } = await import('../utils/defaultCustomer.js');
+    expect(await getTotalOutstandingDebt(db, isolatedWarehouse.id)).toBe(0);
+    expect((await service.getInvoiceDetails(invoice.id)).financialSummary.debtAmount).toBe(0);
+  });
+  it('preserves a high-precision discount through HTTP, database and cent rounding', async () => {
+    await withApi(async request => {
+      const discount = '49.9999999999999999999';
+      const created = await request('/invoices', { customerId, warehouseId, items: [{ productId, quantity: 1, sellingPrice: '0.01' }], discount, idempotencyKey: crypto.randomUUID() });
+      expect(created.status).toBe(201);
+      expect(Number(created.data.netAmount)).toBe(.01);
+      expect(created.data.discount).toBe(discount);
+      const state = await db.invoice.findUniqueOrThrow({ where: { id: created.data.id } });
+      expect(state.discount.toString()).toBe(discount);
+    });
+  });
+  it('preserves exact FIFO write-off value and stock value through partial returns', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: .02, sellingPrice: 1, stock: 2 } });
+    await db.productBatch.createMany({ data: [
+      { productId: product.id, warehouseId, quantity: 1, remainingQuantity: 1, costPrice: .01, createdAt: new Date('2026-01-01') },
+      { productId: product.id, warehouseId, quantity: 1, remainingQuantity: 1, costPrice: .02, createdAt: new Date('2026-01-02') },
+    ] });
+    const { StockService } = await import('./stock.service.js');
+    await StockService.writeOffStock(product.id, warehouseId, 2, userId, 'FIFO reference');
+    const transaction = await db.inventoryTransaction.findFirstOrThrow({ where: { productId: product.id, qtyChange: -2 } });
+    await withApi(async request => {
+      const before = (await request(`/reports/writeoffs?warehouse_id=${warehouseId}`)).data.find((row: any) => row.transaction_id === transaction.id);
+      expect(Number(before.total_value)).toBe(.03);
+      await StockService.returnWriteOffTransaction(transaction.id, 1, userId);
+      const partial = (await request(`/reports/writeoffs?warehouse_id=${warehouseId}`)).data.find((row: any) => row.transaction_id === transaction.id);
+      expect(Number(partial.total_value)).toBe(.02);
+      await StockService.returnWriteOffTransaction(transaction.id, 1, userId);
+    });
+    const batches = await db.productBatch.findMany({ where: { productId: product.id } });
+    expect(batches.reduce((sum, batch) => sum + Math.round(Number(batch.costPrice) * 100) * batch.remainingQuantity, 0)).toBe(3);
+    expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(2);
+    await expect(StockService.returnWriteOffTransaction(transaction.id, 1, userId)).rejects.toThrow();
+    await StockService.writeOffStock(product.id, warehouseId, 2, userId, 'Competing restoration');
+    const second = await db.inventoryTransaction.findFirstOrThrow({ where: { productId: product.id, qtyChange: -2 }, orderBy: { id: 'desc' } });
+    const outcomes = await Promise.allSettled([1, 2].map(() => StockService.returnWriteOffTransaction(second.id, 2, userId)));
+    expect(outcomes.filter(outcome => outcome.status === 'fulfilled')).toHaveLength(1);
+    expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(2);
+    await StockService.writeOffStock(product.id, warehouseId, 2, userId, 'Cancellation history');
+    const third = await db.inventoryTransaction.findFirstOrThrow({ where: { productId: product.id, qtyChange: -2 }, orderBy: { id: 'desc' } });
+    await StockService.deleteWriteOffTransactionPermanently(third.id, userId);
+    expect(await db.inventoryTransaction.findUnique({ where: { id: third.id } })).not.toBeNull();
+    expect(await db.inventoryTransaction.count({ where: { referenceId: third.id, qtyChange: 2 } })).toBe(1);
+  });
+  it('cancels the exact incoming batch rather than a newer batch of equal quantity', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: 1, sellingPrice: 3 } });
+    const { StockService } = await import('./stock.service.js');
+    const first = await StockService.addStock(product.id, warehouseId, 2, 1, userId, 'First exact batch');
+    const second = await StockService.addStock(product.id, warehouseId, 2, 2, userId, 'Second exact batch');
+    const incoming = await db.inventoryTransaction.findFirstOrThrow({ where: { productId: product.id, type: 'incoming', reason: 'First exact batch' } });
+    await StockService.reverseIncomingTransaction(incoming.id, userId);
+    expect(await db.productBatch.findUnique({ where: { id: first.id } })).toBeNull();
+    expect(await db.productBatch.findUnique({ where: { id: second.id } })).not.toBeNull();
+    expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(2);
+    await expect(StockService.reverseIncomingTransaction(incoming.id, userId)).rejects.toThrow();
+  });
+  it('rolls back restock prices on failure and deduplicates retrying purchases', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: 1, sellingPrice: 5 } });
+    await withApi(async request => {
+      const payload = { warehouseId, quantity: 0, costPrice: '10', sellingPrice: '20', idempotency_key: crypto.randomUUID() };
+      expect((await request(`/products/${product.id}/restock`, payload)).status).toBe(400);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).costPrice)).toBe(1);
+      const valid = { ...payload, quantity: 2, idempotency_key: crypto.randomUUID() };
+      const responses = await Promise.all([1, 2].map(() => request(`/products/${product.id}/restock`, valid)));
+      expect(responses.map(response => response.status)).toEqual([200, 200]);
+      expect(responses[0].data.id).toBe(responses[1].data.id);
+      expect(await db.productBatch.count({ where: { productId: product.id } })).toBe(1);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(2);
+      expect((await request(`/products/${product.id}/restock`, { ...valid, quantity: 3 })).status).toBe(400);
+    });
+  });
+  it('deduplicates HTTP write-offs, partial restorations and transfers', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: .1, sellingPrice: 1, stock: 4 } });
+    await db.productBatch.create({ data: { productId: product.id, warehouseId, quantity: 4, remainingQuantity: 4, costPrice: .1 } });
+    const destination = await db.warehouse.create({ data: { name: crypto.randomUUID() } });
+    await withApi(async request => {
+      const writeoff = { quantity: 1, reason: 'Retry write-off', idempotency_key: crypto.randomUUID() };
+      const outcomes = await Promise.all([1, 2].map(() => request(`/products/${product.id}/write-off`, writeoff)));
+      expect(outcomes.map(row => row.status)).toEqual([200, 200]);
+      expect(outcomes[0].data).toEqual(outcomes[1].data);
+      const id = outcomes[0].data.transactionId;
+      const restoration = { quantity: 1, reason: 'Retry return', idempotency_key: crypto.randomUUID() };
+      const restored = await Promise.all([1, 2].map(() => request(`/products/history/${id}/return-writeoff`, restoration)));
+      expect(restored.map(row => row.status)).toEqual([200, 200]);
+      expect(restored[0].data).toEqual(restored[1].data);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(4);
+      const transfer = { fromWarehouseId: warehouseId, toWarehouseId: destination.id, quantity: 2, idempotency_key: crypto.randomUUID() };
+      const moved = await Promise.all([1, 2].map(() => request(`/products/${product.id}/transfer`, transfer)));
+      expect(moved.map(row => row.status)).toEqual([200, 200]);
+      expect(moved[0].data).toEqual(moved[1].data);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(2);
+      expect(Number((await db.product.findUniqueOrThrow({ where: { id: moved[0].data.destinationProductId } })).stock)).toBe(2);
+      expect(await db.inventoryTransaction.count({ where: { productId: product.id, type: 'transfer' } })).toBe(1);
+    });
+  });
+  it('preserves inventory financial history when permanent product deletion is requested', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: 1, sellingPrice: 2 } });
+    const event = await db.inventoryTransaction.create({ data: { productId: product.id, warehouseId, userId, type: 'adjustment', qtyChange: -1, costAtTime: 1, sellingAtTime: 2, reason: 'Historical write-off' } });
+    await withApi(async request => expect((await request(`/products/${product.id}?force=true`, undefined, 'ADMIN', 'DELETE')).status).toBe(400));
+    expect(await db.inventoryTransaction.findUnique({ where: { id: event.id } })).not.toBeNull();
+  });
+  it('lists the same batch-backed stock with and without a warehouse filter', async () => {
+    const parent = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    const product = await db.product.create({ data: { name: crypto.randomUUID(), nameKey: crypto.randomUUID(), categoryId: parent.categoryId, warehouseId, unit: 'pcs', costPrice: 1, sellingPrice: 2, stock: 100 } });
+    await db.productBatch.create({ data: { productId: product.id, warehouseId, quantity: 3, remainingQuantity: 3, costPrice: 1 } });
+    await withApi(async request => {
+      for (const path of ['/products', `/products?warehouseId=${warehouseId}`]) {
+        const response = await request(path);
+        expect(response.status).toBe(200);
+        const row = response.data.find((item: any) => item.id === product.id);
+        expect(row.stock).toBe(3);
+        expect(row.batches[0]).not.toHaveProperty('costPrice');
+      }
+    });
+    // Reading must not silently repair historical caches.
+    expect(Number((await db.product.findUniqueOrThrow({ where: { id: product.id } })).stock)).toBe(100);
+  });
+  it('cannot reject an order after a competing approval has already created its invoice', async () => {
+    const order = await db.customerOrder.create({ data: { customerId, userId, warehouseId, totalAmount: 1, items: { create: [{ productId, quantity: 1, sellingPrice: 1 }] } } });
+    let release!: () => void, ready!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const locked = new Promise<void>(resolve => { ready = resolve; });
+    const blocker = db.$transaction(async tx => { await tx.$queryRaw`SELECT id FROM customer_orders WHERE id = ${order.id} FOR UPDATE`; ready(); await hold; }, { timeout: 10000 });
+    await locked;
+    async function waitForLocks(minimum: number) {
+      for (let attempt = 0; attempt < 150; attempt++) {
+        const [row] = await db.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()`;
+        if (row.count >= minimum) return;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      throw new Error('Could not stage the competing order locks');
+    }
+    try {
+      await withApi(async request => {
+        const approval = request(`/orders/${order.id}/approve`, {});
+        await waitForLocks(1);
+        const rejection = request(`/orders/${order.id}/reject`, {});
+        await waitForLocks(2);
+        release(); await blocker;
+        const results = await Promise.all([approval, rejection]);
+        expect(results.map(result => result.status)).toEqual([200, 400]);
+      });
+      const state = await db.customerOrder.findUniqueOrThrow({ where: { id: order.id } });
+      expect(state.status).toBe('approved'); expect(state.invoiceId).not.toBeNull();
+    } finally { release(); await blocker; }
+  });
   it('serializes duplicate concurrent returns and preserves inventory/ledger history', async () => {
     const stockBefore = Number((await db.product.findUniqueOrThrow({ where: { id: productId }, select: { stock: true } })).stock);
     const invoice = await sale(); const original = await db.invoiceItem.findFirstOrThrow({ where: { invoiceId: invoice.id } });
@@ -114,6 +364,18 @@ suite('PostgreSQL financial transaction integration', () => {
     expect(Number((await db.payment.findUniqueOrThrow({ where: { id: original.id } })).amount)).toBe(100);
     expect(Number((await db.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).paidAmount)).toBe(0);
     await expect(db.payment.delete({ where: { id: original.id } })).rejects.toThrow();
+  });
+  it('rejects unknown payment methods without persisting a sale or expense payment', async () => {
+    const count = await db.invoice.count();
+    await expect(service.createInvoice({ customerId, userId, warehouseId, items: [{ productId, quantity: 1, sellingPrice: 10 }], paidAmount: 1, paymentMethod: 'unknown' })).rejects.toThrow(/payment method/i);
+    expect(await db.invoice.count()).toBe(count);
+    const router = (await import('../routes/expenses.routes.js')).default;
+    const expenseCount = await db.expense.count();
+    await expect(invokeRoute(router, '/', 'post', { warehouseId, title: 'Invalid method', amount: 10, paidAmount: 1, paymentMethod: 'unknown', expenseDate: '2026-11-09', idempotency_key: crypto.randomUUID() })).rejects.toThrow(/payment method/i);
+    expect(await db.expense.count()).toBe(expenseCount);
+    const expense = await invokeRoute(router, '/', 'post', { warehouseId, title: 'Valid unpaid expense', amount: 10, expenseDate: '2026-11-09', idempotency_key: crypto.randomUUID() });
+    await expect(invokeRoute(router, '/:id/payments', 'post', { amount: 1, method: 'unknown', idempotency_key: crypto.randomUUID() }, { id: expense.id })).rejects.toThrow(/payment method/i);
+    expect(await db.expensePayment.count({ where: { expenseId: expense.id } })).toBe(0);
   });
   it('preserves expense payments and records immutable, idempotent refunds', async () => {
     const router = (await import('../routes/expenses.routes.js')).default;

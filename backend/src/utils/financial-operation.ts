@@ -1,4 +1,11 @@
 import { createHash } from 'node:crypto';
+export function paymentMethod(value: unknown = 'cash'): 'cash' | 'card' | 'transfer' {
+  const method = String(value).trim();
+  if (method !== 'cash' && method !== 'card' && method !== 'transfer') {
+    throw Object.assign(new Error('Unsupported payment method'), { status: 400 });
+  }
+  return method;
+}
 export function operationKey(value: unknown): string {
   if (typeof value !== 'string' || !value.trim() || value.length > 160) throw Object.assign(new Error('A stable idempotency key is required'), { status: 400 });
   return value.trim();

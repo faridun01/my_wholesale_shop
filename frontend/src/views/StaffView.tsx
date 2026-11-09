@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { clsx } from 'clsx';
@@ -28,12 +29,12 @@ const sortStaff = (rows: StaffStatsRow[], key: SortKey) => {
       case 'invoices':
         return row.invoicesCount;
       case 'collection':
-        return row.soldAmount > 0 ? row.collectionRate : -1;
+        return decimal(row.soldAmount).gt(0) ? row.collectionRate : -1;
       default:
         return row.soldAmount;
     }
   };
-  return [...rows].sort((a, b) => value(b) - value(a) || a.username.localeCompare(b.username, 'ru'));
+  return [...rows].sort((a, b) => decimal(value(b)).minus(decimal(value(a))).toNumber() || a.username.localeCompare(b.username, 'ru'));
 };
 
 function CollectionBar({ rate, hasSales }: { rate: number; hasSales: boolean }) {
@@ -216,13 +217,13 @@ export default function StaffView() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Долг</p>
-                      <p className={clsx('truncate font-mono text-xs font-black', row.debtAmount > 0 ? 'text-rose-600' : 'text-slate-300')}>
+                      <p className={clsx('truncate font-mono text-xs font-black', decimal(row.debtAmount).gt(0) ? 'text-rose-600' : 'text-slate-300')}>
                         {formatMoney(row.debtAmount)}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <CollectionBar rate={row.collectionRate} hasSales={row.soldAmount > 0} />
+                    <CollectionBar rate={row.collectionRate} hasSales={decimal(row.soldAmount).gt(0)} />
                   </div>
                 </button>
               ))}
@@ -264,11 +265,11 @@ export default function StaffView() {
                       <td className="px-3.5 py-2.5 text-right font-mono font-bold">{formatCount(row.invoicesCount)}</td>
                       <td className="px-3.5 py-2.5 text-right font-mono font-bold tabular-nums text-slate-900">{formatMoney(row.soldAmount)}</td>
                       <td className="px-3.5 py-2.5 text-right font-mono tabular-nums text-emerald-700">{formatMoney(row.paidAmount)}</td>
-                      <td className={clsx('px-3.5 py-2.5 text-right font-mono tabular-nums', row.debtAmount > 0 ? 'font-bold text-rose-600' : 'text-slate-300')}>
+                      <td className={clsx('px-3.5 py-2.5 text-right font-mono tabular-nums', decimal(row.debtAmount).gt(0) ? 'font-bold text-rose-600' : 'text-slate-300')}>
                         {formatMoney(row.debtAmount)}
                       </td>
                       <td className="px-3.5 py-2.5">
-                        <CollectionBar rate={row.collectionRate} hasSales={row.soldAmount > 0} />
+                        <CollectionBar rate={row.collectionRate} hasSales={decimal(row.soldAmount).gt(0)} />
                       </td>
                       <td className="px-2 py-2.5 text-slate-300">
                         <ChevronRight size={16} />

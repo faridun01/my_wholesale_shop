@@ -1,0 +1,83 @@
+﻿{
+  "financialTotals": [
+    {
+      "database_name": "my_wholesale_shop",
+      "invalid_balances": 0,
+      "invalid_quantities": 0,
+      "payment_mismatches": 0,
+      "return_mismatches": 0,
+      "subtotal_mismatches": 0,
+      "invoice_total_mismatches": 0,
+      "invalid_discounts": 0,
+      "invoices_with_recorded_tax": 0,
+      "total_recorded_tax": "0",
+      "excessive_returns": 0,
+      "orphan_returns": 0,
+      "orphan_invoice_payments": 0,
+      "expense_payment_mismatches": 0,
+      "invalid_product_money": 0,
+      "invalid_batches": 0,
+      "stock_cache_mismatches": 2,
+      "allocation_quantity_mismatches": 0,
+      "legacy_refund_payment_count": 0,
+      "return_115_count": 0,
+      "invoice_115_return_count": 0,
+      "historical_return_count": 4
+    }
+  ],
+  "returnDetailSources": {
+    "returnItemsTable": false,
+    "inventoryTransactionsTable": true
+  },
+  "inventoryReturnEvents": [
+    {
+      "type": "return",
+      "event_count": 27,
+      "invoice_count": 6,
+      "product_count": 11,
+      "quantity": 5655
+    }
+  ],
+  "returnDetails": [
+    {
+      "return_id": 11,
+      "invoice_id": 57,
+      "total_value": "14",
+      "matching_stock_events": 0,
+      "matched_products": 0,
+      "matched_quantity": 0,
+      "exact_return_id_matches": 0,
+      "invoice_reference_matches": true
+    },
+    {
+      "return_id": 12,
+      "invoice_id": 57,
+      "total_value": "98",
+      "matching_stock_events": 0,
+      "matched_products": 0,
+      "matched_quantity": 0,
+      "exact_return_id_matches": 0,
+      "invoice_reference_matches": true
+    },
+    {
+      "return_id": 13,
+      "invoice_id": 57,
+      "total_value": "52.56",
+      "matching_stock_events": 0,
+      "matched_products": 0,
+      "matched_quantity": 0,
+      "exact_return_id_matches": 0,
+      "invoice_reference_matches": true
+    },
+    {
+      "return_id": 14,
+      "invoice_id": 81,
+      "total_value": "661.78",
+      "matching_stock_events": 0,
+      "matched_products": 0,
+      "matched_quantity": 0,
+      "exact_return_id_matches": 0,
+      "invoice_reference_matches": true
+    }
+  ]
+}

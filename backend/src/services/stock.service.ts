@@ -1,13 +1,26 @@
+import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
+import { normalizeMoney } from '../utils/money.js';
+import { decimal } from '../utils/financial.js';
 import prisma from '../db/prisma.js';
-import { addMoney, cumulativeValue, lineTotal } from '../utils/financial.js';
+import { quantity as wholeStoredQuantity, toCents, addMoney, cumulativeValue, lineTotal } from '../utils/financial.js';
 
 function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return decimal(value).toDecimalPlaces(2).toNumber();
 }
 
 function toNumber(value: any, fallback = 0): number {
   const n = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(n) ? n : fallback;
+}
+
+async function stockOperation(tx: any, value: string | undefined, payload: unknown) {
+  const key = value ? operationKey(value) : null;
+  const hash = requestHash(payload);
+  if (!key) return { key, hash, existing: null };
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+  const existing = await tx.inventoryTransaction.findUnique({ where: { idempotencyKey: key } });
+  if (existing) assertReplay(existing, hash);
+  return { key, hash, existing };
 }
 
 /**
@@ -191,7 +204,8 @@ export class StockService {
     fromWarehouseId: number,
     toWarehouseId: number,
     quantity: number,
-    userId: number
+    userId: number,
+    idempotencyKey?: string
   ) {
     const transferQty = roundQty(toNumber(quantity, 0));
 
@@ -204,6 +218,8 @@ export class StockService {
     }
 
     return await prisma.$transaction(async (tx: any) => {
+      const operation = await stockOperation(tx, idempotencyKey, { kind: 'transfer', productId, fromWarehouseId, toWarehouseId, quantity, userId });
+      if (operation.existing) return { success: true, destinationProductId: operation.existing.referenceId };
       const sourceProduct = await tx.product.findUnique({ where: { id: productId } });
 
       if (!sourceProduct) {
@@ -296,6 +312,9 @@ export class StockService {
           qtyChange: -transferQty,
           type: 'transfer',
           reason: `Transfer to Warehouse #${toWarehouseId}`,
+          referenceId: destProduct.id,
+          idempotencyKey: operation.key,
+          requestHash: operation.hash,
         },
       });
 
@@ -326,17 +345,18 @@ export class StockService {
     productId: number,
     warehouseId: number,
     quantity: number,
-    costPrice: number,
+    costPrice: number | string,
     userId: number,
     reason?: string,
-    purchaseCostPrice?: number,
-    expensePercent?: number
+    purchaseCostPrice?: number | string,
+    expensePercent?: number | string,
+    options: { transactionClient?: any; idempotencyKey?: string; sellingPrice?: unknown } = {}
   ) {
     const normalizedQty = roundQty(toNumber(quantity, 0));
-    const normalizedCost = round2(toNumber(costPrice, 0));
+    const normalizedCost = normalizeMoney(costPrice, 'Purchase cost');
     const normalizedReason = String(reason || 'Stock Arrival').trim();
-    const normalizedPurchaseCostPrice = purchaseCostPrice !== undefined ? round2(toNumber(purchaseCostPrice, 0)) : null;
-    const normalizedExpensePercent = expensePercent !== undefined ? toNumber(expensePercent, 0) : 0;
+    const normalizedPurchaseCostPrice = purchaseCostPrice !== undefined ? normalizeMoney(purchaseCostPrice, 'Purchase cost') : null;
+    const normalizedExpensePercent = decimal(expensePercent ?? 0).toString();
 
     if (normalizedQty <= 0) {
       throw new Error('Количество должно быть больше 0');
@@ -346,7 +366,28 @@ export class StockService {
       throw new Error('Цена закупки не может быть отрицательной');
     }
 
-    return await prisma.$transaction(async (tx: any) => {
+    if (decimal(normalizedExpensePercent).lt(0)) throw new Error('Expense percentage must be non-negative');
+    const key = options.idempotencyKey ? operationKey(options.idempotencyKey) : null;
+    const sellingPrice = options.sellingPrice === undefined ? undefined : normalizeMoney(options.sellingPrice, 'Selling price');
+    const hash = requestHash({ productId, warehouseId, quantity: normalizedQty, costPrice: normalizedCost, userId, reason: normalizedReason, purchaseCostPrice: normalizedPurchaseCostPrice, expensePercent: normalizedExpensePercent, sellingPrice });
+    const runTransaction: any = options.transactionClient ? (callback: any) => callback(options.transactionClient) : prisma.$transaction.bind(prisma);
+    return await runTransaction(async (tx: any) => {
+      if (key) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text`;
+        const existing = await tx.inventoryTransaction.findUnique({ where: { idempotencyKey: key } });
+        if (existing) {
+          assertReplay(existing, hash);
+          const original = await tx.productBatch.findUnique({ where: { id: existing.referenceId } });
+          if (!original) throw new Error('Previously applied incoming batch has already been cancelled');
+          return original;
+        }
+      }
+      await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+      const product = await tx.product.findUnique({ where: { id: productId } });
+      if (!product || Number(product.warehouseId) !== Number(warehouseId)) throw new Error('Incoming product does not belong to the warehouse');
+      if (sellingPrice !== undefined && (!decimal(product.costPrice).eq(normalizedCost) || !decimal(product.sellingPrice).eq(sellingPrice))) {
+        await tx.priceHistory.create({ data: { productId, costPrice: normalizedCost, sellingPrice } });
+      }
       const batch = await tx.productBatch.create({
         data: {
           productId,
@@ -366,6 +407,10 @@ export class StockService {
           userId,
           qtyChange: normalizedQty,
           type: 'incoming',
+          idempotencyKey: key,
+          requestHash: hash,
+          referenceId: batch.id,
+          totalCost: lineTotal(normalizedQty, normalizedCost),
           reason: normalizedReason,
           costAtTime: normalizedCost,
         },
@@ -377,6 +422,9 @@ export class StockService {
           stock: { increment: normalizedQty },
           totalIncoming: { increment: normalizedQty },
           costPrice: normalizedCost,
+          ...(purchaseCostPrice !== undefined ? { purchaseCostPrice: normalizedPurchaseCostPrice } : {}),
+          ...(expensePercent !== undefined ? { expensePercent: normalizedExpensePercent } : {}),
+          ...(sellingPrice !== undefined ? { sellingPrice } : {}),
           unit: 'шт',
         },
       });
@@ -387,6 +435,7 @@ export class StockService {
 
   static async reverseIncomingTransaction(transactionId: number, userId: number) {
     return prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT id FROM inventory_transactions WHERE id = ${transactionId} FOR UPDATE`;
       const transaction = await tx.inventoryTransaction.findUnique({
         where: { id: transactionId },
       });
@@ -400,23 +449,12 @@ export class StockService {
       }
 
       const quantity = roundQty(toNumber(transaction.qtyChange, 0));
-      let batch = transaction.referenceId
-        ? await tx.productBatch.findUnique({
-            where: { id: Number(transaction.referenceId) },
-          })
-        : null;
-
-      if (!batch) {
-        batch = await tx.productBatch.findFirst({
-          where: {
-            productId: transaction.productId,
-            warehouseId: transaction.warehouseId,
-            quantity,
-            remainingQuantity: { gte: quantity },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-      }
+      const existingReversal = await tx.inventoryTransaction.findFirst({ where: { referenceId: transaction.id, type: 'adjustment', qtyChange: { lt: 0 } } });
+      if (existingReversal) throw new Error('Incoming transaction has already been reversed');
+      if (!transaction.referenceId) throw new Error('Historical incoming batch link requires reconciliation');
+      await tx.$queryRaw`SELECT id FROM product_batches WHERE id = ${Number(transaction.referenceId)} FOR UPDATE`;
+      const batch = await tx.productBatch.findUnique({ where: { id: Number(transaction.referenceId) } });
+      if (batch && (Number(batch.productId) !== Number(transaction.productId) || Number(batch.warehouseId) !== Number(transaction.warehouseId))) throw new Error('Incoming batch link requires reconciliation');
 
       if (!batch) {
         throw new Error('Не удалось найти связанную партию для отмены прихода');
@@ -459,9 +497,12 @@ export class StockService {
     warehouseId: number,
     quantity: number,
     userId: number,
-    reason: string
+    reason: string,
+    idempotencyKey?: string
   ) {
     return prisma.$transaction(async (tx: any) => {
+      const operation = await stockOperation(tx, idempotencyKey, { kind: 'write-off', productId, warehouseId, quantity, userId, reason });
+      if (operation.existing) return { success: true, transactionId: operation.existing.id };
       const product = await tx.product.findUnique({
         where: { id: productId },
         select: {
@@ -503,6 +544,7 @@ export class StockService {
 
       let remainingToWriteOff = normalizedQuantity;
       let totalCost = 0;
+      const costAllocations: { batchId: number; quantity: number; costPrice: string }[] = [];
       const normalizedReason = String(reason || '').trim() || 'служебное списание';
 
       for (const batch of batches) {
@@ -512,7 +554,8 @@ export class StockService {
 
         const batchRemaining = roundQty(toNumber(batch.remainingQuantity, 0));
         const takeFromBatch = Math.min(batchRemaining, remainingToWriteOff);
-        totalCost += takeFromBatch * toNumber(batch.costPrice, 0);
+        costAllocations.push({ batchId: Number(batch.id), quantity: takeFromBatch, costPrice: decimal(batch.costPrice).toFixed(2) });
+        totalCost = decimal(totalCost).plus(decimal(takeFromBatch).times(decimal(toNumber(batch.costPrice, 0)))).toNumber();
 
         await tx.productBatch.update({
           where: { id: batch.id },
@@ -524,106 +567,40 @@ export class StockService {
         remainingToWriteOff = roundQty(remainingToWriteOff - takeFromBatch);
       }
 
-      await tx.inventoryTransaction.create({
+      const event = await tx.inventoryTransaction.create({
         data: {
           productId,
           warehouseId,
           userId,
           qtyChange: -normalizedQuantity,
           type: 'adjustment',
+          idempotencyKey: operation.key,
+          requestHash: operation.hash,
+          totalCost,
+          costAllocations,
           reason: `Списание: ${normalizedReason}`,
-          costAtTime: normalizedQuantity > 0 ? round2(totalCost / normalizedQuantity) : 0,
+          costAtTime: normalizedQuantity > 0 ? round2(decimal(totalCost).div(decimal(normalizedQuantity)).toNumber()) : 0,
           sellingAtTime: Number(product.sellingPrice || 0),
         },
       });
 
       await this.updateProductStockCache(productId, tx);
 
-      return { success: true };
+      return { success: true, transactionId: event.id };
     });
   }
 
   static async reverseCorrectionWriteOff(transactionId: number, userId: number) {
-    return prisma.$transaction(async (tx: any) => {
-      const transaction = await tx.inventoryTransaction.findUnique({
-        where: { id: transactionId },
-      });
-
-      if (!transaction) {
-        throw new Error('Списание не найдено');
-      }
-
-      if (
-        transaction.type !== 'adjustment' ||
-        Number(transaction.qtyChange || 0) >= 0 ||
-        !String(transaction.reason || '').startsWith('Списание:') ||
-        !this.isCorrectionWriteOffReason(transaction.reason)
-      ) {
-        throw new Error('Можно отменить только корректировочное списание');
-      }
-
-      const existingReversal = await tx.inventoryTransaction.findFirst({
-        where: {
-          referenceId: transaction.id,
-          qtyChange: { gt: 0 },
-          type: 'adjustment',
-        },
-      });
-
-      if (existingReversal) {
-        throw new Error('Это корректировочное списание уже отменено');
-      }
-
-      const product = await tx.product.findUnique({
-        where: { id: transaction.productId },
-        select: {
-          id: true,
-          costPrice: true,
-          active: true,
-        },
-      });
-
-      if (!product || !product.active) {
-        throw new Error('Товар не найден');
-      }
-
-      const restoredQuantity = roundQty(Math.abs(toNumber(transaction.qtyChange, 0)));
-      if (!Number.isFinite(restoredQuantity) || restoredQuantity <= 0) {
-        throw new Error('Некорректное количество для отмены списания');
-      }
-
-      await tx.productBatch.create({
-        data: {
-          productId: transaction.productId,
-          warehouseId: transaction.warehouseId,
-          quantity: restoredQuantity,
-          remainingQuantity: restoredQuantity,
-          costPrice: round2(toNumber(transaction.costAtTime, toNumber(product.costPrice, 0))),
-        },
-      });
-
-      await tx.inventoryTransaction.create({
-        data: {
-          productId: transaction.productId,
-          warehouseId: transaction.warehouseId,
-          userId,
-          qtyChange: restoredQuantity,
-          type: 'adjustment',
-          reason: `Отмена корректировочного списания #${transaction.id}`,
-          referenceId: transaction.id,
-          costAtTime: transaction.costAtTime,
-          sellingAtTime: transaction.sellingAtTime,
-        },
-      });
-
-      await this.updateProductStockCache(transaction.productId, tx);
-
-      return { success: true };
-    });
+    const transaction = await prisma.inventoryTransaction.findUnique({ where: { id: transactionId } });
+    if (!transaction || !this.isCorrectionWriteOffReason(transaction.reason)) throw new Error('Only correction write-offs may be reversed');
+    return this.returnWriteOffTransaction(transactionId, Math.abs(Number(transaction.qtyChange)), userId, 'Correction reversal');
   }
 
-  static async returnWriteOffTransaction(transactionId: number, quantity: number, userId: number, reason?: string) {
+  static async returnWriteOffTransaction(transactionId: number, quantity: number, userId: number, reason?: string, idempotencyKey?: string) {
     return prisma.$transaction(async (tx: any) => {
+      const operation = await stockOperation(tx, idempotencyKey, { kind: 'return-write-off', transactionId, quantity, userId, reason });
+      if (operation.existing) return { success: true, transactionId: operation.existing.id };
+      await tx.$queryRaw`SELECT id FROM inventory_transactions WHERE id = ${transactionId} FOR UPDATE`;
       const transaction = await tx.inventoryTransaction.findUnique({
         where: { id: transactionId },
       });
@@ -650,6 +627,8 @@ export class StockService {
         where: {
           referenceId: transaction.id,
           type: 'adjustment',
+          idempotencyKey: operation.key,
+          requestHash: operation.hash,
           qtyChange: { gt: 0 },
         },
         select: { qtyChange: true },
@@ -681,26 +660,55 @@ export class StockService {
         throw new Error('Товар не найден');
       }
 
-      await tx.productBatch.create({
-        data: {
-          productId: transaction.productId,
-          warehouseId: transaction.warehouseId,
-          quantity: normalizedQuantity,
-          remainingQuantity: normalizedQuantity,
-          costPrice: round2(toNumber(transaction.costAtTime, toNumber(product.costPrice, 0))),
-        },
-      });
+      const saved = Array.isArray(transaction.costAllocations) ? transaction.costAllocations : null;
+      let costToRestore = 0;
+      const restoredAllocations: { batchId: number; quantity: number; costPrice: string }[] = [];
+      if (saved) {
+        if (saved.reduce((sum: number, row: any) => sum + wholeStoredQuantity(row.quantity), 0) !== originalQuantity ||
+            toCents(addMoney(...saved.map((row: any) => lineTotal(row.quantity, row.costPrice)))) !== toCents(transaction.totalCost)) {
+          throw new Error('Write-off cost allocations require reconciliation');
+        }
+        let skipped = alreadyReturned;
+        let needed = normalizedQuantity;
+        for (const row of saved) {
+          const available = wholeStoredQuantity(row.quantity);
+          const skip = Math.min(skipped, available); skipped -= skip;
+          const take = Math.min(available - skip, needed);
+          if (!take) continue;
+          const existing = await tx.productBatch.findUnique({ where: { id: Number(row.batchId) } });
+          const price = decimal(row.costPrice).toFixed(2);
+          if (existing && Number(existing.productId) === Number(transaction.productId) && Number(existing.warehouseId) === Number(transaction.warehouseId) && decimal(existing.costPrice).eq(price)) {
+            await tx.productBatch.update({ where: { id: existing.id }, data: { remainingQuantity: { increment: take } } });
+          } else {
+            await tx.productBatch.create({ data: { productId: transaction.productId, warehouseId: transaction.warehouseId, quantity: take, remainingQuantity: take, costPrice: price } });
+          }
+          restoredAllocations.push({ batchId: Number(row.batchId), quantity: take, costPrice: price });
+          costToRestore = addMoney(costToRestore, lineTotal(take, price));
+          needed -= take;
+          if (!needed) break;
+        }
+        if (needed) throw new Error('Write-off allocation quantity mismatch');
+      } else {
+        // No invented batch details for historical write-offs.
+        const price = transaction.costAtTime ?? product.costPrice;
+        await tx.productBatch.create({ data: { productId: transaction.productId, warehouseId: transaction.warehouseId, quantity: normalizedQuantity, remainingQuantity: normalizedQuantity, costPrice: price } });
+        costToRestore = lineTotal(normalizedQuantity, price);
+      }
 
       const reasonSuffix = String(reason || '').trim();
-      await tx.inventoryTransaction.create({
+      const event = await tx.inventoryTransaction.create({
         data: {
           productId: transaction.productId,
           warehouseId: transaction.warehouseId,
           userId,
           qtyChange: normalizedQuantity,
           type: 'adjustment',
+          idempotencyKey: operation.key,
+          requestHash: operation.hash,
           reason: `Возврат списания #${transaction.id}${reasonSuffix ? `: ${reasonSuffix}` : ''}`,
           referenceId: transaction.id,
+          totalCost: costToRestore,
+          ...(saved ? { costAllocations: restoredAllocations } : {}),
           costAtTime: transaction.costAtTime,
           sellingAtTime: transaction.sellingAtTime,
         },
@@ -708,73 +716,15 @@ export class StockService {
 
       await this.updateProductStockCache(transaction.productId, tx);
 
-      return { success: true };
+      return { success: true, transactionId: event.id };
     });
   }
 
-  static async deleteWriteOffTransactionPermanently(transactionId: number) {
-    return prisma.$transaction(async (tx: any) => {
-      const transaction = await tx.inventoryTransaction.findUnique({
-        where: { id: transactionId },
-      });
-
-      if (!transaction) {
-        throw new Error('Списание не найдено');
-      }
-
-      if (
-        transaction.type !== 'adjustment' ||
-        Number(transaction.qtyChange || 0) >= 0 ||
-        !String(transaction.reason || '').includes('Списание')
-      ) {
-        throw new Error('Удалить можно только списание товара');
-      }
-
-      const linkedReturns = await tx.inventoryTransaction.findMany({
-        where: {
-          referenceId: transaction.id,
-          type: 'adjustment',
-          qtyChange: { gt: 0 },
-        },
-        select: { id: true },
-      });
-
-      if (linkedReturns.length > 0) {
-        throw new Error('У этого списания уже есть возврат. Сначала удалите возвратные операции.');
-      }
-
-      const product = await tx.product.findUnique({
-        where: { id: transaction.productId },
-        select: {
-          id: true,
-          costPrice: true,
-        },
-      });
-
-      if (!product) {
-        throw new Error('Товар не найден');
-      }
-
-      const restoredQuantity = roundQty(Math.abs(toNumber(transaction.qtyChange, 0)));
-
-      await tx.productBatch.create({
-        data: {
-          productId: transaction.productId,
-          warehouseId: transaction.warehouseId,
-          quantity: restoredQuantity,
-          remainingQuantity: restoredQuantity,
-          costPrice: round2(toNumber(transaction.costAtTime, toNumber(product.costPrice, 0))),
-        },
-      });
-
-      await tx.inventoryTransaction.delete({
-        where: { id: transaction.id },
-      });
-
-      await this.updateProductStockCache(transaction.productId, tx);
-
-      return { success: true };
-    });
+  static async deleteWriteOffTransactionPermanently(transactionId: number, userId?: number) {
+    // Retain the original event; cancelling a write-off is an appended restoration.
+    const transaction = await prisma.inventoryTransaction.findUnique({ where: { id: transactionId } });
+    if (!transaction) throw new Error('Write-off not found');
+    return this.returnWriteOffTransaction(transactionId, Math.abs(Number(transaction.qtyChange)), userId ?? transaction.userId, 'Write-off cancellation');
   }
 
   /**

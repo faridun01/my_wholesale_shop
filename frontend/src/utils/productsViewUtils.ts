@@ -1,3 +1,4 @@
+import { decimal } from './financial';
 import { roundMoney, toFixedNumber } from './format';
 import {
   calculateEffectiveCost,
@@ -186,7 +187,7 @@ export const buildProductSubmitPayload = (formData: ProductFormData, categoryId:
     warehouseId: Number(formData.warehouseId),
     costPrice: roundMoney(formData.costPrice),
     purchaseCostPrice: roundMoney(formData.costPrice),
-    expensePercent: parseFloat(formData.expensePercent || '0'),
+    expensePercent: decimal(formData.expensePercent || '0').toString(),
     sellingPrice: roundMoney(formData.sellingPrice),
     minStock: parseFloat(formData.minStock),
     initialStock: parseFloat(formData.initialStock),
@@ -292,8 +293,8 @@ const getStockSortMetrics = (product: any) => {
 export const getProductEfficiencyMetrics = (product: any) => {
   const costPrice = Number(product?.costPrice || 0);
   const sellingPrice = Number(product?.sellingPrice || 0);
-  const profitPerUnit = sellingPrice - costPrice;
-  const marginPercent = sellingPrice > 0 ? (profitPerUnit / sellingPrice) * 100 : 0;
+  const profitPerUnit = decimal(sellingPrice).minus(decimal(costPrice)).toNumber();
+  const marginPercent = sellingPrice > 0 ? decimal(profitPerUnit).div(decimal(sellingPrice)).times(decimal(100)).toNumber() : 0;
 
   let label = 'Слабая';
   let className = 'bg-rose-50 text-rose-700 border-rose-100';

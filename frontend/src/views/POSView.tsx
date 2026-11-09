@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import { discountedUnit, discountAmount, lineTotal as exactLineTotal, saleTotals } from '../utils/financial';
 import React, { startTransition, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -1064,30 +1065,30 @@ export default function POSView() {
   const getDiscountedUnitPrice = (item: CartItem) => {
     const sellingPrice = Number(item.sellingPrice || 0);
     const itemDiscount = clampDiscountPercent(item.lineDiscountPercent || 0);
-    const unitPriceAfterDiscount = sellingPrice * (1 - itemDiscount / 100);
+    const unitPriceAfterDiscount = decimal(sellingPrice).times(decimal(1).minus(decimal(itemDiscount).div(decimal(100)))).toNumber();
     return discountedUnit(sellingPrice, itemDiscount);
   };
   const getLineTotal = (item: CartItem) => exactLineTotal(item.quantity, item.sellingPrice, item.lineDiscountPercent || 0);
-  const getLineSubtotal = (item: CartItem) => roundMoney(Number(item.sellingPrice || 0) * Number(item.quantity || 0));
-  const getLineDiscountAmount = (item: CartItem) => roundMoney(getLineSubtotal(item) - getLineTotal(item));
+  const getLineSubtotal = (item: CartItem) => roundMoney(decimal(item.sellingPrice || 0).times(decimal(item.quantity || 0)).toNumber());
+  const getLineDiscountAmount = (item: CartItem) => roundMoney(decimal(getLineSubtotal(item)).minus(decimal(getLineTotal(item))).toNumber());
 
-  const subtotal = normalizeMoneyValue(roundMoney(cart.reduce((sum, item) => sum + getLineSubtotal(item), 0)));
+  const subtotal = normalizeMoneyValue(roundMoney(cart.reduce((sum, item) => decimal(sum).plus(decimal(getLineSubtotal(item))).toNumber(), 0)));
   const lineDiscountAmount = normalizeMoneyValue(
-    Math.max(0, roundMoney(cart.reduce((sum, item) => sum + getLineDiscountAmount(item), 0))),
+    Math.max(0, roundMoney(cart.reduce((sum, item) => decimal(sum).plus(decimal(getLineDiscountAmount(item))).toNumber(), 0))),
   );
-  const subtotalAfterLineDiscount = normalizeMoneyValue(Math.max(0, roundMoney(subtotal - lineDiscountAmount)));
+  const subtotalAfterLineDiscount = normalizeMoneyValue(Math.max(0, roundMoney(decimal(subtotal).minus(decimal(lineDiscountAmount)).toNumber())));
   const normalizedDiscount = Math.max(0, discount);
   const invoiceDiscountAmount = normalizeMoneyValue(
     Math.max(0, discountAmount(subtotalAfterLineDiscount, normalizedDiscount)),
   );
-  const totalDiscountAmount = normalizeMoneyValue(roundMoney(lineDiscountAmount + invoiceDiscountAmount));
-  const total = normalizeMoneyValue(Math.max(0, roundMoney(subtotalAfterLineDiscount - invoiceDiscountAmount)));
+  const totalDiscountAmount = normalizeMoneyValue(roundMoney(decimal(lineDiscountAmount).plus(decimal(invoiceDiscountAmount)).toNumber()));
+  const total = normalizeMoneyValue(Math.max(0, roundMoney(decimal(subtotalAfterLineDiscount).minus(decimal(invoiceDiscountAmount)).toNumber())));
   // Only an admin records payments; everyone else's sale is always created unpaid
   // (the server enforces the same rule).
   const canRecordPayment = isAdmin;
   const parsedPaidAmount = parseMoneyInput(paidAmount);
   const paid = canRecordPayment ? parsedPaidAmount ?? 0 : 0;
-  const balance = paid - total;
+  const balance = decimal(paid).minus(decimal(total)).toNumber();
   const cartWeightSummary = React.useMemo(
     () =>
       cart.reduce(

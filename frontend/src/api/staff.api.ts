@@ -1,21 +1,22 @@
+import type { MoneyValue } from '../utils/financial';
 import client from './client';
 
 export type StaffInvoiceStatus = 'paid' | 'partial' | 'unpaid';
 
 export type StaffStatusBucket = {
   count: number;
-  amount: number;
-  paid: number;
-  debt: number;
+  amount: MoneyValue;
+  paid: MoneyValue;
+  debt: MoneyValue;
 };
 
 export type StaffMetrics = {
   invoicesCount: number;
-  soldAmount: number;
-  paidAmount: number;
-  debtAmount: number;
-  returnedAmount: number;
-  averageCheck: number;
+  soldAmount: MoneyValue;
+  paidAmount: MoneyValue;
+  debtAmount: MoneyValue;
+  returnedAmount: MoneyValue;
+  averageCheck: MoneyValue;
   /** 0..1 — share of sold amount already paid. */
   collectionRate: number;
   byStatus: Record<StaffInvoiceStatus, StaffStatusBucket>;
@@ -40,7 +41,7 @@ export type StaffSummary = StaffMetrics & {
   user: StaffUser;
   period: { start: string | null; end: string | null };
   /** Admin only. */
-  profit?: number;
+  profit?: MoneyValue;
 };
 
 export type StaffPeriodParams = {

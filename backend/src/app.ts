@@ -1,4 +1,5 @@
 import express from 'express';
+import { financialJsonReplacer } from './utils/financial.js';
 import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,6 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('json replacer', financialJsonReplacer);
 
 // Production traffic always arrives through exactly two reverse proxies
 // (host Caddy, then the frontend nginx container) before reaching Express —

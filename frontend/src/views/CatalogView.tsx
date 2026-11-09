@@ -1,3 +1,4 @@
+import { decimal } from '../utils/financial';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import {
@@ -73,8 +74,8 @@ const getProductStockParts = (product: any) => {
 const getProductCommercialStats = (product: any) => {
   const salePrice = Number(product?.sellingPrice || 0);
   const purchasePrice = Number(product?.costPrice || 0);
-  const profitPerUnit = salePrice - purchasePrice;
-  const marginPercent = salePrice > 0 ? (profitPerUnit / salePrice) * 100 : 0;
+  const profitPerUnit = decimal(salePrice).minus(decimal(purchasePrice)).toNumber();
+  const marginPercent = salePrice > 0 ? decimal(profitPerUnit).div(decimal(salePrice)).times(decimal(100)).toNumber() : 0;
   return { salePrice, purchasePrice, profitPerUnit, marginPercent };
 };
 

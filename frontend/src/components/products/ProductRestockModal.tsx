@@ -1,3 +1,4 @@
+import { decimal } from '../../utils/financial';
 import React from 'react';
 import { clsx } from 'clsx';
 import {
@@ -57,7 +58,7 @@ export default function ProductRestockModal({
 
   const cost = Number(restockData.costPrice || 0);
   const sell = Number(restockData.sellingPrice || 0);
-  const marginPercent = sell > 0 && cost > 0 ? ((sell - cost) / sell) * 100 : null;
+  const marginPercent = sell > 0 && cost > 0 ? decimal(sell).minus(decimal(cost)).div(decimal(sell)).times(decimal(100)).toNumber() : null;
 
   return (
     <AnimatePresence>

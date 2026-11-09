@@ -1,6 +1,7 @@
+import { decimal } from '../utils/financial.js';
 import { assertNoTaxPayload, financialError } from '../utils/financial.js';
 import { addMoney, refundByMethod, toCents } from '../utils/financial.js';
-import { operationKey, requestHash, assertReplay } from '../utils/financial-operation.js';
+import { operationKey, requestHash, assertReplay, paymentMethod } from '../utils/financial-operation.js';
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import type { AuthRequest } from '../middlewares/auth.middleware.js';
@@ -94,7 +95,7 @@ const getExpenseRefundedAmount = (expense: any) =>
   Array.isArray(expense?.payments)
     ? roundMoney(
         expense.payments.reduce(
-          (sum: number, payment: any) => sum + (!payment.reversalOfId && Number(payment.amount || 0) < 0 ? Math.abs(Number(payment.amount || 0)) : 0),
+          (sum: number, payment: any) => decimal(sum).plus(decimal(!payment.reversalOfId && Number(payment.amount || 0) < 0 ? Math.abs(Number(payment.amount || 0)) : 0)).toNumber(),
           0,
         ),
       )
@@ -243,7 +244,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
             expenseId: expense.id,
             userId: req.user!.id,
             amount: paidAmount,
-            method: String(req.body?.paymentMethod || 'cash').trim() || 'cash',
+            method: paymentMethod(req.body?.paymentMethod),
             paymentDate,
             note: normalizeOptionalString(req.body?.paymentNote),
           },
@@ -382,7 +383,7 @@ router.post('/:id/payments', async (req: AuthRequest, res, next) => {
           requestHash: hash,
           userId: req.user!.id,
           amount,
-          method: String(req.body?.method || 'cash').trim() || 'cash',
+          method: paymentMethod(req.body?.method),
           paymentDate: normalizePaymentDate(req.body?.paymentDate),
           note: normalizeOptionalString(req.body?.note),
         },

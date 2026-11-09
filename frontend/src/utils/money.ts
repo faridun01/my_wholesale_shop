@@ -1,19 +1,20 @@
+import { decimal } from './financial';
 import { roundMoney } from './format';
 
 export const calculateEffectiveCost = (purchaseCost: unknown, expensePercent: unknown) => {
   const base = roundMoney(purchaseCost);
   const percent = Math.max(0, Number(expensePercent || 0));
-  return roundMoney(base + (base * percent / 100));
+  return roundMoney(decimal(base).times(decimal(percent).div(100).plus(1)).toNumber());
 };
 
 export const calculateDiscountAmount = (amount: unknown, discountPercent: unknown) => {
   const total = roundMoney(amount);
   const percent = Math.max(0, Number(discountPercent || 0));
-  return roundMoney(total * percent / 100);
+  return roundMoney(decimal(total).times(percent).div(100).toNumber());
 };
 
 export const calculateLineTotal = (quantity: unknown, price: unknown) => {
-  return roundMoney(Number(quantity || 0) * Number(price || 0));
+  return roundMoney(decimal(quantity || 0).times(decimal(price || 0)).toNumber());
 };
 
 export const calculateUnitCostFromPackage = (packagePrice: unknown, unitsPerPackage: unknown) => {
@@ -23,7 +24,7 @@ export const calculateUnitCostFromPackage = (packagePrice: unknown, unitsPerPack
     return packageCost;
   }
 
-  return roundMoney(packageCost / units);
+  return roundMoney(decimal(packageCost).div(decimal(units)).toNumber());
 };
 
 export const calculateUnitCostFromLineTotal = (lineTotal: unknown, quantity: unknown) => {
@@ -33,6 +34,6 @@ export const calculateUnitCostFromLineTotal = (lineTotal: unknown, quantity: unk
     return 0;
   }
 
-  return roundMoney(total / qty);
+  return roundMoney(decimal(total).div(qty).toNumber());
 };
 
