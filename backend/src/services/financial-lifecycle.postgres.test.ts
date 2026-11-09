@@ -82,7 +82,7 @@ suite('full financial lifecycle through the real routes', () => {
     app.set('json replacer', financialJsonReplacer);
     app.use(express.json());
     app.use((req, _res, next) => {
-      (req as any).user = { id: adminId, role: 'ADMIN', warehouseId };
+      (req as any).user = { id: adminId, role: req.headers['x-test-role'] || 'ADMIN', warehouseId };
       next();
     });
     app.use('/invoices', (await import('../routes/invoices.routes.js')).default);
@@ -307,6 +307,68 @@ suite('full financial lifecycle through the real routes', () => {
     expect((await returnItems(id, [{ invoiceItemId: line.id, quantity: 10 }])).status).toBe(200);
     expect(money((await invoiceOf(id)).netAmount)).toBe(0);
     await expectStock(p, 10);
+  });
+
+  it('keeps every figure in step when a batch cost is corrected', async () => {
+    const p = await newProduct(50);
+    await restock(p, 20, 30);
+    await restock(p, 20, 40);
+    const [older, newer] = await db.productBatch.findMany({ where: { productId: p }, orderBy: { id: 'asc' } });
+
+    // 5 sold from the older batch, then 3 written off from it.
+    const sale = await sell([{ productId: p, quantity: 5, sellingPrice: '50' }]);
+    const writeOff = await call('POST', `/products/${p}/write-off`, { warehouseId, quantity: 3, reason: 'брак', idempotency_key: key() });
+    const stockValue = async () => {
+      const batches = await db.productBatch.findMany({ where: { productId: p } });
+      return addMoney(...batches.map((b) => lineTotal(b.remainingQuantity, b.costPrice)));
+    };
+    const profit = async () => addMoney(...((await call('GET', `/reports/profit?warehouse_id=${warehouseId}`)).data as any[]).filter((r) => r.invoice_id === sale.data.id).map((r) => r.profit));
+    expect(await stockValue()).toBe(1160); // 12 x 30 + 20 x 40
+    expect(await profit()).toBe(100);
+
+    const saved = await call('PUT', `/products/batches/${older.id}/cost`, { purchaseCostPrice: 20 });
+    expect(saved.data).toMatchObject({ success: true, changed: true });
+
+    expect(await stockValue()).toBe(1040); // 12 x 20 + 20 x 40
+    expect(await profit()).toBe(150);
+    const [line] = (await invoiceOf(sale.data.id)).items;
+    expect(money(line.costPrice)).toBe(20);
+    const outgoing = await db.inventoryTransaction.findFirstOrThrow({ where: { referenceId: sale.data.id, type: 'outgoing' } });
+    expect(money(outgoing.costAtTime)).toBe(20);
+
+    const report = (await call('GET', `/reports/writeoffs?warehouse_id=${warehouseId}`)).data as any[];
+    expect(money(report.find((r) => r.transaction_id === writeOff.data.transactionId).total_value)).toBe(60);
+
+    // Only the newest batch sets the product card, and quantities never move.
+    expect(money((await db.product.findUniqueOrThrow({ where: { id: p } })).costPrice)).toBe(40);
+    await call('PUT', `/products/batches/${newer.id}/cost`, { purchaseCostPrice: 35 });
+    expect(money((await db.product.findUniqueOrThrow({ where: { id: p } })).costPrice)).toBe(35);
+    await expectStock(p, 32);
+
+    // A later restoration goes back into the same batch at the corrected cost.
+    expect((await call('POST', `/products/history/${writeOff.data.transactionId}/return-writeoff`, { quantity: 3, reason: 'ошибка', idempotency_key: key() })).status).toBeLessThan(300);
+    expect(await db.productBatch.count({ where: { productId: p } })).toBe(2);
+    await expectStock(p, 35);
+
+    const trail = await db.inventoryTransaction.count({ where: { productId: p, reason: { startsWith: 'Изменение себестоимости партии' } } });
+    expect(trail).toBe(2);
+    expect((await call('PUT', `/products/batches/${older.id}/cost`, { purchaseCostPrice: 20 })).data.changed).toBe(false);
+  });
+
+  it('refuses an invalid batch cost and asks before accepting one above the selling price', async () => {
+    const p = await newProduct(11);
+    await restock(p, 10, 9);
+    const batch = await db.productBatch.findFirstOrThrow({ where: { productId: p } });
+    expect((await call('PUT', `/products/batches/${batch.id}/cost`, { purchaseCostPrice: 0 })).status).toBe(400);
+    expect((await call('PUT', `/products/batches/${batch.id}/cost`, { purchaseCostPrice: -1 })).status).toBe(400);
+    expect((await call('PUT', `/products/batches/${batch.id}/cost`, { purchaseCostPrice: 96.2 })).status).toBe(400);
+    expect(money((await db.productBatch.findUniqueOrThrow({ where: { id: batch.id } })).costPrice)).toBe(9);
+    expect((await call('PUT', `/products/batches/${batch.id}/cost`, { purchaseCostPrice: 96.2, confirmCostAboveSelling: true })).status).toBe(200);
+    expect(money((await db.productBatch.findUniqueOrThrow({ where: { id: batch.id } })).costPrice)).toBe(96.2);
+
+    const seller = await fetch(`${baseUrl}/products/batches/${batch.id}/cost`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-test-role': 'SELLER' }, body: JSON.stringify({ purchaseCostPrice: 5 }) });
+    expect(seller.status).toBe(403);
+    expect(money((await db.productBatch.findUniqueOrThrow({ where: { id: batch.id } })).costPrice)).toBe(96.2);
   });
 
   it('allows deleting only an untouched batch and keeps the journal in step', async () => {

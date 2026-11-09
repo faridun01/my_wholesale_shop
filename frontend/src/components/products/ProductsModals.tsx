@@ -78,6 +78,7 @@ interface ProductsModalsProps {
   handleOpenDeleteWriteOffConfirm: (transaction: any) => void;
   handleOpenWriteOffModal: (product?: any) => void;
   handleDeleteBatch: (batchId: number) => void;
+  handleUpdateBatchCost: (batchId: number, value: string) => Promise<boolean>;
   handleMergeProduct: () => void;
   handleConfirmDeleteProduct: () => void;
   handleDeleteWriteOffPermanently: () => void;
@@ -160,6 +161,7 @@ export default function ProductsModals(props: ProductsModalsProps) {
     handleOpenDeleteWriteOffConfirm,
     handleOpenWriteOffModal,
     handleDeleteBatch,
+    handleUpdateBatchCost,
     handleMergeProduct,
     handleConfirmDeleteProduct,
     handleDeleteWriteOffPermanently,
@@ -262,6 +264,7 @@ export default function ProductsModals(props: ProductsModalsProps) {
           productBatches={productBatches}
           canManage={isAdmin}
           onDeleteBatch={handleDeleteBatch}
+          onUpdateBatchCost={handleUpdateBatchCost}
         />
       </React.Suspense>
 

@@ -1342,6 +1342,39 @@ router.post('/batches/:batchId/zero', async (req: AuthRequest, res, next) => {
   }
 });
 
+router.put('/batches/:batchId/cost', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    if (!ensureAdminProductAccess(access, res)) {
+      return;
+    }
+
+    const batchId = Number(req.params.batchId);
+    if (!Number.isFinite(batchId) || batchId <= 0) {
+      return res.status(400).json({ error: 'Некорректная партия' });
+    }
+
+    const batch = await prisma.productBatch.findUnique({
+      where: { id: batchId },
+      select: { expensePercent: true, product: { select: { sellingPrice: true } } },
+    });
+    if (!batch) {
+      return res.status(404).json({ error: 'Партия не найдена' });
+    }
+
+    const purchaseCostPrice = normalizeMoney(req.body.purchaseCostPrice, 'Purchase cost', { allowZero: false });
+    const costPrice = roundMoney(calculateEffectiveCostPrice(purchaseCostPrice, decimal(batch.expensePercent ?? 0).toString()));
+    assertCostNotAboveSelling(costPrice, batch.product.sellingPrice, req.body.confirmCostAboveSelling);
+
+    res.json(await StockSvc.updateBatchCost(batchId, costPrice, purchaseCostPrice, req.user!.id));
+  } catch (error) {
+    if (error instanceof Error) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
 router.delete('/batches/:batchId', async (req: AuthRequest, res, next) => {
   try {
     const access = await getAccessContext(req);

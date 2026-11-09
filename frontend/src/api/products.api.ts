@@ -57,6 +57,11 @@ export const zeroProductBatch = async (batchId: number) => {
   return response.data;
 };
 
+export const updateProductBatchCost = async (batchId: number, data: { purchaseCostPrice: number; confirmCostAboveSelling: boolean }) => {
+  const response = await client.put(`/products/batches/${batchId}/cost`, data);
+  return response.data;
+};
+
 export const deleteProductBatch = async (batchId: number) => {
   const response = await client.delete(`/products/batches/${batchId}`);
   return response.data;

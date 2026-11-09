@@ -815,6 +815,80 @@ export class StockService {
   }
 
   /**
+   * Corrects a batch's cost. Profit and stock value read the batch directly; everything
+   * that stored a copy of that cost is brought in line here, in one transaction, and the
+   * correction itself is recorded in the stock ledger.
+   */
+  static async updateBatchCost(batchId: number, costPrice: number, purchaseCostPrice: number, userId: number) {
+    return prisma.$transaction(async (tx: any) => {
+      // Same row lock as FIFO allocation, so a sale cannot read the old cost mid-change.
+      await tx.$queryRaw`SELECT id FROM product_batches WHERE id = ${batchId} FOR UPDATE`;
+      const batch = await tx.productBatch.findUnique({ where: { id: batchId } });
+      if (!batch) throw new Error('Партия не найдена');
+
+      const oldCost = decimal(batch.costPrice).toFixed(2);
+      const newCost = decimal(costPrice).toFixed(2);
+      if (oldCost === newCost) return { success: true, changed: false };
+
+      await tx.productBatch.update({ where: { id: batchId }, data: { costPrice, purchaseCostPrice } });
+
+      const soldLines = await tx.saleAllocation.findMany({ where: { batchId }, select: { invoiceItemId: true }, distinct: ['invoiceItemId'] });
+      for (const { invoiceItemId } of soldLines) {
+        const item = await tx.invoiceItem.findUnique({
+          where: { id: invoiceItemId },
+          include: { saleAllocations: { include: { batch: { select: { costPrice: true } } } } },
+        });
+        const quantity = item.saleAllocations.reduce((sum: number, row: any) => sum + roundQty(toNumber(row.quantity, 0)), 0);
+        const lineCost = addMoney(...item.saleAllocations.map((row: any) => lineTotal(row.quantity, row.batch.costPrice)));
+        const averageCost = cumulativeValue(lineCost, 1, quantity);
+        await tx.invoiceItem.update({ where: { id: invoiceItemId }, data: { costPrice: averageCost } });
+        await tx.inventoryTransaction.updateMany({
+          where: { type: 'outgoing', referenceId: item.invoiceId, productId: item.productId },
+          data: { costAtTime: averageCost },
+        });
+      }
+
+      // Write-offs and their restorations keep the per-batch cost they were made at.
+      const costEvents = await tx.inventoryTransaction.findMany({
+        where: { type: 'adjustment', productId: batch.productId, totalCost: { not: null } },
+      });
+      for (const event of costEvents) {
+        const rows = Array.isArray(event.costAllocations) ? event.costAllocations : [];
+        if (!rows.some((row: any) => Number(row.batchId) === batchId)) continue;
+        const costAllocations = rows.map((row: any) => (Number(row.batchId) === batchId ? { ...row, costPrice: newCost } : row));
+        const quantity = costAllocations.reduce((sum: number, row: any) => sum + wholeStoredQuantity(row.quantity), 0);
+        const totalCost = addMoney(...costAllocations.map((row: any) => lineTotal(row.quantity, row.costPrice)));
+        await tx.inventoryTransaction.update({
+          where: { id: event.id },
+          data: { costAllocations, totalCost, costAtTime: cumulativeValue(totalCost, 1, quantity) },
+        });
+      }
+
+      await tx.inventoryTransaction.create({
+        data: {
+          productId: batch.productId,
+          warehouseId: batch.warehouseId,
+          userId,
+          qtyChange: 0,
+          type: 'adjustment',
+          reason: `Изменение себестоимости партии #${batchId}: ${oldCost} -> ${newCost}`,
+          referenceId: batchId,
+          costAtTime: costPrice,
+        },
+      });
+
+      // The product card shows the cost of its latest receipt.
+      const latest = await tx.productBatch.findFirst({ where: { productId: batch.productId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
+      if (latest?.id === batchId) {
+        const product = await tx.product.update({ where: { id: batch.productId }, data: { costPrice, purchaseCostPrice } });
+        await tx.priceHistory.create({ data: { productId: batch.productId, costPrice, sellingPrice: product.sellingPrice } });
+      }
+
+      return { success: true, changed: true };
+    });
+  }
+
+  /**
    * Rebuild product stock from batches.
    */
   static async updateProductStockCache(productId: number, tx?: any) {

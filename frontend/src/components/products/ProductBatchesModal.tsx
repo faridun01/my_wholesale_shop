@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { clsx } from 'clsx';
-import { Layers, Trash2, X } from 'lucide-react';
-import { formatMoney } from '../../utils/format';
+import { Layers, Pencil, Trash2, X } from 'lucide-react';
+import { formatMoney, toFixedNumber } from '../../utils/format';
 import { formatProductName } from '../../utils/productName';
 
 interface ProductBatchesModalProps {
@@ -12,6 +12,7 @@ interface ProductBatchesModalProps {
   productBatches: any[];
   canManage?: boolean;
   onDeleteBatch?: (batchId: number) => void;
+  onUpdateBatchCost?: (batchId: number, value: string) => Promise<boolean>;
 }
 
 const DELETE_BLOCKED_REASON = 'Нельзя удалить: товар из партии уже продан или списан';
@@ -106,7 +107,33 @@ export default function ProductBatchesModal({
   productBatches,
   canManage = false,
   onDeleteBatch,
+  onUpdateBatchCost,
 }: ProductBatchesModalProps) {
+  const [editingBatch, setEditingBatch] = useState<any>(null);
+  const [costInput, setCostInput] = useState('');
+  const [isSavingCost, setIsSavingCost] = useState(false);
+
+  const startEditingCost = (batch: any) => {
+    setEditingBatch(batch);
+    setCostInput(String(toFixedNumber(batch.purchaseCostPrice ?? batch.costPrice)));
+  };
+
+  const saveCost = async () => {
+    if (!editingBatch || !onUpdateBatchCost || isSavingCost) return;
+    setIsSavingCost(true);
+    try {
+      if (await onUpdateBatchCost(editingBatch.id, costInput)) {
+        setEditingBatch(null);
+      }
+    } finally {
+      setIsSavingCost(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) setEditingBatch(null);
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -175,6 +202,42 @@ export default function ProductBatchesModal({
                 Списание происходит автоматически по принципу <span className="font-bold">FIFO</span>: сначала расходуются самые ранние партии.
               </div>
 
+              {editingBatch && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                  <label htmlFor="batch-cost-input" className="block text-xs font-bold text-slate-800">
+                    Цена закупки за 1 шт · партия от {new Date(editingBatch.createdAt).toLocaleDateString('ru-RU')}
+                  </label>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <input
+                      id="batch-cost-input"
+                      type="text"
+                      inputMode="decimal"
+                      value={costInput}
+                      onChange={(event) => setCostInput(event.target.value)}
+                      className="h-9 w-32 rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-sm font-bold text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void saveCost()}
+                      disabled={isSavingCost || !costInput}
+                      className="h-9 rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSavingCost ? 'Сохранение...' : 'Сохранить'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingBatch(null)}
+                      className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-600">
+                    Себестоимость продаж, прибыль и стоимость склада пересчитаются по новой цене, в том числе за прошлые продажи из этой партии.
+                  </p>
+                </div>
+              )}
+
               {/* Mobile Cards List */}
               <div className="space-y-2 sm:hidden">
                 {productBatches.map((b, i) => {
@@ -229,6 +292,14 @@ export default function ProductBatchesModal({
                       {canManage && (
                         <div className="flex items-center justify-end gap-2 pt-1">
                           {!b.canDelete && <p className="text-[10px] text-slate-500">{DELETE_BLOCKED_REASON}</p>}
+                          <button
+                            type="button"
+                            onClick={() => startEditingCost(b)}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                          >
+                            <Pencil size={11} />
+                            <span>Цена</span>
+                          </button>
                           <button
                             type="button"
                             disabled={!b.canDelete}
@@ -297,7 +368,15 @@ export default function ProductBatchesModal({
                             {formatMoney(b.costPrice)}
                           </td>
                           {canManage && (
-                            <td className="py-2.5 px-3 text-right">
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => startEditingCost(b)}
+                                className="mr-1.5 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                              >
+                                <Pencil size={11} />
+                                <span>Цена</span>
+                              </button>
                               <button
                                 type="button"
                                 disabled={!b.canDelete}

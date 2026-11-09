@@ -8,8 +8,11 @@ import {
   returnWriteOffTransaction,
   reverseCorrectionWriteOffTransaction,
   reverseIncomingTransaction,
+  updateProductBatchCost,
   writeOffProduct,
 } from '../../api/products.api';
+import { parseMoneyInput } from '../../utils/format';
+import { submitWithCostConfirmation } from '../../utils/productsViewUtils';
 
 type WriteOffData = {
   productId: string;
@@ -117,6 +120,26 @@ const useProductMovementActions = ({
     } catch (err: any) {
       await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
       toast.error(err.response?.data?.error || 'Ошибка при удалении партии');
+    }
+  };
+
+  const handleUpdateBatchCost = async (batchId: number, value: string) => {
+    const purchaseCostPrice = parseMoneyInput(value);
+    if (purchaseCostPrice === null || purchaseCostPrice <= 0) {
+      toast.error('Введите цену закупки больше нуля');
+      return false;
+    }
+
+    try {
+      await submitWithCostConfirmation((confirmCostAboveSelling) =>
+        updateProductBatchCost(batchId, { purchaseCostPrice, confirmCostAboveSelling }),
+      );
+      await Promise.allSettled([refreshSelectedProductBatches(), fetchInitialData()]);
+      toast.success('Цена закупки обновлена');
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Ошибка при изменении цены');
+      return false;
     }
   };
 
@@ -316,6 +339,7 @@ const useProductMovementActions = ({
     handleShowHistory,
     handleShowBatches,
     handleDeleteBatch,
+    handleUpdateBatchCost,
     handleReverseIncoming,
     handleReverseCorrectionWriteOff,
     handleOpenReturnWriteOffModal,

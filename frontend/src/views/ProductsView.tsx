@@ -636,6 +636,7 @@ export default function ProductsView() {
     handleShowHistory,
     handleShowBatches,
     handleDeleteBatch,
+    handleUpdateBatchCost,
     handleReverseIncoming,
     handleReverseCorrectionWriteOff,
     handleOpenReturnWriteOffModal,
@@ -888,6 +889,7 @@ export default function ProductsView() {
           handleOpenDeleteWriteOffConfirm={handleOpenDeleteWriteOffConfirm}
           handleOpenWriteOffModal={handleOpenWriteOffModal}
           handleDeleteBatch={handleDeleteBatch}
+          handleUpdateBatchCost={handleUpdateBatchCost}
           handleMergeProduct={handleMergeProduct}
           handleConfirmDeleteProduct={handleConfirmDeleteProduct}
           handleDeleteWriteOffPermanently={handleDeleteWriteOffPermanently}
