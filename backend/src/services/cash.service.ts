@@ -164,6 +164,24 @@ export class CashService {
     return handovers.map(handoverOut);
   }
 
+  /**
+   * A staff member's cash must be handed over before they stop being staff: an
+   * administrator's or customer's receipts are not handed over, so whatever they still
+   * held would drop out of the cash control.
+   */
+  static async assertCashSettledBeforeLeavingStaff(userId: number, change: { role?: string; active?: boolean }) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user || isAdminRole(user.role)) return;
+    const newRole = String(change.role || '').toUpperCase();
+    if (newRole !== 'ADMIN' && newRole !== 'CUSTOMER' && change.active !== false) return;
+    const { payments, handovers } = await this.ledger([userId]);
+    const { onHand, pendingAmount } = summarize(payments, handovers);
+    if (toCents(onHand) > 0 || toCents(pendingAmount) > 0) {
+      const money = (value: unknown) => addMoney(value).toFixed(2).replace('.', ',');
+      throw conflict(`Сначала касса сотрудника: на руках ${money(onHand)}, ждёт подтверждения ${money(pendingAmount)}. Пусть он передаст деньги в «Моя касса», а вы подтвердите приём в «Контроль кассы».`);
+    }
+  }
+
   static pendingCount() {
     return prisma.cashHandover.count({ where: { status: 'pending' } });
   }

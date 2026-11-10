@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import express from 'express';
 import { once } from 'node:events';
 import type { Server } from 'node:http';
+import jwt from 'jsonwebtoken';
 import { financialJsonReplacer } from '../utils/financial.js';
 
 // Never uses DATABASE_URL: runs only against the isolated *_financial_test database
@@ -57,6 +58,7 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     });
     app.use('/payments', (await import('./payments.routes.js')).default);
     app.use('/cash', (await import('./cash.routes.js')).default);
+    app.use('/auth', (await import('./auth.routes.js')).default);
     app.use((error: any, _req: any, res: any, _next: any) => res.status(error.status || 500).json({ error: error.message }));
     server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
@@ -143,6 +145,30 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect((await mine(ali)).summary.onHand).toBe(0);
     const row = (await call(adminId, 'GET', '/cash/staff')).data.find((s: any) => s.id === ali);
     expect([row.onHand, row.pendingAmount, row.confirmed]).toEqual([0, 0, 2500]);
+  });
+
+  it('will not make a staff member an administrator, a customer or inactive while they hold cash', async () => {
+    const ali = await newSeller();
+    const invoice = await newInvoice(300);
+    const paymentId = (await pay(ali, invoice.invoiceId, 300)).data.id;
+    // The user routes use the real sign-in check, so they get a real administrator token.
+    const token = jwt.sign({ id: adminId }, process.env.JWT_SECRET!, { issuer: process.env.JWT_ISSUER || 'my-wholesale-shop', audience: process.env.JWT_AUDIENCE || 'my-wholesale-shop-users' });
+    const asAdmin = async (method: string, body?: unknown) => {
+      const response = await fetch(`${baseUrl}/auth/users/${ali}`, { method, headers: { 'Content-Type': 'application/json', 'x-test-user': String(adminId), Authorization: `Bearer ${token}` }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: response.status, data: await response.json() as any };
+    };
+
+    const promoted = await asAdmin('PUT', { role: 'ADMIN' });
+    expect([promoted.status, promoted.data.error]).toEqual([409, expect.stringContaining('на руках 300,00')]);
+    expect((await asAdmin('PUT', { active: false })).status).toBe(409);
+    expect((await asAdmin('DELETE')).status).toBe(409);
+    expect((await asAdmin('PUT', { role: 'MANAGER' })).status).toBe(200);
+
+    const sent = (await call(ali, 'POST', '/cash/handovers', { paymentIds: [paymentId], idempotencyKey: key() })).data;
+    expect((await asAdmin('PUT', { role: 'ADMIN' })).data.error).toContain('ждёт подтверждения 300,00');
+    await call(adminId, 'POST', `/cash/handovers/${sent.id}/confirm`);
+    expect((await asAdmin('PUT', { role: 'ADMIN' })).status).toBe(200);
+    expect((await db.user.findUniqueOrThrow({ where: { id: ali } })).role).toBe('ADMIN');
   });
 
   it('keeps exact kopecks and drops a payment cancelled before it was sent', async () => {

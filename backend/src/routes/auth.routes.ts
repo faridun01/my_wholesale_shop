@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import { AuthService } from '../services/auth.service.js';
+import { CashService } from '../services/cash.service.js';
 import { authenticate, authorize, invalidateUserCache } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { securityConfig } from '../config/security.js';
@@ -158,6 +159,8 @@ router.put(
       delete updateData.customerId;
       delete updateData.canCancelInvoices;
       delete updateData.canAcceptPayments;
+    } else {
+      await CashService.assertCashSettledBeforeLeavingStaff(targetId, { role: updateData.role, active: updateData.active });
     }
 
     // A non-admin setting a NEW password for their OWN account through this generic
@@ -194,6 +197,7 @@ router.delete(
   async (req, res, next) => {
   try {
     const targetId = Number(req.params.id);
+    await CashService.assertCashSettledBeforeLeavingStaff(targetId, { active: false });
     await AuthService.deleteUser(targetId);
     invalidateUserCache(targetId);
     res.json({ success: true });

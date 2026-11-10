@@ -15,7 +15,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { canAcceptClientPayments, isAdminUser, isCustomerUser, type AppUser } from '../../utils/userAccess';
+import { isAdminUser, isCustomerUser, type AppUser } from '../../utils/userAccess';
 
 export type NavItem = {
   to: string;
@@ -57,9 +57,10 @@ export function getFilteredNavItems(user: AppUser): NavItem[] {
         return item.to === '/catalog' || item.to === '/pos';
       }
 
-      // Staff hand their own cash over; an administrator's cash is the main cash.
+      // Staff hand their own cash over; an administrator's cash is the main cash. Kept for
+      // staff whose grant was withdrawn too, so they can still hand over what they hold.
       if (item.to === '/my-cash') {
-        return !isAdmin && canAcceptClientPayments(user);
+        return !isAdmin;
       }
       if (item.to === '/cash') {
         return isAdmin;
