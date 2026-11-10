@@ -105,6 +105,7 @@ export default function SettingsView() {
     warehouseId: '',
     customerId: '',
     canCancelInvoices: false,
+    canAcceptPayments: false,
   };
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [customerOptions, setCustomerOptions] = useState<any[]>([]);
@@ -892,7 +893,12 @@ export default function SettingsView() {
                                 Отмена накл.
                               </span>
                             )}
-                            {!u.canCancelInvoices && (
+                            {u.canAcceptPayments && (
+                              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200/60">
+                                Приём оплаты
+                              </span>
+                            )}
+                            {!u.canCancelInvoices && !u.canAcceptPayments && (
                               <span className="text-slate-400 text-[11px]">—</span>
                             )}
                           </div>
@@ -936,6 +942,7 @@ export default function SettingsView() {
                                     warehouseId: u.warehouseId ? String(u.warehouseId) : '',
                                     customerId: u.customerId ? String(u.customerId) : '',
                                     canCancelInvoices: !!u.canCancelInvoices,
+                                    canAcceptPayments: !!u.canAcceptPayments,
                                   });
                                   setShowEditUser(true);
                                 }}
@@ -1032,6 +1039,7 @@ export default function SettingsView() {
                                 warehouseId: u.warehouseId ? String(u.warehouseId) : '',
                                 customerId: u.customerId ? String(u.customerId) : '',
                                 canCancelInvoices: !!u.canCancelInvoices,
+                                canAcceptPayments: !!u.canAcceptPayments,
                               });
                               setShowEditUser(true);
                             }}
@@ -1070,6 +1078,11 @@ export default function SettingsView() {
                       {u.canCancelInvoices && (
                         <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                           Отмена
+                        </span>
+                      )}
+                      {u.canAcceptPayments && (
+                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          Приём оплаты
                         </span>
                       )}
                     </div>
@@ -1674,6 +1687,18 @@ export default function SettingsView() {
                             checked={newUser.canCancelInvoices}
                             onChange={(e) => setNewUser({ ...newUser, canCancelInvoices: e.target.checked })}
                             className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 text-xs font-medium text-slate-700 cursor-pointer">
+                          <span>
+                            Может принимать оплату
+                            <span className="block text-[11px] font-normal text-slate-500">Принятые деньги сотрудник передаёт администратору в «Моя касса»</span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={newUser.canAcceptPayments}
+                            onChange={(e) => setNewUser({ ...newUser, canAcceptPayments: e.target.checked })}
+                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                           />
                         </label>
                       </div>

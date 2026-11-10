@@ -28,6 +28,7 @@ type PublicUser = {
   customerId: number | null;
   active: boolean;
   canCancelInvoices: boolean;
+  canAcceptPayments: boolean;
   twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -52,6 +53,7 @@ const toPublicUser = (user: any): PublicUser => ({
   customerId: user.customerId ?? null,
   active: user.active,
   canCancelInvoices: Boolean(user.canCancelInvoices),
+  canAcceptPayments: Boolean(user.canAcceptPayments),
   twoFactorEnabled: Boolean(user.twoFactorEnabled),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
@@ -223,6 +225,7 @@ export class AuthService {
     warehouseId?: number;
     customerId?: number;
     canCancelInvoices?: boolean;
+    canAcceptPayments?: boolean;
   }) {
     const username = normalizeUsername(data.username);
     validatePasswordStrength(data.password);
@@ -238,6 +241,7 @@ export class AuthService {
         warehouseId: data.warehouseId,
         customerId: data.customerId,
         canCancelInvoices: data.canCancelInvoices || false,
+        canAcceptPayments: data.canAcceptPayments || false,
       },
       include: { warehouse: true, customer: true },
     });

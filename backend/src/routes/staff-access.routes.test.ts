@@ -49,8 +49,8 @@ beforeAll(async () => {
   prisma = (await import('../db/prisma.js')).default;
 });
 
-describe('payments: only ADMIN can record or cancel a payment', () => {
-  it('rejects a seller creating a payment for their own invoice', async () => {
+describe('payments: a seller records one only with the grant, and never cancels one', () => {
+  it('rejects a seller without "Может принимать оплату" creating a payment', async () => {
     const handler = getHandler(paymentsRouter, 'post', '/');
     const res = createMockResponse();
 

@@ -45,6 +45,23 @@ export class AuditService {
   }
 
   /**
+   * Writes the entry inside the caller's transaction: it is kept or rolled back with
+   * the action it describes, so a financial action never exists without its record.
+   */
+  static async record(tx: any, options: AuditLogOptions) {
+    await tx.auditLog.create({
+      data: {
+        userId: options.userId ?? null,
+        action: options.action,
+        entity: options.entity,
+        entityId: options.entityId ?? null,
+        details: typeof options.details === 'object' ? JSON.stringify(options.details) : options.details ?? null,
+        ipAddress: options.ipAddress ?? null,
+      },
+    });
+  }
+
+  /**
    * Fetches audit logs with optional filtering.
    */
   static async getLogs(limit = 100, offset = 0) {

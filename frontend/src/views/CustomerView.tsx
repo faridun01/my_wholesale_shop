@@ -36,7 +36,8 @@ import { formatCount, formatMoney, formatTransactionReason } from '../utils/form
 import { formatProductName } from '../utils/productName';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import PaginationControls from '../components/common/PaginationControls';
-import { getCurrentUser, isAdminUser } from '../utils/userAccess';
+import { canAcceptClientPayments, getCurrentUser, isAdminUser } from '../utils/userAccess';
+import StaffCollectPanel from '../components/cash/StaffCollectPanel';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   CUSTOMER_PAYMENT_EPSILON,
@@ -586,6 +587,8 @@ export default function CustomerView() {
             </button>
           </div>
         </div>
+
+        {!isAdmin && canAcceptClientPayments(user) && <StaffCollectPanel />}
 
         {/* Desktop Tabs */}
         <div className="hidden lg:flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">

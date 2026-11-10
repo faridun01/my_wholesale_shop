@@ -410,6 +410,75 @@ suite('full financial lifecycle through the real routes', () => {
     expect((await call('POST', '/payments/give-back', { invoice_id: legacy.id, amount: 1, method: 'cash', idempotency_key: key() })).status).toBe(400);
   });
 
+  it('lists every event of an invoice in order, with who did it and what changed', async () => {
+    const p = await newProduct(10);
+    const q = await newProduct(20);
+    await restock(p, 50, 1);
+    await restock(q, 50, 2);
+    const id = (await sell([{ productId: p, quantity: 10, sellingPrice: '10', discount: 0 }])).data.id;
+    expect((await call('PUT', `/invoices/${id}`, { customerId, items: [{ productId: p, quantity: 8, sellingPrice: '10' }, { productId: q, quantity: 1, sellingPrice: '20' }], discount: 10 })).status).toBe(200);
+    const firstPayment = (await pay(id, 50)).data;
+    expect((await call('DELETE', `/payments/${firstPayment.id}`)).status).toBe(200);
+    expect((await pay(id, 90)).status).toBe(201);
+    const newCustomer = await db.customer.create({ data: { name: `History ${crypto.randomUUID()}` } });
+    expect((await call('PUT', `/invoices/${id}`, { customerId: newCustomer.id })).status).toBe(200);
+    const line = (await invoiceOf(id)).items.find((item) => item.productId === p)!;
+    expect((await returnItems(id, [{ invoiceItemId: line.id, quantity: 4 }])).status).toBe(200);
+    expect((await giveBack(id, 36)).status).toBe(201);
+
+    const { status, data } = await call('GET', `/invoices/${id}/history`);
+    expect(status).toBe(200);
+    expect(data.earlierEditsNotKept).toBe(false);
+    expect(data.events.map((event: any) => event.type)).toEqual(['created', 'edited', 'payment', 'payment_reversed', 'payment', 'edited', 'returned', 'money_returned']);
+    expect(data.events.every((event: any) => typeof event.user === 'string' && event.user.length > 0)).toBe(true);
+    const [created, edited, reversedPayment, reversal, payment, customerChange, returned, handedBack] = data.events;
+    expect(created.amount).toBe('100');
+    expect(created.items).toEqual([expect.objectContaining({ quantity: 10, price: '10', discount: '0', total: 100 })]);
+    expect(edited.changes.amount).toEqual({ before: 100, after: 90 });
+    expect(edited.changes.discount).toEqual({ before: 0, after: 10 });
+    expect(edited.changes.items).toEqual([
+      expect.objectContaining({ before: expect.objectContaining({ quantity: 10 }), after: expect.objectContaining({ quantity: 8 }) }),
+      expect.objectContaining({ before: null, after: expect.objectContaining({ quantity: 1, price: '20' }) }),
+    ]);
+    expect([reversedPayment.amount, reversedPayment.reversed, reversal.amount]).toEqual(['50', true, '50']);
+    expect([payment.amount, payment.reversed]).toEqual(['90', false]);
+    expect(customerChange.changes.customer.after).toBe(newCustomer.name);
+    expect([customerChange.changes.amount, customerChange.changes.items]).toEqual([null, []]);
+    expect(returned.amount).toBe('36');
+    expect(returned.reason).toBe('lifecycle');
+    expect(returned.items).toEqual([expect.objectContaining({ quantity: 4, total: 36 })]);
+    expect(handedBack.amount).toBe('36');
+    expect(JSON.stringify(data)).not.toMatch(/cost/i);
+  });
+
+  it('shows a cancellation and a system correction, and keeps history private to the seller', async () => {
+    const p = await newProduct(10);
+    await restock(p, 50, 1);
+    const cancelledId = (await sell([{ productId: p, quantity: 6, sellingPrice: '10', discount: 0 }])).data.id;
+    expect((await call('POST', `/invoices/${cancelledId}/cancel`)).status).toBe(200);
+    const cancelled = (await call('GET', `/invoices/${cancelledId}/history`)).data.events.at(-1);
+    expect([cancelled.type, cancelled.quantityRestored, cancelled.exactDate]).toEqual(['cancelled', 6, true]);
+    expect(cancelled.user).toEqual(expect.any(String));
+
+    const id = (await sell([{ productId: p, quantity: 10, sellingPrice: '10', discount: 0 }])).data.id;
+    await db.invoice.update({ where: { id }, data: { createdAt: new Date('2026-05-01T00:00:00Z') } });
+    await db.invoiceRevision.create({ data: { invoiceId: id, userId: adminId, snapshot: {
+      correction: 'Исправление завышения цены на 0,01 за единицу', id, totalAmount: '100.10', discount: '0', netAmount: '100.10',
+      items: [{ id: 1, productId: p, quantity: 10, sellingPrice: '10', discount: '0', totalPrice: '100.10' }],
+    } } });
+    const history = (await call('GET', `/invoices/${id}/history`)).data;
+    expect(history.earlierEditsNotKept).toBe(true);
+    expect(history.events[0].amount).toBe('100.1');
+    const corrected = history.events.find((event: any) => event.type === 'corrected');
+    expect([corrected.user, corrected.note, corrected.changes.amount]).toEqual([null, 'Исправление завышения цены на 0,01 за единицу', { before: 100.1, after: 100 }]);
+
+    const otherSeller = await db.user.create({ data: { username: `h-${crypto.randomUUID()}`, passwordHash: 'test-only', role: 'CASHIER', warehouseId } });
+    await db.invoice.update({ where: { id }, data: { userId: otherSeller.id } });
+    const refused = await fetch(`${baseUrl}/invoices/${id}/history`, { headers: { 'x-test-role': 'CASHIER' } });
+    expect(refused.status).toBe(403);
+    expect((await call('GET', '/invoices/999999999/history')).status).toBe(404);
+  });
+
   it('counts old goods-return offsets as received money in staff totals', async () => {
     const { StaffStatsService } = await import('./staff-stats.service.js');
     const warehouse = (await db.warehouse.create({ data: { name: `Staff ${crypto.randomUUID()}` } })).id;

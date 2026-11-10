@@ -30,6 +30,8 @@ const POSView = React.lazy(() => import('./views/POSView'));
 const CustomerOrdersView = React.lazy(() => import('./views/CustomerOrdersView'));
 const MenuView = React.lazy(() => import('./views/MenuView'));
 const StaffView = React.lazy(() => import('./views/StaffView'));
+const MyCashView = React.lazy(() => import('./views/MyCashView'));
+const CashControlView = React.lazy(() => import('./views/CashControlView'));
 
 const RouteLoading = () => (
   <div className="flex min-h-[40vh] items-center justify-center">
@@ -279,6 +281,22 @@ export default function App() {
             element={
               <AdminRoute>
                 <StaffView />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/my-cash"
+            element={
+              <StaffRoute>
+                <MyCashView />
+              </StaffRoute>
+            }
+          />
+          <Route
+            path="/cash"
+            element={
+              <AdminRoute>
+                <CashControlView />
               </AdminRoute>
             }
           />

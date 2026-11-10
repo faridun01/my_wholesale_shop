@@ -7,6 +7,7 @@ export type AppUser = {
   warehouseId?: number | string | null;
   customerId?: number | string | null;
   twoFactorEnabled?: boolean;
+  canAcceptPayments?: boolean;
   warehouse?: {
     id?: number;
     name?: string;
@@ -30,6 +31,11 @@ export function getCurrentUser(): AppUser {
 export function isAdminUser(user: AppUser): boolean {
   const role = String(user.role || '').toUpperCase();
   return role === 'ADMIN';
+}
+
+/** A staff member granted "Может принимать оплату" (an administrator always may). */
+export function canAcceptClientPayments(user: AppUser): boolean {
+  return isAdminUser(user) || Boolean(user.canAcceptPayments);
 }
 
 export function isCustomerUser(user: AppUser): boolean {

@@ -17,6 +17,7 @@ export const registerBodySchema = z.object({
   warehouseId: z.coerce.number().int().positive().optional(),
   customerId: z.coerce.number().int().positive().optional(),
   canCancelInvoices: z.boolean().optional(),
+  canAcceptPayments: z.boolean().optional(),
 });
 
 export const updateUserBodySchema = z
@@ -32,6 +33,7 @@ export const updateUserBodySchema = z
     warehouseId: z.coerce.number().int().positive().nullable().optional(),
     customerId: z.coerce.number().int().positive().nullable().optional(),
     canCancelInvoices: z.boolean().optional(),
+    canAcceptPayments: z.boolean().optional(),
     active: z.boolean().optional(),
   })
   .refine((payload) => Object.keys(payload).length > 0, {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Download, LogOut, Warehouse } from 'lucide-react';
+import { Banknote, ChevronLeft, Download, LogOut, Warehouse } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -10,6 +10,7 @@ import { getCurrentUser, isAdminUser, isCustomerUser } from '../../utils/userAcc
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import InstallPwaModal from '../pwa/InstallPwaModal';
 import { SHOW_CUSTOMER_ORDERS, getFilteredNavItems, type NavItem } from './navConfig';
+import { getPendingHandoversCount } from '../../api/cash.api';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
   const [remindersCount, setRemindersCount] = useState(0);
   const [customerOrdersCount, setCustomerOrdersCount] = useState(0);
   const previousCustomerOrdersCountRef = useRef<number | null>(null);
+  const [cashPendingCount, setCashPendingCount] = useState(0);
+  const previousCashPendingCountRef = useRef<number | null>(null);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   );
@@ -109,6 +112,52 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
       window.removeEventListener('customer-orders-updated', refreshCustomerOrdersCount as EventListener);
     };
   }, [isCustomer]);
+
+  // Tells an administrator that a staff member sent cash to be confirmed.
+  useEffect(() => {
+    if (!hasStoredSession() || !isAdmin) return;
+
+    const refreshCashPendingCount = () => {
+      getPendingHandoversCount()
+        .then((nextCount) => {
+          const previousCount = previousCashPendingCountRef.current;
+          if (nextCount > 0 && (previousCount === null || nextCount > previousCount)) {
+            toast(
+              (t) => (
+                <button
+                  type="button"
+                  className="text-left"
+                  onClick={() => {
+                    toast.dismiss(t.id);
+                    navigate('/cash');
+                  }}
+                >
+                  <span className="block font-semibold">
+                    {previousCount === null ? `Передач кассы ждут подтверждения: ${nextCount}` : 'Сотрудник передал кассу'}
+                  </span>
+                  <span className="block text-xs text-slate-500">Пересчитайте деньги и подтвердите приём</span>
+                </button>
+              ),
+              { id: 'cash-handover', duration: 10000, icon: <Banknote size={18} className="text-emerald-600" /> },
+            );
+          }
+          previousCashPendingCountRef.current = nextCount;
+          setCashPendingCount(nextCount);
+        })
+        .catch(() => setCashPendingCount(0));
+    };
+
+    refreshCashPendingCount();
+    const intervalId = window.setInterval(refreshCashPendingCount, 30000);
+    window.addEventListener('focus', refreshCashPendingCount);
+    window.addEventListener('cash-handovers-updated', refreshCashPendingCount as EventListener);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshCashPendingCount);
+      window.removeEventListener('cash-handovers-updated', refreshCashPendingCount as EventListener);
+    };
+  }, [isAdmin, navigate]);
 
   useEffect(() => {
     if (typeof document === 'undefined' || isDesktopViewport) return;
@@ -251,6 +300,17 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                           <item.icon size={18} className="shrink-0" strokeWidth={isActive ? 2.2 : 2} />
 
                           {!sidebarCollapsed && <span className="truncate text-[13.5px] font-medium">{item.label}</span>}
+
+                          {item.to === '/cash' && cashPendingCount > 0 && (
+                            <span
+                              className={clsx(
+                                'flex items-center justify-center rounded-full bg-amber-500 text-[9px] font-semibold text-white',
+                                sidebarCollapsed ? 'absolute right-1 top-1 h-4 min-w-4 px-1' : 'ml-auto h-4 min-w-4 px-1',
+                              )}
+                            >
+                              {cashPendingCount > 9 ? '9+' : cashPendingCount}
+                            </span>
+                          )}
 
                           {item.to === '/reminders' && remindersCount > 0 && (
                             <span

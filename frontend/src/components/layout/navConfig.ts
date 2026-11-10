@@ -4,6 +4,7 @@ import {
   BookOpen,
   Calendar,
   History,
+  Landmark,
   LayoutDashboard,
   Package,
   Settings,
@@ -11,9 +12,10 @@ import {
   ShoppingCart,
   UserCheck,
   Users,
+  Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { isAdminUser, isCustomerUser, type AppUser } from '../../utils/userAccess';
+import { canAcceptClientPayments, isAdminUser, isCustomerUser, type AppUser } from '../../utils/userAccess';
 
 export type NavItem = {
   to: string;
@@ -33,9 +35,11 @@ export const navItems: NavItem[] = [
   { to: '/catalog', icon: BookOpen, label: 'Каталог', section: 'Управление' },
   { to: '/products', icon: Package, label: 'Товары', section: 'Управление' },
   { to: '/sales', icon: History, label: 'История продаж', section: 'Управление' },
+  { to: '/my-cash', icon: Wallet, label: 'Моя касса', section: 'Управление' },
   { to: '/customers', icon: Users, label: 'Клиенты', section: 'Отношения' },
   { to: '/staff', icon: UserCheck, label: 'Сотрудники', section: 'Отношения' },
   { to: '/reminders', icon: Calendar, label: 'Напоминания', section: 'Отношения' },
+  { to: '/cash', icon: Landmark, label: 'Контроль кассы', section: 'Система' },
   { to: '/expenses', icon: Banknote, label: 'Расходы', section: 'Система' },
   { to: '/reports', icon: BarChart3, label: 'Отчеты', section: 'Система' },
   { to: '/settings', icon: Settings, label: 'Настройки', section: 'Система' },
@@ -51,6 +55,14 @@ export function getFilteredNavItems(user: AppUser): NavItem[] {
     .filter((item) => {
       if (isCustomer) {
         return item.to === '/catalog' || item.to === '/pos';
+      }
+
+      // Staff hand their own cash over; an administrator's cash is the main cash.
+      if (item.to === '/my-cash') {
+        return !isAdmin && canAcceptClientPayments(user);
+      }
+      if (item.to === '/cash') {
+        return isAdmin;
       }
 
       if (

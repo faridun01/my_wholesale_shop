@@ -16,6 +16,7 @@ import paymentRoutes from './routes/payments.routes.js';
 import expenseRoutes from './routes/expenses.routes.js';
 import customerOrderRoutes from './routes/customer-orders.routes.js';
 import staffRoutes from './routes/staff.routes.js';
+import cashRoutes from './routes/cash.routes.js';
 import { authenticate, authenticateUploadAccess } from './middlewares/auth.middleware.js';
 import { corsMiddleware, securityHeaders } from './middlewares/security.middleware.js';
 import { generalRateLimit } from './middlewares/general-rate-limit.middleware.js';
@@ -72,6 +73,7 @@ app.use('/api/payments', authenticate, paymentRoutes);
 app.use('/api/expenses', authenticate, expenseRoutes);
 app.use('/api/customer-orders', authenticate, customerOrderRoutes);
 app.use('/api/staff', authenticate, staffRoutes);
+app.use('/api/cash', authenticate, cashRoutes);
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 import { uploadImage } from './middlewares/upload.middleware.js';

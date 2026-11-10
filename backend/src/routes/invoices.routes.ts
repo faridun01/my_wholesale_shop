@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { operationKey } from '../utils/financial-operation.js';
 import prisma from '../db/prisma.js';
 import { InvoiceService } from '../services/invoice.service.js';
+import { getInvoiceHistory } from '../services/invoice-history.service.js';
 import { AuditService } from '../services/audit.service.js';
 import { AuthRequest } from '../middlewares/auth.middleware.js';
 import { ensureWarehouseAccess, getAccessContext, getScopedWarehouseId } from '../utils/access.js';
@@ -132,6 +133,27 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
 
     const invoice = await InvoiceService.getInvoiceDetails(Number(req.params.id));
     res.json(invoice);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/history', async (req: AuthRequest, res, next) => {
+  try {
+    const access = await getAccessContext(req);
+    const invoiceId = Number(req.params.id);
+    const invoiceMeta = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      select: { warehouseId: true, userId: true },
+    });
+    if (!invoiceMeta) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (!canAccessInvoice(access, invoiceMeta)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    res.json(await getInvoiceHistory(invoiceId));
   } catch (error) {
     next(error);
   }

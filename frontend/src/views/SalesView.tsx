@@ -2,6 +2,7 @@ import { decimal } from '../utils/financial';
 import { returnPreview } from '../utils/returnPreview';
 import { addMoney } from '../utils/financial';
 import InvoiceFinancialHistory from '../components/sales/InvoiceFinancialHistory';
+import InvoiceChangeHistory from '../components/sales/InvoiceChangeHistory';
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 import { 
@@ -1017,6 +1018,7 @@ export default function SalesView() {
                 </div>
 
                 <InvoiceFinancialHistory invoice={selectedInvoice} />
+                <InvoiceChangeHistory key={selectedInvoice.id} invoiceId={selectedInvoice.id} />
                 {/* Summary Requisites Block */}
                 <div className="flex justify-end pt-1">
                   <div className="w-full sm:max-w-96 rounded-2xl border border-slate-200/90 bg-white p-4 text-xs space-y-2.5 shadow-sm">

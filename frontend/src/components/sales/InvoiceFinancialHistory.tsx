@@ -4,7 +4,7 @@ import { returnReceiptInvoice } from '../../utils/print/returnReceipt';
 import { getInvoiceAmountToReturn, getInvoiceShownPaidAmount } from '../../utils/salesViewUtils';
 import toast from 'react-hot-toast';
 
-const methods: Record<string, string> = { cash: 'Наличные', card: 'Карта', transfer: 'Перевод', mixed: 'Несколько способов' };
+export const methods: Record<string, string> = { cash: 'Наличные', card: 'Карта', transfer: 'Перевод', mixed: 'Несколько способов' };
 async function document(invoice: any, pdf = false) {
   try {
     if (pdf) { const { downloadSalesInvoicePdf } = await import('../../utils/print/salesInvoicePdf'); await downloadSalesInvoicePdf(invoice); }

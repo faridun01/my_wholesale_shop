@@ -19,6 +19,7 @@ model User {
   customerId       Int?      @map("customer_id")
   active           Boolean   @default(true)
   canCancelInvoices Boolean   @default(false) @map("can_cancel_invoices")
+  canAcceptPayments Boolean   @default(false) @map("can_accept_payments")
   twoFactorEnabled Boolean   @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?   @map("two_factor_secret")
   twoFactorBackupCodes String[] @default([]) @map("two_factor_backup_codes")
@@ -36,6 +37,8 @@ model User {
   expensePayments ExpensePayment[]
   customerOrders CustomerOrder[]
   approvedCustomerOrders CustomerOrder[] @relation("ApprovedCustomerOrders")
+  cashHandovers CashHandover[] @relation("CashHandoverStaff")
+  confirmedCashHandovers CashHandover[] @relation("CashHandoverConfirmedBy")
 
   @@index([active, warehouseId])
   @@index([customerId, active])
@@ -464,12 +467,47 @@ model Payment {
   customer Customer @relation(fields: [customerId], references: [id])
   invoice  Invoice? @relation(fields: [invoiceId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
+  cashHandoverItem CashHandoverItem?
 
   @@index([customerId, createdAt])
   @@index([customerId, invoiceId])
   @@index([invoiceId, createdAt])
   @@index([userId, createdAt])
   @@map("payments")
+}
+
+// Cash a staff member hands to an administrator. Client payments are never changed by it.
+model CashHandover {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  status          String    @default("pending") // 'pending' | 'confirmed'
+  amount          Decimal   @db.Decimal(12, 2)
+  confirmedById   Int?      @map("confirmed_by_id")
+  confirmedAt     DateTime? @map("confirmed_at")
+  idempotencyKey  String    @unique @map("idempotency_key")
+  requestHash     String    @map("request_hash")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user        User               @relation("CashHandoverStaff", fields: [userId], references: [id])
+  confirmedBy User?              @relation("CashHandoverConfirmedBy", fields: [confirmedById], references: [id])
+  items       CashHandoverItem[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("cash_handovers")
+}
+
+model CashHandoverItem {
+  id         Int     @id @default(autoincrement())
+  handoverId Int     @map("handover_id")
+  paymentId  Int     @unique @map("payment_id")
+  amount     Decimal @db.Decimal(12, 2)
+
+  handover CashHandover @relation(fields: [handoverId], references: [id], onDelete: Restrict)
+  payment  Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([handoverId])
+  @@map("cash_handover_items")
 }
 
 model Expense {
