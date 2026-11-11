@@ -52,7 +52,7 @@ export default function MyCashView() {
               <MoneyTile label="Принято сегодня" value={data.summary.today} />
               <MoneyTile label="На руках" value={data.summary.onHand} tone={toCents(data.summary.onHand) > 0 ? 'warn' : 'default'} hint="ещё не передано" />
               <MoneyTile label="Ждёт подтверждения" value={data.summary.pendingAmount} />
-              <MoneyTile label="Сдано администратору" value={data.summary.confirmed} tone="good" />
+              <MoneyTile label="Сдано" value={data.summary.confirmed} tone="good" hint="администратору, всего" />
             </div>
 
             <button

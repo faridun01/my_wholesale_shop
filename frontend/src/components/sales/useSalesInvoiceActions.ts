@@ -77,7 +77,7 @@ const useSalesInvoiceActions = ({
 
     try {
       await client.delete(`/invoices/${id}${force ? '?force=true' : ''}`);
-      toast.success('Накладная удалена');
+      toast.success('Накладная отменена, товар вернулся на склад');
       closeDeleteInvoiceModal();
 
       if (Number(selectedInvoice?.id) === Number(id)) {
@@ -89,7 +89,7 @@ const useSalesInvoiceActions = ({
       }
       await fetchInvoices();
     } catch (err: any) {
-      const message = err.response?.data?.error || err?.message || 'Ошибка при удалении накладной';
+      const message = err.response?.data?.error || err?.message || 'Ошибка при отмене накладной';
       const isForceNeeded = !force && (message.includes('уже есть оплата') || message.includes('уже есть возврат'));
 
       if (isForceNeeded) {

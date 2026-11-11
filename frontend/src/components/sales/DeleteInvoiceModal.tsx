@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import {
   AlertTriangle,
-  Trash2,
+  Ban,
   X,
   Loader2,
   User,
@@ -121,11 +121,11 @@ export default function DeleteInvoiceModal({
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 shadow-2xs">
-                  <Trash2 size={20} />
+                  <Ban size={20} />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                    Удалить накладную №{invoiceId}
+                    Отменить накладную №{invoiceId}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                     Отмена продажи и возврат товаров на склад
@@ -225,10 +225,10 @@ export default function DeleteInvoiceModal({
                 <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
                 <div className="text-xs text-rose-950 leading-relaxed space-y-1">
                   <p className="font-semibold text-rose-900">
-                    Это действие нельзя будет отменить
+                    Отменённую накладную нельзя вернуть в работу
                   </p>
                   <p className="text-[11px] text-rose-800/90 leading-snug">
-                    Все списанные товары из накладной будут автоматически возвращены на склад, а накладная будет аннулирована.
+                    Все товары из накладной вернутся на склад, а накладная будет аннулирована: она останется в истории со статусом «Отменена» и не попадёт в продажи, долги и отчёты.
                   </p>
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function DeleteInvoiceModal({
                   </div>
                   <p className="text-[11px] text-amber-800 leading-relaxed">
                     {paidAmount > 0.005
-                      ? `По этой накладной внесены оплаты на сумму ${formatMoney(paidAmount)}. При принудительном удалении полученные платежи не будут удалены автоматически.`
+                      ? `По этой накладной внесены оплаты на сумму ${formatMoney(paidAmount)}. При принудительной отмене полученные платежи останутся в истории.`
                       : 'По этой накладной производились возвраты. Требуется принудительный режим.'}
                   </p>
 
@@ -254,7 +254,7 @@ export default function DeleteInvoiceModal({
                       className="h-4 w-4 rounded border-amber-300 text-rose-600 focus:ring-rose-500"
                     />
                     <span className="text-xs font-bold text-rose-800">
-                      Удалить принудительно (force delete)
+                      Отменить принудительно
                     </span>
                   </label>
                 </div>
@@ -272,7 +272,7 @@ export default function DeleteInvoiceModal({
                         onClick={() => setForceDelete(true)}
                         className="underline text-[11px] text-rose-700 font-bold hover:text-rose-900"
                       >
-                        Включить принудительное удаление и повторить
+                        Включить принудительную отмену и повторить
                       </button>
                     )}
                   </div>
@@ -289,7 +289,7 @@ export default function DeleteInvoiceModal({
                   disabled={isDeleting}
                   className="flex-1 h-11 sm:h-12 rounded-xl sm:rounded-2xl border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-[0.98] transition-all disabled:opacity-50"
                 >
-                  Отмена
+                  Не отменять
                 </button>
                 <button
                   type="submit"
@@ -299,17 +299,17 @@ export default function DeleteInvoiceModal({
                   {isDeleting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>Удаление...</span>
+                      <span>Отмена накладной...</span>
                     </>
                   ) : forceDelete ? (
                     <>
-                      <Trash2 size={16} />
-                      <span>Удалить принудительно</span>
+                      <Ban size={16} />
+                      <span>Отменить принудительно</span>
                     </>
                   ) : (
                     <>
-                      <Trash2 size={16} />
-                      <span>Удалить накладную</span>
+                      <Ban size={16} />
+                      <span>Отменить накладную</span>
                     </>
                   )}
                 </button>

@@ -89,7 +89,8 @@ export default function AcceptPaymentModal({ customer, onClose, onDone }: { cust
         onChange={(event) => setAmount(event.target.value)}
         className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 font-mono text-base font-bold text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
       />
-      {problem && <p className="mt-1.5 text-xs font-semibold text-rose-600">{problem}</p>}
+      {/* Choosing the invoice is the next step, not a mistake. */}
+      {problem && <p className={clsx('mt-1.5 text-xs font-semibold', invoice ? 'text-rose-600' : 'text-slate-500')}>{problem}</p>}
     </Modal>
   );
 }

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CreditCard,
   Download,
+  Landmark,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -15,8 +16,10 @@ import {
   UserCheck,
   Users,
   Loader2,
+  Wallet,
 } from 'lucide-react';
 import client from '../api/client';
+import { getPendingHandoversCount } from '../api/cash.api';
 import { logout } from '../api/auth.api';
 import { clearAuthSession, hasStoredSession } from '../utils/authStorage';
 import { getCurrentUser, isAdminUser, isCustomerUser } from '../utils/userAccess';
@@ -46,6 +49,7 @@ export default function MenuView() {
   }, [defaultDesktopRoute, navigate]);
 
   const [remindersCount, setRemindersCount] = useState(0);
+  const [cashPendingCount, setCashPendingCount] = useState(0);
   const { isStandalone, isInstalled, isIOS, canPromptNative, promptInstall, markAsInstalled } = usePWAInstall();
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -63,6 +67,13 @@ export default function MenuView() {
         setRemindersCount(0);
       });
   }, [isCustomer]);
+
+  useEffect(() => {
+    if (!hasStoredSession() || !isAdmin) return;
+    getPendingHandoversCount()
+      .then(setCashPendingCount)
+      .catch(() => setCashPendingCount(0));
+  }, [isAdmin]);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -161,6 +172,41 @@ export default function MenuView() {
               </div>
               <ChevronRight size={16} className="text-slate-300" />
             </Link>
+
+            {isAdmin ? (
+              <Link
+                to="/cash"
+                className="flex items-center justify-between p-3.5 transition-colors hover:bg-slate-50 active:bg-slate-100/70"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Landmark size={18} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-900">Контроль кассы</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {cashPendingCount > 0 && (
+                    <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white">
+                      {cashPendingCount}
+                    </span>
+                  )}
+                  <ChevronRight size={16} className="text-slate-300" />
+                </div>
+              </Link>
+            ) : (
+              <Link
+                to="/my-cash"
+                className="flex items-center justify-between p-3.5 transition-colors hover:bg-slate-50 active:bg-slate-100/70"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Wallet size={18} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-900">Моя касса</span>
+                </div>
+                <ChevronRight size={16} className="text-slate-300" />
+              </Link>
+            )}
 
             <Link
               to="/reminders"

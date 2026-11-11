@@ -15,7 +15,7 @@ import {
   RotateCcw,
   Search,
   Share2,
-  Trash2,
+  Ban,
   X,
 } from 'lucide-react';
 import FloatingMenu from '../common/FloatingMenu';
@@ -271,11 +271,11 @@ function SalesRowActions({
                 className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
               >
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100/70 text-rose-600 border border-rose-200/80 transition-colors group-hover:bg-rose-500 group-hover:text-white">
-                  <Trash2 size={14} />
+                  <Ban size={14} />
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="font-semibold text-rose-600">Удалить</span>
-                  <span className="text-[10px] font-normal text-rose-400">Безвозвратное удаление</span>
+                  <span className="font-semibold text-rose-600">Отменить</span>
+                  <span className="text-[10px] font-normal text-rose-400">Товар вернётся на склад</span>
                 </div>
               </button>
             </>
@@ -1083,11 +1083,11 @@ const SalesInvoicesSection = ({
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 shadow-2xs border border-rose-200">
-                          <Trash2 size={15} />
+                          <Ban size={15} />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-rose-700">Удалить накладную</p>
-                          <p className="text-[10px] text-rose-500/80">Безвозвратное удаление</p>
+                          <p className="text-xs font-bold text-rose-700">Отменить накладную</p>
+                          <p className="text-[10px] text-rose-500/80">Товар вернётся на склад</p>
                         </div>
                       </div>
                       <ChevronRight size={14} className="text-rose-300 group-hover:text-rose-500 transition-colors" />

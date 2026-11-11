@@ -1296,10 +1296,10 @@ export default function SalesView() {
                         handleDeleteInvoice(selectedInvoice);
                       }}
                       className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200/90 bg-rose-50/80 text-rose-600 shadow-2xs hover:bg-rose-500 hover:text-white hover:border-rose-500 active:scale-95 transition-all shrink-0"
-                      title="Удалить накладную"
-                      aria-label="Удалить накладную"
+                      title="Отменить накладную"
+                      aria-label="Отменить накладную"
                     >
-                      <Trash2 size={17} />
+                      <Ban size={17} />
                     </button>
                   )}
 

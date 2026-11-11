@@ -498,7 +498,7 @@ export class InvoiceService {
         Number(invoice.paidAmount || 0) > 0 ||
         toCents(addMoney(...(invoice.payments || []).map((p: any) => p.amount))) !== toCents(invoice.paidAmount)
       ) {
-        throw new Error('Нельзя менять товары в накладной после оплаты. Сначала удалите оплату.');
+        throw new Error('Нельзя менять товары в накладной после оплаты. Сначала отмените оплату.');
       }
 
       let customer: any = null;
@@ -748,11 +748,11 @@ export class InvoiceService {
       }
 
       if (Number(invoice.paidAmount || 0) !== 0 || toCents(addMoney(...(invoice.payments || []).map((p: any) => p.amount))) !== 0) {
-        throw new Error('Нельзя удалить накладную, по которой уже есть оплата');
+        throw new Error('Нельзя отменить накладную, по которой уже есть оплата');
       }
 
       if ((invoice.returns?.length || 0) > 0 || Number(invoice.returnedAmount || 0) > 0) {
-        throw new Error('Нельзя удалить накладную, по которой уже есть возврат');
+        throw new Error('Нельзя отменить накладную, по которой уже есть возврат');
       }
 
       // 1. Return stock for each item
