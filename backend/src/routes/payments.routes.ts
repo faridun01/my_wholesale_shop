@@ -9,6 +9,7 @@ import { normalizeMoney, roundMoney, getInvoiceStatus } from '../utils/money.js'
 import { PUBLIC_USER_SELECT } from '../utils/publicUser.js';
 import { NO_PAYMENT_PERMISSION_ERROR } from '../services/cash.service.js';
 import { AuditService } from '../services/audit.service.js';
+import { publishCashEvent } from '../services/cash-events.js';
 
 const router = Router();
 const PAYMENT_EPSILON = 0.01;
@@ -53,6 +54,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       await AuditService.record(tx, { userId: req.user!.id, action: 'PAYMENT_ACCEPTED', entity: 'Payment', entityId: payment.id, ipAddress: req.ip, details: { invoiceId, customerId: payment.customerId, amount, method } });
       return payment;
     });
+    publishCashEvent({ type: 'payment_accepted', userId: req.user!.id, username: req.user!.username, amount: addMoney(result.amount) });
     res.status(201).json(result);
   } catch (error) { next(error); }
 });
@@ -102,8 +104,8 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       const payments = await tx.payment.findMany({ where: { invoiceId: meta.invoiceId } });
       const original = payments.find((p: any) => p.id === id);
       if (!original || Number(original.amount) <= 0 || original.reversalOfId) throw new Error('Refund and reversal entries cannot be deleted; use an explicit adjustment');
-      const inPendingHandover = await tx.cashHandoverItem.findFirst({ where: { paymentId: id, handover: { status: 'pending' } }, select: { handoverId: true } });
-      if (inPendingHandover) throw Object.assign(new Error(`Оплата входит в сдачу кассы №${inPendingHandover.handoverId}, которая ждёт подтверждения. Сначала подтвердите приём.`), { status: 409 });
+      const inPendingHandover = await tx.cashHandoverItem.findFirst({ where: { paymentId: id, active: true, handover: { status: 'pending' } }, select: { handoverId: true } });
+      if (inPendingHandover) throw Object.assign(new Error(`Оплата входит в сдачу кассы №${inPendingHandover.handoverId}, которая ждёт подтверждения. Сначала подтвердите приём или верните кассу сотруднику.`), { status: 409 });
       if (!payments.some((p: any) => p.reversalOfId === id)) {
         if (payments.some((p: any) => p.returnId || (Number(p.amount) < 0 && !p.reversalOfId))) throw financialError('Payments with dependent refunds require an explicit reconciliation');
         const paid = addMoney(...payments.map((p: any) => p.amount));
@@ -117,6 +119,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       const updated = await tx.invoice.update({ where: { id: meta.invoiceId }, data: { paidAmount, status: getInvoiceStatus(appliedPaid, Number(invoice.netAmount)) }, include: { customer: true, user: { select: PUBLIC_USER_SELECT }, items: true } });
       return { success: true, invoice: updated };
     });
+    publishCashEvent({ type: 'payment_reversed', userId: meta.userId, amount: addMoney(meta.amount), by: req.user!.username });
     res.json(result);
   } catch (error) { next(error); }
 });

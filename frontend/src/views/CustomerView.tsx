@@ -72,6 +72,19 @@ const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
   ].join(' ');
 
 export default function CustomerView() {
+  const user = getCurrentUser();
+  if (!isAdminUser(user)) {
+    return <div className="app-page-shell min-h-full space-y-4">
+      <h1 className="text-xl font-bold text-slate-900">Приём оплаты</h1>
+      {canAcceptClientPayments(user)
+        ? <StaffCollectPanel />
+        : <p className="text-sm text-slate-600">Нет права принимать оплату. Обратитесь к администратору.</p>}
+    </div>;
+  }
+  return <CustomerManagementView />;
+}
+
+function CustomerManagementView() {
   const location = useLocation();
   const user = useMemo(() => getCurrentUser(), []);
   const isAdmin = isAdminUser(user);
@@ -108,6 +121,8 @@ export default function CustomerView() {
         </span>
       );
     }
+    // A seller receives the amounts as zeros: any paid/unpaid badge would be made up.
+    if (!isAdmin) return null;
     if (balance <= PAYMENT_EPSILON) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/80 shadow-2xs">
@@ -424,7 +439,10 @@ export default function CustomerView() {
     invoices,
   });
 
+  // A seller receives customer figures masked to zero, so a statement printed for them
+  // would claim nothing was sold, paid or owed. Statements are an administrator's document.
   const handlePrintCustomerReconciliation = async (customer: Customer, invoices?: StatementInvoice[]) => {
+    if (!isAdmin) return;
     try {
       const customerInvoices =
         invoices ||
@@ -452,6 +470,7 @@ export default function CustomerView() {
   };
 
   const handlePrintAllReconciliation = async () => {
+    if (!isAdmin) return;
     if (customers.length === 0) {
       toast.error('Список клиентов пуст');
       return;
@@ -530,15 +549,17 @@ export default function CustomerView() {
             <p className="mt-0.5 text-xs text-slate-500">База клиентов, детальные акты сверки и истории продаж по накладным.</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handlePrintAllReconciliation}
-              disabled={isPrintingReconciliation || customers.length === 0}
-              className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              <Printer size={15} />
-              <span>{isPrintingReconciliation ? 'Подготовка...' : 'Общий акт сверки'}</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handlePrintAllReconciliation}
+                disabled={isPrintingReconciliation || customers.length === 0}
+                className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Printer size={15} />
+                <span>{isPrintingReconciliation ? 'Подготовка...' : 'Общий акт сверки'}</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 setSelectedCustomer(null);
@@ -559,21 +580,26 @@ export default function CustomerView() {
             <NavLink to="/customers" end className={sectionTabClassName}>
               Клиенты
             </NavLink>
-            <NavLink to="/customers/debts" className={sectionTabClassName}>
-              Долги
-            </NavLink>
+            {/* Debts are an administrator's page; a seller is sent back from it. */}
+            {isAdmin && (
+              <NavLink to="/customers/debts" className={sectionTabClassName}>
+                Долги
+              </NavLink>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handlePrintAllReconciliation}
-              disabled={isPrintingReconciliation || customers.length === 0}
-              className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
-              title="Общий акт сверки"
-            >
-              <Printer size={14} />
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handlePrintAllReconciliation}
+                disabled={isPrintingReconciliation || customers.length === 0}
+                className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+                title="Общий акт сверки"
+              >
+                <Printer size={14} />
+              </button>
+            )}
             <button
               onClick={() => {
                 setSelectedCustomer(null);
@@ -591,14 +617,16 @@ export default function CustomerView() {
         {!isAdmin && canAcceptClientPayments(user) && <StaffCollectPanel />}
 
         {/* Desktop Tabs */}
-        <div className="hidden lg:flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
-          <NavLink to="/customers" end className={sectionTabClassName}>
-            База клиентов
-          </NavLink>
-          <NavLink to="/customers/debts" className={sectionTabClassName}>
-            Долги и оплаты
-          </NavLink>
-        </div>
+        {isAdmin && (
+          <div className="hidden lg:flex items-center gap-1 rounded-full border border-slate-200/70 bg-white p-1.5 w-fit shadow-xs">
+            <NavLink to="/customers" end className={sectionTabClassName}>
+              База клиентов
+            </NavLink>
+            <NavLink to="/customers/debts" className={sectionTabClassName}>
+              Долги и оплаты
+            </NavLink>
+          </div>
+        )}
 
         {/* Search & Filter Toolbar */}
         <div className="rounded-2xl lg:rounded-[28px] border border-slate-200/70 bg-white p-2.5 sm:p-4 shadow-xs space-y-2 sm:space-y-3">
@@ -742,7 +770,7 @@ export default function CustomerView() {
                 </div>
 
                 {/* Actions row */}
-                <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <div className={clsx('mt-2.5 grid grid-cols-1 gap-2', isAdmin && 'md:grid-cols-2')}>
                   <button
                     type="button"
                     onClick={() => openStatement(customer)}
@@ -751,14 +779,16 @@ export default function CustomerView() {
                     <FileText size={13} />
                     <span>Накладные</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintCustomerReconciliation(customer)}
-                    className="hidden md:flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border border-slate-200/80 bg-white py-1.5 sm:py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
-                  >
-                    <Printer size={13} />
-                    <span>Акт сверки</span>
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerReconciliation(customer)}
+                      className="hidden md:flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border border-slate-200/80 bg-white py-1.5 sm:py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 active:scale-[0.99]"
+                    >
+                      <Printer size={13} />
+                      <span>Акт сверки</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </m.div>
@@ -1026,15 +1056,17 @@ export default function CustomerView() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handlePrintCustomerReconciliation(selectedCustomer, statementData)}
-                      className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
-                      title="Печать акта сверки"
-                    >
-                      <Printer size={14} />
-                      <span>Акт сверки</span>
-                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerReconciliation(selectedCustomer, statementData)}
+                        className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                        title="Печать акта сверки"
+                      >
+                        <Printer size={14} />
+                        <span>Акт сверки</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={closeStatementModal}
@@ -1088,6 +1120,7 @@ export default function CustomerView() {
                     >
                       Все ({statementData.length})
                     </button>
+                    {isAdmin && (<>
                     <button
                       type="button"
                       onClick={() => setStatementFilter('unpaid')}
@@ -1114,6 +1147,7 @@ export default function CustomerView() {
                       <span>Оплачено</span>
                       <span>({paidStatementCount})</span>
                     </button>
+                    </>)}
                   </div>
 
                   {statementData.length > 3 && (

@@ -260,7 +260,8 @@ suite('PostgreSQL financial transaction integration', () => {
     await locked;
     async function waitForLocks(minimum: number) {
       for (let attempt = 0; attempt < 150; attempt++) {
-        const [row] = await db.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()`;
+        // Only waits on customer orders: other test files run at the same time and wait on their own locks.
+        const [row] = await db.$queryRaw<Array<{ count: number }>>`SELECT COUNT(*)::int AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid() AND query ILIKE '%customer_orders%'`;
         if (row.count >= minimum) return;
         await new Promise(resolve => setTimeout(resolve, 10));
       }

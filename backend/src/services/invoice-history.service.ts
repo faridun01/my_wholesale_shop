@@ -60,7 +60,7 @@ export async function getInvoiceHistory(invoiceId: number) {
     include: {
       items: true,
       revisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
-      payments: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+      payments: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], include: { cashHandoverItems: { include: { handover: true } } } },
       returns: {
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         include: { items: { include: { invoiceItem: { select: { productId: true, productNameSnapshot: true } } } } },
@@ -85,6 +85,18 @@ export async function getInvoiceHistory(invoiceId: number) {
   const productNames = new Map(products.map((product) => [product.id, product.name]));
 
   const reversedIds = new Set(invoice.payments.flatMap((payment) => (payment.reversalOfId ? [payment.reversalOfId] : [])));
+  // One handover may contain several payments from this invoice and other
+  // invoices. Show only this invoice's share, once per handover.
+  const handovers = new Map<number, { handover: any; amount: number; paymentIds: number[] }>();
+  // A payment can be in several handovers over time: returned ones stay in the history.
+  for (const payment of invoice.payments) {
+    for (const item of payment.cashHandoverItems) {
+      const row = handovers.get(item.handoverId) || { handover: item.handover, amount: 0, paymentIds: [] };
+      row.amount = addMoney(row.amount, item.amount);
+      row.paymentIds.push(payment.id);
+      handovers.set(item.handoverId, row);
+    }
+  }
   const events: any[] = [
     { type: 'created', at: invoice.createdAt, userId: invoice.userId, amount: saleAmount(versions[0]), items: [...linesOf(versions[0], productNames).values()] },
     ...invoice.revisions.map((revision, index) => {
@@ -99,6 +111,11 @@ export async function getInvoiceHistory(invoiceId: number) {
       };
     }),
     ...invoice.payments.map((payment) => paymentEvent(payment, reversedIds)),
+    ...[...handovers.values()].flatMap(({ handover, amount, paymentIds }) => [
+      { type: 'cash_handover_sent', at: handover.createdAt, userId: handover.userId, amount, handoverId: handover.id, paymentIds },
+      ...(handover.confirmedAt ? [{ type: 'cash_handover_confirmed', at: handover.confirmedAt, userId: handover.confirmedById, amount, handoverId: handover.id, paymentIds }] : []),
+      ...(handover.status === 'returned' ? [{ type: 'cash_handover_returned', at: handover.returnedAt, userId: handover.returnedById, amount, handoverId: handover.id, paymentIds, reason: handover.returnReason }] : []),
+    ]),
     ...invoice.returns.map((itemReturn) => ({
       type: 'returned',
       at: itemReturn.createdAt,

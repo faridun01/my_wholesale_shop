@@ -11,6 +11,8 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import InstallPwaModal from '../pwa/InstallPwaModal';
 import { SHOW_CUSTOMER_ORDERS, getFilteredNavItems, type NavItem } from './navConfig';
 import { getPendingHandoversCount } from '../../api/cash.api';
+import { useCashEvents } from '../../api/cashEvents';
+import { formatMoney } from '../../utils/format';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -113,51 +115,73 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     };
   }, [isCustomer]);
 
-  // Tells an administrator that a staff member sent cash to be confirmed.
+  const showCashHandoverToast = React.useCallback((title: string) => {
+    toast(
+      (t) => (
+        <button
+          type="button"
+          className="text-left"
+          onClick={() => {
+            toast.dismiss(t.id);
+            navigate('/cash');
+          }}
+        >
+          <span className="block font-semibold">{title}</span>
+          <span className="block text-xs text-slate-500">Пересчитайте деньги и подтвердите приём</span>
+        </button>
+      ),
+      { id: 'cash-handover', duration: 10000, icon: <Banknote size={18} className="text-emerald-600" /> },
+    );
+  }, [navigate]);
+
+  // Tells an administrator that a staff member sent cash to be confirmed. The live
+  // notice below does it at once; this count check is the fallback and the badge.
+  const refreshCashPendingRef = useRef<(silent?: boolean) => void>(() => {});
   useEffect(() => {
     if (!hasStoredSession() || !isAdmin) return;
 
-    const refreshCashPendingCount = () => {
+    const refreshCashPendingCount = (silent = false) => {
       getPendingHandoversCount()
         .then((nextCount) => {
           const previousCount = previousCashPendingCountRef.current;
-          if (nextCount > 0 && (previousCount === null || nextCount > previousCount)) {
-            toast(
-              (t) => (
-                <button
-                  type="button"
-                  className="text-left"
-                  onClick={() => {
-                    toast.dismiss(t.id);
-                    navigate('/cash');
-                  }}
-                >
-                  <span className="block font-semibold">
-                    {previousCount === null ? `Передач кассы ждут подтверждения: ${nextCount}` : 'Сотрудник передал кассу'}
-                  </span>
-                  <span className="block text-xs text-slate-500">Пересчитайте деньги и подтвердите приём</span>
-                </button>
-              ),
-              { id: 'cash-handover', duration: 10000, icon: <Banknote size={18} className="text-emerald-600" /> },
-            );
+          if (!silent && nextCount > 0 && (previousCount === null || nextCount > previousCount)) {
+            showCashHandoverToast(previousCount === null ? `Передач кассы ждут подтверждения: ${nextCount}` : 'Сотрудник передал кассу');
           }
           previousCashPendingCountRef.current = nextCount;
           setCashPendingCount(nextCount);
         })
         .catch(() => setCashPendingCount(0));
     };
+    refreshCashPendingRef.current = refreshCashPendingCount;
 
     refreshCashPendingCount();
     const intervalId = window.setInterval(refreshCashPendingCount, 30000);
-    window.addEventListener('focus', refreshCashPendingCount);
-    window.addEventListener('cash-handovers-updated', refreshCashPendingCount as EventListener);
+    const refreshOnEvent = () => refreshCashPendingCount();
+    window.addEventListener('focus', refreshOnEvent);
+    window.addEventListener('cash-handovers-updated', refreshOnEvent);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshCashPendingCount);
-      window.removeEventListener('cash-handovers-updated', refreshCashPendingCount as EventListener);
+      window.removeEventListener('focus', refreshOnEvent);
+      window.removeEventListener('cash-handovers-updated', refreshOnEvent);
     };
-  }, [isAdmin, navigate]);
+  }, [isAdmin, showCashHandoverToast]);
+
+  // Live cash notices: the administrator hears of every handover at once, a staff member
+  // of the administrator's decision on their own cash, wherever they are in the app.
+  useCashEvents((event) => {
+    if (isAdmin) {
+      if (event.type === 'handover_sent') showCashHandoverToast(`${event.username || 'Сотрудник'} передал кассу · ${formatMoney(event.amount)}`);
+      refreshCashPendingRef.current(true);
+      return;
+    }
+    if (event.userId !== user.id) return;
+    if (event.type === 'handover_confirmed') {
+      toast.success(`${event.by || 'Администратор'} подтвердил приём ${formatMoney(event.amount)}`, { duration: 8000 });
+    } else if (event.type === 'handover_returned' && event.by !== user.username) {
+      toast(`Касса ${formatMoney(event.amount)} возвращена вам: ${event.reason || 'без причины'}`, { duration: 10000, icon: <Banknote size={18} className="text-amber-600" /> });
+    }
+  }, hasStoredSession() && !isCustomer);
 
   useEffect(() => {
     if (typeof document === 'undefined' || isDesktopViewport) return;

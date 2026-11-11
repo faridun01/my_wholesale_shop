@@ -58,6 +58,7 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     });
     app.use('/payments', (await import('./payments.routes.js')).default);
     app.use('/cash', (await import('./cash.routes.js')).default);
+    app.use('/invoices', (await import('./invoices.routes.js')).default);
     app.use('/auth', (await import('./auth.routes.js')).default);
     app.use((error: any, _req: any, res: any, _next: any) => res.status(error.status || 500).json({ error: error.message }));
     server = app.listen(0, '127.0.0.1');
@@ -185,5 +186,155 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect([me.summary.onHand, me.operations.find((op: any) => op.paymentId === mistaken).available]).toEqual([0, false]);
     expect((await call(ali, 'POST', '/cash/handovers', { paymentIds: [mistaken], idempotencyKey: key() })).status).toBe(409);
     expect((await call(adminId, 'POST', '/cash/handovers', { paymentIds: [small], idempotencyKey: key() })).status).toBe(400);
+  });
+
+  it('serializes a cash handover against reversal of its payment', async () => {
+    const seller = await newSeller();
+    const invoice = await newInvoice(200);
+    const paymentId = (await pay(seller, invoice.invoiceId, 200)).data.id;
+    let release!: () => void, ready!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const locked = new Promise<void>(resolve => { ready = resolve; });
+    const blocker = db.$transaction(async tx => {
+      await tx.$executeRawUnsafe('LOCK TABLE cash_handovers IN SHARE MODE');
+      ready(); await hold;
+    }, { timeout: 15000 });
+    await locked;
+    const sent = call(seller, 'POST', '/cash/handovers', { paymentIds: [paymentId], idempotencyKey: key() });
+    try {
+      let waiting = false;
+      for (let attempt = 0; attempt < 150; attempt++) {
+        const rows = await db.$queryRaw<Array<{ count: number }>>`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%INSERT INTO%cash_handovers%'`;
+        if (rows[0].count > 0) { waiting = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      const reversal = call(adminId, 'DELETE', `/payments/${paymentId}`);
+      // Let the reversal reach its lock/check while the handover INSERT is held.
+      await new Promise(resolve => setTimeout(resolve, 100));
+      release(); await blocker;
+      expect([(await sent).status, (await reversal).status]).toEqual([201, 409]);
+      expect(await db.payment.count({ where: { reversalOfId: paymentId } })).toBe(0);
+    } finally { release(); await blocker; await sent; }
+  });
+
+  it('returns a handover: the seller takes back a waiting one, an administrator any with a reason, and the money can be sent again', async () => {
+    const ali = await newSeller();
+    const bob = await newSeller();
+    const invoice = await newInvoice(1000);
+    const first = (await pay(ali, invoice.invoiceId, 300)).data.id;
+    const second = (await pay(ali, invoice.invoiceId, 200)).data.id;
+
+    const waiting = (await call(ali, 'POST', '/cash/handovers', { paymentIds: [first, second], idempotencyKey: key() })).data;
+    expect((await call(bob, 'POST', `/cash/handovers/${waiting.id}/return`, {})).status).toBe(404);
+    const takenBack = await call(ali, 'POST', `/cash/handovers/${waiting.id}/return`, {});
+    expect([takenBack.status, takenBack.data.status, takenBack.data.returnReason]).toEqual([200, 'returned', 'Отозвано сотрудником']);
+    expect((await call(adminId, 'POST', `/cash/handovers/${waiting.id}/confirm`)).status).toBe(409);
+    let me = await mine(ali);
+    expect([me.summary.onHand, me.summary.pendingAmount, me.operations.filter((op: any) => op.available).length]).toEqual([500, 0, 2]);
+
+    // The seller now sends only part; the administrator confirms it by mistake and returns it.
+    const partial = (await call(ali, 'POST', '/cash/handovers', { paymentIds: [first], idempotencyKey: key() })).data;
+    await call(adminId, 'POST', `/cash/handovers/${partial.id}/confirm`);
+    expect((await call(ali, 'POST', `/cash/handovers/${partial.id}/return`, {})).status).toBe(409);
+    expect((await call(adminId, 'POST', `/cash/handovers/${partial.id}/return`, {})).status).toBe(400);
+    const undone = await call(adminId, 'POST', `/cash/handovers/${partial.id}/return`, { reason: 'Деньги не получены' });
+    expect([undone.data.status, undone.data.returnedById, undone.data.confirmedById]).toEqual(['returned', adminId, adminId]);
+    me = await mine(ali);
+    expect([me.summary.onHand, me.summary.confirmed]).toEqual([500, 0]);
+    expect(me.handovers.find((h: any) => h.id === partial.id)).toMatchObject({ status: 'returned', returnReason: 'Деньги не получены', returnedBy: { id: adminId } });
+    await expect(db.cashHandover.update({ where: { id: partial.id }, data: { status: 'confirmed' } })).rejects.toThrow();
+    await expect(db.cashHandoverItem.updateMany({ where: { handoverId: partial.id }, data: { active: true } })).rejects.toThrow();
+
+    const again = await call(ali, 'POST', '/cash/handovers', { paymentIds: [first, second], idempotencyKey: key() });
+    expect(again.status).toBe(201);
+    await call(adminId, 'POST', `/cash/handovers/${again.data.id}/confirm`);
+    expect((await mine(ali)).summary).toMatchObject({ onHand: 0, pendingAmount: 0, confirmed: 500 });
+
+    const events = (await call(adminId, 'GET', `/invoices/${invoice.invoiceId}/history`)).data.events.map((e: any) => e.type);
+    expect(events.filter((t: string) => t === 'cash_handover_returned')).toHaveLength(2);
+    expect(events.filter((t: string) => t === 'payment')).toHaveLength(2);
+    expect(await db.auditLog.count({ where: { action: 'CASH_HANDOVER_RETURNED', entityId: { in: [waiting.id, partial.id] } } })).toBe(2);
+    expect(Number((await db.invoice.findUniqueOrThrow({ where: { id: invoice.invoiceId } })).paidAmount)).toBe(500);
+  });
+
+  it('tells open pages at once: the administrator about every staff member, a seller only about their own cash', async () => {
+    const ali = await newSeller();
+    const bob = await newSeller();
+    const listen = async (as: number) => {
+      const controller = new AbortController();
+      const response = await fetch(`${baseUrl}/cash/events`, { headers: { 'x-test-user': String(as) }, signal: controller.signal });
+      const events: any[] = [];
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      void (async () => {
+        let buffer = '';
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
+              const data = buffer.slice(0, end).split('\n').find((line) => line.startsWith('data: '));
+              buffer = buffer.slice(end + 2);
+              if (data) events.push(JSON.parse(data.slice(6)));
+            }
+          }
+        } catch { /* aborted */ }
+      })();
+      return { events, headers: response.headers, stop: () => controller.abort() };
+    };
+    const until = async (condition: () => boolean) => {
+      for (let i = 0; i < 100 && !condition(); i += 1) await new Promise((resolve) => setTimeout(resolve, 20));
+      return condition();
+    };
+    const admin = await listen(adminId);
+    const aliPage = await listen(ali);
+    const bobPage = await listen(bob);
+    try {
+      expect(admin.headers.get('content-type')).toContain('text/event-stream');
+      expect(admin.headers.get('cache-control')).toContain('no-transform');
+      const invoice = await newInvoice(100);
+      const paymentId = (await pay(ali, invoice.invoiceId, 100)).data.id;
+      const sent = (await call(ali, 'POST', '/cash/handovers', { paymentIds: [paymentId], idempotencyKey: key() })).data;
+      expect(await until(() => admin.events.some((e) => e.type === 'handover_sent' && e.handoverId === sent.id))).toBe(true);
+      expect(admin.events.find((e) => e.type === 'handover_sent')).toMatchObject({ userId: ali, amount: 100 });
+      await call(adminId, 'POST', `/cash/handovers/${sent.id}/confirm`);
+      expect(await until(() => aliPage.events.some((e) => e.type === 'handover_confirmed' && e.handoverId === sent.id))).toBe(true);
+      expect(aliPage.events.map((e) => e.type)).toEqual(['payment_accepted', 'handover_sent', 'handover_confirmed']);
+      expect(bobPage.events.filter((e) => e.userId === ali)).toEqual([]);
+    } finally {
+      admin.stop(); aliPage.stop(); bobPage.stop();
+    }
+  });
+
+  it('records three receipts and a single invoice-specific handover and confirmation without paying twice', async () => {
+    const seller = await newSeller();
+    const invoice = await newInvoice(1000);
+    const other = await newInvoice(42);
+    const ids: number[] = [];
+    for (let i = 0; i < 3; i++) ids.push((await pay(seller, invoice.invoiceId, 200)).data.id);
+    ids.push((await pay(seller, other.invoiceId, 42)).data.id);
+    const history = async () => (await call(adminId, 'GET', `/invoices/${invoice.invoiceId}/history`)).data.events;
+    expect((await history()).filter((e: any) => e.type === 'payment')).toHaveLength(3);
+    const sent = (await call(seller, 'POST', '/cash/handovers', { paymentIds: ids, idempotencyKey: key() })).data;
+    expect(Number(sent.amount)).toBe(642);
+    const pendingEvents = await history();
+    expect(pendingEvents.filter((e: any) => e.type === 'cash_handover_sent')).toEqual([
+      expect.objectContaining({ handoverId: sent.id, amount: '600', paymentIds: ids.slice(0, 3), user: expect.any(String) }),
+    ]);
+    expect(pendingEvents.some((e: any) => e.type === 'cash_handover_confirmed')).toBe(false);
+    const confirmed = await Promise.all([1, 2].map(() => call(adminId, 'POST', `/cash/handovers/${sent.id}/confirm`)));
+    expect(confirmed.map(r => r.status)).toEqual([200, 200]);
+    const events = await history();
+    expect(events.filter((e: any) => e.type === 'payment')).toHaveLength(3);
+    expect(events.filter((e: any) => e.type === 'cash_handover_confirmed')).toEqual([
+      expect.objectContaining({ handoverId: sent.id, amount: '600', user: expect.any(String) }),
+    ]);
+    expect(await db.auditLog.count({ where: { entity: 'CashHandover', entityId: sent.id, action: 'CASH_HANDOVER_CONFIRMED' } })).toBe(1);
+    const stored = await db.invoice.findUniqueOrThrow({ where: { id: invoice.invoiceId } });
+    expect([Number(stored.netAmount), Number(stored.paidAmount)]).toEqual([1000, 600]);
+    expect(await db.payment.count({ where: { invoiceId: invoice.invoiceId } })).toBe(3);
+    expect((await mine(seller)).summary).toMatchObject({ onHand: 0, pendingAmount: 0, confirmed: 642 });
   });
 });

@@ -8,6 +8,9 @@ const titles: Record<string, string> = {
   edited: 'Накладная изменена',
   corrected: 'Исправление при сверке',
   payment: 'Оплата',
+  cash_handover_sent: 'Деньги переданы на подтверждение',
+  cash_handover_confirmed: 'Приём кассы подтверждён',
+  cash_handover_returned: 'Касса возвращена сотруднику',
   payment_reversed: 'Оплата отменена',
   money_returned: 'Деньги выданы покупателю',
   return_adjustment: 'Корректировка оплаты из-за возврата',
@@ -19,6 +22,9 @@ const dotColors: Record<string, string> = {
   edited: 'bg-violet-500',
   corrected: 'bg-slate-400',
   payment: 'bg-emerald-500',
+  cash_handover_sent: 'bg-amber-500',
+  cash_handover_confirmed: 'bg-emerald-600',
+  cash_handover_returned: 'bg-slate-400',
   payment_reversed: 'bg-rose-500',
   money_returned: 'bg-rose-500',
   return_adjustment: 'bg-amber-500',
@@ -43,6 +49,14 @@ function Changes({ changes }: { changes: any }) {
 function EventBody({ event }: { event: any }) {
   const method = event.method ? methods[event.method] || event.method : null;
   switch (event.type) {
+    case 'cash_handover_sent':
+    case 'cash_handover_confirmed':
+    case 'cash_handover_returned':
+      return <div className="mt-1 text-slate-600">
+        <p>Сдача кассы №{event.handoverId} · по этой накладной {formatMoney(event.amount)}</p>
+        {event.reason && <p>Причина: {event.reason}</p>}
+        <p>Передача уже принятой оплаты. Внесённая сумма и долг не меняются.</p>
+      </div>;
     case 'created':
       return <div className="mt-1 text-slate-600">
         <p>Итого: {formatMoney(event.amount)}</p>

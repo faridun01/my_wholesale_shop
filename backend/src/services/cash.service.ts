@@ -1,4 +1,5 @@
 import prisma from '../db/prisma.js';
+import { Prisma } from '@prisma/client';
 import { addMoney, balancePaidAmount, financialError, toCents } from '../utils/financial.js';
 import { assertReplay, operationKey, requestHash } from '../utils/financial-operation.js';
 import { isAdminRole, type AccessContext } from '../utils/access.js';
@@ -35,21 +36,24 @@ const PAYMENT_SELECT = {
   createdAt: true,
   customer: { select: { name: true } },
   reversal: { select: { id: true } },
-  cashHandoverItem: { select: { handoverId: true, handover: { select: { status: true } } } },
+  // Only the handover the payment is in now; returned handovers released it.
+  cashHandoverItems: { where: { active: true }, select: { handoverId: true, handover: { select: { status: true } } } },
 } as const;
 
 const HANDOVER_INCLUDE = {
   user: { select: { id: true, username: true } },
   confirmedBy: { select: { id: true, username: true } },
+  returnedBy: { select: { id: true, username: true } },
   items: {
     orderBy: { id: 'asc' as const },
     select: { amount: true, payment: { select: { id: true, invoiceId: true, createdAt: true, customer: { select: { name: true } } } } },
   },
 };
 
+const activeItem = (payment: any) => payment.cashHandoverItems?.[0] ?? null;
 const isReceipt = (payment: any) => !payment.reversalOfId && toCents(payment.amount) > 0;
 // Cash a staff member is accountable for: received in cash and not cancelled before it was handed over.
-const owesCash = (payment: any) => isReceipt(payment) && payment.method === 'cash' && (!payment.reversal || Boolean(payment.cashHandoverItem));
+const owesCash = (payment: any) => isReceipt(payment) && payment.method === 'cash' && (!payment.reversal || Boolean(activeItem(payment)));
 
 const operationOf = (payment: any) => ({
   paymentId: payment.id,
@@ -58,10 +62,10 @@ const operationOf = (payment: any) => ({
   invoiceId: payment.invoiceId,
   amount: payment.amount,
   cancelled: Boolean(payment.reversal),
-  handoverId: payment.cashHandoverItem?.handoverId ?? null,
-  handoverStatus: payment.cashHandoverItem?.handover?.status ?? null,
+  handoverId: activeItem(payment)?.handoverId ?? null,
+  handoverStatus: activeItem(payment)?.handover?.status ?? null,
   // Still on hand, can be sent.
-  available: owesCash(payment) && !payment.cashHandoverItem,
+  available: owesCash(payment) && !activeItem(payment),
 });
 
 const handoverOut = (handover: any) => ({
@@ -72,6 +76,9 @@ const handoverOut = (handover: any) => ({
   createdAt: handover.createdAt,
   confirmedBy: handover.confirmedBy,
   confirmedAt: handover.confirmedAt,
+  returnedBy: handover.returnedBy,
+  returnedAt: handover.returnedAt,
+  returnReason: handover.returnReason,
   items: handover.items.map((item: any) => ({
     paymentId: item.payment.id,
     invoiceId: item.payment.invoiceId,
@@ -129,8 +136,13 @@ export class CashService {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`cash-handover-user:${userId}`}, 0))::text`;
       const existing = await tx.cashHandover.findUnique({ where: { idempotencyKey: key } });
       if (existing) { assertReplay(existing, hash); return existing; }
+      // Reversal locks the invoice before inspecting handover membership. Use
+      // that same lock before checking eligibility, in a stable order for batches.
+      const sources = await tx.payment.findMany({ where: { id: { in: paymentIds } }, select: { invoiceId: true } });
+      const invoiceIds = [...new Set<number>(sources.flatMap((p: any) => p.invoiceId == null ? [] : [p.invoiceId]))].sort((a, b) => a - b);
+      if (invoiceIds.length) await tx.$queryRaw(Prisma.sql`SELECT id FROM invoices WHERE id IN (${Prisma.join(invoiceIds)}) ORDER BY id FOR UPDATE`);
       const payments = await tx.payment.findMany({ where: { id: { in: paymentIds } }, select: PAYMENT_SELECT });
-      const usable = payments.filter((p: any) => p.userId === userId && owesCash(p) && !p.cashHandoverItem);
+      const usable = payments.filter((p: any) => p.userId === userId && owesCash(p) && !activeItem(p));
       if (usable.length !== paymentIds.length) throw conflict('Часть денег уже сдана или оплата отменена. Обновите страницу.');
       const amount = sum(usable.map((p: any) => p.amount));
       const handover = await tx.cashHandover.create({
@@ -148,15 +160,40 @@ export class CashService {
       if (!handover) throw notFound('Сдача кассы не найдена');
       // A repeated click returns the confirmation already made.
       if (handover.status === 'confirmed') return handover;
+      if (handover.status === 'returned') throw conflict('Эта касса уже возвращена сотруднику');
       const confirmed = await tx.cashHandover.update({ where: { id }, data: { status: 'confirmed', confirmedById: adminId, confirmedAt: new Date() } });
       await AuditService.record(tx, { userId: adminId, action: 'CASH_HANDOVER_CONFIRMED', entity: 'CashHandover', entityId: id, details: { amount: handover.amount, staffId: handover.userId } });
       return confirmed;
     });
   }
 
+  /**
+   * Gives a handover back: its payments are on the staff member's hands again and can be
+   * sent anew. The staff member may take back their own handover while it waits; an
+   * administrator may return any, also one confirmed by mistake, with a reason.
+   */
+  static async returnHandover(id: number, actor: { id: number; isAdmin: boolean }, body: any) {
+    const reason = String(body?.reason || '').trim().slice(0, 500);
+    if (actor.isAdmin && !reason) throw financialError('Укажите причину возврата');
+    return prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT id FROM cash_handovers WHERE id = ${id} FOR UPDATE`;
+      const handover = await tx.cashHandover.findUnique({ where: { id } });
+      if (!handover || (!actor.isAdmin && handover.userId !== actor.id)) throw notFound('Сдача кассы не найдена');
+      if (handover.status === 'returned') return handover;
+      if (!actor.isAdmin && handover.status !== 'pending') throw conflict('Приём уже подтверждён: вернуть кассу может только администратор');
+      await tx.cashHandoverItem.updateMany({ where: { handoverId: id, active: true }, data: { active: false } });
+      const returned = await tx.cashHandover.update({
+        where: { id },
+        data: { status: 'returned', returnedById: actor.id, returnedAt: new Date(), returnReason: reason || 'Отозвано сотрудником' },
+      });
+      await AuditService.record(tx, { userId: actor.id, action: 'CASH_HANDOVER_RETURNED', entity: 'CashHandover', entityId: id, details: { amount: handover.amount, staffId: handover.userId, wasConfirmed: handover.status === 'confirmed', reason: returned.returnReason } });
+      return returned;
+    });
+  }
+
   static async listHandovers(status?: string) {
     const handovers = await prisma.cashHandover.findMany({
-      where: status === 'pending' || status === 'confirmed' ? { status } : {},
+      where: status === 'pending' || status === 'confirmed' || status === 'returned' ? { status } : {},
       include: HANDOVER_INCLUDE,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 200,
@@ -198,7 +235,7 @@ export class CashService {
   }
 
   /** Customers who owe on invoices of the caller's warehouse: only what is needed to take a payment. */
-  static async debtors(access: AccessContext, search: unknown) {
+  static async debtors(access: AccessContext, search: unknown, sort: unknown = 'name') {
     if (!access.isAdmin && !access.warehouseId) return [];
     const query = String(search || '').trim().slice(0, 80);
     const customerMatch = query ? { OR: [{ name: { contains: query, mode: 'insensitive' as const } }, { phone: { contains: query } }] } : undefined;
@@ -231,6 +268,13 @@ export class CashService {
       entry.invoices.push({ id: invoice.id, createdAt: invoice.createdAt, netAmount: invoice.netAmount, paidAmount: paid, remaining });
       customers.set(invoice.customer.id, entry);
     }
-    return [...customers.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 100);
+    // Sorted before the cut, so "largest debt" and "oldest debt" really are the first ones.
+    const byName = (a: any, b: any) => a.name.localeCompare(b.name, 'ru');
+    const order: Record<string, (a: any, b: any) => number> = {
+      name: byName,
+      debt: (a, b) => toCents(b.debt) - toCents(a.debt) || byName(a, b),
+      oldest: (a, b) => new Date(a.invoices[0].createdAt).getTime() - new Date(b.invoices[0].createdAt).getTime() || byName(a, b),
+    };
+    return [...customers.values()].sort(order[String(sort)] || byName).slice(0, 100);
   }
 }

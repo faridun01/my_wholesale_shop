@@ -39,6 +39,7 @@ model User {
   approvedCustomerOrders CustomerOrder[] @relation("ApprovedCustomerOrders")
   cashHandovers CashHandover[] @relation("CashHandoverStaff")
   confirmedCashHandovers CashHandover[] @relation("CashHandoverConfirmedBy")
+  returnedCashHandovers CashHandover[] @relation("CashHandoverReturnedBy")
 
   @@index([active, warehouseId])
   @@index([customerId, active])
@@ -467,7 +468,7 @@ model Payment {
   customer Customer @relation(fields: [customerId], references: [id])
   invoice  Invoice? @relation(fields: [invoiceId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
-  cashHandoverItem CashHandoverItem?
+  cashHandoverItems CashHandoverItem[]
 
   @@index([customerId, createdAt])
   @@index([customerId, invoiceId])
@@ -480,16 +481,20 @@ model Payment {
 model CashHandover {
   id              Int       @id @default(autoincrement())
   userId          Int       @map("user_id")
-  status          String    @default("pending") // 'pending' | 'confirmed'
+  status          String    @default("pending") // 'pending' | 'confirmed' | 'returned'
   amount          Decimal   @db.Decimal(12, 2)
   confirmedById   Int?      @map("confirmed_by_id")
   confirmedAt     DateTime? @map("confirmed_at")
+  returnedById    Int?      @map("returned_by_id")
+  returnedAt      DateTime? @map("returned_at")
+  returnReason    String?   @map("return_reason")
   idempotencyKey  String    @unique @map("idempotency_key")
   requestHash     String    @map("request_hash")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   user        User               @relation("CashHandoverStaff", fields: [userId], references: [id])
   confirmedBy User?              @relation("CashHandoverConfirmedBy", fields: [confirmedById], references: [id])
+  returnedBy  User?              @relation("CashHandoverReturnedBy", fields: [returnedById], references: [id])
   items       CashHandoverItem[]
 
   @@index([userId, createdAt])
@@ -500,13 +505,16 @@ model CashHandover {
 model CashHandoverItem {
   id         Int     @id @default(autoincrement())
   handoverId Int     @map("handover_id")
-  paymentId  Int     @unique @map("payment_id")
+  paymentId  Int     @map("payment_id")
   amount     Decimal @db.Decimal(12, 2)
+  // Cleared when the handover is returned; one payment is in one active handover at most.
+  active     Boolean @default(true)
 
   handover CashHandover @relation(fields: [handoverId], references: [id], onDelete: Restrict)
   payment  Payment      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
 
   @@index([handoverId])
+  @@index([paymentId])
   @@map("cash_handover_items")
 }
 

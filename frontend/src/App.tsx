@@ -252,7 +252,7 @@ export default function App() {
             path="/customers/debts"
             element={
               <StaffRoute>
-                <CustomerDebtsView />
+                {isAdminUser(getCurrentUser()) ? <CustomerDebtsView /> : <Navigate to="/customers" replace />}
               </StaffRoute>
             }
           />

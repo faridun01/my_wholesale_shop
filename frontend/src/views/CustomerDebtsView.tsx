@@ -453,7 +453,9 @@ export default function CustomerDebtsView() {
     return 'Смешанные статусы';
   };
 
+  // Sellers get these figures masked to zero; a statement printed from them would be false.
   const handlePrint = async () => {
+    if (!isAdmin) return;
     if (sortedCustomers.length === 0) {
       toast.error('Нет клиентов для выгрузки');
       return;
@@ -568,15 +570,17 @@ export default function CustomerDebtsView() {
                 </select>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={isExportingInvoices || filteredCustomers.length === 0}
-              className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              <Printer size={15} />
-              <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isExportingInvoices || filteredCustomers.length === 0}
+                className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Printer size={15} />
+                <span>{isExportingInvoices ? 'Подготовка...' : 'Печать акта сверки'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -609,15 +613,17 @@ export default function CustomerDebtsView() {
                 </select>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={isExportingInvoices || filteredCustomers.length === 0}
-              className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
-              title="Печать акта сверки"
-            >
-              <Printer size={14} />
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isExportingInvoices || filteredCustomers.length === 0}
+                className="hidden md:flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50"
+                title="Печать акта сверки"
+              >
+                <Printer size={14} />
+              </button>
+            )}
           </div>
         </div>
 
