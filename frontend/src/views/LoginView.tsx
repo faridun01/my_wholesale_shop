@@ -199,13 +199,17 @@ export default function LoginView() {
             {!twoFactorToken ? (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <label htmlFor="login-username" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Логин
                   </label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" />
                     <input
+                      id="login-username"
                       type="text"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       required
                       value={username}
                       onChange={(event) => setUsername(event.target.value)}
@@ -216,13 +220,15 @@ export default function LoginView() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <label htmlFor="login-password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Пароль
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" />
                     <input
+                      id="login-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
@@ -232,9 +238,11 @@ export default function LoginView() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                      aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                      aria-pressed={showPassword}
+                      className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
-                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                     </button>
                   </div>
                 </div>
@@ -272,13 +280,17 @@ export default function LoginView() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <label htmlFor="login-2fa-code" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Код 2FA или резервный код
                   </label>
                   <div className="relative">
-                    <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                    <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" />
                     <input
+                      id="login-2fa-code"
                       type="text"
+                      autoComplete="one-time-code"
+                      autoCapitalize="characters"
+                      spellCheck={false}
                       required
                       autoFocus
                       value={twoFactorCode}
