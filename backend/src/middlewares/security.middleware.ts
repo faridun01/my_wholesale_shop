@@ -14,7 +14,7 @@ const buildCorsOriginCheck = (): CorsOptions['origin'] => {
       return callback(null, true);
     }
 
-    return callback(new Error('Origin not allowed by CORS'));
+    return callback(Object.assign(new Error('Origin not allowed by CORS'), { status: 403 }));
   };
 };
 
@@ -29,9 +29,8 @@ export const corsMiddleware = cors({
 
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const isHttps =
-    req.secure ||
-    String(req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  // Express derives secure only through the configured trusted proxy chain.
+  const isHttps = req.secure;
   const cspReportOnly = String(process.env.CSP_REPORT_ONLY || 'true').toLowerCase() !== 'false';
   const cspReportUri = String(process.env.CSP_REPORT_URI || '').trim();
   const cspDirectives = [
@@ -43,7 +42,8 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self'",
-    "connect-src 'self' https: http: ws: wss:",
+    "connect-src 'self'",
+    "frame-src 'self' blob:",
     "form-action 'self'",
   ];
 
@@ -64,8 +64,24 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   }
 
   if (isProduction && isHttps) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Strict-Transport-Security', 'max-age=300');
   }
 
+  next();
+};
+
+// SameSite is a second layer, not the only CSRF check. Native clients using a
+// bearer token without browser provenance remain supported.
+export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+  let source = origin;
+  if (!source && referer) {
+    try { source = new URL(referer).origin; } catch { return res.status(403).json({ error: 'Invalid request origin' }); }
+  }
+  if (source && !securityConfig.cors.origins.includes(source)) return res.status(403).json({ error: 'Untrusted request origin' });
+  const usesCookie = /(?:^|;\s*)auth_token=/.test(req.headers.cookie || '');
+  if (!source && usesCookie && !req.headers.authorization?.startsWith('Bearer ')) return res.status(403).json({ error: 'Request origin required' });
   next();
 };

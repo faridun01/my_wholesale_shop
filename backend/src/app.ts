@@ -18,7 +18,8 @@ import customerOrderRoutes from './routes/customer-orders.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import cashRoutes from './routes/cash.routes.js';
 import { authenticate, authenticateUploadAccess } from './middlewares/auth.middleware.js';
-import { corsMiddleware, securityHeaders } from './middlewares/security.middleware.js';
+import { corsMiddleware, securityHeaders, csrfProtection } from './middlewares/security.middleware.js';
+import { cspReportRouter } from './routes/csp-report.routes.js';
 import { generalRateLimit } from './middlewares/general-rate-limit.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,13 +49,16 @@ app.use((req, res, next) => {
 
   next();
 });
-app.use(corsMiddleware);
 app.use(securityHeaders);
+app.use(corsMiddleware);
 app.use(compression());
+app.use('/api/security/csp-report', generalRateLimit, cspReportRouter);
+app.use('/api', csrfProtection);
 app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', authenticateUploadAccess, express.static(path.join(__dirname, '../uploads'), {
   immutable: true,
   maxAge: '7d',
+  setHeaders: (res) => res.setHeader('Cache-Control', 'private, max-age=604800'),
 }));
 
 app.use('/api', generalRateLimit);

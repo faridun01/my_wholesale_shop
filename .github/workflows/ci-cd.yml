@@ -14,10 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -61,10 +61,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -99,10 +99,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -129,6 +129,13 @@ jobs:
           JWT_SECRET: ci_docker_jwt_secret
           TWO_FACTOR_BACKUP_PEPPER: ci_docker_pepper
         run: docker compose build
+
+      - name: Validate nginx configuration
+        env:
+          POSTGRES_PASSWORD: ci_docker_postgres_password
+          JWT_SECRET: ci_docker_jwt_secret
+          TWO_FACTOR_BACKUP_PEPPER: ci_docker_pepper
+        run: docker run --rm --add-host backend:127.0.0.1 "$(docker compose images -q frontend)" nginx -t
 
   deploy:
     name: Build & Publish Container Images
@@ -157,6 +164,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,format=long
 
       - name: Build and Push Backend Image
         uses: docker/build-push-action@v5
@@ -174,6 +184,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=sha,format=long
 
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v5

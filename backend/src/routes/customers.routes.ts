@@ -575,7 +575,7 @@ router.get('/:id/history', async (req: AuthRequest, res, next) => {
     const where = {
       customerId,
       cancelled: false,
-      ...(access.isAdmin ? {} : access.warehouseId ? { warehouseId: access.warehouseId } : {}),
+      ...(access.isAdmin ? {} : { warehouseId: access.warehouseId ?? -1 }),
     };
 
     const [invoices, total] = await Promise.all([

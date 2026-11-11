@@ -222,9 +222,12 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, className, ...props }, ref) => (
+  ({ label, error, icon, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const id = props.id || generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
+      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
       <div className="relative">
         {icon && <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">{icon}</div>}
         <input
@@ -236,11 +239,15 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className,
           )}
           {...props}
+          id={id}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={[props['aria-describedby'], error && `${id}-error`].filter(Boolean).join(' ') || undefined}
         />
       </div>
-      {error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
     </div>
-  ),
+    );
+  },
 );
 Input.displayName = 'Input';
 
@@ -250,9 +257,12 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className, rows = 3, ...props }, ref) => (
+  ({ label, error, className, rows = 3, ...props }, ref) => {
+    const generatedId = React.useId();
+    const id = props.id || generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
+      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
       <textarea
         ref={ref}
         rows={rows}
@@ -262,10 +272,14 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           className,
         )}
         {...props}
+          id={id}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={[props['aria-describedby'], error && `${id}-error`].filter(Boolean).join(' ') || undefined}
       />
-      {error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
     </div>
-  ),
+    );
+  },
 );
 Textarea.displayName = 'Textarea';
 
@@ -276,9 +290,12 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, children, className, ...props }, ref) => (
+  ({ label, error, options, children, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const id = props.id || generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
+      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>}
       <select
         ref={ref}
         className={clsx(
@@ -287,6 +304,9 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           className,
         )}
         {...props}
+          id={id}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={[props['aria-describedby'], error && `${id}-error`].filter(Boolean).join(' ') || undefined}
       >
         {options
           ? options.map((opt) => (
@@ -296,9 +316,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             ))
           : children}
       </select>
-      {error && <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs font-medium text-rose-600">{error}</p>}
     </div>
-  ),
+    );
+  },
 );
 Select.displayName = 'Select';
 
@@ -314,6 +335,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, onCle
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      aria-label={placeholder}
       className={clsx('app-control w-full pl-10 pr-9 text-sm', className)}
       {...props}
     />
@@ -321,6 +343,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, onCle
       <button
         type="button"
         onClick={onClear}
+        aria-label="Очистить поиск"
         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
       >
         <X size={16} />

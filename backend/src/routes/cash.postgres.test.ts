@@ -58,6 +58,7 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     });
     app.use('/payments', (await import('./payments.routes.js')).default);
     app.use('/cash', (await import('./cash.routes.js')).default);
+    app.use('/customers', (await import('./customers.routes.js')).default);
     app.use('/invoices', (await import('./invoices.routes.js')).default);
     app.use('/auth', (await import('./auth.routes.js')).default);
     app.use((error: any, _req: any, res: any, _next: any) => res.status(error.status || 500).json({ error: error.message }));
@@ -186,6 +187,15 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect([me.summary.onHand, me.operations.find((op: any) => op.paymentId === mistaken).available]).toEqual([0, false]);
     expect((await call(ali, 'POST', '/cash/handovers', { paymentIds: [mistaken], idempotencyKey: key() })).status).toBe(409);
     expect((await call(adminId, 'POST', '/cash/handovers', { paymentIds: [small], idempotencyKey: key() })).status).toBe(400);
+  });
+
+  it('does not expose customer invoice history to staff without an assigned warehouse', async () => {
+    const seller = await newSeller();
+    const invoice = await newInvoice(100);
+    await db.user.update({ where: { id: seller }, data: { warehouseId: null } });
+    const response = await call(seller, 'GET', `/customers/${invoice.customerId}/history`);
+    expect(response.status).toBe(200);
+    expect(response.data).toEqual([]);
   });
 
   it('serializes a cash handover against reversal of its payment', async () => {

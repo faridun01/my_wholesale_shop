@@ -27,6 +27,8 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      # Enable only for an approved release after a verified backup/rehearsal.
+      APPLY_MIGRATIONS: ${APPLY_MIGRATIONS:-false}
       # Report periods and dashboard windows are built from the server's calendar day.
       TZ: ${TZ:-Asia/Dushanbe}
       HOST: 0.0.0.0

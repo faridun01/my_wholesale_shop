@@ -28,7 +28,7 @@ const parseOrigins = (value?: string | null) =>
 
 export const allowedOrigins = Array.from(
   new Set([
-    ...DEFAULT_ALLOWED_ORIGINS.map(normalizeOrigin),
+    ...(process.env.NODE_ENV === 'production' ? [] : DEFAULT_ALLOWED_ORIGINS.map(normalizeOrigin)),
     ...parseOrigins(process.env.CORS_ORIGINS),
     ...parseOrigins(process.env.FRONTEND_ORIGIN),
   ])
