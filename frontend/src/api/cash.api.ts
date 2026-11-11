@@ -19,7 +19,9 @@ export const returnCashHandover = async (id: number, reason?: string) =>
 
 export const getPendingHandoversCount = async () => Number((await client.get('/cash/pending-count')).data?.count || 0);
 
-export const getHandovers = async (status?: 'pending' | 'confirmed' | 'returned') => (await client.get('/cash/handovers', { params: { status } })).data;
+/** from/to are calendar days (YYYY-MM-DD), inclusive; they filter by when the handover was confirmed or returned. */
+export const getHandovers = async (status?: 'pending' | 'confirmed' | 'returned', period?: { from: string; to: string }) =>
+  (await client.get('/cash/handovers', { params: { status, ...period } })).data;
 
 // A repeated confirmation returns the one already made.
 export const confirmHandover = async (id: number) => (await client.post(`/cash/handovers/${id}/confirm`)).data;

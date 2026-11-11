@@ -144,7 +144,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
       getPendingHandoversCount()
         .then((nextCount) => {
           const previousCount = previousCashPendingCountRef.current;
-          if (!silent && nextCount > 0 && (previousCount === null || nextCount > previousCount)) {
+          // The opening count is pointless on the cash control page itself: it shows the same list.
+          const onCashPage = previousCount === null && window.location.pathname === '/cash';
+          if (!silent && !onCashPage && nextCount > 0 && (previousCount === null || nextCount > previousCount)) {
             showCashHandoverToast(previousCount === null ? `Передач кассы ждут подтверждения: ${nextCount}` : 'Сотрудник передал кассу');
           }
           previousCashPendingCountRef.current = nextCount;

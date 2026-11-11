@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { m, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
-import { Card, Badge } from '../components/UI';
+import { Card, Badge, PageHeader } from '../components/UI';
 import client from '../api/client';
 import { createCustomer, deleteCustomer, getCustomers, updateCustomer } from '../api/customers.api';
 import { formatCount, formatMoney, formatTransactionReason } from '../utils/format';
@@ -74,8 +74,16 @@ const sectionTabClassName = ({ isActive }: { isActive: boolean }) =>
 export default function CustomerView() {
   const user = getCurrentUser();
   if (!isAdminUser(user)) {
-    return <div className="app-page-shell min-h-full space-y-4">
-      <h1 className="text-xl font-bold text-slate-900">Приём оплаты</h1>
+    return <div className="app-page-shell mx-auto min-h-full max-w-3xl space-y-4">
+      <PageHeader
+        title="Приём оплаты"
+        description="Клиенты с долгом по накладным вашего склада"
+        actions={canAcceptClientPayments(user) && (
+          <NavLink to="/my-cash" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+            <Wallet size={15} aria-hidden="true" /> Моя касса
+          </NavLink>
+        )}
+      />
       {canAcceptClientPayments(user)
         ? <StaffCollectPanel />
         : <p className="text-sm text-slate-600">Нет права принимать оплату. Обратитесь к администратору.</p>}

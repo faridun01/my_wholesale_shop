@@ -194,12 +194,21 @@ export class CashService {
     });
   }
 
-  static async listHandovers(status?: string) {
+  /**
+   * Handovers by status, optionally within a period of calendar days (server time zone,
+   * like the reports). The period applies to the moment that matters for the status:
+   * when it was confirmed, returned or sent.
+   */
+  static async listHandovers(status?: string, from?: string, to?: string) {
+    const known = status === 'pending' || status === 'confirmed' || status === 'returned';
+    const dateField = status === 'confirmed' ? 'confirmedAt' : status === 'returned' ? 'returnedAt' : 'createdAt';
+    const period = from || to ? buildCreatedAtRange({ start: from, end: to }) : null;
     const handovers = await prisma.cashHandover.findMany({
-      where: status === 'pending' || status === 'confirmed' || status === 'returned' ? { status } : {},
+      where: { ...(known ? { status } : {}), ...(period ? { [dateField]: period } : {}) } as Prisma.CashHandoverWhereInput,
       include: HANDOVER_INCLUDE,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 200,
+      orderBy: [{ [dateField]: 'desc' } as Prisma.CashHandoverOrderByWithRelationInput, { id: 'desc' }],
+      // A month of handovers fits easily; without a period only the latest are needed.
+      take: period ? 1000 : 200,
     });
     return handovers.map(handoverOut);
   }

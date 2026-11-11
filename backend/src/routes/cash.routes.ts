@@ -85,7 +85,12 @@ router.get('/pending-count', adminOnly, async (_req: AuthRequest, res, next) => 
 
 router.get('/handovers', adminOnly, async (req: AuthRequest, res, next) => {
   try {
-    res.json(await CashService.listHandovers(req.query.status ? String(req.query.status) : undefined));
+    const from = req.query.from ? String(req.query.from) : undefined;
+    const to = req.query.to ? String(req.query.to) : undefined;
+    if ([from, to].some((day) => day !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(day))) {
+      return res.status(400).json({ error: 'Период задаётся датами ГГГГ-ММ-ДД' });
+    }
+    res.json(await CashService.listHandovers(req.query.status ? String(req.query.status) : undefined, from, to));
   } catch (error) { next(error); }
 });
 

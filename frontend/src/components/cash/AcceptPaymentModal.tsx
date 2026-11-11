@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Modal } from '../UI';
 import { acceptPayment } from '../../api/cash.api';
 import { formatMoney, parseMoneyInput } from '../../utils/format';
-import { toCents } from '../../utils/financial';
+import { addMoney, toCents } from '../../utils/financial';
 import { errorText, formatDateTime } from './cashUi';
 
 export default function AcceptPaymentModal({ customer, onClose, onDone }: { customer: any; onClose: () => void; onDone: () => void }) {
@@ -48,14 +48,16 @@ export default function AcceptPaymentModal({ customer, onClose, onDone }: { cust
           type="button"
           onClick={() => void confirm()}
           disabled={Boolean(problem) || isSaving}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
-          <Banknote size={16} />
-          {isSaving ? 'Сохраняем...' : 'Подтвердить оплату'}
+          <Banknote size={16} aria-hidden="true" />
+          {isSaving ? 'Сохраняем...' : !problem && parsed !== null ? `Принять ${formatMoney(parsed)}` : 'Подтвердить оплату'}
         </button>
       }
     >
-      <p className="text-xs font-semibold text-slate-700">Накладная</p>
+      <p className="text-xs font-semibold text-slate-700">
+        {customer.invoices.length > 1 ? '1. Выберите накладную' : 'Накладная'}
+      </p>
       <div className="mt-1.5 space-y-1.5">
         {customer.invoices.map((item: any) => (
           <button
@@ -67,30 +69,51 @@ export default function AcceptPaymentModal({ customer, onClose, onDone }: { cust
               setAmount(String(item.remaining));
             }}
             className={clsx(
-              'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs transition-colors',
+              'flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left text-xs transition-colors',
               item.id === invoiceId ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
             )}
           >
             <span className="min-w-0">
-              <span className="font-bold">№{item.id}</span>
-              <span className={clsx('ml-1.5', item.id === invoiceId ? 'text-slate-300' : 'text-slate-400')}>{formatDateTime(item.createdAt)}</span>
+              <span className="block text-sm font-bold">№{item.id}</span>
+              <span className={clsx('block text-[11px]', item.id === invoiceId ? 'text-slate-300' : 'text-slate-500')}>{formatDateTime(item.createdAt)}</span>
             </span>
-            <span className="shrink-0 font-mono font-bold">остаток {formatMoney(item.remaining)}</span>
+            <span className="shrink-0 text-right">
+              <span className={clsx('block text-[10px]', item.id === invoiceId ? 'text-slate-300' : 'text-slate-500')}>остаток</span>
+              <span className="block font-mono text-sm font-bold tabular-nums">{formatMoney(item.remaining)}</span>
+            </span>
           </button>
         ))}
       </div>
 
-      <label htmlFor="accept-payment-amount" className="mt-4 block text-xs font-semibold text-slate-700">Получено от клиента</label>
+      <div className="mt-4 flex items-end justify-between gap-2">
+        <label htmlFor="accept-payment-amount" className="block text-xs font-semibold text-slate-700">
+          {customer.invoices.length > 1 ? '2. Получено от клиента' : 'Получено от клиента'}
+        </label>
+        {invoice && (
+          <button type="button" onClick={() => setAmount(String(invoice.remaining))} className="h-8 rounded-lg px-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50">
+            Весь остаток
+          </button>
+        )}
+      </div>
       <input
         id="accept-payment-amount"
         type="text"
         inputMode="decimal"
+        autoComplete="off"
         value={amount}
         onChange={(event) => setAmount(event.target.value)}
-        className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 font-mono text-base font-bold text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+        disabled={!invoice}
+        className="mt-1 h-13 w-full rounded-xl border border-slate-200 bg-white px-3.5 font-mono text-xl font-bold tabular-nums text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:bg-slate-50"
       />
       {/* Choosing the invoice is the next step, not a mistake. */}
       {problem && <p className={clsx('mt-1.5 text-xs font-semibold', invoice ? 'text-rose-600' : 'text-slate-500')}>{problem}</p>}
+      {!problem && invoice && parsed !== null && (
+        <p className="mt-1.5 text-xs text-slate-600">
+          {toCents(parsed) === toCents(invoice.remaining)
+            ? 'Накладная будет полностью оплачена'
+            : `Останется долга по накладной: ${formatMoney(addMoney(invoice.remaining, -parsed))}`}
+        </p>
+      )}
     </Modal>
   );
 }

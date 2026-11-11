@@ -135,6 +135,14 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect([listed.user.id, listed.items.length]).toEqual([ali, 3]);
 
     const confirmed = await call(adminId, 'POST', `/cash/handovers/${sent.data.id}/confirm`);
+    // Today's receipts and a month can be listed by the day of confirmation.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const ids = async (query: string) => (await call(adminId, 'GET', `/cash/handovers?${query}`)).data.map((h: any) => h.id);
+    expect(await ids(`status=confirmed&from=${today}&to=${today}`)).toContain(sent.data.id);
+    expect(await ids('status=confirmed&from=2020-01-01&to=2020-01-31')).not.toContain(sent.data.id);
+    expect(await ids(`status=pending&from=${today}&to=${today}`)).not.toContain(sent.data.id);
+    expect((await call(adminId, 'GET', '/cash/handovers?from=yesterday')).status).toBe(400);
     const repeated = await call(adminId, 'POST', `/cash/handovers/${sent.data.id}/confirm`);
     expect([confirmed.data.status, confirmed.data.confirmedById, repeated.status, repeated.data.status]).toEqual(['confirmed', adminId, 200, 'confirmed']);
     me = await mine(ali);
