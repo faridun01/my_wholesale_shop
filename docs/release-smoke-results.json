@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-11-11T17:45:18.570Z",
+  "commit": "4f125e2b6dde72ed14bb78450214caf539f28991",
+  "checks": [
+    "Pending migrations: startup refuses without changing the database",
+    "Explicit migration application on disposable PostgreSQL: backend healthy",
+    "Default restart on migrated schema: backend healthy",
+    "nginx -t; HTML/deep links/JS/404 security headers; HSTS HTTPS only; API proxy; CSRF; CSP reports; upload authentication"
+  ],
+  "success": true
+}
