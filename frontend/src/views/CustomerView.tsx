@@ -654,6 +654,7 @@ function CustomerManagementView() {
 
             <div className="grid grid-cols-2 gap-2 md:col-span-2">
               <select
+                aria-label="Сегмент клиентов"
                 value={segmentFilter}
                 onChange={(e) => setSegmentFilter(e.target.value)}
                 className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -665,6 +666,7 @@ function CustomerManagementView() {
                 <option value="Новый">Новый</option>
               </select>
               <select
+                aria-label="Сортировка"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"

@@ -296,7 +296,7 @@ export default function POSProductList({
                   <div className="inline-flex flex-col items-center rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-center text-emerald-700 font-mono">
                     <span className="whitespace-nowrap text-[10px] font-semibold leading-tight">{stockParts.primary}</span>
                     {stockParts.secondary ? (
-                      <span className="whitespace-nowrap text-[9px] font-medium leading-tight text-emerald-600/90">{stockParts.secondary}</span>
+                      <span className="whitespace-nowrap text-[9px] font-medium leading-tight text-emerald-600">{stockParts.secondary}</span>
                     ) : null}
                   </div>
                 </div>

@@ -39,8 +39,8 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
     "object-src 'none'",
     "frame-ancestors 'none'",
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https://fonts.gstatic.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
     "script-src 'self'",
     "connect-src 'self'",
     "frame-src 'self' blob:",
@@ -64,7 +64,8 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   }
 
   if (isProduction && isHttps) {
-    res.setHeader('Strict-Transport-Security', 'max-age=300');
+    // Same value as frontend/nginx.conf; browsers already hold it, so it must not shrink.
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 
   next();

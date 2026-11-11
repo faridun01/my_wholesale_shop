@@ -17,7 +17,7 @@ import expenseRoutes from './routes/expenses.routes.js';
 import customerOrderRoutes from './routes/customer-orders.routes.js';
 import staffRoutes from './routes/staff.routes.js';
 import cashRoutes from './routes/cash.routes.js';
-import { authenticate, authenticateUploadAccess } from './middlewares/auth.middleware.js';
+import { authenticate, authenticateUploadAccess, staffOnly } from './middlewares/auth.middleware.js';
 import { corsMiddleware, securityHeaders, csrfProtection } from './middlewares/security.middleware.js';
 import { cspReportRouter } from './routes/csp-report.routes.js';
 import { generalRateLimit } from './middlewares/general-rate-limit.middleware.js';
@@ -55,34 +55,39 @@ app.use(compression());
 app.use('/api/security/csp-report', generalRateLimit, cspReportRouter);
 app.use('/api', csrfProtection);
 app.use(express.json({ limit: '10mb' }));
-app.use('/uploads', authenticateUploadAccess, express.static(path.join(__dirname, '../uploads'), {
+const serveUploads = express.static(path.join(__dirname, '../uploads'), {
   immutable: true,
   maxAge: '7d',
   setHeaders: (res) => res.setHeader('Cache-Control', 'private, max-age=604800'),
-}));
+});
+app.use('/uploads', authenticateUploadAccess, serveUploads);
+// The frontend builds image URLs under /api (utils/media.ts); without this they were 404
+// and every uploaded product photo was replaced by the placeholder.
+app.use('/api/uploads', authenticateUploadAccess, serveUploads);
 
 app.use('/api', generalRateLimit);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/invoices', authenticate, invoiceRoutes);
+// Products, warehouses, settings and customer orders also serve the customer portal.
+app.use('/api/invoices', authenticate, staffOnly, invoiceRoutes);
 app.use('/api/products', authenticate, productRoutes);
 app.use('/api/warehouses', authenticate, warehouseRoutes);
-app.use('/api/customers', authenticate, customerRoutes);
-app.use('/api/dashboard', authenticate, dashboardRoutes);
-app.use('/api/reports', authenticate, reportsRoutes);
+app.use('/api/customers', authenticate, staffOnly, customerRoutes);
+app.use('/api/dashboard', authenticate, staffOnly, dashboardRoutes);
+app.use('/api/reports', authenticate, staffOnly, reportsRoutes);
 app.use('/api/settings', authenticate, settingsRoutes);
-app.use('/api/reminders', authenticate, reminderRoutes);
-app.use('/api/payments', authenticate, paymentRoutes);
-app.use('/api/expenses', authenticate, expenseRoutes);
+app.use('/api/reminders', authenticate, staffOnly, reminderRoutes);
+app.use('/api/payments', authenticate, staffOnly, paymentRoutes);
+app.use('/api/expenses', authenticate, staffOnly, expenseRoutes);
 app.use('/api/customer-orders', authenticate, customerOrderRoutes);
-app.use('/api/staff', authenticate, staffRoutes);
-app.use('/api/cash', authenticate, cashRoutes);
+app.use('/api/staff', authenticate, staffOnly, staffRoutes);
+app.use('/api/cash', authenticate, staffOnly, cashRoutes);
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 import { uploadImage } from './middlewares/upload.middleware.js';
 import { resizeUploadedImage } from './utils/image-resize.js';
-app.post('/api/upload', authenticate, (req, res, next) => {
+app.post('/api/upload', authenticate, staffOnly, (req, res, next) => {
   uploadImage.single('photo')(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({ error: err.message || 'Ошибка загрузки файла' });

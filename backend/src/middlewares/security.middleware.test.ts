@@ -39,7 +39,9 @@ describe('browser security boundary', () => {
       expect(response.headers.get('strict-transport-security')).toBeNull();
       const headers: Record<string, string> = {};
       securityHeaders({ secure: true } as any, { setHeader: (k: string, v: string) => { headers[k] = v; } } as any, () => {});
-      expect(headers['Strict-Transport-Security']).toBe('max-age=300');
+      expect(headers['Strict-Transport-Security']).toBe('max-age=31536000; includeSubDomains');
+      const nginx = readFileSync(new URL('../../../frontend/nginx.conf', import.meta.url), 'utf8');
+      expect(nginx).toContain('https "max-age=31536000; includeSubDomains";');
     } finally { vi.unstubAllEnvs(); }
   });
   it('collects bounded CSP reports without logging document paths or inline samples', async () => {

@@ -1472,6 +1472,7 @@ export default function ReportsView({ warehouseId: initialWarehouseId = null }: 
                   <Calendar size={13} className="text-slate-400 shrink-0" />
                   <input
                     type="month"
+                    aria-label="Месяц отчёта"
                     value={dateRange.start.slice(0, 7)}
                     onChange={handleMonthChange}
                     className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none cursor-pointer"

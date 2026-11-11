@@ -154,9 +154,6 @@ export function printCustomerDebts({ customers, filterLabel, generatedAt = new D
   </head>
   <body>
     ${pagesHtml}
-    <script>
-      window.onload = function () {};
-    </script>
   </body>
 </html>`;
 

@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Secondary text is mostly 9–12px, which needs 4.5:1 (WCAG AA). Tailwind's slate-400
+     (#90a1b9, 2.6:1 on white) and slate-500 (#62748e, 4.4:1 on the light greys) fell short.
+     Darkened just enough to pass on every light surface here; 500 stays a shade darker. */
+  --color-slate-400: #5e6f86;
+  --color-slate-500: #556580;
+
+  /* Status colours, same rule: text in them and white text on them reach 4.5:1. The 700
+     shades move with them so hover states stay a visible step darker. */
+  --color-emerald-600: #007d56;
+  --color-emerald-700: #006646;
+  --color-amber-600: #b05303;
+  --color-amber-700: #8f4202;
+  --color-rose-600: #d3023d;
 
   /* Accent — one deliberate value, used everywhere instead of the previous mix of
      #008060 / emerald-600 / #0f9f6e / gradients. */
@@ -27,7 +41,8 @@
   --color-sidebar-raised: #161c28;
   --color-sidebar-line: #232a38;
   --color-sidebar-fg: #c7cbd6;
-  --color-sidebar-fg-muted: #6d7381;
+  /* 4.5:1 on both sidebar surfaces (WCAG AA for the small group labels); was #6d7381, 3.6–3.8:1. */
+  --color-sidebar-fg-muted: #7f8491;
   --color-sidebar-active: #16332a;
   --color-sidebar-active-line: #2a5245;
 }

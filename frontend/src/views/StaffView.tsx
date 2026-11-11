@@ -216,7 +216,7 @@ export default function StaffView() {
                       <p className="truncate font-mono text-xs font-black text-emerald-700">{formatMoney(row.paidAmount)}</p>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">Долг</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Долг</p>
                       <p className={clsx('truncate font-mono text-xs font-black', decimal(row.debtAmount).gt(0) ? 'text-rose-600' : 'text-slate-300')}>
                         {formatMoney(row.debtAmount)}
                       </p>

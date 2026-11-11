@@ -2,7 +2,7 @@ import { decimal } from '../financial';
 import { addMoney } from '../financial';
 import { formatMoney, formatTransactionReason } from '../format';
 
-import { buildDocumentHtml, createHiddenPrintFrame, escapeHtml } from './customerInvoice/shared';
+import { buildDocumentHtml, createHiddenPrintFrame, escapeHtml, printAndClose } from './customerInvoice/shared';
 
 const PAYMENT_EPSILON = 0.01;
 
@@ -664,11 +664,12 @@ export function printCustomerInvoice(options: CustomerInvoicePrintOptions) {
     return { ok: false, reason: 'blocked' as const };
   }
 
-  const html = buildDocumentHtml(renderCustomerInvoiceSection(options), `Накладная #${options.invoice.id}`, true);
+  const html = buildDocumentHtml(renderCustomerInvoiceSection(options), `Накладная #${options.invoice.id}`);
 
   printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
+  printAndClose(printWindow);
 
   return { ok: true as const };
 }
@@ -725,7 +726,7 @@ export function printCustomerReconciliationBatch({
   ].join('');
 
   iframeDocument.open();
-  iframeDocument.write(buildDocumentHtml(sectionsHtml, '', false, '0', 'print-without-browser-header'));
+  iframeDocument.write(buildDocumentHtml(sectionsHtml, '', '0', 'print-without-browser-header'));
   iframeDocument.close();
 
   iframe.onload = () => {

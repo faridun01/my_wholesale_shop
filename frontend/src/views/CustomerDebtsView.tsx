@@ -557,6 +557,7 @@ export default function CustomerDebtsView() {
               <div className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs">
                 <Store size={15} className="text-slate-400" />
                 <select
+                  aria-label="Склад"
                   value={selectedWarehouseId}
                   onChange={(e) => handleWarehouseSelect(e.target.value)}
                   className="bg-transparent outline-none cursor-pointer"
@@ -600,6 +601,7 @@ export default function CustomerDebtsView() {
               <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-xs">
                 <Store size={12} className="text-slate-400 shrink-0" />
                 <select
+                  aria-label="Склад"
                   value={selectedWarehouseId}
                   onChange={(e) => handleWarehouseSelect(e.target.value)}
                   className="bg-transparent outline-none cursor-pointer max-w-[80px] truncate text-[11px]"
@@ -736,6 +738,7 @@ export default function CustomerDebtsView() {
                 )}
               </div>
               <select
+                aria-label="Сортировка"
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortMode)}
                 className="rounded-xl sm:rounded-2xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2 sm:py-2.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"

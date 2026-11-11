@@ -11,7 +11,7 @@ if (-not $DbUser) {
     if ($env:POSTGRES_USER) { $DbUser = $env:POSTGRES_USER } else { $DbUser = "postgres" }
 }
 if (-not $DbName) {
-    if ($env:POSTGRES_DB) { $DbName = $env:POSTGRES_DB } else { $DbName = "wholesale_shop" }
+    if ($env:POSTGRES_DB) { $DbName = $env:POSTGRES_DB } else { $DbName = "my_wholesale_shop" }
 }
 
 if (-not (Test-Path $BackupDir)) {

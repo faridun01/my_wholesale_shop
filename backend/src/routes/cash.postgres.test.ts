@@ -83,6 +83,8 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect((await call(ali, 'POST', '/payments', { customer_id: a.customerId, amount: 10, idempotency_key: key() })).status).toBe(400);
     expect((await pay(ali, elsewhere.invoiceId, 10)).status).toBe(403);
     expect((await pay(ali, a.invoiceId, 600)).status).toBe(400);
+    // An administrator's payment without an invoice must name a real customer: 400, not a database error.
+    expect((await call(adminId, 'POST', '/payments', { amount: 10, idempotency_key: key() })).status).toBe(400);
 
     const repeatKey = key();
     const first = await pay(ali, a.invoiceId, 500, { idempotency_key: repeatKey, method: 'transfer' });

@@ -523,6 +523,7 @@ export default function ExpensesView() {
               <div className="relative flex-1 sm:flex-initial">
                 <Warehouse className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 <select
+                  aria-label="Склад"
                   value={selectedWarehouseId}
                   onChange={(event) => setSelectedWarehouseId(event.target.value)}
                   disabled={!isAdmin}
@@ -550,7 +551,7 @@ export default function ExpensesView() {
         {/* Metrics Row (compact 3-col on all screen sizes) */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <div className="rounded-2xl sm:rounded-3xl border border-slate-200/70 bg-white p-2.5 sm:p-4 shadow-xs">
-            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-rose-500 truncate">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-rose-600 truncate">
               Всего
             </p>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-2xl font-bold text-slate-900 truncate" title={formatMoney(totalAmount)}>
@@ -558,7 +559,7 @@ export default function ExpensesView() {
             </p>
           </div>
           <div className="rounded-2xl sm:rounded-3xl border border-slate-200/70 bg-white p-2.5 sm:p-4 shadow-xs">
-            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-emerald-500 truncate">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-emerald-600 truncate">
               Оплачено
             </p>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-2xl font-bold text-slate-900 truncate" title={formatMoney(totalPaidAmount)}>
@@ -566,7 +567,7 @@ export default function ExpensesView() {
             </p>
           </div>
           <div className="rounded-2xl sm:rounded-3xl border border-slate-200/70 bg-white p-2.5 sm:p-4 shadow-xs">
-            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-amber-500 truncate">
+            <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-amber-600 truncate">
               Долг
             </p>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-2xl font-bold text-slate-900 truncate" title={formatMoney(totalRemainingAmount)}>
@@ -649,6 +650,7 @@ export default function ExpensesView() {
             {/* Category & Date Filters (collapsible on mobile, visible on desktop) */}
             <div className={`grid grid-cols-1 gap-2 sm:grid-cols-3 ${showMobileFilters ? 'grid' : 'hidden sm:grid'}`}>
               <select
+                aria-label="Категория"
                 value={historyCategoryFilter}
                 onChange={(event) => setHistoryCategoryFilter(event.target.value)}
                 className="w-full rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-1.5 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -980,6 +982,7 @@ export default function ExpensesView() {
                     <div className="flex items-center gap-2 rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2">
                       <Warehouse size={14} className="text-slate-400 shrink-0" />
                       <select
+                        aria-label="Склад"
                         value={selectedWarehouseId}
                         onChange={(event) => setSelectedWarehouseId(event.target.value)}
                         disabled={!isAdmin}
@@ -1000,6 +1003,7 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Категория</label>
                     <select
+                      aria-label="Категория расхода"
                       value={form.category}
                       onChange={(event) => setForm({ ...form, category: event.target.value })}
                       className="w-full rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -1018,6 +1022,7 @@ export default function ExpensesView() {
                       <CalendarDays size={14} className="text-slate-400 shrink-0" />
                       <input
                         type="date"
+                        aria-label="Дата расхода"
                         value={form.expenseDate}
                         onChange={(event) => setForm({ ...form, expenseDate: event.target.value })}
                         className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
@@ -1068,6 +1073,7 @@ export default function ExpensesView() {
                       <CalendarDays size={14} className="text-emerald-500 shrink-0" />
                       <input
                         type="date"
+                        aria-label="Дата оплаты"
                         value={form.paymentDate}
                         onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
                         className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
@@ -1180,6 +1186,7 @@ export default function ExpensesView() {
                     <CalendarDays size={14} className="text-emerald-500 shrink-0" />
                     <input
                       type="date"
+                      aria-label="Дата оплаты"
                       value={expensePaymentDate}
                       onChange={(event) => setExpensePaymentDate(event.target.value)}
                       className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
@@ -1322,6 +1329,7 @@ export default function ExpensesView() {
                     <CalendarDays size={14} className="text-sky-500 shrink-0" />
                     <input
                       type="date"
+                      aria-label="Дата возврата"
                       value={refundDate}
                       onChange={(event) => setRefundDate(event.target.value)}
                       className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
@@ -1401,6 +1409,7 @@ export default function ExpensesView() {
                     <div className="flex items-center gap-2 rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2">
                       <Warehouse size={14} className="text-slate-400 shrink-0" />
                       <select
+                        aria-label="Склад"
                         value={editForm.warehouseId}
                         onChange={(event) => setEditForm({ ...editForm, warehouseId: event.target.value })}
                         className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"
@@ -1420,6 +1429,7 @@ export default function ExpensesView() {
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-700">Категория</label>
                     <select
+                      aria-label="Категория расхода"
                       value={editForm.category}
                       onChange={(event) => setEditForm({ ...editForm, category: event.target.value })}
                       className="w-full rounded-xl border border-slate-200/70 bg-[#f4f5fb] px-3 py-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-slate-300 focus:bg-white"
@@ -1438,6 +1448,7 @@ export default function ExpensesView() {
                       <CalendarDays size={14} className="text-slate-400 shrink-0" />
                       <input
                         type="date"
+                        aria-label="Дата расхода"
                         value={editForm.expenseDate}
                         onChange={(event) => setEditForm({ ...editForm, expenseDate: event.target.value })}
                         className="w-full bg-transparent text-xs font-medium text-slate-700 outline-none"

@@ -153,7 +153,7 @@ export default function StaffInvoiceDetails({ invoiceId, canRecordPayment, onClo
                 <p className="mt-0.5 truncate font-mono text-xs font-black text-emerald-700">{formatMoney(getInvoiceAppliedPaidAmount(invoice))}</p>
               </div>
               <div className={balance > 0 ? 'rounded-xl bg-rose-50 px-2 py-2' : 'rounded-xl bg-slate-50 px-2 py-2'}>
-                <p className={balance > 0 ? 'text-[10px] font-bold uppercase tracking-wider text-rose-500' : 'text-[10px] font-bold uppercase tracking-wider text-slate-400'}>Долг</p>
+                <p className={balance > 0 ? 'text-[10px] font-bold uppercase tracking-wider text-rose-600' : 'text-[10px] font-bold uppercase tracking-wider text-slate-400'}>Долг</p>
                 <p className={balance > 0 ? 'mt-0.5 truncate font-mono text-xs font-black text-rose-600' : 'mt-0.5 truncate font-mono text-xs font-black text-slate-400'}>
                   {formatMoney(balance)}
                 </p>

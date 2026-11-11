@@ -601,7 +601,7 @@ export default function RemindersView() {
                 <p className="font-mono text-xl sm:text-2xl font-black tracking-tight tabular-nums">
                   {reminders.length}
                 </p>
-                <span className={clsx('text-[11px] font-semibold', filterTab === 'all' ? 'text-slate-400' : 'text-slate-400')}>
+                <span className={clsx('text-[11px] font-semibold', filterTab === 'all' ? 'text-slate-300' : 'text-slate-500')}>
                   {activeCount} активных
                 </span>
               </div>
@@ -1205,6 +1205,7 @@ export default function RemindersView() {
                   <button
                     type="button"
                     onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() - 1, 1))}
+                    aria-label="Предыдущий месяц"
                     className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                   >
                     <ChevronLeft size={15} />
@@ -1212,6 +1213,7 @@ export default function RemindersView() {
                   <button
                     type="button"
                     onClick={() => setActiveMonth(new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 1))}
+                    aria-label="Следующий месяц"
                     className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                   >
                     <ChevronRight size={15} />
@@ -1434,6 +1436,7 @@ export default function RemindersView() {
                       <div className="relative">
                         <input
                           type="date"
+                          aria-label="Дата напоминания"
                           required
                           value={reminderForm.dueDate}
                           onChange={(e) => setReminderForm({ ...reminderForm, dueDate: e.target.value })}

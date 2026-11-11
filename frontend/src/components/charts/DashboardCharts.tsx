@@ -136,7 +136,8 @@ export default function DashboardCharts({
           ) : null}
         </div>
 
-        <div className="mt-3 h-48 sm:h-60">
+        {/* The list below carries the same figures as text, so screen readers read that instead. */}
+        <div className="mt-3 h-48 sm:h-60" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -147,6 +148,7 @@ export default function DashboardCharts({
                 outerRadius={74}
                 paddingAngle={2}
                 dataKey="value"
+                rootTabIndex={-1}
               >
                 {categoryData.map((entry, index) => (
                   <Cell key={`${entry.name}-${index}`} fill={ringColors[index % ringColors.length]} />

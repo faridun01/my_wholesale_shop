@@ -6,10 +6,11 @@ export const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// Printable documents carry no script of their own: under the Content-Security-Policy an
+// inline script in a written document is blocked, so the app drives printing instead.
 export const buildDocumentHtml = (
   sectionsHtml: string,
   title: string,
-  autoClose = false,
   pageMargin = '10mm',
   bodyClass = '',
 ) => `<!doctype html>
@@ -86,18 +87,19 @@ export const buildDocumentHtml = (
     </head>
     <body class="${escapeHtml(bodyClass)}">
       ${sectionsHtml}
-      ${
-        autoClose
-          ? `<script>
-              window.onload = () => {
-                window.print();
-                setTimeout(() => window.close(), 300);
-              };
-            </script>`
-          : ''
-      }
     </body>
   </html>`;
+
+/** Prints a window the app has just written a document into, then closes it. */
+export const printAndClose = (printWindow: Window) => {
+  const run = () => {
+    printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true });
+    printWindow.focus();
+    printWindow.print();
+  };
+  if (printWindow.document.readyState === 'complete') run();
+  else printWindow.addEventListener('load', run, { once: true });
+};
 
 export const createHiddenPrintFrame = () => {
   const iframe = document.createElement('iframe');

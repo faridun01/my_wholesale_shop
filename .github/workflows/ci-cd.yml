@@ -39,6 +39,16 @@ jobs:
       - name: Run TypeScript & Code Linting
         run: npm run lint
 
+      - name: Run Frontend ESLint
+        run: npm --prefix frontend run lint
+
+      # Blocks a release on a known critical advisory in shipped dependencies. Lower
+      # levels are reviewed by hand (docs/*-dependency-audit.json): some need major upgrades.
+      - name: Audit production dependencies
+        run: |
+          npm audit --prefix backend --omit=dev --audit-level=critical
+          npm audit --prefix frontend --omit=dev --audit-level=critical
+
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest

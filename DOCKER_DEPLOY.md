@@ -73,18 +73,47 @@ unset GHCR_TOKEN
 ```
 
 After the workflow for the new commit has completed successfully, update the
-VPS without running a local build:
+VPS without running a local build.
+
+The backend never applies database migrations on its own. On start it checks
+the migration state and, if this release needs migrations that are not applied
+yet, it stops with an error instead of serving on an old schema. Apply them
+explicitly, right after a backup:
 
 ```bash
+# 1. Back up the database (see "Database Backup" below) and check the file is not empty.
+# 2. Pull the new images.
 docker compose pull backend frontend
-docker compose up -d --no-build backend frontend
+# 3. Start the backend once with migrations enabled (only this command; .env keeps false).
+APPLY_MIGRATIONS=true docker compose up -d --no-build backend
+docker compose logs backend | grep -E "migration|Server running"
+# 4. Start the frontend and check.
+docker compose up -d --no-build frontend
 docker compose ps
 curl -fsS https://crm.itforce.pro/api/health
 ```
 
+A release without new migrations can use plain `docker compose up -d --no-build
+backend frontend`; `APPLY_MIGRATIONS=true` is harmless when nothing is pending.
+
 If GHCR packages are public, the login step is not needed. To deploy a specific
 published image tag instead of the default `master`, set `IMAGE_TAG` in the
 server's `.env` before pulling.
+
+### Rollback
+
+Every published image is also tagged with its full commit SHA
+(`sha-<40-char-commit>`). To return to the previous release:
+
+```bash
+IMAGE_TAG=sha-<previous-commit> docker compose pull backend frontend
+IMAGE_TAG=sha-<previous-commit> docker compose up -d --no-build backend frontend
+```
+
+Migrations are forward-only and additive, so older code keeps working on the
+newer schema in the normal case. Restore the pre-release database backup only
+if a migration itself damaged data — a restore discards every operation made
+after the backup.
 
 To build from source locally, use:
 
@@ -125,6 +154,16 @@ Run database backup locally or via Docker:
 # Windows PowerShell:
 .\backend\scripts\backup.ps1
 
-# Docker container dump:
-docker compose exec postgres pg_dump -U postgres wholesale_shop | gzip > ./backups/backup_$(date +%Y%m%d).sql.gz
+# Docker container dump (custom format, restorable with pg_restore):
+mkdir -p backups
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > "backups/backup_$(date +%Y%m%d_%H%M%S).dump"
+ls -lh backups   # an empty or tiny file means the backup failed
+```
+
+Restore (stops writes first; replaces the current data):
+
+```bash
+docker compose stop backend
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < backups/<file>.dump
+docker compose start backend
 ```

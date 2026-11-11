@@ -59,6 +59,7 @@ export default function PaginationControls({
           type="button"
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage <= 1}
+          aria-label="Предыдущая страница"
           className="inline-flex h-8 sm:h-9 items-center gap-1 rounded-xl border border-slate-200/80 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft size={15} />
@@ -91,6 +92,7 @@ export default function PaginationControls({
           type="button"
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
+          aria-label="Следующая страница"
           className="inline-flex h-8 sm:h-9 items-center gap-1 rounded-xl border border-slate-200/80 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <span className="hidden sm:inline">Дальше</span>

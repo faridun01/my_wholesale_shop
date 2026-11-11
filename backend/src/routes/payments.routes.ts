@@ -27,6 +27,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const key = operationKey(req.body.idempotency_key);
     const invoiceId = req.body.invoice_id ? Number(req.body.invoice_id) : null;
     if (!isAdmin && !invoiceId) throw financialError('Выберите накладную, в счёт которой принята оплата');
+    if (!invoiceId && !(Number.isSafeInteger(Number(req.body.customer_id)) && Number(req.body.customer_id) > 0)) throw financialError('Выберите клиента');
     const access = isAdmin ? null : await getAccessContext(req);
     // Staff simply take the money; it is cash they later hand to an administrator.
     const method = isAdmin ? String(req.body.method || 'cash') : 'cash';

@@ -182,6 +182,18 @@ export const authenticateUploadAccess = async (req: AuthRequest, res: Response, 
   }
 };
 
+/**
+ * Keeps customer-portal accounts out of the staff API as a whole. Those routes scope a
+ * non-admin by warehouse, which is the wrong boundary for a customer: one with a warehouse
+ * set by mistake could otherwise sell, create customers or read the warehouse's sales.
+ */
+export const staffOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (String(req.user?.role || '').toUpperCase() === 'CUSTOMER') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+};
+
 export const authorize = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user || !roles.some(role => role.toUpperCase() === req.user?.role.toUpperCase())) {

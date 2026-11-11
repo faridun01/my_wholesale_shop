@@ -67,9 +67,11 @@ export default function HistoryView() {
         </div>
         <button 
           onClick={fetchHistory}
+          aria-label="Обновить"
+          title="Обновить"
           className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-600 transition-all shadow-sm"
         >
-          <RefreshCcw size={24} />
+          <RefreshCcw size={24} aria-hidden="true" />
         </button>
       </div>
 

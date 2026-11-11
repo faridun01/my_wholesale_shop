@@ -113,10 +113,11 @@ export default function ReportsCharts({
 
       <Panel title={currentMeta.pieTitle}>
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] items-center gap-4 lg:gap-8">
-          <div className="h-56 flex items-center justify-center">
+          {/* The list beside it carries the same figures as text, so screen readers read that instead. */}
+          <div className="h-56 flex items-center justify-center" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={82} paddingAngle={4} dataKey="value">
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={82} paddingAngle={4} dataKey="value" rootTabIndex={-1}>
                   {pieData.map((item, index) => (
                     <Cell key={`${item.name}-${index}`} fill={pieColors[index % pieColors.length]} />
                   ))}

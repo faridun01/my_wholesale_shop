@@ -596,6 +596,7 @@ const SalesInvoicesSection = ({
               <div>
                 <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Склад</label>
                 <select
+                  aria-label="Склад"
                   value={selectedWarehouseId || ''}
                   onChange={(e) => setSelectedWarehouseId(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-slate-300"
@@ -613,6 +614,7 @@ const SalesInvoicesSection = ({
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Сотрудник</label>
               <select
+                aria-label="Сотрудник"
                 value={staffFilter}
                 onChange={(e) => setStaffFilter(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-slate-300"
@@ -682,6 +684,7 @@ const SalesInvoicesSection = ({
                   <span className="text-[10px] font-black uppercase text-slate-400 mr-1.5 shrink-0">От</span>
                   <input
                     type="date"
+                    aria-label="Дата от"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
                     className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
@@ -707,6 +710,7 @@ const SalesInvoicesSection = ({
                   <span className="text-[10px] font-black uppercase text-slate-400 mr-1.5 shrink-0">До</span>
                   <input
                     type="date"
+                    aria-label="Дата до"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
                     className="w-full bg-transparent text-xs font-semibold text-slate-800 outline-none"
@@ -745,6 +749,7 @@ const SalesInvoicesSection = ({
       )}>
         {isAdmin && warehouses && warehouses.length > 1 && setSelectedWarehouseId && (
           <select
+            aria-label="Склад"
             value={selectedWarehouseId || ''}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
             className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
@@ -759,6 +764,7 @@ const SalesInvoicesSection = ({
         )}
 
         <select
+          aria-label="Сотрудник"
           value={staffFilter}
           onChange={(e) => setStaffFilter(e.target.value)}
           className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 shadow-2xs"
@@ -778,6 +784,7 @@ const SalesInvoicesSection = ({
           <span className="text-[10px] font-bold uppercase text-slate-400">От</span>
           <input
             type="date"
+            aria-label="Дата от"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
@@ -801,6 +808,7 @@ const SalesInvoicesSection = ({
           <span className="text-[10px] font-bold uppercase text-slate-400">До</span>
           <input
             type="date"
+            aria-label="Дата до"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
@@ -1087,7 +1095,7 @@ const SalesInvoicesSection = ({
                         </div>
                         <div>
                           <p className="text-xs font-bold text-rose-700">Отменить накладную</p>
-                          <p className="text-[10px] text-rose-500/80">Товар вернётся на склад</p>
+                          <p className="text-[10px] text-rose-600">Товар вернётся на склад</p>
                         </div>
                       </div>
                       <ChevronRight size={14} className="text-rose-300 group-hover:text-rose-500 transition-colors" />

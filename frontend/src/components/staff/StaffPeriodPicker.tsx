@@ -45,6 +45,7 @@ export default function StaffPeriodPicker({ period, onChange, className }: Staff
             <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">С</span>
             <input
               type="date"
+              aria-label="Период с"
               value={period.start || ''}
               max={period.end || undefined}
               onChange={(e) => onChange({ ...period, start: e.target.value || undefined })}
@@ -55,6 +56,7 @@ export default function StaffPeriodPicker({ period, onChange, className }: Staff
             <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">По</span>
             <input
               type="date"
+              aria-label="Период по"
               value={period.end || ''}
               min={period.start || undefined}
               onChange={(e) => onChange({ ...period, end: e.target.value || undefined })}
