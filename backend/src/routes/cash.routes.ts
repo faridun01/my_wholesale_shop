@@ -31,8 +31,12 @@ router.get('/events', (req: AuthRequest, res) => {
   });
   // Keeps proxies from closing a quiet connection.
   const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-  req.on('close', () => {
+  // The browser reconnects through the sign-in check, so a changed role or a blocked
+  // account stops receiving what it may no longer see.
+  const lifetime = setTimeout(() => res.end(), 10 * 60 * 1000);
+  res.on('close', () => {
     clearInterval(ping);
+    clearTimeout(lifetime);
     unsubscribe();
   });
 });

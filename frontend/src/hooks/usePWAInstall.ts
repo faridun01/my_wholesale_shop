@@ -123,7 +123,7 @@ export const checkIsStandalone = (): boolean => {
       window.location.search?.includes('standalone=true') ||
       window.location.hash?.includes('source=pwa'));
 
-  if (Boolean(isStandaloneMedia || isNavigatorStandalone || isAndroidApp || isPwaUrlParam)) {
+  if (isStandaloneMedia || isNavigatorStandalone || isAndroidApp || isPwaUrlParam) {
     saveStandaloneState();
     return true;
   }

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { ErrorState, LoadingState, PageHeader } from '../components/UI';
 import { confirmHandover, getCashStaff, getHandovers, returnCashHandover } from '../api/cash.api';
 import { useCashEvents } from '../api/cashEvents';
-import { toCents } from '../utils/financial';
+import { addMoney, toCents } from '../utils/financial';
 import { formatMoney } from '../utils/format';
 import { FilterChips, ListToolbar, byAmountDesc, byDateDesc, errorText, formatDateTime, matches } from '../components/cash/cashUi';
 
@@ -38,11 +38,14 @@ const handoverMatches = (handover: any, query: string) =>
 function ReturnForm({ handover, onDone, onCancel }: { handover: any; onDone: () => void; onCancel: () => void }) {
   const [reason, setReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Payments cancelled after the handover were refunded from the main cash and do not go back.
+  const backAmount = addMoney(...handover.items.filter((item: any) => !item.cancelled).map((item: any) => item.amount));
+  const refunded = toCents(backAmount) !== toCents(handover.amount);
   const submit = async () => {
     setIsSaving(true);
     try {
       await returnCashHandover(handover.id, reason.trim());
-      toast.success(`Касса ${formatMoney(handover.amount)} возвращена ${handover.user.username}`);
+      toast.success(`Касса ${formatMoney(backAmount)} возвращена ${handover.user.username}`);
       onDone();
     } catch (error) {
       toast.error(errorText(error, 'Не удалось вернуть кассу'));
@@ -64,6 +67,11 @@ function ReturnForm({ handover, onDone, onCancel }: { handover: any; onDone: () 
         placeholder="Например: не хватает 100 сомони"
         className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-slate-400"
       />
+      {refunded && (
+        <p className="mt-2 text-[11px] text-amber-800">
+          Отдайте сотруднику {formatMoney(backAmount)}: часть оплат на {formatMoney(addMoney(handover.amount, -backAmount))} уже отменена, эти деньги выданы клиентам из кассы.
+        </p>
+      )}
       <div className="mt-2 flex gap-2">
         <button type="button" onClick={onCancel} className="h-9 flex-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100">Не возвращать</button>
         <button type="button" onClick={() => void submit()} disabled={isSaving || !reason.trim()} className="h-9 flex-1 rounded-lg bg-slate-900 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50">
@@ -81,7 +89,7 @@ function ClientsList({ items }: { items: any[] }) {
       <ul className="mt-1.5 space-y-1">
         {items.map((item) => (
           <li key={item.paymentId} className="flex justify-between gap-3">
-            <span className="truncate">{item.customer || 'Клиент'}{item.invoiceId ? ` · накл. №${item.invoiceId}` : ''}</span>
+            <span className="truncate">{item.customer || 'Клиент'}{item.invoiceId ? ` · накл. №${item.invoiceId}` : ''}{item.cancelled ? ' · оплата отменена' : ''}</span>
             <span className="shrink-0 font-mono font-bold">{formatMoney(item.amount)}</span>
           </li>
         ))}

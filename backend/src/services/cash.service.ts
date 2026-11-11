@@ -46,7 +46,7 @@ const HANDOVER_INCLUDE = {
   returnedBy: { select: { id: true, username: true } },
   items: {
     orderBy: { id: 'asc' as const },
-    select: { amount: true, payment: { select: { id: true, invoiceId: true, createdAt: true, customer: { select: { name: true } } } } },
+    select: { amount: true, payment: { select: { id: true, invoiceId: true, createdAt: true, customer: { select: { name: true } }, reversal: { select: { id: true } } } } },
   },
 };
 
@@ -85,6 +85,9 @@ const handoverOut = (handover: any) => ({
     at: item.payment.createdAt,
     customer: item.payment.customer?.name ?? null,
     amount: item.amount,
+    // Cancelled after it was handed over: refunded from the main cash, so returning the
+    // handover does not put it back on the staff member's hands.
+    cancelled: Boolean(item.payment.reversal),
   })),
 });
 

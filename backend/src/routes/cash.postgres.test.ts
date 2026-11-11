@@ -258,6 +258,28 @@ suite('staff cash: taken from clients, sent to an administrator, confirmed', () 
     expect(Number((await db.invoice.findUniqueOrThrow({ where: { id: invoice.invoiceId } })).paidAmount)).toBe(500);
   });
 
+  it('returning a confirmed handover gives back only payments that were not cancelled meanwhile', async () => {
+    const ali = await newSeller();
+    const [a, b] = await Promise.all([newInvoice(700), newInvoice(300)]);
+    const kept = (await pay(ali, a.invoiceId, 700)).data.id;
+    const refunded = (await pay(ali, b.invoiceId, 300)).data.id;
+    const sent = (await call(ali, 'POST', '/cash/handovers', { paymentIds: [kept, refunded], idempotencyKey: key() })).data;
+    await call(adminId, 'POST', `/cash/handovers/${sent.id}/confirm`);
+    // The administrator gives the client 300 back from the main cash, then undoes the confirmation.
+    expect((await call(adminId, 'DELETE', `/payments/${refunded}`)).status).toBe(200);
+    const listed = (await call(adminId, 'GET', '/cash/handovers?status=confirmed')).data.find((h: any) => h.id === sent.id);
+    expect(listed.items.map((item: any) => [item.paymentId, item.cancelled]).sort((x: any, y: any) => x[0] - y[0])).toEqual([[kept, false], [refunded, true]]);
+    expect((await call(adminId, 'POST', `/cash/handovers/${sent.id}/return`, { reason: 'Пересчитать' })).status).toBe(200);
+
+    const me = await mine(ali);
+    expect([me.summary.onHand, me.summary.confirmed, me.summary.pendingAmount]).toEqual([700, 0, 0]);
+    expect(me.operations.filter((op: any) => op.available).map((op: any) => op.paymentId)).toEqual([kept]);
+    const row = (await call(adminId, 'GET', '/cash/staff')).data.find((s: any) => s.id === ali);
+    expect(row.onHand).toBe(700);
+    const paidOn = async (invoiceId: number) => Number((await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } })).paidAmount);
+    expect([await paidOn(a.invoiceId), await paidOn(b.invoiceId)]).toEqual([700, 0]);
+  });
+
   it('tells open pages at once: the administrator about every staff member, a seller only about their own cash', async () => {
     const ali = await newSeller();
     const bob = await newSeller();
